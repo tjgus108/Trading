@@ -5,12 +5,14 @@ Trading Bot 진입점.
   python main.py                          # dry_run (config.yaml 기준)
   python main.py --live                   # 실거래 (sandbox=false 필요)
   python main.py --backtest               # 백테스트만 실행
+  python main.py --loop                   # 캔들 완성 시각에 맞춰 반복 실행
   python main.py --config path/to/cfg.yaml
 """
 
 import argparse
 import logging
 import sys
+import threading
 
 from src.config import load_config
 from src.logging_setup import setup_logging
@@ -21,6 +23,8 @@ from src.pipeline.runner import TradingPipeline
 from src.strategy.ema_cross import EmaCrossStrategy
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.backtest.engine import BacktestEngine
+from src.notifier import TelegramNotifier
+from src.scheduler import CandleScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="config/config.yaml", help="설정 파일 경로")
     parser.add_argument("--live", action="store_true", help="실거래 모드 (dry_run 무시)")
     parser.add_argument("--backtest", action="store_true", help="백테스트만 실행하고 종료")
+    parser.add_argument("--loop", action="store_true", help="캔들 완성 시각에 맞춰 반복 실행 (Ctrl+C로 종료)")
     return parser.parse_args()
 
 
@@ -83,7 +88,19 @@ def run_backtest(cfg, data_feed, strategy) -> bool:
     return result.passed
 
 
-def run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run: bool) -> None:
+def build_notifier(cfg) -> TelegramNotifier:
+    """설정으로부터 TelegramNotifier 생성."""
+    tg = cfg.telegram
+    if tg is None:
+        return TelegramNotifier(enabled=False)
+    return TelegramNotifier(
+        bot_token=tg.bot_token,
+        chat_id=tg.chat_id,
+        enabled=tg.enabled,
+    )
+
+
+def run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run: bool, notifier: TelegramNotifier) -> None:
     """파이프라인 1회 실행."""
     pipeline = TradingPipeline(
         connector=connector,
@@ -125,6 +142,9 @@ def run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run: boo
     if result.error:
         print(f"ERROR:    {result.error}")
 
+    # Telegram 알림
+    notifier.notify_pipeline(result)
+
     # WORKLOG 기록
     _append_worklog(result)
 
@@ -145,10 +165,13 @@ def main() -> None:
 
     logger.info("Trading Bot starting — strategy=%s symbol=%s", cfg.strategy, cfg.trading.symbol)
 
+    notifier = build_notifier(cfg)
+
     try:
         connector, data_feed, risk_manager, strategy = build_components(cfg)
     except Exception as e:
         logger.error("Startup failed: %s", e)
+        notifier.notify_error(f"Startup failed: {e}")
         sys.exit(1)
 
     if args.backtest:
@@ -159,7 +182,38 @@ def main() -> None:
     if args.live:
         logger.warning("LIVE MODE — real orders will be submitted")
 
-    run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run=dry_run)
+    notifier.notify_startup(
+        strategy=cfg.strategy,
+        symbol=cfg.trading.symbol,
+        dry_run=dry_run,
+    )
+
+    if args.loop:
+        # ── 반복 실행 (스케줄러 모드) ───────────────────────────────────
+        stop_event = threading.Event()
+
+        def _pipeline_fn():
+            run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run=dry_run, notifier=notifier)
+
+        scheduler = CandleScheduler()
+        logger.info(
+            "Loop mode — timeframe=%s  (Ctrl+C to stop)",
+            cfg.trading.timeframe,
+        )
+        try:
+            scheduler.run_loop(_pipeline_fn, cfg.trading.timeframe, stop_event)
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt received — stopping scheduler")
+            stop_event.set()
+        logger.info("Trading Bot stopped gracefully")
+    else:
+        # ── 1회 실행 ───────────────────────────────────────────────────
+        try:
+            run_pipeline(cfg, connector, data_feed, risk_manager, strategy, dry_run=dry_run, notifier=notifier)
+        except Exception as e:
+            logger.error("Pipeline error: %s", e)
+            notifier.notify_error(f"Pipeline error: {e}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

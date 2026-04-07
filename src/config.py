@@ -44,6 +44,13 @@ class LoggingConfig:
 
 
 @dataclass
+class TelegramConfig:
+    enabled: bool
+    bot_token: str
+    chat_id: str
+
+
+@dataclass
 class AppConfig:
     exchange: ExchangeConfig
     trading: TradingConfig
@@ -51,6 +58,7 @@ class AppConfig:
     logging: LoggingConfig
     strategy: str = "donchian_breakout"  # "ema_cross" | "donchian_breakout"
     dry_run: bool = True
+    telegram: Optional[TelegramConfig] = None
 
 
 def load_config(path: str = "config/config.yaml") -> AppConfig:
@@ -70,6 +78,15 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
     trd = raw["trading"]
     rsk = raw["risk"]
     log = raw.get("logging", {})
+    tg = raw.get("telegram")
+
+    telegram_cfg: Optional[TelegramConfig] = None
+    if tg is not None:
+        telegram_cfg = TelegramConfig(
+            enabled=tg.get("enabled", False),
+            bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", tg.get("bot_token", "")),
+            chat_id=os.environ.get("TELEGRAM_CHAT_ID", tg.get("chat_id", "")),
+        )
 
     return AppConfig(
         exchange=ExchangeConfig(
@@ -97,4 +114,5 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
         ),
         strategy=raw.get("strategy", "donchian_breakout"),
         dry_run=raw.get("dry_run", True),
+        telegram=telegram_cfg,
     )

@@ -23,3 +23,8 @@ risk:
 logging:
   level: INFO
   file: logs/trading.log
+
+telegram:
+  enabled: false
+  bot_token: ""   # TELEGRAM_BOT_TOKEN env var로도 설정 가능
+  chat_id: ""     # TELEGRAM_CHAT_ID env var로도 설정 가능
