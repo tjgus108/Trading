@@ -14,12 +14,17 @@ _Last updated: 2026-04-07_
 - [x] TradingPipeline (data→alpha→risk→execution, dry_run)
 - [x] 테스트 15개 통과
 
-## 다음 작업
-- [ ] config 로더 (config.yaml → dataclass)
-- [ ] 진입점 (`main.py`) — CLI로 dry_run / live 선택
-- [ ] 로깅 설정 (파일 + 콘솔)
-- [ ] Telegram 알림 (선택)
-- [ ] 실거래소로 통합 테스트
+## 완료된 추가 작업
+- [x] config 로더 (config.yaml → AppConfig dataclass)
+- [x] main.py — `--backtest` / `--live` / `--config` CLI
+- [x] 로깅 설정 (파일 + 콘솔, ccxt 노이즈 억제)
+- [x] 테스트 18/18 통과
+
+## 다음 작업 (선택)
+- [ ] Telegram 알림 (파이프라인 결과 푸시)
+- [ ] 스케줄러 (cron or asyncio loop로 주기적 실행)
+- [ ] 실거래소 샌드박스 통합 테스트
+- [ ] 전략 추가 (RSI 역추세, 볼린저밴드 등)
 
 ## 결정된 사항
 - 거래소: ccxt 추상화 (환경변수로 교체 가능)
