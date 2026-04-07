@@ -29,12 +29,18 @@ from src.scheduler import CandleScheduler
 from src.strategy.base import Action, BaseStrategy
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
+from src.strategy.funding_rate import FundingRateStrategy
+from src.strategy.residual_mean_reversion import ResidualMeanReversionStrategy
+from src.strategy.pair_trading import PairTradingStrategy
 
 logger = logging.getLogger(__name__)
 
 STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_cross": EmaCrossStrategy,
     "donchian_breakout": DonchianBreakoutStrategy,
+    "funding_rate": FundingRateStrategy,
+    "residual_mean_reversion": ResidualMeanReversionStrategy,
+    "pair_trading": PairTradingStrategy,
 }
 
 
