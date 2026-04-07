@@ -6,11 +6,19 @@ trading:
   symbol: BTC/USDT
   timeframe: 1h
   max_position_size: 0.1  # 포트폴리오 대비 최대 비중
+  limit: 500              # 가져올 OHLCV 캔들 수
+
+strategy: donchian_breakout  # "ema_cross" | "donchian_breakout"
+dry_run: true                # true면 주문 미제출 (시뮬레이션)
 
 risk:
-  max_drawdown: 0.05      # 최대 허용 낙폭 5%
-  stop_loss: 0.02         # 손절 2%
-  take_profit: 0.04       # 익절 4%
+  max_drawdown: 0.05        # 최대 허용 낙폭 5%
+  max_daily_loss: 0.03      # 일일 최대 손실 3%
+  stop_loss: 1.5            # ATR 배수 (손절)
+  take_profit: 3.0          # ATR 배수 (익절)
+  risk_per_trade: 0.01      # 트레이드당 계좌 위험 비율 1%
+  max_consecutive_losses: 5
+  flash_crash_pct: 0.10     # 단일 캔들 10% 이상 변동 시 서킷 브레이커
 
 logging:
   level: INFO

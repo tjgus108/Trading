@@ -1,0 +1,31 @@
+"""
+로깅 설정: 파일 + 콘솔 동시 출력.
+logs/ 디렉토리는 .gitignore에 포함된다.
+"""
+
+import logging
+import os
+from pathlib import Path
+
+
+def setup_logging(level: str = "INFO", log_file: str = "logs/trading.log") -> None:
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+
+    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+
+    handlers: list[logging.Handler] = [
+        logging.StreamHandler(),
+        logging.FileHandler(log_file, encoding="utf-8"),
+    ]
+
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format=fmt,
+        datefmt=datefmt,
+        handlers=handlers,
+    )
+
+    # 외부 라이브러리 노이즈 줄이기
+    logging.getLogger("ccxt").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
