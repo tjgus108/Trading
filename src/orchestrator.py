@@ -17,6 +17,7 @@ import threading
 from dataclasses import dataclass
 from typing import Optional
 
+from src.alpha.context import MarketContextBuilder
 from src.backtest.engine import BacktestEngine, BacktestResult
 from src.config import AppConfig
 from src.data.feed import DataFeed
@@ -32,6 +33,7 @@ from src.strategy.ema_cross import EmaCrossStrategy
 from src.strategy.funding_rate import FundingRateStrategy
 from src.strategy.residual_mean_reversion import ResidualMeanReversionStrategy
 from src.strategy.pair_trading import PairTradingStrategy
+from src.strategy.ml_strategy import MLRFStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "funding_rate": FundingRateStrategy,
     "residual_mean_reversion": ResidualMeanReversionStrategy,
     "pair_trading": PairTradingStrategy,
+    "ml_rf": MLRFStrategy,
 }
 
 
@@ -89,6 +92,9 @@ class BotOrchestrator:
         self._tracker = PositionTracker()
         self._stop_event = threading.Event()
         self._cycle_count: int = 0
+        self._context_builder: Optional[MarketContextBuilder] = None
+        self._demo: bool = False
+        self._tournament_interval: int = 72  # C3: 자동 재평가 주기 (캔들 수)
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -99,6 +105,7 @@ class BotOrchestrator:
         live 모드일 때 backtest FAIL이면 OrchestratorError 발생.
         """
         self._dry_run = dry_run
+        self._demo = demo
         self._notifier = self._build_notifier()
         logger.info("Orchestrator starting — strategy=%s symbol=%s dry_run=%s demo=%s",
                     self.cfg.strategy, self.cfg.trading.symbol, dry_run, demo)
@@ -106,7 +113,9 @@ class BotOrchestrator:
         self._connect(mock=demo)
         self._build_risk()
         self._load_strategy()
+        self._build_context(demo=demo)
         self._build_pipeline()
+        self._attach_llm_analyst(demo=demo)
 
         if not dry_run:
             self._backtest_gate()
@@ -129,6 +138,15 @@ class BotOrchestrator:
         # 매 24사이클마다 일일 P&L 리포트 (1h 타임프레임 기준 ~24시간)
         if self._cycle_count % 24 == 0:
             self._send_daily_report()
+
+        # C3: 매 TOURNAMENT_INTERVAL 사이클마다 전략 자동 재평가 (기본 72사이클 = 3일)
+        if self._cycle_count % self._tournament_interval == 0 and self._cycle_count > 0:
+            logger.info("C3: Auto-tournament triggered at cycle %d", self._cycle_count)
+            try:
+                tr = self.run_tournament()
+                logger.info("C3: Auto-tournament winner → %s", tr.winner)
+            except Exception as e:
+                logger.error("C3: Auto-tournament failed: %s", e)
 
         return result
 
@@ -270,6 +288,22 @@ class BotOrchestrator:
         self._strategy = strategy_cls()
         logger.info("Strategy loaded: %s", self._strategy.name)
 
+    def _build_context(self, demo: bool = False) -> None:
+        """MarketContextBuilder 초기화. demo=True면 mock 모드."""
+        self._context_builder = MarketContextBuilder(symbol=self.cfg.trading.symbol)
+        self._context_builder.set_high_risk_callback(self._on_high_news_risk)
+        if demo:
+            # demo 모드: build()가 항상 mock 반환하도록 래핑
+            original_build = self._context_builder.build
+            self._context_builder.build = lambda **kw: original_build(use_mock=True)
+        logger.info("MarketContextBuilder initialized (demo=%s)", demo)
+
+    def _on_high_news_risk(self, event) -> None:
+        """HIGH 뉴스 이벤트 즉시 알림."""
+        msg = f"[HIGH NEWS RISK] {event.event[:100]} → {event.action}"
+        logger.warning(msg)
+        self._notifier.notify_error(msg)
+
     def _build_pipeline(self) -> None:
         self._pipeline = TradingPipeline(
             connector=self._connector,
@@ -279,7 +313,18 @@ class BotOrchestrator:
             symbol=self.cfg.trading.symbol,
             timeframe=self.cfg.trading.timeframe,
             dry_run=self._dry_run,
+            context_builder=self._context_builder,
         )
+
+    def _attach_llm_analyst(self, demo: bool = False) -> None:
+        """C2: LLMAnalyst를 파이프라인에 연결. API 키 없으면 mock 모드."""
+        try:
+            from src.alpha.llm_analyst import LLMAnalyst
+            analyst = LLMAnalyst(use_haiku=True)
+            self._pipeline.llm_analyst = analyst
+            logger.info("LLMAnalyst attached (enabled=%s demo=%s)", analyst._enabled, demo)
+        except Exception as e:
+            logger.warning("LLMAnalyst attach failed (non-fatal): %s", e)
 
     def _build_notifier(self) -> TelegramNotifier:
         tg = self.cfg.telegram

@@ -4,6 +4,7 @@ from .donchian_breakout import DonchianBreakoutStrategy
 from .funding_rate import FundingRateStrategy
 from .residual_mean_reversion import ResidualMeanReversionStrategy
 from .pair_trading import PairTradingStrategy
+from .ml_strategy import MLRFStrategy
 
 __all__ = [
     "BaseStrategy",
@@ -13,4 +14,5 @@ __all__ = [
     "FundingRateStrategy",
     "ResidualMeanReversionStrategy",
     "PairTradingStrategy",
+    "MLRFStrategy",
 ]

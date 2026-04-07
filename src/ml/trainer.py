@@ -1,0 +1,200 @@
+"""
+C1. WalkForwardTrainer: RandomForest walk-forward 학습.
+
+학습 규칙:
+  - Train/validation/test split: 60/20/20 (시계열 순서 유지)
+  - Walk-forward: 미래 데이터 누출 금지
+  - 최소 성과: test accuracy > 55%
+  - 모델 파일: models/<name>_<date>.pkl
+
+사용법:
+    trainer = WalkForwardTrainer(symbol="BTC/USDT")
+    result = trainer.train(df)  # BacktestResult 유사 구조
+    if result.passed:
+        trainer.save("models/rf_btc_2024-01-01.pkl")
+"""
+
+import logging
+import pickle
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+from src.ml.features import FeatureBuilder
+
+logger = logging.getLogger(__name__)
+
+MODELS_DIR = Path("models")
+MIN_ACCURACY = 0.55  # test accuracy 최소 기준
+
+
+@dataclass
+class TrainingResult:
+    model_name: str
+    n_samples: int
+    n_features: int
+    train_accuracy: float
+    val_accuracy: float
+    test_accuracy: float
+    feature_importances: dict[str, float]
+    passed: bool
+    fail_reasons: list[str]
+    model_path: Optional[str] = None
+
+    def summary(self) -> str:
+        verdict = "PASS" if self.passed else "FAIL"
+        lines = [
+            f"ML_TRAINING_RESULT:",
+            f"  model: {self.model_name}",
+            f"  n_samples: {self.n_samples}",
+            f"  train_accuracy: {self.train_accuracy:.3f}",
+            f"  val_accuracy: {self.val_accuracy:.3f}",
+            f"  test_accuracy: {self.test_accuracy:.3f}",
+            f"  verdict: {verdict}",
+        ]
+        if self.fail_reasons:
+            lines.append(f"  fail_reasons: {self.fail_reasons}")
+        if self.model_path:
+            lines.append(f"  saved: {self.model_path}")
+        # 상위 5개 피처 중요도
+        top5 = sorted(self.feature_importances.items(), key=lambda x: x[1], reverse=True)[:5]
+        if top5:
+            lines.append("  top_features:")
+            for fname, imp in top5:
+                lines.append(f"    {fname}: {imp:.3f}")
+        return "\n".join(lines)
+
+
+class WalkForwardTrainer:
+    """
+    RandomForest walk-forward 학습기.
+
+    train(df): DataFrame → TrainingResult
+    학습 완료 후 save()로 모델 저장.
+    """
+
+    def __init__(
+        self,
+        symbol: str = "BTC/USDT",
+        n_estimators: int = 100,
+        max_depth: int = 6,
+        forward_n: int = 5,
+        threshold: float = 0.003,
+    ):
+        self.symbol = symbol
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
+        self._trained_model = None
+        self._class_order: Optional[list[int]] = None
+
+    def train(self, df: pd.DataFrame) -> TrainingResult:
+        """
+        walk-forward 학습 실행.
+        df: DataFeed.fetch() 반환 DataFrame (지표 포함, 최소 200 캔들 권장)
+        """
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.metrics import accuracy_score
+        except ImportError:
+            logger.error("scikit-learn 미설치: pip install scikit-learn")
+            return TrainingResult(
+                model_name="", n_samples=0, n_features=0,
+                train_accuracy=0, val_accuracy=0, test_accuracy=0,
+                feature_importances={}, passed=False,
+                fail_reasons=["scikit-learn not installed"],
+            )
+
+        X, y = self.feature_builder.build(df)
+        n = len(X)
+
+        if n < 100:
+            return TrainingResult(
+                model_name="", n_samples=n, n_features=X.shape[1] if n > 0 else 0,
+                train_accuracy=0, val_accuracy=0, test_accuracy=0,
+                feature_importances={}, passed=False,
+                fail_reasons=[f"샘플 부족: {n} < 100"],
+            )
+
+        # 60/20/20 시계열 분할
+        train_end = int(n * 0.60)
+        val_end = int(n * 0.80)
+
+        X_train = X.iloc[:train_end]
+        y_train = y.iloc[:train_end]
+        X_val = X.iloc[train_end:val_end]
+        y_val = y.iloc[train_end:val_end]
+        X_test = X.iloc[val_end:]
+        y_test = y.iloc[val_end:]
+
+        logger.info(
+            "Training RF: n=%d train=%d val=%d test=%d features=%d",
+            n, len(X_train), len(X_val), len(X_test), X.shape[1],
+        )
+
+        # 학습
+        clf = RandomForestClassifier(
+            n_estimators=self.n_estimators,
+            max_depth=self.max_depth,
+            random_state=42,
+            n_jobs=-1,
+            class_weight="balanced",
+        )
+        clf.fit(X_train, y_train)
+
+        # 성과 평가
+        train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
+        val_acc = float(accuracy_score(y_val, clf.predict(X_val)))
+        test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
+
+        # 피처 중요도
+        feat_importance = dict(zip(X.columns, clf.feature_importances_))
+
+        fail_reasons = []
+        if test_acc < MIN_ACCURACY:
+            fail_reasons.append(f"test_accuracy {test_acc:.3f} < {MIN_ACCURACY}")
+        if val_acc < MIN_ACCURACY:
+            fail_reasons.append(f"val_accuracy {val_acc:.3f} < {MIN_ACCURACY}")
+
+        self._trained_model = clf
+        self._class_order = list(clf.classes_)
+        model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
+
+        result = TrainingResult(
+            model_name=model_name,
+            n_samples=n,
+            n_features=X.shape[1],
+            train_accuracy=round(train_acc, 4),
+            val_accuracy=round(val_acc, 4),
+            test_accuracy=round(test_acc, 4),
+            feature_importances=feat_importance,
+            passed=len(fail_reasons) == 0,
+            fail_reasons=fail_reasons,
+        )
+        logger.info(result.summary())
+        return result
+
+    def save(self, path: Optional[str] = None) -> str:
+        """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""
+        if self._trained_model is None:
+            raise RuntimeError("모델이 학습되지 않음 — train() 먼저 호출")
+
+        MODELS_DIR.mkdir(exist_ok=True)
+        if path is None:
+            name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}.pkl"
+            path = str(MODELS_DIR / name)
+
+        payload = {
+            "model": self._trained_model,
+            "name": Path(path).stem,
+            "class_order": self._class_order,
+            "symbol": self.symbol,
+        }
+        with open(path, "wb") as f:
+            pickle.dump(payload, f)
+        logger.info("ML model saved: %s", path)
+        return path

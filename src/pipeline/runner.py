@@ -1,6 +1,6 @@
 """
 TradingPipeline: 오케스트레이터가 호출하는 메인 파이프라인.
-data → signal → risk → execution 순서를 강제한다.
+data → context(B1~B3) → signal → risk → execution 순서를 강제한다.
 """
 
 import logging
@@ -27,11 +27,14 @@ class PipelineResult:
     execution: Optional[dict] = None
     error: Optional[str] = None
     notes: list[str] = field(default_factory=list)
+    context_score: Optional[float] = None   # MarketContext composite score
+    news_risk: str = "NONE"                 # HIGH | MEDIUM | LOW | NONE
 
     def log_line(self) -> str:
         sig = f"{self.signal.action.value} {self.symbol}" if self.signal else "N/A"
         risk_status = self.risk.status.value if self.risk else "N/A"
         exec_status = (self.execution or {}).get("status", "SKIPPED")
+        ctx = f"{self.context_score:+.2f}" if self.context_score is not None else "N/A"
         return (
             f"## [{self.timestamp}]\n"
             f"Pipeline: {self.pipeline_step}\n"
@@ -39,6 +42,7 @@ class PipelineResult:
             f"Signal: {sig}\n"
             f"Risk: {risk_status}\n"
             f"Execution: {exec_status}\n"
+            f"Context: score={ctx} news={self.news_risk}\n"
             f"Notes: {'; '.join(self.notes) if self.notes else 'none'}\n"
         )
 
@@ -46,10 +50,11 @@ class PipelineResult:
 class TradingPipeline:
     """
     파이프라인 실행 순서:
-      1. data-agent  → DataFeed.fetch()
-      2. alpha-agent → strategy.generate()
-      3. risk-agent  → RiskManager.evaluate()   ← GATEKEEPER
-      4. execution   → ExchangeConnector.create_order() + wait_for_fill()
+      1. data-agent    → DataFeed.fetch()
+      1b. context      → MarketContextBuilder.build() (B1~B3, 선택적)
+      2. alpha-agent   → strategy.generate() + context.adjust_signal()
+      3. risk-agent    → RiskManager.evaluate()   ← GATEKEEPER
+      4. execution     → ExchangeConnector.create_order() + wait_for_fill()
     """
 
     def __init__(
@@ -61,6 +66,7 @@ class TradingPipeline:
         symbol: str,
         timeframe: str,
         dry_run: bool = True,
+        context_builder=None,   # MarketContextBuilder (선택적)
     ):
         self.connector = connector
         self.data_feed = data_feed
@@ -69,6 +75,8 @@ class TradingPipeline:
         self.symbol = symbol
         self.timeframe = timeframe
         self.dry_run = dry_run
+        self.context_builder = context_builder
+        self.llm_analyst = None  # LLMAnalyst (선택적, C2)
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -90,12 +98,45 @@ class TradingPipeline:
             logger.error("[pipeline] data FAILED: %s", e)
             return result
 
+        # ── Step 1b: Market Context (B1~B3) ────────────────────────────
+        ctx = None
+        if self.context_builder is not None:
+            try:
+                ctx = self.context_builder.build()
+                result.context_score = ctx.composite_score
+                result.news_risk = ctx.news_risk_level
+                for line in ctx.summary_lines():
+                    result.notes.append(line)
+            except Exception as e:
+                logger.warning("[pipeline] context build failed (non-fatal): %s", e)
+
         # ── Step 2: Signal (Alpha) ──────────────────────────────────────
         try:
             signal: Signal = self.strategy.generate(summary.df)
+
+            # MarketContext로 신호 조정
+            if ctx is not None:
+                signal, ctx_notes = ctx.adjust_signal(signal)
+                result.notes.extend(ctx_notes)
+
             result.signal = signal
             result.pipeline_step = "alpha"
             logger.info("[pipeline] signal=%s confidence=%s", signal.action.value, signal.confidence.value)
+
+            # C2: LLM 분석 (이벤트 기반 — HOLD 아닐 때만)
+            if self.llm_analyst is not None and signal.action != Action.HOLD:
+                try:
+                    ctx_summary = "; ".join(ctx.summary_lines()[:2]) if ctx else ""
+                    llm_note = self.llm_analyst.analyze_signal(
+                        symbol=self.symbol,
+                        signal_action=signal.action.value,
+                        signal_reasoning=signal.reasoning,
+                        context_summary=ctx_summary,
+                    )
+                    if llm_note:
+                        result.notes.append(f"LLM: {llm_note}")
+                except Exception as e:
+                    logger.debug("LLM analysis skipped: %s", e)
 
             # HOLD는 리스크/실행 건너뜀
             if signal.action == Action.HOLD:

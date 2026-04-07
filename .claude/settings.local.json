@@ -11,7 +11,15 @@
       "WebFetch(domain:dev.to)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(pip install:*)",
+      "Read(//Users/seohyunhan/.pyenv/versions/**)",
+      "Bash(pyenv versions:*)",
+      "Bash(conda env:*)",
+      "Read(//opt/homebrew/**)",
+      "Read(//usr/bin/**)",
+      "Bash(/usr/bin/python3:*)",
+      "Bash(python3 -m pip install python-dotenv pyyaml ccxt pandas numpy requests --quiet)"
     ]
   }
 }
