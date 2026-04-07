@@ -127,3 +127,12 @@ Signal: HOLD BTC/USDT
 Risk: N/A
 Execution: SKIPPED
 Notes: HOLD — no order
+
+## [2026-04-07 22:12 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=11(Extreme Fear) | FR=0.0041% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order

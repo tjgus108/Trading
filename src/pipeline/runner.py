@@ -76,7 +76,8 @@ class TradingPipeline:
         self.timeframe = timeframe
         self.dry_run = dry_run
         self.context_builder = context_builder
-        self.llm_analyst = None  # LLMAnalyst (선택적, C2)
+        self.llm_analyst = None   # LLMAnalyst (선택적, C2)
+        self.ensemble = None      # MultiLLMEnsemble (선택적, D1)
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -122,6 +123,38 @@ class TradingPipeline:
             result.signal = signal
             result.pipeline_step = "alpha"
             logger.info("[pipeline] signal=%s confidence=%s", signal.action.value, signal.confidence.value)
+
+            # D1: 멀티 LLM 앙상블 (HOLD 아닐 때만)
+            if self.ensemble is not None and signal.action != Action.HOLD:
+                try:
+                    ctx_summary = "; ".join(ctx.summary_lines()[:1]) if ctx else ""
+                    ens = self.ensemble.analyze(
+                        symbol=self.symbol,
+                        rule_signal=signal.action.value,
+                        signal_context=signal.reasoning[:150],
+                        market_summary=ctx_summary,
+                    )
+                    result.notes.append(f"ENSEMBLE: {ens.summary()}")
+                    # 앙상블이 강하게 반대하면 HOLD 전환
+                    if ens.conflicts_with(signal.action.value):
+                        result.notes.append(f"ENSEMBLE conflict → HOLD 전환")
+                        from src.strategy.base import Confidence
+                        signal = Signal(
+                            action=Action.HOLD,
+                            confidence=Confidence.MEDIUM,
+                            strategy=signal.strategy,
+                            entry_price=signal.entry_price,
+                            reasoning=f"[ENSEMBLE_CONFLICT] {signal.reasoning}",
+                            invalidation="LLM 합의 전환 시 재진입",
+                            bull_case=signal.bull_case,
+                            bear_case=signal.bear_case,
+                        )
+                        result.signal = signal
+                        result.pipeline_step = "alpha"
+                        result.notes.append("HOLD — ensemble conflict")
+                        return result
+                except Exception as e:
+                    logger.debug("Ensemble check failed: %s", e)
 
             # C2: LLM 분석 (이벤트 기반 — HOLD 아닐 때만)
             if self.llm_analyst is not None and signal.action != Action.HOLD:
