@@ -7,6 +7,8 @@ Trading Bot 진입점.
   python main.py --loop                   # 캔들 완성 시각마다 반복 (Ctrl+C 종료)
   python main.py --loop --live            # 실거래 반복
   python main.py --backtest               # 백테스트만 실행
+  python main.py --tournament             # 전략 토너먼트 후 승자로 실행
+  python main.py --tournament --loop      # 토너먼트 승자로 루프 실행
   python main.py --config path/to/cfg.yaml
 """
 
@@ -24,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--live", action="store_true", help="실거래 모드")
     parser.add_argument("--loop", action="store_true", help="캔들마다 반복 실행")
     parser.add_argument("--backtest", action="store_true", help="백테스트만 실행")
+    parser.add_argument("--tournament", action="store_true", help="전략 토너먼트 후 승자로 실행")
     return parser.parse_args()
 
 
@@ -45,6 +48,16 @@ def main() -> None:
         result = orch.run_backtest_only()
         print(result.summary())
         sys.exit(0 if result.passed else 1)
+
+    if args.tournament:
+        result = orch.run_tournament()
+        print(result.summary())
+        # 토너먼트 후 바로 실행
+        if args.loop:
+            orch.run_loop()
+        else:
+            orch.run_once()
+        return
 
     if args.loop:
         orch.run_loop()

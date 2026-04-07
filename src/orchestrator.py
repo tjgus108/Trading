@@ -5,14 +5,16 @@ BotOrchestrator: 트레이딩 봇 전체 생명주기를 관리하는 중앙 조
   - 컴포넌트 조립 및 초기화
   - Startup gate: backtest PASS 없이 live 불가
   - 파이프라인 1회 / 스케줄 루프 실행
-  - Strategy tournament: 여러 전략 백테스트 후 최고 선택 (Phase 2 준비)
+  - Strategy tournament: 여러 전략 병렬 백테스트 후 Sharpe 기준 최고 선택
   - 알림 / 로그 / 상태 파일 관리
 
 main.py는 인수 파싱 후 Orchestrator에 위임하고 끝낸다.
 """
 
+import concurrent.futures
 import logging
 import threading
+from dataclasses import dataclass
 from typing import Optional
 
 from src.backtest.engine import BacktestEngine, BacktestResult
@@ -37,6 +39,24 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
 
 class OrchestratorError(Exception):
     pass
+
+
+@dataclass
+class TournamentResult:
+    winner: str                          # 전략 이름
+    winner_sharpe: float
+    rankings: list[dict]                 # [{name, sharpe, passed, fail_reasons}]
+
+    def summary(self) -> str:
+        lines = ["TOURNAMENT RESULT:"]
+        for i, r in enumerate(self.rankings, 1):
+            verdict = "PASS" if r["passed"] else "FAIL"
+            lines.append(
+                f"  #{i} {r['name']:25s}  Sharpe={r['sharpe']:.3f}  {verdict}"
+                + (f"  fail={r['fail_reasons']}" if r["fail_reasons"] else "")
+            )
+        lines.append(f"  WINNER → {self.winner} (Sharpe={self.winner_sharpe:.3f})")
+        return "\n".join(lines)
 
 
 class BotOrchestrator:
@@ -117,6 +137,82 @@ class BotOrchestrator:
         """백테스트만 실행하고 결과 반환. startup() 이후 호출."""
         self._assert_ready()
         return self._run_backtest(self._strategy)
+
+    def run_tournament(self, candidates: Optional[list[str]] = None) -> TournamentResult:
+        """
+        여러 전략을 병렬 백테스트 후 Sharpe 기준으로 순위를 매기고 승자를 반환.
+        승자 전략으로 파이프라인을 재구성한다.
+
+        Args:
+            candidates: 검증할 전략 이름 목록. None이면 STRATEGY_REGISTRY 전체.
+
+        Returns:
+            TournamentResult (rankings + winner)
+        """
+        self._assert_ready()
+        names = candidates or list(STRATEGY_REGISTRY.keys())
+        logger.info("Tournament starting — candidates: %s", names)
+
+        strategies = []
+        for name in names:
+            cls = STRATEGY_REGISTRY.get(name)
+            if cls is None:
+                logger.warning("Tournament: unknown strategy '%s', skipping", name)
+                continue
+            strategies.append(cls())
+
+        if not strategies:
+            raise OrchestratorError("No valid strategies for tournament")
+
+        # 병렬 백테스트
+        results: dict[str, BacktestResult] = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(strategies)) as pool:
+            futures = {pool.submit(self._run_backtest, s): s.name for s in strategies}
+            for fut in concurrent.futures.as_completed(futures):
+                name = futures[fut]
+                try:
+                    results[name] = fut.result()
+                    logger.info("Tournament [%s]: Sharpe=%.3f passed=%s",
+                                name, results[name].sharpe_ratio, results[name].passed)
+                except Exception as e:
+                    logger.error("Tournament [%s] failed: %s", name, e)
+
+        if not results:
+            raise OrchestratorError("All strategies failed during tournament")
+
+        # Sharpe 기준 정렬 (PASS 전략 우선, 그 다음 Sharpe 내림차순)
+        ranked = sorted(
+            results.items(),
+            key=lambda x: (x[1].passed, x[1].sharpe_ratio),
+            reverse=True,
+        )
+
+        winner_name, winner_result = ranked[0]
+        rankings = [
+            {
+                "name": name,
+                "sharpe": r.sharpe_ratio,
+                "passed": r.passed,
+                "fail_reasons": r.fail_reasons,
+            }
+            for name, r in ranked
+        ]
+
+        tournament = TournamentResult(
+            winner=winner_name,
+            winner_sharpe=winner_result.sharpe_ratio,
+            rankings=rankings,
+        )
+
+        # 승자 전략으로 파이프라인 재구성
+        self._strategy = STRATEGY_REGISTRY[winner_name]()
+        self._build_pipeline()
+        logger.info("Tournament winner: %s (Sharpe=%.3f)", winner_name, winner_result.sharpe_ratio)
+
+        msg = f"Tournament winner: {winner_name} (Sharpe={winner_result.sharpe_ratio:.3f})"
+        self._notifier.notify_error(f"[Tournament] {msg}")  # notify_info 없으므로 재사용
+
+        return tournament
 
     # ── Internal: 초기화 ─────────────────────────────────────────────────
 
