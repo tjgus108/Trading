@@ -17,6 +17,7 @@ import argparse
 import sys
 
 from src.config import load_config
+from src.dashboard import Dashboard, MultiStatusProvider, OrchestratorStatusProvider
 from src.logging_setup import setup_logging
 from src.multi_bot import MultiBot, SymbolConfig
 from src.orchestrator import BotOrchestrator, OrchestratorError
@@ -31,6 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tournament", action="store_true", help="전략 토너먼트 후 승자로 실행")
     parser.add_argument("--symbols", nargs="+", metavar="SYMBOL",
                         help="멀티 심볼 모드 (예: BTC/USDT ETH/USDT)")
+    parser.add_argument("--dashboard", action="store_true", help="HTTP 상태 대시보드 실행 (기본 포트 8080)")
+    parser.add_argument("--dashboard-port", type=int, default=8080, metavar="PORT")
     return parser.parse_args()
 
 
@@ -50,6 +53,9 @@ def main() -> None:
         except OrchestratorError as e:
             print(f"STARTUP FAILED: {e}")
             sys.exit(1)
+        if args.dashboard:
+            Dashboard(MultiStatusProvider(multi), port=args.dashboard_port).start()
+            print(f"Dashboard: http://localhost:{args.dashboard_port}")
         multi.run_loop()
         return
 
@@ -60,6 +66,10 @@ def main() -> None:
     except OrchestratorError as e:
         print(f"STARTUP FAILED: {e}")
         sys.exit(1)
+
+    if args.dashboard:
+        Dashboard(OrchestratorStatusProvider(orch), port=args.dashboard_port).start()
+        print(f"Dashboard: http://localhost:{args.dashboard_port}")
 
     if args.backtest:
         result = orch.run_backtest_only()
