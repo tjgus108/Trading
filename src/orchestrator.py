@@ -23,9 +23,10 @@ from src.data.feed import DataFeed
 from src.exchange.connector import ExchangeConnector
 from src.notifier import TelegramNotifier
 from src.pipeline.runner import PipelineResult, TradingPipeline
+from src.position_tracker import Position, PositionTracker
 from src.risk.manager import CircuitBreaker, RiskManager
 from src.scheduler import CandleScheduler
-from src.strategy.base import BaseStrategy
+from src.strategy.base import Action, BaseStrategy
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -79,7 +80,9 @@ class BotOrchestrator:
         self._strategy: Optional[BaseStrategy] = None
         self._notifier: Optional[TelegramNotifier] = None
         self._pipeline: Optional[TradingPipeline] = None
+        self._tracker = PositionTracker()
         self._stop_event = threading.Event()
+        self._cycle_count: int = 0
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -113,6 +116,13 @@ class BotOrchestrator:
         self._assert_ready()
         result = self._pipeline.run()
         self._handle_result(result)
+        self._update_position_from_result(result)
+        self._cycle_count += 1
+
+        # 매 24사이클마다 일일 P&L 리포트 (1h 타임프레임 기준 ~24시간)
+        if self._cycle_count % 24 == 0:
+            self._send_daily_report()
+
         return result
 
     def run_loop(self) -> None:
@@ -334,6 +344,55 @@ class BotOrchestrator:
                 f.write("\n" + result.log_line())
         except OSError:
             pass
+
+    def _update_position_from_result(self, result: PipelineResult) -> None:
+        """파이프라인 결과로 포지션 트래커 업데이트."""
+        if result.status != "OK":
+            return
+        if result.signal is None or result.risk is None or result.execution is None:
+            return
+
+        exec_status = result.execution.get("status")
+        if exec_status not in ("FILLED", "DRY_RUN"):
+            return
+
+        action = result.signal.action
+        if action == Action.HOLD:
+            return
+
+        # 반대 방향 신호면 기존 포지션 청산
+        if self._tracker.has_position(result.symbol):
+            current = self._tracker.get_position(result.symbol)
+            if current and current.side != action.value:
+                exit_price = result.signal.entry_price
+                self._tracker.close_position(
+                    result.symbol, exit_price, reason="SIGNAL_REVERSE",
+                    circuit_breaker=self._risk_manager.circuit_breaker if self._risk_manager else None,
+                )
+
+        # 새 포지션 오픈
+        if not self._tracker.has_position(result.symbol) and result.risk.position_size:
+            from datetime import datetime, timezone
+            pos = Position(
+                symbol=result.symbol,
+                side=action.value,
+                entry_price=result.signal.entry_price,
+                size=result.risk.position_size,
+                stop_loss=result.risk.stop_loss or 0.0,
+                take_profit=result.risk.take_profit or 0.0,
+                opened_at=datetime.now(timezone.utc).isoformat(),
+                order_id=result.execution.get("order_id"),
+            )
+            self._tracker.open_position(pos)
+
+    def _send_daily_report(self) -> None:
+        summary = self._tracker.daily_summary()
+        logger.info("Daily report: %s", summary)
+        self._notifier.notify_error(f"[Daily Report] {summary}")
+
+    @property
+    def tracker(self) -> PositionTracker:
+        return self._tracker
 
     def _assert_ready(self) -> None:
         if self._pipeline is None:
