@@ -1,0 +1,17 @@
+{
+  "model": "claude-sonnet-4-6",
+  "availableModels": ["sonnet", "haiku"],
+  "permissions": {
+    "deny": [
+      "Read(./logs/**)",
+      "Read(./__pycache__/**)",
+      "Read(./**/__pycache__/**)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./config/secrets.json)",
+      "Read(./config/secrets/**)",
+      "Read(./.venv/**)",
+      "Read(./node_modules/**)"
+    ]
+  }
+}
