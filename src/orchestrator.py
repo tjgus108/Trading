@@ -86,17 +86,18 @@ class BotOrchestrator:
 
     # ── Public API ───────────────────────────────────────────────────────
 
-    def startup(self, dry_run: bool = True) -> None:
+    def startup(self, dry_run: bool = True, demo: bool = False) -> None:
         """
         컴포넌트 초기화 + backtest gate.
+        demo=True: MockExchangeConnector 사용 (API 키 불필요)
         live 모드일 때 backtest FAIL이면 OrchestratorError 발생.
         """
         self._dry_run = dry_run
         self._notifier = self._build_notifier()
-        logger.info("Orchestrator starting — strategy=%s symbol=%s dry_run=%s",
-                    self.cfg.strategy, self.cfg.trading.symbol, dry_run)
+        logger.info("Orchestrator starting — strategy=%s symbol=%s dry_run=%s demo=%s",
+                    self.cfg.strategy, self.cfg.trading.symbol, dry_run, demo)
 
-        self._connect()
+        self._connect(mock=demo)
         self._build_risk()
         self._load_strategy()
         self._build_pipeline()
@@ -226,11 +227,15 @@ class BotOrchestrator:
 
     # ── Internal: 초기화 ─────────────────────────────────────────────────
 
-    def _connect(self) -> None:
-        self._connector = ExchangeConnector(
-            exchange_name=self.cfg.exchange.name,
-            sandbox=self.cfg.exchange.sandbox,
-        )
+    def _connect(self, mock: bool = False) -> None:
+        if mock:
+            from src.exchange.mock_connector import MockExchangeConnector
+            self._connector = MockExchangeConnector(symbol=self.cfg.trading.symbol)
+        else:
+            self._connector = ExchangeConnector(
+                exchange_name=self.cfg.exchange.name,
+                sandbox=self.cfg.exchange.sandbox,
+            )
         self._connector.connect()
         self._data_feed = DataFeed(self._connector)
 

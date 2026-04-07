@@ -56,13 +56,13 @@ class MultiBot:
 
     # ── Public API ────────────────────────────────────────────────────────
 
-    def startup(self, dry_run: bool = True) -> None:
+    def startup(self, dry_run: bool = True, demo: bool = False) -> None:
         """모든 심볼 봇 초기화."""
         for sym_cfg in self._symbols:
             cfg = self._make_cfg(sym_cfg)
             bot = BotOrchestrator(cfg)
             try:
-                bot.startup(dry_run=dry_run)
+                bot.startup(dry_run=dry_run, demo=demo)
                 self._bots[sym_cfg.symbol] = bot
                 logger.info("MultiBot: %s started", sym_cfg.symbol)
             except Exception as e:
