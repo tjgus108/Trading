@@ -27,16 +27,37 @@ BotOrchestrator.startup()
 
 ## Agent Team
 
+### 핵심 파이프라인
 | Agent | Model | 언제 호출 |
 |---|---|---|
 | data-agent | haiku | 시세 이상 감지, 데이터 품질 문제 |
 | alpha-agent | sonnet | 신호 생성 로직 검토, 전략 개선 |
 | risk-agent | sonnet | 리스크 파라미터 검토, 서킷 브레이커 분석 |
-| backtest-agent | haiku | 전략 성과 검증, 파라미터 최적화 |
 | execution-agent | haiku | 주문 실패 분석, 슬리피지 리포트 |
+| backtest-agent | haiku | 전략 성과 검증, 파라미터 최적화 |
 | memory-agent | haiku | 세션 상태 복원, WORKLOG 요약 |
+
+### 알파 소스 확장
+| Agent | Model | 언제 호출 |
+|---|---|---|
+| sentiment-agent | haiku | 펀딩비/Fear&Greed 감성 점수 요청 시 |
+| onchain-agent | haiku | 온체인 고래/거래소 플로우 분석 시 |
+| news-agent | haiku | 주요 이벤트 리스크 감지 시, 매 사이클 선택적 |
+| ml-agent | sonnet | ML 신호 학습/추론 요청 시 |
+| strategy-researcher-agent | sonnet | 새 전략 리서치 및 구현 시 |
+
+### 개발 보조
+| Agent | Model | 언제 호출 |
+|---|---|---|
 | researcher | haiku | 코드베이스 탐색, 파일 위치 확인 |
 | reviewer | haiku | 코드 변경 검토 |
+
+### 권장 파이프라인 (알파 소스 확장 시)
+```
+[data-agent] → [sentiment-agent + onchain-agent + news-agent] (병렬)
+      ↓               ↓ (컨텍스트로 전달)
+[alpha-agent + ml-agent] → [risk-agent] → [execution-agent]
+```
 
 ## Development Task Coordination
 
@@ -58,11 +79,13 @@ BotOrchestrator.startup()
 
 | Phase | 상태 | 내용 |
 |---|---|---|
-| 1 | 완료 | BotOrchestrator 클래스, main.py 경량화 |
-| 2 | 다음 | Strategy Tournament (병렬 백테스트 → 자동 선택) |
-| 3 | 예정 | Position & P&L 추적, 일일 리포트 |
-| 4 | 예정 | 멀티 심볼 |
-| 5 | 예정 | 대시보드 |
+| 1~5 | 완료 | Orchestrator, Tournament, P&L, MultiBot, Dashboard |
+| A | 다음 | 신규 전략 3종 (Funding Rate, RSI Divergence, BB Squeeze) |
+| B | 예정 | 감성/온체인/뉴스 데이터 소스 통합 |
+| C | 예정 | ML 신호 생성기, LLM 시장 분석 고도화 |
+| D | 장기 | 멀티 LLM 앙상블, WebSocket 실시간, Walk-forward 최적화 |
+
+자세한 내용: `ROADMAP.md`
 
 ## Rules
 
