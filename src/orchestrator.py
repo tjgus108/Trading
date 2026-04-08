@@ -58,6 +58,9 @@ from src.strategy.stochastic import StochasticStrategy
 from src.strategy.macd_strategy import MACDStrategy
 from src.strategy.ichimoku import IchimokuStrategy
 from src.strategy.williams_r import WilliamsRStrategy
+from src.strategy.parabolic_sar import ParabolicSARStrategy
+from src.strategy.adx_trend import ADXTrendStrategy
+from src.strategy.aroon import AroonStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -90,6 +93,9 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "macd": MACDStrategy,
     "ichimoku": IchimokuStrategy,
     "williams_r": WilliamsRStrategy,
+    "parabolic_sar": ParabolicSARStrategy,
+    "adx_trend": ADXTrendStrategy,
+    "aroon": AroonStrategy,
 }
 
 
