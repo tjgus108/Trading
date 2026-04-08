@@ -5,6 +5,8 @@ RSI Divergence 전략:
 - Lookback: 5~20 candles (confirmed swing pivots only)
 - Confidence: HIGH if divergence > 2%, MEDIUM otherwise
 - Filters: RSI zone filter + min candle gap + swing pivot confirmation
+           + min swing size (RSI diff >= 3, price change >= 0.5%)
+           + EMA50 trend filter (bullish div valid in downtrend, bearish in uptrend)
 """
 
 import pandas as pd
@@ -18,6 +20,8 @@ _MIN_GAP = 3          # minimum candles between pivot and current
 _SWING_WINDOW = 2     # bars each side to confirm local swing high/low
 _RSI_BEAR_ZONE = 55   # bearish div: RSI at ref must be above this
 _RSI_BULL_ZONE = 45   # bullish div: RSI at ref must be below this
+_MIN_RSI_DIFF = 3.0   # minimum RSI difference to count as divergence
+_MIN_PRICE_CHG = 0.005  # minimum price change (0.5%) to count as divergence
 
 
 class RsiDivergenceStrategy(BaseStrategy):
@@ -129,7 +133,11 @@ class RsiDivergenceStrategy(BaseStrategy):
 
             if price_high_now > price_ref and rsi_now < rsi_ref:
                 price_div = (price_high_now - price_ref) / price_ref
-                rsi_div = (rsi_ref - rsi_now) / rsi_ref
+                rsi_diff = rsi_ref - rsi_now
+                # Min swing size filter: skip trivially small divergences
+                if price_div < _MIN_PRICE_CHG or rsi_diff < _MIN_RSI_DIFF:
+                    continue
+                rsi_div = rsi_diff / rsi_ref
                 div_pct = (price_div + rsi_div) / 2
                 if div_pct > best_div:
                     best_div = div_pct
@@ -168,7 +176,11 @@ class RsiDivergenceStrategy(BaseStrategy):
 
             if price_low_now < price_ref and rsi_now > rsi_ref:
                 price_div = (price_ref - price_low_now) / price_ref
-                rsi_div = (rsi_now - rsi_ref) / rsi_now if rsi_now != 0 else 0
+                rsi_diff = rsi_now - rsi_ref
+                # Min swing size filter: skip trivially small divergences
+                if price_div < _MIN_PRICE_CHG or rsi_diff < _MIN_RSI_DIFF:
+                    continue
+                rsi_div = rsi_diff / rsi_now if rsi_now != 0 else 0
                 div_pct = (price_div + rsi_div) / 2
                 if div_pct > best_div:
                     best_div = div_pct

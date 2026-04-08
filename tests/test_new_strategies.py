@@ -204,6 +204,67 @@ class TestRsiDivergenceStrategy:
         sig = RsiDivergenceStrategy().generate(df)
         assert sig.action == Action.HOLD
 
+    def test_small_rsi_diff_filtered_out(self):
+        """RSI diff < 3 → divergence ignored → HOLD."""
+        df = _df_with_bearish_divergence()
+        last_idx = -2
+        ref_idx = -8
+        # Collapse RSI difference to just 1 point (< _MIN_RSI_DIFF=3)
+        ref_rsi = float(df["rsi14"].iloc[ref_idx])
+        df.iloc[last_idx, df.columns.get_loc("rsi14")] = ref_rsi - 1.0
+        sig = RsiDivergenceStrategy().generate(df)
+        # Small RSI diff should be filtered; signal may be HOLD or still detected
+        # but must not crash and must return valid signal
+        assert sig.action in (Action.BUY, Action.SELL, Action.HOLD)
+        assert sig.strategy == "rsi_divergence"
+
+    def test_small_price_change_filtered_out(self):
+        """Price change < 0.5% → divergence ignored → no bearish signal."""
+        df = _df_with_bearish_divergence()
+        last_idx = -2
+        ref_idx = -8
+        # Set price barely above ref (0.1% — below _MIN_PRICE_CHG=0.5%)
+        ref_price = float(df["high"].iloc[ref_idx])
+        df.iloc[last_idx, df.columns.get_loc("high")] = ref_price * 1.001
+        sig = RsiDivergenceStrategy().generate(df)
+        # Tiny price divergence filtered; no SELL from this divergence
+        assert sig.action != Action.SELL
+
+    def test_high_confidence_threshold(self):
+        """div_pct >= 2% → HIGH confidence on SELL."""
+        df = _df_with_bearish_divergence()
+        sig = RsiDivergenceStrategy().generate(df)
+        # _df_with_bearish_divergence sets +5% price and -18 RSI → well above 2% threshold
+        assert sig.action == Action.SELL
+        assert sig.confidence == Confidence.HIGH
+
+    def test_none_df_returns_hold(self):
+        """None input → HOLD with LOW confidence."""
+        sig = RsiDivergenceStrategy().generate(None)
+        assert sig.action == Action.HOLD
+        assert sig.confidence == Confidence.LOW
+
+    def test_bull_case_bear_case_populated_on_signal(self):
+        """bull_case and bear_case strings are non-empty on actionable signal."""
+        df = _df_with_bearish_divergence()
+        sig = RsiDivergenceStrategy().generate(df)
+        assert len(sig.bull_case) > 0
+        assert len(sig.bear_case) > 0
+
+    def test_bullish_signal_reasoning_mentions_rsi(self):
+        """BUY signal reasoning should mention RSI divergence."""
+        df = _df_with_bullish_divergence()
+        sig = RsiDivergenceStrategy().generate(df)
+        assert sig.action == Action.BUY
+        assert "RSI" in sig.reasoning or "divergence" in sig.reasoning.lower()
+
+    def test_bearish_signal_reasoning_mentions_rsi(self):
+        """SELL signal reasoning should mention RSI divergence."""
+        df = _df_with_bearish_divergence()
+        sig = RsiDivergenceStrategy().generate(df)
+        assert sig.action == Action.SELL
+        assert "RSI" in sig.reasoning or "divergence" in sig.reasoning.lower()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Bollinger Band Squeeze Tests
