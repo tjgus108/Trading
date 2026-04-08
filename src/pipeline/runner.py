@@ -29,6 +29,7 @@ class PipelineResult:
     notes: list[str] = field(default_factory=list)
     context_score: Optional[float] = None   # MarketContext composite score
     news_risk: str = "NONE"                 # HIGH | MEDIUM | LOW | NONE
+    pnl: float = 0.0                        # 거래 손익 (USD)
 
     def log_line(self) -> str:
         sig = f"{self.signal.action.value} {self.symbol}" if self.signal else "N/A"

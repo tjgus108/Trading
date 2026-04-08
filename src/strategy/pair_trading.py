@@ -61,6 +61,30 @@ class PairTradingStrategy(BaseStrategy):
 
     def generate(self, df: pd.DataFrame) -> Signal:
         """df = BTC OHLCV DataFrame (지표 포함)."""
+        min_rows = 30
+        if df is None or len(df) < min_rows:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=0.0,
+                reasoning="데이터 부족",
+                invalidation="",
+                bull_case="",
+                bear_case="",
+            )
+        if self._eth_df is None or len(self._eth_df) < min_rows:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=0.0,
+                reasoning="데이터 부족",
+                invalidation="",
+                bull_case="",
+                bear_case="",
+            )
+
         last = self._last(df)
         entry = last["close"]
         rsi = last["rsi14"]

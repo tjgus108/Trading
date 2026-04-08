@@ -21,6 +21,15 @@ MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
 MIN_TRADES = 30
 
+ANNUALIZATION = {
+    "1m": 252 * 24 * 60,
+    "5m": 252 * 24 * 12,
+    "15m": 252 * 24 * 4,
+    "1h": 252 * 24,
+    "4h": 252 * 6,
+    "1d": 252,
+}
+
 
 @dataclass
 class BacktestResult:
@@ -59,11 +68,17 @@ class BacktestEngine:
         commission: float = 0.001,   # 0.1% per trade
         atr_multiplier_sl: float = 1.5,
         atr_multiplier_tp: float = 3.0,
+        slippage: float = 0.0005,
+        timeframe: str = "1h",
+        funding_cost_per_candle: float = 0.0,
     ):
         self.initial_balance = initial_balance
         self.commission = commission
         self.atr_multiplier_sl = atr_multiplier_sl
         self.atr_multiplier_tp = atr_multiplier_tp
+        self.slippage = slippage
+        self.timeframe = timeframe
+        self.funding_cost_per_candle = funding_cost_per_candle
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -84,6 +99,15 @@ class BacktestEngine:
             window = df.iloc[: i + 1]
             candle = df.iloc[i]
 
+            # 펀딩비 적용 (포지션 보유 중 매 캔들)
+            if position and self.funding_cost_per_candle != 0.0:
+                position_value = position["size"] * candle["close"]
+                funding = position_value * self.funding_cost_per_candle
+                if position["side"] == "BUY":
+                    balance -= funding   # BUY: 비용
+                else:
+                    balance += funding   # SELL: 수익
+
             # 열린 포지션 청산 체크
             if position:
                 pnl, closed = self._check_exit(position, candle)
@@ -102,16 +126,18 @@ class BacktestEngine:
                         sl_dist = atr * self.atr_multiplier_sl
                         risk_amt = balance * 0.01
                         size = risk_amt / sl_dist
-                        entry = candle["close"]
-                        cost = size * entry * self.commission
+                        close = candle["close"]
 
                         if signal.action == Action.BUY:
+                            entry = close * (1 + self.slippage)
                             sl = entry - sl_dist
                             tp = entry + atr * self.atr_multiplier_tp
                         else:
+                            entry = close * (1 - self.slippage)
                             sl = entry + sl_dist
                             tp = entry - atr * self.atr_multiplier_tp
 
+                        cost = size * entry * self.commission
                         balance -= cost
                         position = {"side": signal.action.value, "entry": entry, "sl": sl, "tp": tp, "size": size}
 
@@ -133,14 +159,18 @@ class BacktestEngine:
 
         if side == "BUY":
             if candle["low"] <= sl:
-                return (sl - entry) * size, True
+                exit_price = sl * (1 - self.slippage)
+                return (exit_price - entry) * size, True
             if candle["high"] >= tp:
-                return (tp - entry) * size, True
+                exit_price = tp * (1 - self.slippage)
+                return (exit_price - entry) * size, True
         else:
             if candle["high"] >= sl:
-                return (entry - sl) * size, True
+                exit_price = sl * (1 + self.slippage)
+                return (entry - exit_price) * size, True
             if candle["low"] <= tp:
-                return (entry - tp) * size, True
+                exit_price = tp * (1 + self.slippage)
+                return (entry - exit_price) * size, True
         return 0.0, False
 
     def _market_close(self, position: dict, close_price: float) -> float:
@@ -166,7 +196,8 @@ class BacktestEngine:
 
         eq = np.array(equity)
         returns = np.diff(eq) / eq[:-1]
-        sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+        ann_factor = ANNUALIZATION.get(self.timeframe, 252 * 24)
+        sharpe = (returns.mean() / returns.std() * np.sqrt(ann_factor)) if returns.std() > 0 else 0
 
         peak = np.maximum.accumulate(eq)
         drawdowns = (peak - eq) / peak

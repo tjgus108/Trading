@@ -198,6 +198,7 @@ class LSTMSignalGenerator:
         criterion = nn.CrossEntropyLoss()
 
         best_val_loss = float("inf")
+        best_state = {k: v.clone() for k, v in model.state_dict().items()}
         patience = 0
 
         for epoch in range(EPOCHS):
@@ -282,7 +283,7 @@ class LSTMSignalGenerator:
         import torch
         from sklearn.preprocessing import StandardScaler  # type: ignore
 
-        data = torch.load(path, map_location="cpu")
+        data = torch.load(path, map_location="cpu", weights_only=False)
         n_features = data["n_features"]
         model = self._build_torch_model(n_features)
         model.load_state_dict(data["model_state"])

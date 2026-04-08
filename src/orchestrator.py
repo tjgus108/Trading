@@ -15,6 +15,7 @@ import concurrent.futures
 import logging
 import threading
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional
 
 from src.alpha.context import MarketContextBuilder
@@ -34,6 +35,15 @@ from src.strategy.funding_rate import FundingRateStrategy
 from src.strategy.residual_mean_reversion import ResidualMeanReversionStrategy
 from src.strategy.pair_trading import PairTradingStrategy
 from src.strategy.ml_strategy import MLRFStrategy
+from src.strategy.lstm_strategy import MLLSTMStrategy
+from src.strategy.rsi_divergence import RsiDivergenceStrategy
+from src.strategy.bb_squeeze import BbSqueezeStrategy
+from src.strategy.funding_carry import FundingCarryStrategy
+from src.strategy.regime_adaptive import RegimeAdaptiveStrategy
+from src.strategy.lob_strategy import LOBOFIStrategy
+from src.strategy.heston_lstm_strategy import HestonLSTMStrategy
+from src.strategy.cross_exchange_arb import CrossExchangeArbStrategy
+from src.strategy.liquidation_cascade import LiquidationCascadeStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +54,15 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "residual_mean_reversion": ResidualMeanReversionStrategy,
     "pair_trading": PairTradingStrategy,
     "ml_rf": MLRFStrategy,
+    "ml_lstm": MLLSTMStrategy,
+    "rsi_divergence": RsiDivergenceStrategy,
+    "bb_squeeze": BbSqueezeStrategy,
+    "funding_carry": FundingCarryStrategy,
+    "regime_adaptive": RegimeAdaptiveStrategy,
+    "lob_maker": LOBOFIStrategy,
+    "heston_lstm": HestonLSTMStrategy,
+    "cross_exchange_arb": CrossExchangeArbStrategy,
+    "liquidation_cascade": LiquidationCascadeStrategy,
 }
 
 
@@ -95,6 +114,7 @@ class BotOrchestrator:
         self._context_builder: Optional[MarketContextBuilder] = None
         self._demo: bool = False
         self._tournament_interval: int = 72  # C3: 자동 재평가 주기 (캔들 수)
+        self._last_run_date: Optional[date] = None
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -130,9 +150,28 @@ class BotOrchestrator:
     def run_once(self) -> PipelineResult:
         """파이프라인 1회 실행 후 결과 반환."""
         self._assert_ready()
+
+        # 자정 감지: 날짜가 바뀌면 일일 손실 리셋
+        today = date.today()
+        if self._last_run_date is not None and self._last_run_date != today:
+            logger.info("날짜 변경 감지 (%s → %s): 일일 손실 리셋", self._last_run_date, today)
+            if self._risk_manager:
+                self._risk_manager.reset_daily()
+        self._last_run_date = today
+
         result = self._pipeline.run()
         self._handle_result(result)
         self._update_position_from_result(result)
+
+        # CircuitBreaker에 거래 결과 기록 (pnl 정보가 있을 때)
+        if result.pnl != 0.0 and self._risk_manager and self._risk_manager.circuit_breaker:
+            try:
+                balance = self._pipeline._fetch_balance_usd()
+                self._risk_manager.circuit_breaker.record_trade_result(result.pnl, balance)
+                logger.debug("CircuitBreaker.record_trade_result(pnl=%.2f, balance=%.2f)", result.pnl, balance)
+            except Exception as e:
+                logger.warning("circuit_breaker.record_trade_result 실패: %s", e)
+
         self._cycle_count += 1
 
         # 매 24사이클마다 일일 P&L 리포트 (1h 타임프레임 기준 ~24시간)

@@ -88,6 +88,7 @@ class CircuitBreaker:
 
     def reset_daily(self) -> None:
         self._daily_loss = 0.0
+        self._consecutive_losses = 0
 
 
 class RiskManager:
@@ -104,6 +105,11 @@ class RiskManager:
         self.atr_multiplier_tp = atr_multiplier_tp
         self.max_position_size = max_position_size
         self.circuit_breaker = circuit_breaker
+
+    def reset_daily(self) -> None:
+        """자정 리셋: 일일 손실 초기화."""
+        if self.circuit_breaker:
+            self.circuit_breaker.reset_daily()
 
     def evaluate(
         self,

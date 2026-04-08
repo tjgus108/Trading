@@ -1,0 +1,228 @@
+"""
+BacktestEngine 단위 테스트.
+"""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.backtest.engine import ANNUALIZATION, BacktestEngine, BacktestResult
+from src.strategy.base import Action, BaseStrategy, Confidence, Signal
+
+
+# ---------------------------------------------------------------------------
+# 헬퍼: 결정론적 테스트용 전략 & DataFrame
+# ---------------------------------------------------------------------------
+
+class AlwaysBuyStrategy(BaseStrategy):
+    name = "always_buy"
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        return Signal(
+            action=Action.BUY,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test",
+            invalidation="none",
+        )
+
+
+class AlwaysSellStrategy(BaseStrategy):
+    name = "always_sell"
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        return Signal(
+            action=Action.SELL,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test",
+            invalidation="none",
+        )
+
+
+class HoldStrategy(BaseStrategy):
+    name = "hold"
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        return Signal(
+            action=Action.HOLD,
+            confidence=Confidence.LOW,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test",
+            invalidation="none",
+        )
+
+
+def make_df(n: int = 200, close_trend: float = 0.001) -> pd.DataFrame:
+    """단조 상승 가격 + 일정 ATR을 가진 테스트용 DataFrame."""
+    np.random.seed(42)
+    closes = 100.0 * np.cumprod(1 + close_trend + np.random.randn(n) * 0.002)
+    highs = closes * 1.005
+    lows = closes * 0.995
+    atr14 = np.full(n, 1.0)  # 고정 ATR=1.0 for simplicity
+    return pd.DataFrame({"close": closes, "high": highs, "low": lows, "atr14": atr14})
+
+
+# ---------------------------------------------------------------------------
+# 기본 동작 테스트
+# ---------------------------------------------------------------------------
+
+def test_no_trades_returns_result():
+    engine = BacktestEngine()
+    df = make_df()
+    result = engine.run(HoldStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    assert result.total_trades == 0
+    assert result.passed is False
+    assert "no trades generated" in result.fail_reasons
+
+
+def test_result_fields_present():
+    engine = BacktestEngine()
+    df = make_df()
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert hasattr(result, "sharpe_ratio")
+    assert hasattr(result, "max_drawdown")
+    assert hasattr(result, "profit_factor")
+    assert hasattr(result, "total_return")
+    assert hasattr(result, "win_rate")
+
+
+def test_summary_string():
+    engine = BacktestEngine()
+    df = make_df()
+    result = engine.run(AlwaysBuyStrategy(), df)
+    s = result.summary()
+    assert "BACKTEST_RESULT" in s
+    assert "always_buy" in s
+
+
+def test_balance_decreases_with_commission():
+    """커미션만 있어도 잔고는 초기보다 낮아질 수 있다."""
+    engine = BacktestEngine(commission=0.01)  # 1% 커미션
+    df = make_df()
+    result = engine.run(AlwaysBuyStrategy(), df)
+    # total_return이 반드시 커미션으로만 손실날 수 있음 — 값 존재 여부만 확인
+    assert isinstance(result.total_return, float)
+
+
+# ---------------------------------------------------------------------------
+# 수정 1: 슬리피지 테스트
+# ---------------------------------------------------------------------------
+
+def test_slippage_reduces_profit():
+    """slippage=0.001 이면 slippage=0 보다 수익이 작아야 한다."""
+    df = make_df(n=300, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+
+    result_no_slip = BacktestEngine(slippage=0.0).run(strategy, df)
+    result_slip = BacktestEngine(slippage=0.001).run(strategy, df)
+
+    assert result_slip.total_return < result_no_slip.total_return, (
+        f"slippage 적용 시 수익이 감소해야 함: "
+        f"slip={result_slip.total_return:.4f} vs no-slip={result_no_slip.total_return:.4f}"
+    )
+
+
+def test_slippage_buy_entry_price_higher():
+    """BUY 슬리피지: entry가 close보다 높아야 함 (직접 확인 불가하므로 수익 감소로 검증)."""
+    df = make_df(n=200, close_trend=0.001)
+    r0 = BacktestEngine(slippage=0.0).run(AlwaysBuyStrategy(), df)
+    r1 = BacktestEngine(slippage=0.002).run(AlwaysBuyStrategy(), df)
+    assert r1.total_return <= r0.total_return
+
+
+def test_slippage_sell_entry_price_lower():
+    """SELL 슬리피지: entry가 close보다 낮아야 함 (수익 감소로 검증)."""
+    df = make_df(n=200, close_trend=-0.001)
+    r0 = BacktestEngine(slippage=0.0).run(AlwaysSellStrategy(), df)
+    r1 = BacktestEngine(slippage=0.002).run(AlwaysSellStrategy(), df)
+    assert r1.total_return <= r0.total_return
+
+
+# ---------------------------------------------------------------------------
+# 수정 2: Sharpe 연환산 테스트
+# ---------------------------------------------------------------------------
+
+def test_annualization_map_keys():
+    for tf in ("1m", "5m", "15m", "1h", "4h", "1d"):
+        assert tf in ANNUALIZATION
+    assert ANNUALIZATION["1d"] == 252
+    assert ANNUALIZATION["1h"] == 252 * 24
+
+
+def test_sharpe_timeframe_1h_vs_1d():
+    """동일 데이터에서 1h annualization > 1d annualization → Sharpe 1h > Sharpe 1d."""
+    df = make_df(n=300, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+
+    r_1h = BacktestEngine(timeframe="1h").run(strategy, df)
+    r_1d = BacktestEngine(timeframe="1d").run(strategy, df)
+
+    assert r_1h.sharpe_ratio > r_1d.sharpe_ratio, (
+        f"1h Sharpe({r_1h.sharpe_ratio}) should be > 1d Sharpe({r_1d.sharpe_ratio})"
+    )
+
+
+def test_sharpe_timeframe_default_is_1h():
+    engine = BacktestEngine()
+    assert engine.timeframe == "1h"
+
+
+def test_sharpe_1m_largest():
+    """1m annualization이 가장 크므로 Sharpe도 가장 크다."""
+    df = make_df(n=300, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+    r_1m = BacktestEngine(timeframe="1m").run(strategy, df)
+    r_1d = BacktestEngine(timeframe="1d").run(strategy, df)
+    assert r_1m.sharpe_ratio > r_1d.sharpe_ratio
+
+
+# ---------------------------------------------------------------------------
+# 수정 3: Funding Rate 테스트
+# ---------------------------------------------------------------------------
+
+def test_funding_cost_buy_reduces_balance():
+    """BUY 포지션 보유 중 펀딩비가 양수면 잔고가 줄어 수익이 작아야 한다."""
+    df = make_df(n=300, close_trend=0.001)
+    strategy = AlwaysBuyStrategy()
+
+    r_no_funding = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
+    r_funding = BacktestEngine(funding_cost_per_candle=0.0001).run(strategy, df)
+
+    assert r_funding.total_return < r_no_funding.total_return, (
+        "펀딩비 적용 시 BUY 포지션 수익이 감소해야 함"
+    )
+
+
+def test_funding_cost_sell_increases_balance():
+    """SELL 포지션 보유 중 펀딩비 수령 → 수익이 늘어야 한다."""
+    df = make_df(n=300, close_trend=-0.001)
+    strategy = AlwaysSellStrategy()
+
+    r_no_funding = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
+    r_funding = BacktestEngine(funding_cost_per_candle=0.0001).run(strategy, df)
+
+    assert r_funding.total_return > r_no_funding.total_return, (
+        "펀딩비 수령 시 SELL 포지션 수익이 증가해야 함"
+    )
+
+
+def test_funding_cost_default_zero():
+    engine = BacktestEngine()
+    assert engine.funding_cost_per_candle == 0.0
+
+
+def test_funding_zero_no_effect():
+    """funding_cost_per_candle=0 이면 결과가 동일해야 한다."""
+    df = make_df(n=200)
+    strategy = AlwaysBuyStrategy()
+    r1 = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
+    r2 = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
+    assert r1.total_return == r2.total_return

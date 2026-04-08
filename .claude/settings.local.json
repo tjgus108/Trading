@@ -19,7 +19,29 @@
       "Read(//opt/homebrew/**)",
       "Read(//usr/bin/**)",
       "Bash(/usr/bin/python3:*)",
-      "Bash(python3 -m pip install python-dotenv pyyaml ccxt pandas numpy requests --quiet)"
+      "Bash(python3 -m pip install python-dotenv pyyaml ccxt pandas numpy requests --quiet)",
+      "Bash(python3 -m pytest tests/ -q --tb=short)",
+      "Bash(python3 -c \"import pytest; print\\(pytest.__version__\\)\")",
+      "Bash(python3.11 --version)",
+      "Bash(python3.12 --version)",
+      "Read(//usr/local/bin/**)",
+      "Bash(ls /usr/local/bin/python*)",
+      "Bash(ls /opt/homebrew/bin/python*)",
+      "Bash(pytest --version)",
+      "Read(//Users/seohyunhan/.local/bin/**)",
+      "Read(//Users/seohyunhan/Library/Python/3.9/bin/**)",
+      "Read(//Users/seohyunhan/Library/**)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/ -q --tb=short)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_funding_carry.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_regime_adaptive.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_lob_strategy.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_specialist_agents.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_heston_lstm.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_cross_exchange_arb.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_backtest_engine.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_kelly_twap.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_risk_manager.py tests/test_new_strategies.py tests/test_regime_adaptive.py -v)",
+      "Bash(~/Library/Python/3.9/bin/pytest tests/test_liquidation_cascade.py -v)"
     ]
   }
 }

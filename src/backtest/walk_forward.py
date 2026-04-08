@@ -218,7 +218,8 @@ class WalkForwardOptimizer:
                 fail_reasons=["유효 윈도우 없음 (데이터 부족)"],
             )
         best_key = max(param_oos_map, key=lambda k: sum(param_oos_map[k]) / len(param_oos_map[k]))
-        best_final_params = dict(sorted(eval(best_key)))  # str → dict 복원
+        import ast
+        best_final_params = dict(ast.literal_eval(best_key))  # str → dict 복원
 
         import statistics
         oos_sharpes = [wr.oos_sharpe for wr in window_results]
