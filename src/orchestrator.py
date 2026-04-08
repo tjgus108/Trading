@@ -53,6 +53,7 @@ from src.strategy.vwap_reversion import VWAPReversionStrategy
 from src.strategy.volume_breakout import VolumeBreakoutStrategy
 from src.strategy.momentum import MomentumStrategy
 from src.strategy.bb_reversion import BBReversionStrategy
+from src.strategy.candle_pattern import CandlePatternStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volume_breakout": VolumeBreakoutStrategy,
     "momentum": MomentumStrategy,
     "bb_reversion": BBReversionStrategy,
+    "candle_pattern": CandlePatternStrategy,
 }
 
 
