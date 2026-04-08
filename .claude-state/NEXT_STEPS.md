@@ -1,10 +1,63 @@
 # Next Steps
 
-_Last updated: 2026-04-08_
+_Last updated: 2026-04-09_
 
-## Status: **543 passed** | 전략 21종+ | Phase G~L 완료
+## Status: **560 passed** | 전략 22종 | Phase G~L 완료
 
-## 최근 작업 (2026-04-08) — SuperTrend 전략 추가 (6 new tests)
+## 최근 작업 (2026-04-09) — 시장 레짐 자동 감지 추가
+
+- `src/analysis/regime_detector.py` 신규: `SimpleRegimeDetector.detect()` (EMA50 기울기, bull/bear/sideways/unknown)
+- `src/orchestrator.py`:
+  - `from src.analysis.regime_detector import SimpleRegimeDetector` import 추가
+  - `run_once()`: pipeline 실행 전 data fetch → regime 감지 → `logger.info("Market regime: %s", regime)`
+  - `run_tournament()`: 토너먼트 시작 전 동일하게 regime 감지 로그
+- `tests/test_regime_detector.py` 신규: 5개 테스트 (bull/bear/sideways/데이터부족/None) 전부 통과
+
+## 이전 작업 (2026-04-09) — RSI Divergence 버그 수정
+
+- `src/strategy/rsi_divergence.py`:
+  - 버그: 임의 row 비교 → swing high/low pivot 확인 (`_is_swing_high`, `_is_swing_low`)
+  - 버그: 첫 매칭 즉시 return → best divergence % 선택으로 변경 (가장 강한 신호 우선)
+  - 추가: RSI zone 필터 (bearish ≥55, bullish ≤45) — 과잉 신호 억제
+  - 추가: 최소 간격 `_MIN_GAP=3`, lookback `_LOOKBACK_MAX` 15→20 확장
+- `tests/test_new_strategies.py`: 테스트 픽스처 개선 (swing pivot + RSI zone 조건 충족)
+- 555 passed, 11 skipped. commit + push 완료.
+
+## 이전 작업 (2026-04-09) — 토너먼트 상관관계 경고 + BacktestReport 연결
+
+- `src/orchestrator.py`: `run_tournament()` 완료 후 `_check_top3_correlation()` 호출
+  - 상위 3개 전략 win_rate 기반 신호 시뮬레이션 → SignalCorrelationTracker 사용
+  - |r| ≥ 0.7 쌍 발견 시 `logger.warning(...)` 출력
+- `src/backtest/report.py`: `BacktestReport.from_backtest_result()` classmethod 추가
+  - BacktestEngine.BacktestResult → BacktestReport 직접 변환
+- `tests/test_phase_j.py`: `test_from_backtest_result` 테스트 추가
+- `tests/test_tournament.py`: 상관관계 체크 호출 테스트 2개 추가
+- 36 passed. commit + push 완료.
+
+## 이전 작업 (2026-04-09) — SuperTrend 토너먼트 포함 확인 + multiplier 2.5 조정
+
+- 토너먼트 참여 확인: `_EXCLUDE_FROM_TOURNAMENT`에 supertrend 없음 (이미 포함됨)
+- `src/strategy/supertrend.py`: multiplier 기본값 3.0 → 2.5 (신호 빈도 증가)
+- `tests/test_supertrend.py`: multiplier 값 일치 업데이트
+- 553 passed, 11 skipped. commit + push 완료.
+
+## 이전 작업 (2026-04-09) — VWAPReversionStrategy 신규 추가
+
+- `src/strategy/vwap_reversion.py` 신규: VWAPReversionStrategy (name="vwap_reversion")
+  - BUY: close < vwap*0.995 AND rsi14 < 35, HIGH if rsi < 25
+  - SELL: close > vwap*1.005 AND rsi14 > 65, HIGH if rsi > 75
+  - 최소 50행 필요
+- `src/orchestrator.py`: VWAPReversionStrategy import + STRATEGY_REGISTRY 등록
+- `tests/test_vwap_reversion.py` 신규: 9개 테스트 전부 통과
+- 전체 552 passed, 11 skipped. commit + push 완료.
+
+## 이전 작업 (2026-04-09) — bb_squeeze squeeze percentile 완화
+
+- `src/strategy/bb_squeeze.py`: `_SQUEEZE_PERCENTILE` 20 → 30 (신호 빈도 증가)
+- 토너먼트 FAIL 원인: trades=11 < MIN_TRADES=15. percentile 완화로 squeeze 조건 더 자주 충족
+- 테스트 543개 전부 통과. commit + push 완료.
+
+## 이전 작업 (2026-04-08) — SuperTrend 전략 추가 (6 new tests)
 
 - `src/strategy/supertrend.py` 신규: SuperTrendStrategy (ATR 기반 추세 전환, period=10, multiplier=3.0)
 - `src/orchestrator.py`: SuperTrendStrategy import + STRATEGY_REGISTRY "supertrend" 등록
@@ -121,7 +174,7 @@ _Last updated: 2026-04-08_
 
 ---
 
-## STRATEGY_REGISTRY (현재 18종)
+## STRATEGY_REGISTRY (현재 19종)
 | 이름 | 전략 | 상태 |
 |---|---|---|
 | ema_cross | EMA20/50 크로스 | ✅ |
@@ -136,6 +189,7 @@ _Last updated: 2026-04-08_
 | regime_adaptive | HMM 레짐 적응형 RF | ✅ E1 완료 |
 | funding_carry | Funding Rate Cash-and-Carry | ✅ E2 완료 |
 | lob_maker | LOB OFI 마켓메이킹 | 🔨 E3 구현 중 |
+| vwap_reversion | VWAP 이탈 + RSI 회귀 (약세장용) | ✅ |
 
 ---
 
