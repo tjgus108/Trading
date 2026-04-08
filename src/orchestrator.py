@@ -62,6 +62,8 @@ from src.strategy.parabolic_sar import ParabolicSARStrategy
 from src.strategy.adx_trend import ADXTrendStrategy
 from src.strategy.aroon import AroonStrategy
 from src.strategy.cci import CCIStrategy
+from src.strategy.cmf import CMFStrategy
+from src.strategy.trix import TRIXStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -98,6 +100,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "adx_trend": ADXTrendStrategy,
     "aroon": AroonStrategy,
     "cci": CCIStrategy,
+    "cmf": CMFStrategy,
+    "trix": TRIXStrategy,
 }
 
 
