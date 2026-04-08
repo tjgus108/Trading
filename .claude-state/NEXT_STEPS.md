@@ -2,9 +2,23 @@
 
 _Last updated: 2026-04-08_
 
-## Status: Phase A~F 전체 완료 — 전략 15종 | CircuitBreaker 상태 추적 활성화 + 전략 IndexError 방어 완료
+## Status: **419+ passed** | 전략 18종 | G2 완료
 
-## 최근 작업 (2026-04-08)
+## 최근 작업 (2026-04-08) — G2 GEX Signal + CME Basis Spread 전략
+- `src/data/options_feed.py` 신규: GEXFeed (Deribit API), CMEBasisFeed (Binance API), mock() 지원
+- `src/strategy/gex_strategy.py` 신규: GEXStrategy — positive GEX mean-revert / negative GEX 추세추종
+- `src/strategy/cme_basis_strategy.py` 신규: CMEBasisStrategy — basis_annual 기반 캐리 전략
+- `src/orchestrator.py`: gex_signal, cme_basis STRATEGY_REGISTRY 등록
+- `src/strategy/__init__.py`: GEXStrategy, CMEBasisStrategy 추가
+- `tests/test_gex_cme.py` 신규: 14개 테스트
+
+## 이전 작업 (2026-04-08) — G4 DataFeed 캐싱 + 통합 테스트
+- `src/data/feed.py`: `import time` 추가, `__init__`에 `cache_ttl` 파라미터 + `_cache` dict 추가
+- `fetch()` → 캐시 히트/미스 로직으로 교체, 기존 로직은 `_fetch_fresh()`로 이름 변경
+- `invalidate_cache(symbol, timeframe)` 메서드 추가 (전체/부분 무효화)
+- `tests/integration/test_full_pipeline.py` 신규 생성: 4개 통합 테스트 (EMA 백테스트, 캐시, 토너먼트, walk-forward)
+
+## 이전 작업 (2026-04-08)
 - CircuitBreaker.reset_daily(): `_consecutive_losses` 초기화 추가
 - RiskManager.reset_daily(): CircuitBreaker에 위임하는 메서드 추가
 - PipelineResult: `pnl: float = 0.0` 필드 추가
@@ -54,7 +68,7 @@ _Last updated: 2026-04-08_
 
 ---
 
-## STRATEGY_REGISTRY (현재 9종 → Phase E 완료 후 12종)
+## STRATEGY_REGISTRY (현재 18종)
 | 이름 | 전략 | 상태 |
 |---|---|---|
 | ema_cross | EMA20/50 크로스 | ✅ |

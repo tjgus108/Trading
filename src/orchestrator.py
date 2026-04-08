@@ -44,6 +44,8 @@ from src.strategy.lob_strategy import LOBOFIStrategy
 from src.strategy.heston_lstm_strategy import HestonLSTMStrategy
 from src.strategy.cross_exchange_arb import CrossExchangeArbStrategy
 from src.strategy.liquidation_cascade import LiquidationCascadeStrategy
+from src.strategy.gex_strategy import GEXStrategy
+from src.strategy.cme_basis_strategy import CMEBasisStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "heston_lstm": HestonLSTMStrategy,
     "cross_exchange_arb": CrossExchangeArbStrategy,
     "liquidation_cascade": LiquidationCascadeStrategy,
+    "gex_signal": GEXStrategy,
+    "cme_basis": CMEBasisStrategy,
 }
 
 
@@ -150,6 +154,7 @@ class BotOrchestrator:
     def run_once(self) -> PipelineResult:
         """파이프라인 1회 실행 후 결과 반환."""
         self._assert_ready()
+        self._update_funding_rates()
 
         # 자정 감지: 날짜가 바뀌면 일일 손실 리셋
         today = date.today()
@@ -354,6 +359,33 @@ class BotOrchestrator:
             dry_run=self._dry_run,
             context_builder=self._context_builder,
         )
+
+    def _attach_specialist(self) -> None:
+        """F1: SpecialistEnsemble을 파이프라인에 연결."""
+        try:
+            from src.alpha.specialist_agents import SpecialistEnsemble
+            self._pipeline.specialist_ensemble = SpecialistEnsemble()
+            logger.info("SpecialistEnsemble attached")
+        except Exception as e:
+            logger.warning("SpecialistEnsemble 연결 실패: %s", e)
+
+    def attach_specialist(self) -> None:
+        """Public: SpecialistEnsemble 연결 (main.py --specialist 플래그에서 호출)."""
+        self._assert_ready()
+        self._attach_specialist()
+
+    def _update_funding_rates(self) -> None:
+        """FundingRateStrategy가 있으면 펀딩비 업데이트."""
+        try:
+            from src.data.sentiment import SentimentFetcher
+            from src.strategy.funding_rate import FundingRateStrategy
+            if isinstance(self._strategy, FundingRateStrategy):
+                sf = SentimentFetcher()
+                score = sf.get_score()
+                if hasattr(self._strategy, 'update_funding_rate'):
+                    self._strategy.update_funding_rate(score * 0.0001)
+        except Exception as e:
+            logger.debug("펀딩비 업데이트 실패 (무시): %s", e)
 
     def _attach_llm_analyst(self, demo: bool = False) -> None:
         """C2: LLMAnalyst를 파이프라인에 연결. API 키 없으면 mock 모드."""

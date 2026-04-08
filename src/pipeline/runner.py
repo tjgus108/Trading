@@ -11,7 +11,7 @@ from typing import Optional
 from src.data.feed import DataFeed, DataSummary
 from src.exchange.connector import ExchangeConnector
 from src.risk.manager import RiskManager, RiskResult, RiskStatus
-from src.strategy.base import Action, BaseStrategy, Signal
+from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class PipelineResult:
     context_score: Optional[float] = None   # MarketContext composite score
     news_risk: str = "NONE"                 # HIGH | MEDIUM | LOW | NONE
     pnl: float = 0.0                        # 거래 손익 (USD)
+    specialist_action: str = ""             # SpecialistEnsemble 최종 액션
 
     def log_line(self) -> str:
         sig = f"{self.signal.action.value} {self.symbol}" if self.signal else "N/A"
@@ -77,8 +78,9 @@ class TradingPipeline:
         self.timeframe = timeframe
         self.dry_run = dry_run
         self.context_builder = context_builder
-        self.llm_analyst = None   # LLMAnalyst (선택적, C2)
-        self.ensemble = None      # MultiLLMEnsemble (선택적, D1)
+        self.llm_analyst = None          # LLMAnalyst (선택적, C2)
+        self.ensemble = None             # MultiLLMEnsemble (선택적, D1)
+        self.specialist_ensemble = None  # SpecialistEnsemble (선택적, F1)
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -139,7 +141,6 @@ class TradingPipeline:
                     # 앙상블이 강하게 반대하면 HOLD 전환
                     if ens.conflicts_with(signal.action.value):
                         result.notes.append(f"ENSEMBLE conflict → HOLD 전환")
-                        from src.strategy.base import Confidence
                         signal = Signal(
                             action=Action.HOLD,
                             confidence=Confidence.MEDIUM,
@@ -171,6 +172,26 @@ class TradingPipeline:
                         result.notes.append(f"LLM: {llm_note}")
                 except Exception as e:
                     logger.debug("LLM analysis skipped: %s", e)
+
+            # F1: SpecialistEnsemble 신호 검증 (있을 때만)
+            if self.specialist_ensemble is not None:
+                try:
+                    spec_vote = self.specialist_ensemble.analyze(summary.df)
+                    result.specialist_action = spec_vote.action
+                    # spec_vote.action이 signal.action.value와 반대이고 confidence >= 0.7이면 HOLD
+                    if (spec_vote.action != "HOLD" and
+                            spec_vote.action != signal.action.value and
+                            spec_vote.confidence >= 0.7):
+                        signal = Signal(
+                            action=Action.HOLD, confidence=Confidence.LOW,
+                            strategy=signal.strategy, entry_price=signal.entry_price,
+                            reasoning=f"SpecialistEnsemble 충돌: {spec_vote.action} conf={spec_vote.confidence:.2f}",
+                            invalidation="", bull_case="", bear_case="",
+                        )
+                        result.signal = signal
+                        result.notes.append(f"SPECIALIST conflict → HOLD ({spec_vote.action} conf={spec_vote.confidence:.2f})")
+                except Exception as e:
+                    logger.debug("SpecialistEnsemble check failed: %s", e)
 
             # HOLD는 리스크/실행 건너뜀
             if signal.action == Action.HOLD:

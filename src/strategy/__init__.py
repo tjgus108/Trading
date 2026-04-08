@@ -14,6 +14,8 @@ from .lob_strategy import LOBOFIStrategy
 from .heston_lstm_strategy import HestonLSTMStrategy
 from .cross_exchange_arb import CrossExchangeArbStrategy
 from .liquidation_cascade import LiquidationCascadeStrategy
+from .gex_strategy import GEXStrategy
+from .cme_basis_strategy import CMEBasisStrategy
 
 __all__ = [
     "BaseStrategy",
@@ -33,4 +35,6 @@ __all__ = [
     "HestonLSTMStrategy",
     "CrossExchangeArbStrategy",
     "LiquidationCascadeStrategy",
+    "GEXStrategy",
+    "CMEBasisStrategy",
 ]

@@ -4,6 +4,7 @@ data-agent가 이 모듈을 사용한다.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -28,10 +29,33 @@ class DataSummary:
 
 
 class DataFeed:
-    def __init__(self, connector: ExchangeConnector):
+    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60):
         self.connector = connector
+        self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
+        self._cache_ttl = cache_ttl  # 초
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
+        key = (symbol, timeframe, limit)
+        now = time.time()
+        if key in self._cache:
+            cached_summary, ts = self._cache[key]
+            if now - ts < self._cache_ttl:
+                return cached_summary  # 캐시 히트
+        # 캐시 미스: 실제 fetch
+        summary = self._fetch_fresh(symbol, timeframe, limit)
+        self._cache[key] = (summary, now)
+        return summary
+
+    def invalidate_cache(self, symbol=None, timeframe=None):
+        """특정 심볼/타임프레임 또는 전체 캐시 무효화."""
+        if symbol is None and timeframe is None:
+            self._cache.clear()
+        else:
+            keys_to_del = [k for k in self._cache if k[0] == symbol or k[1] == timeframe]
+            for k in keys_to_del:
+                del self._cache[k]
+
+    def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
         df = self._to_dataframe(raw)
         missing = self._count_missing(df, timeframe)
