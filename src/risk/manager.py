@@ -5,9 +5,13 @@ LLM이 직접 수치를 계산하지 않고 이 코드가 처리한다.
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
+import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +110,50 @@ class RiskManager:
         self.max_position_size = max_position_size
         self.circuit_breaker = circuit_breaker
 
+    # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
+
+    @staticmethod
+    def adaptive_stop_multiplier(
+        df: Optional[pd.DataFrame],
+        window: int = 20,
+        annualization: int = 252 * 24,  # 1h 기준
+        low_vol_threshold: float = 0.3,
+        high_vol_threshold: float = 0.6,
+    ) -> float:
+        """최근 realized_vol 기반으로 ATR SL multiplier를 자동 조정.
+
+        realized_vol = std(log_returns, window) * sqrt(annualization)
+
+        - vol < low_vol_threshold  → 1.2  (저변동: 타이트)
+        - low <= vol < high        → 1.5  (중변동: 기본)
+        - vol >= high_vol_threshold → 2.5  (고변동: 넓게)
+
+        df가 None이거나 캔들 수 부족 시 기본값 1.5 반환.
+        """
+        if df is None or len(df) < 2:
+            return 1.5
+
+        closes = df["close"].values[-window:]
+        if len(closes) < 2:
+            return 1.5
+
+        log_returns = np.diff(np.log(closes.astype(float)))
+        std = float(np.std(log_returns, ddof=1))
+        realized_vol = std * math.sqrt(annualization)
+
+        if realized_vol < low_vol_threshold:
+            mult = 1.2
+        elif realized_vol < high_vol_threshold:
+            mult = 1.5
+        else:
+            mult = 2.5
+
+        logger.debug(
+            "adaptive_stop_multiplier: realized_vol=%.4f → multiplier=%.1f",
+            realized_vol, mult,
+        )
+        return mult
+
     def reset_daily(self) -> None:
         """자정 리셋: 일일 손실 초기화."""
         if self.circuit_breaker:
@@ -118,6 +166,7 @@ class RiskManager:
         atr: float,
         account_balance: float,
         last_candle_pct_change: float = 0.0,
+        candle_df: Optional[pd.DataFrame] = None,  # adaptive multiplier용
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -145,8 +194,12 @@ class RiskManager:
                     portfolio_exposure=None,
                 )
 
-        # 포지션 사이징
-        sl_distance = atr * self.atr_multiplier_sl
+        # 포지션 사이징 (candle_df 있으면 adaptive multiplier, 없으면 config 값 사용)
+        if candle_df is not None:
+            sl_mult = self.adaptive_stop_multiplier(candle_df)
+        else:
+            sl_mult = self.atr_multiplier_sl
+        sl_distance = atr * sl_mult
         risk_amount = account_balance * self.risk_per_trade
         position_size = risk_amount / sl_distance
 
