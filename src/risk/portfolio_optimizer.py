@@ -26,6 +26,8 @@ class OptimizationResult:
     expected_return: float          # 연환산 기대수익률
     expected_volatility: float      # 연환산 변동성
     sharpe_ratio: float
+    var_95: float = 0.0             # 일간 95% VaR (손실, 양수)
+    cvar_95: float = 0.0            # 일간 95% CVaR / Expected Shortfall
 
     def summary(self) -> str:
         w_str = ", ".join(f"{s}: {v:.4f}" for s, v in self.weights.items())
@@ -34,7 +36,9 @@ class OptimizationResult:
             f"Weights: {{{w_str}}} | "
             f"E[R]: {self.expected_return:.4f} | "
             f"Vol: {self.expected_volatility:.4f} | "
-            f"Sharpe: {self.sharpe_ratio:.4f}"
+            f"Sharpe: {self.sharpe_ratio:.4f} | "
+            f"VaR95: {self.var_95:.4f} | "
+            f"CVaR95: {self.cvar_95:.4f}"
         )
 
 
@@ -114,6 +118,9 @@ class PortfolioOptimizer:
         ann_v = float(port_returns.std()) * np.sqrt(self.annualization)
         sharpe = (ann_r - self.risk_free_rate) / ann_v if ann_v > 0 else 0.0
 
+        # VaR / CVaR (95%, 일간, 손실은 양수)
+        var_95, cvar_95 = self._compute_var_cvar(port_returns, confidence=0.95)
+
         weights_dict = {sym: float(w) for sym, w in zip(symbols, weights_arr)}
 
         return OptimizationResult(
@@ -122,7 +129,30 @@ class PortfolioOptimizer:
             expected_return=ann_r,
             expected_volatility=ann_v,
             sharpe_ratio=sharpe,
+            var_95=var_95,
+            cvar_95=cvar_95,
         )
+
+    @staticmethod
+    def _compute_var_cvar(
+        port_returns: np.ndarray, confidence: float = 0.95
+    ) -> tuple:
+        """VaR과 CVaR 계산 (손실 기준, 양수 반환).
+
+        Args:
+            port_returns: 포트폴리오 수익률 배열
+            confidence: 신뢰 수준 (0.95 = 95%)
+
+        Returns:
+            (var, cvar) — 양수 (손실)
+        """
+        sorted_r = np.sort(port_returns)
+        cutoff_idx = int(len(sorted_r) * (1 - confidence))
+        if cutoff_idx <= 0:
+            cutoff_idx = 1
+        var = -float(sorted_r[cutoff_idx])
+        cvar = -float(sorted_r[:cutoff_idx].mean()) if cutoff_idx > 0 else var
+        return max(0.0, var), max(0.0, cvar)
 
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
         """min/max clipping 후 반복 재정규화 (수렴 보장)."""

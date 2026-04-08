@@ -142,3 +142,38 @@ def test_summary_string():
     assert isinstance(s, str)
     assert len(s) > 0
     assert "equal_weight" in s
+
+
+# ── VaR / CVaR ───────────────────────────────────────────────────────────────
+
+def test_var_cvar_fields():
+    """OptimizationResult에 var_95, cvar_95 필드 존재 확인."""
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(make_returns())
+    assert hasattr(result, "var_95")
+    assert hasattr(result, "cvar_95")
+    assert isinstance(result.var_95, float)
+    assert isinstance(result.cvar_95, float)
+
+
+def test_var_non_negative():
+    """VaR, CVaR는 항상 0 이상."""
+    opt = PortfolioOptimizer(method="risk_parity")
+    result = opt.optimize(make_returns())
+    assert result.var_95 >= 0.0
+    assert result.cvar_95 >= 0.0
+
+
+def test_cvar_gte_var():
+    """CVaR(Expected Shortfall) >= VaR 이어야 함."""
+    opt = PortfolioOptimizer(method="mean_variance")
+    result = opt.optimize(make_returns())
+    assert result.cvar_95 >= result.var_95 - 1e-9
+
+
+def test_var_summary_contains_var():
+    """summary() 문자열에 VaR95 포함."""
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(make_returns())
+    assert "VaR95" in result.summary()
+    assert "CVaR95" in result.summary()

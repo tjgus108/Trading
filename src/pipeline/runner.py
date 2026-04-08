@@ -11,6 +11,8 @@ from typing import Optional
 from src.data.feed import DataFeed, DataSummary
 from src.exchange.connector import ExchangeConnector
 from src.risk.manager import RiskManager, RiskResult, RiskStatus
+from src.risk.kelly_sizer import KellySizer
+from src.exchange.twap import TWAPExecutor
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
 logger = logging.getLogger(__name__)
@@ -81,6 +83,9 @@ class TradingPipeline:
         self.llm_analyst = None          # LLMAnalyst (선택적, C2)
         self.ensemble = None             # MultiLLMEnsemble (선택적, D1)
         self.specialist_ensemble = None  # SpecialistEnsemble (선택적, F1)
+        self.kelly_sizer: Optional[KellySizer] = None    # H1: Kelly position sizer
+        self.twap_executor: Optional[TWAPExecutor] = None  # H4: TWAP order execution
+        self._trade_history: list[dict] = []             # H1: 거래 기록 (kelly 계산용)
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -229,6 +234,23 @@ class TradingPipeline:
                 logger.warning("[pipeline] risk BLOCKED: %s", risk_result.reason)
                 return result
 
+            # H1: Kelly Sizer — 거래 이력 충분할 때 position_size 재계산
+            if self.kelly_sizer is not None and len(self._trade_history) >= 10:
+                try:
+                    kelly_size = KellySizer.from_trade_history(
+                        trades=self._trade_history,
+                        capital=balance,
+                        price=signal.entry_price,
+                        atr=float(last.get("atr14", 0)) or None,
+                        target_atr=None,
+                    )
+                    if kelly_size > 0:
+                        risk_result.position_size = kelly_size
+                        result.notes.append(f"Kelly size: {kelly_size:.6f}")
+                        logger.info("[pipeline] Kelly size=%.6f", kelly_size)
+                except Exception as e:
+                    logger.debug("Kelly sizing failed: %s", e)
+
             logger.info("[pipeline] risk APPROVED — size=%.4f", risk_result.position_size)
         except Exception as e:
             result.pipeline_step = "risk"
@@ -252,20 +274,44 @@ class TradingPipeline:
 
         try:
             side = "buy" if signal.action == Action.BUY else "sell"
-            order = self.connector.create_order(
-                symbol=self.symbol,
-                side=side,
-                amount=risk_result.position_size,
-            )
-            fill = self.connector.wait_for_fill(order["id"], self.symbol)
-            result.execution = {
-                "status": fill.get("status", "UNKNOWN"),
-                "order_id": fill.get("id"),
-                "filled_size": fill.get("filled"),
-                "avg_price": fill.get("average"),
-            }
-            result.pipeline_step = "execution"
-            logger.info("[pipeline] execution status=%s", fill.get("status"))
+
+            # H4: TWAP 실행 (twap_executor 설정 시)
+            if self.twap_executor is not None:
+                twap_result = self.twap_executor.execute(
+                    connector=self.connector,
+                    symbol=self.symbol,
+                    side=side,
+                    total_qty=risk_result.position_size,
+                )
+                result.execution = {
+                    "status": "TWAP_COMPLETE",
+                    "slices": twap_result.slices_executed,
+                    "avg_price": twap_result.avg_price,
+                    "filled_size": twap_result.total_qty,
+                    "slippage_pct": twap_result.estimated_slippage_pct,
+                }
+                result.pipeline_step = "execution"
+                logger.info(
+                    "[pipeline] TWAP done slices=%d avg=%.2f slip=%.4f%%",
+                    twap_result.slices_executed,
+                    twap_result.avg_price,
+                    twap_result.estimated_slippage_pct,
+                )
+            else:
+                order = self.connector.create_order(
+                    symbol=self.symbol,
+                    side=side,
+                    amount=risk_result.position_size,
+                )
+                fill = self.connector.wait_for_fill(order["id"], self.symbol)
+                result.execution = {
+                    "status": fill.get("status", "UNKNOWN"),
+                    "order_id": fill.get("id"),
+                    "filled_size": fill.get("filled"),
+                    "avg_price": fill.get("average"),
+                }
+                result.pipeline_step = "execution"
+                logger.info("[pipeline] execution status=%s", fill.get("status"))
         except Exception as e:
             result.pipeline_step = "execution"
             result.status = "ERROR"
