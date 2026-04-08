@@ -100,7 +100,7 @@ def main() -> None:
     # ── 단일 심볼 모드 ────────────────────────────────────────────────────
     orch = BotOrchestrator(cfg)
     try:
-        orch.startup(dry_run=dry_run, demo=args.demo)
+        orch.startup(dry_run=dry_run, demo=args.demo, skip_backtest_gate=args.tournament)
     except OrchestratorError as e:
         print(f"STARTUP FAILED: {e}")
         sys.exit(1)

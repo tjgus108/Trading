@@ -128,11 +128,12 @@ class BotOrchestrator:
 
     # ── Public API ───────────────────────────────────────────────────────
 
-    def startup(self, dry_run: bool = True, demo: bool = False) -> None:
+    def startup(self, dry_run: bool = True, demo: bool = False, skip_backtest_gate: bool = False) -> None:
         """
         컴포넌트 초기화 + backtest gate.
         demo=True: MockExchangeConnector 사용 (API 키 불필요)
         live 모드일 때 backtest FAIL이면 OrchestratorError 발생.
+        skip_backtest_gate=True: 토너먼트 모드 등에서 게이트 건너뜀.
         """
         self._dry_run = dry_run
         self._demo = demo
@@ -147,7 +148,7 @@ class BotOrchestrator:
         self._build_pipeline()
         self._attach_llm_analyst(demo=demo)
 
-        if not dry_run:
+        if not dry_run and not skip_backtest_gate:
             self._backtest_gate()
 
         self._notifier.notify_startup(
