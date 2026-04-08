@@ -226,6 +226,7 @@ class TradingPipeline:
                 atr=last["atr14"],
                 account_balance=balance,
                 last_candle_pct_change=last_candle_pct,
+                candle_df=summary.df,
             )
             result.risk = risk_result
             result.pipeline_step = "risk"
