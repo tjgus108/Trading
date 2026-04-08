@@ -9,6 +9,11 @@ E2. Funding Rate Cash-and-Carry 전략.
 실증: Sharpe 1.66~3.5, Calmar 5~10 (ScienceDirect 2025)
 
 df에 "funding_rate" 컬럼 있으면 사용, 없으면 RSI14 proxy 사용.
+
+개선 (v2):
+  - ATR 기반 스탑로스: entry 기준 atr_stop_mult × ATR 하락 시 강제 청산
+  - RSI 과매도 필터: 진입 시 RSI < rsi_floor 이면 진입 차단 (추세 추락 방어)
+  - 음수 펀딩비 즉시 청산: fr < 0 은 캐리가 손해이므로 SELL 우선 처리
 """
 
 import logging
@@ -25,10 +30,11 @@ ANNUALIZE = 3 * 365
 
 class FundingCarryStrategy(BaseStrategy):
     """
-    펀딩비 Cash-and-Carry 전략.
+    펀딩비 Cash-and-Carry 전략 (v2).
 
     entry_threshold 이상 펀딩비 → BUY (캐리 진입)
     exit_threshold 미만 펀딩비  → SELL (포지션 청산)
+    ATR 스탑로스 + RSI 진입 필터로 드로다운 방어.
     """
 
     name = "funding_carry"
@@ -38,15 +44,20 @@ class FundingCarryStrategy(BaseStrategy):
         entry_threshold: float = 0.0003,   # +0.03%: 연 환산 ~32.85% 이상
         exit_threshold: float = 0.0001,    # +0.01%: 펀딩비 낮아지면 청산
         min_holding_candles: int = 8,      # 최소 8캔들 보유 (조기청산 방지)
+        atr_stop_mult: float = 2.0,        # ATR 스탑로스 배수 (entry - mult*ATR)
+        rsi_floor: float = 35.0,           # 진입 시 RSI 최소값 (이하면 진입 차단)
     ):
         self.entry_threshold = entry_threshold
         self.exit_threshold = exit_threshold
         self.min_holding_candles = min_holding_candles
+        self.atr_stop_mult = atr_stop_mult
+        self.rsi_floor = rsi_floor
 
     def generate(self, df: pd.DataFrame) -> Signal:
         last = self._last(df)
         entry = last["close"]
         rsi = last.get("rsi14", 50.0)
+        atr = last.get("atr14", 0.0)
 
         # funding_rate 컬럼 유무에 따라 분기
         if "funding_rate" in df.columns:
@@ -57,15 +68,46 @@ class FundingCarryStrategy(BaseStrategy):
         ann = fr * ANNUALIZE * 100  # 연 환산 %
 
         reasoning_base = f"funding_rate={fr:.4f}, 연환산={ann:.1f}%"
+        stop_price = entry - self.atr_stop_mult * atr if atr > 0 else None
+        stop_note = (
+            f"스탑로스={stop_price:.2f} (ATR×{self.atr_stop_mult})"
+            if stop_price is not None
+            else "ATR 없음"
+        )
+
+        # 음수 펀딩비: 캐리 손해 → 즉시 청산
+        if fr < 0:
+            return Signal(
+                action=Action.SELL,
+                confidence=Confidence.HIGH,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"음수 펀딩비 즉시 청산: {reasoning_base}",
+                invalidation=f"funding_rate > {self.entry_threshold:.4f} 재진입",
+                bull_case="",
+                bear_case="음수 펀딩비: 숏 포지션이 펀딩비 지불 → 손해",
+            )
 
         if fr > self.entry_threshold:
+            # RSI 과매도 구간이면 추세 추락 위험 → 진입 차단
+            if rsi < self.rsi_floor:
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=entry,
+                    reasoning=f"진입 차단: RSI={rsi:.1f} < {self.rsi_floor} (추세 추락 위험), {reasoning_base}",
+                    invalidation=f"RSI > {self.rsi_floor} 회복 시 재검토",
+                    bull_case="펀딩비 조건 충족, RSI 회복 대기",
+                    bear_case="과매도 추세에서 캐리 진입 시 드로다운 위험",
+                )
             return Signal(
                 action=Action.BUY,
                 confidence=Confidence.HIGH,
                 strategy=self.name,
                 entry_price=entry,
-                reasoning=f"Cash-and-carry 진입: {reasoning_base} > {self.entry_threshold:.4f}",
-                invalidation=f"funding_rate < {self.exit_threshold:.4f} 또는 음수 전환",
+                reasoning=f"Cash-and-carry 진입: {reasoning_base} > {self.entry_threshold:.4f}, {stop_note}",
+                invalidation=f"funding_rate < {self.exit_threshold:.4f} 또는 음수 전환 또는 {stop_note}",
                 bull_case=f"펀딩비 {ann:.1f}% 수익 수집, 시장중립 헷지",
                 bear_case="펀딩비 급락 시 조기청산 필요",
             )

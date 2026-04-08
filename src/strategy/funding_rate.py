@@ -21,10 +21,10 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 logger = logging.getLogger(__name__)
 
-# 펀딩비 임계값 (Binance 기본: 0.01%, 과열 기준 3배)
-LONG_EXTREME = 0.0003   # +0.03%: 롱 과밀 → 숏
-SHORT_EXTREME = -0.0001  # -0.01%: 숏 과밀 → 롱
-VERY_EXTREME = 0.0005    # +0.05%: 매우 강한 롱 과밀
+# 펀딩비 임계값 (Binance 기본: 0.01%, 완화된 기준으로 신호 빈도 향상)
+LONG_EXTREME = 0.00015  # +0.015%: 롱 과밀 → 숏 (기존 0.03% → 완화)
+SHORT_EXTREME = -0.00005  # -0.005%: 숏 과밀 → 롱 (기존 -0.01% → 완화)
+VERY_EXTREME = 0.0003    # +0.03%: 매우 강한 롱 과밀 (기존 0.05% → 완화)
 
 
 class FundingRateStrategy(BaseStrategy):
@@ -87,8 +87,8 @@ class FundingRateStrategy(BaseStrategy):
 
         # 롱 과밀: 숏 진입
         if fr >= self.long_threshold:
-            # RSI 추가 확인 (선택): 과매수권이면 신호 강화
-            if self.rsi_confirm and rsi < 45:
+            # RSI 추가 확인 (선택): 과매수권이면 신호 강화 (임계값 완화: 45→55)
+            if self.rsi_confirm and rsi < 55:
                 # 펀딩비는 과열이지만 RSI가 아직 안 떨어졌으면 MEDIUM
                 confidence = Confidence.MEDIUM
             else:
@@ -106,7 +106,7 @@ class FundingRateStrategy(BaseStrategy):
 
         # 숏 과밀: 롱 진입
         if fr <= self.short_threshold:
-            if self.rsi_confirm and rsi > 55:
+            if self.rsi_confirm and rsi > 45:  # 임계값 완화: 55→45
                 confidence = Confidence.MEDIUM
             else:
                 confidence = Confidence.HIGH
