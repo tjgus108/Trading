@@ -66,6 +66,10 @@ from src.strategy.cmf import CMFStrategy
 from src.strategy.trix import TRIXStrategy
 from src.strategy.mfi import MFIStrategy
 from src.strategy.obv import OBVStrategy
+from src.strategy.keltner_channel import KeltnerChannelStrategy
+from src.strategy.price_channel import PriceChannelStrategy
+from src.strategy.pivot_points import PivotPointsStrategy
+from src.strategy.elder_ray import ElderRayStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -106,6 +110,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trix": TRIXStrategy,
     "mfi": MFIStrategy,
     "obv": OBVStrategy,
+    "keltner_channel": KeltnerChannelStrategy,
+    "price_channel": PriceChannelStrategy,
+    "pivot_points": PivotPointsStrategy,
+    "elder_ray": ElderRayStrategy,
 }
 
 
