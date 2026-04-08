@@ -49,41 +49,74 @@ def _base_df(n: int = 120) -> pd.DataFrame:
 
 
 def _df_with_bearish_divergence(n: int = 120) -> pd.DataFrame:
-    """Craft a DataFrame where the last completed candle shows bearish RSI divergence."""
+    """Craft a DataFrame where the last completed candle shows bearish RSI divergence.
+
+    Strategy requires:
+    - ref point is a swing high (local max within ±2 bars)
+    - ref RSI >= 55 (bearish zone)
+    - current price high > ref price high (higher high)
+    - current RSI < ref RSI (lower RSI high)
+    - min 3 candle gap between ref and current
+    """
     df = _base_df(n)
-    # Set price higher high but RSI lower high at the last two meaningful points
-    # Last completed candle = iloc[-2]; earlier reference = iloc[-8]
+    # ref at iloc[-8], last completed at iloc[-2] → 6 candle gap (>= _MIN_GAP=3)
     ref_idx = -8
     last_idx = -2
 
-    ref_price = float(df["high"].iloc[ref_idx])
-    # Make last high strictly greater than reference high
-    df.iloc[last_idx, df.columns.get_loc("high")] = ref_price * 1.05
+    # Force ref to be a swing high: set surrounding bars lower
+    ref_price = 52000.0
+    for offset in range(-2, 3):
+        col = "high"
+        idx = ref_idx + offset
+        if offset == 0:
+            df.iloc[idx, df.columns.get_loc(col)] = ref_price
+        else:
+            df.iloc[idx, df.columns.get_loc(col)] = ref_price * 0.97
 
-    # Make RSI at last candle strictly less than at reference candle
-    ref_rsi = float(df["rsi14"].iloc[ref_idx])
-    target_rsi = max(ref_rsi - 10, 20)
-    df.iloc[last_idx, df.columns.get_loc("rsi14")] = target_rsi
+    # Set ref RSI in bearish zone (>= 55)
+    df.iloc[ref_idx, df.columns.get_loc("rsi14")] = 68.0
+
+    # Current candle: price higher high, RSI lower than ref
+    df.iloc[last_idx, df.columns.get_loc("high")] = ref_price * 1.05  # +5% price
+    df.iloc[last_idx, df.columns.get_loc("rsi14")] = 50.0  # < 68 → bearish div
+
+    # Prevent accidental bullish divergence: keep current low above all ref lows
+    df.iloc[last_idx, df.columns.get_loc("low")] = float(df["low"].iloc[-20:-3].max()) * 1.01
+
     return df
 
 
 def _df_with_bullish_divergence(n: int = 120) -> pd.DataFrame:
-    """Craft a DataFrame where the last completed candle shows bullish RSI divergence only."""
+    """Craft a DataFrame where the last completed candle shows bullish RSI divergence only.
+
+    Strategy requires:
+    - ref point is a swing low (local min within ±2 bars)
+    - ref RSI <= 45 (bullish zone)
+    - current price low < ref price low (lower low)
+    - current RSI > ref RSI (higher RSI low)
+    - min 3 candle gap between ref and current
+    """
     df = _base_df(n)
     ref_idx = -8
     last_idx = -2
 
-    ref_low = float(df["low"].iloc[ref_idx])
-    # Make last low strictly lower (bullish divergence setup)
-    df.iloc[last_idx, df.columns.get_loc("low")] = ref_low * 0.95
+    # Force ref to be a swing low: set surrounding bars higher
+    ref_low = 48000.0
+    for offset in range(-2, 3):
+        idx = ref_idx + offset
+        if offset == 0:
+            df.iloc[idx, df.columns.get_loc("low")] = ref_low
+        else:
+            df.iloc[idx, df.columns.get_loc("low")] = ref_low * 1.03
 
-    # Make RSI at last candle strictly higher than at reference (bullish divergence)
-    ref_rsi = float(df["rsi14"].iloc[ref_idx])
-    target_rsi = min(ref_rsi + 10, 80)
-    df.iloc[last_idx, df.columns.get_loc("rsi14")] = target_rsi
+    # Set ref RSI in bullish zone (<= 45)
+    df.iloc[ref_idx, df.columns.get_loc("rsi14")] = 32.0
+
+    # Current candle: price lower low, RSI higher than ref
+    df.iloc[last_idx, df.columns.get_loc("low")] = ref_low * 0.95  # -5% price
+    df.iloc[last_idx, df.columns.get_loc("rsi14")] = 42.0  # > 32, still <= 45
 
     # Prevent bearish divergence: ensure last high <= all earlier highs in the window
-    # so that price-higher-high condition is NOT met
     window_highs = df["high"].iloc[-20:-2]
     min_high_in_window = float(window_highs.min())
     df.iloc[last_idx, df.columns.get_loc("high")] = min_high_in_window * 0.98
