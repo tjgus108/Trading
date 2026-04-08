@@ -67,6 +67,8 @@ class OrchestratorStatusProvider(StatusProvider):
                     orch._risk_manager.circuit_breaker, "_consecutive_losses", 0
                 ) if orch._risk_manager and orch._risk_manager.circuit_breaker else 0,
             },
+            "regime": getattr(orch, "_last_regime", None),
+            "last_tournament_winner": getattr(orch, "_last_tournament_winner", None),
         }
 
 
@@ -154,6 +156,10 @@ def _render_html(data: dict) -> str:
     cb = data.get("circuit_breaker", {})
     daily_loss_pct = cb.get("daily_loss", 0) * 100
     consec = cb.get("consecutive_losses", 0)
+    regime = data.get("regime") or "—"
+    tournament_winner = data.get("last_tournament_winner") or "—"
+    regime_color_map = {"bull": "#4caf50", "bear": "#f44336", "sideways": "#ff9800"}
+    regime_color = regime_color_map.get(regime, "#aaa")
 
     # 멀티 봇 섹션
     bots_html = ""
@@ -201,6 +207,10 @@ def _render_html(data: dict) -> str:
     <div class="value">{daily_loss_pct:.1f}%</div></div>
   <div class="stat"><div class="label">Consec Losses</div>
     <div class="value">{consec}</div></div>
+  <div class="stat"><div class="label">Market Regime</div>
+    <div class="value" style="color:{regime_color}">{regime}</div></div>
+  <div class="stat"><div class="label">Tournament Winner</div>
+    <div class="value">{tournament_winner}</div></div>
 </div>
 
 <h2>Open Positions</h2>
