@@ -74,6 +74,7 @@ from src.strategy.elder_ray import ElderRayStrategy
 from src.strategy.vortex import VortexStrategy
 from src.strategy.dpo import DPOStrategy
 from src.strategy.stc import STCStrategy
+from src.strategy.dema_cross import DEMACrossStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "vortex": VortexStrategy,
     "dpo": DPOStrategy,
     "stc": STCStrategy,
+    "dema_cross": DEMACrossStrategy,
 }
 
 
