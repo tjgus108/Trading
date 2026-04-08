@@ -1,4 +1,5 @@
 from .base import BaseStrategy, Signal
+from .macd_strategy import MACDStrategy
 from .ema_cross import EmaCrossStrategy
 from .donchian_breakout import DonchianBreakoutStrategy
 from .funding_rate import FundingRateStrategy
@@ -37,4 +38,5 @@ __all__ = [
     "LiquidationCascadeStrategy",
     "GEXStrategy",
     "CMEBasisStrategy",
+    "MACDStrategy",
 ]
