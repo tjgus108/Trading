@@ -46,6 +46,7 @@ from src.strategy.cross_exchange_arb import CrossExchangeArbStrategy
 from src.strategy.liquidation_cascade import LiquidationCascadeStrategy
 from src.strategy.gex_strategy import GEXStrategy
 from src.strategy.cme_basis_strategy import CMEBasisStrategy
+from src.strategy.supertrend import SuperTrendStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "liquidation_cascade": LiquidationCascadeStrategy,
     "gex_signal": GEXStrategy,
     "cme_basis": CMEBasisStrategy,
+    "supertrend": SuperTrendStrategy,
 }
 
 
@@ -251,7 +253,11 @@ class BotOrchestrator:
             TournamentResult (rankings + winner)
         """
         self._assert_ready()
-        names = candidates or list(STRATEGY_REGISTRY.keys())
+        # 외부 API 의존 전략은 토너먼트 기본 목록에서 제외 (타임아웃 방지)
+        _EXCLUDE_FROM_TOURNAMENT = {"gex_signal", "cme_basis", "cross_exchange_arb"}
+        names = candidates or [
+            k for k in STRATEGY_REGISTRY.keys() if k not in _EXCLUDE_FROM_TOURNAMENT
+        ]
         logger.info("Tournament starting — candidates: %s", names)
 
         strategies = []

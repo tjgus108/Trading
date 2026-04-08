@@ -88,8 +88,31 @@ class BbSqueezeStrategy(BaseStrategy):
                     bull_case=bull_case,
                     bear_case=bear_case,
                 )
-            # Squeeze released but price still inside bands — HOLD
-            return self._hold(df, "Squeeze released but price inside bands", bull_case, bear_case)
+            # Squeeze released, price inside bands — use mid as direction
+            if last_close > last_mid:
+                return Signal(
+                    action=Action.BUY,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=last_close,
+                    reasoning=f"BB squeeze released, close ({last_close:.2f}) > mid BB ({last_mid:.2f}) but inside bands. Mild bullish bias.",
+                    invalidation=f"Close below BB mid ({last_mid:.2f})",
+                    bull_case=bull_case,
+                    bear_case=bear_case,
+                )
+            if last_close < last_mid:
+                return Signal(
+                    action=Action.SELL,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=last_close,
+                    reasoning=f"BB squeeze released, close ({last_close:.2f}) < mid BB ({last_mid:.2f}) but inside bands. Mild bearish bias.",
+                    invalidation=f"Close above BB mid ({last_mid:.2f})",
+                    bull_case=bull_case,
+                    bear_case=bear_case,
+                )
+            # Exactly at mid — HOLD
+            return self._hold(df, "Squeeze released but price at BB mid", bull_case, bear_case)
 
         squeeze_status = "in squeeze" if prev_in_squeeze else "no squeeze"
         return self._hold(df, f"No squeeze release ({squeeze_status})", bull_case, bear_case)

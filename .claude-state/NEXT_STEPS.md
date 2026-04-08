@@ -2,9 +2,20 @@
 
 _Last updated: 2026-04-08_
 
-## Status: **537 passed** | 전략 20종+ | Phase G~L 완료
+## Status: **543 passed** | 전략 21종+ | Phase G~L 완료
 
-## 최근 작업 (2026-04-08) — Phase G~L 완료 (537 tests)
+## 최근 작업 (2026-04-08) — SuperTrend 전략 추가 (6 new tests)
+
+- `src/strategy/supertrend.py` 신규: SuperTrendStrategy (ATR 기반 추세 전환, period=10, multiplier=3.0)
+- `src/orchestrator.py`: SuperTrendStrategy import + STRATEGY_REGISTRY "supertrend" 등록
+- `tests/test_supertrend.py` 신규: 6개 테스트 (이름, BUY/SELL/HOLD 신호, 데이터 부족, signal 필드)
+
+## 이전 작업 (2026-04-08) — bb_squeeze 완화 + MIN_TRADES 조정 (537 tests)
+
+- `src/backtest/engine.py`: MIN_TRADES 30 → 15 (고품질 저빈도 전략 허용)
+- `src/strategy/bb_squeeze.py`: squeeze release 시 price inside bands에도 mid 기준 BUY/SELL MEDIUM 신호 추가 (신호 빈도 대폭 증가)
+
+## 이전 작업 (2026-04-08) — Phase G~L 완료 (537 tests)
 
 ### Phase H — 고급 리스크 & 적응형 전략 선택
 - H1: KellySizer 파이프라인 통합 (거래 이력 10건 이상 시 position_size 재계산)

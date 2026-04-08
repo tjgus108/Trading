@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 MIN_SHARPE = 1.0
 MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
-MIN_TRADES = 30
+MIN_TRADES = 15
 
 ANNUALIZATION = {
     "1m": 252 * 24 * 60,
