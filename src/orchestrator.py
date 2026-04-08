@@ -71,6 +71,8 @@ from src.strategy.price_channel import PriceChannelStrategy
 from src.strategy.pivot_points import PivotPointsStrategy
 from src.strategy.elder_ray import ElderRayStrategy
 from src.strategy.vortex import VortexStrategy
+from src.strategy.dpo import DPOStrategy
+from src.strategy.stc import STCStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -116,6 +118,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "pivot_points": PivotPointsStrategy,
     "elder_ray": ElderRayStrategy,
     "vortex": VortexStrategy,
+    "dpo": DPOStrategy,
+    "stc": STCStrategy,
 }
 
 
