@@ -55,6 +55,7 @@ from src.strategy.momentum import MomentumStrategy
 from src.strategy.bb_reversion import BBReversionStrategy
 from src.strategy.candle_pattern import CandlePatternStrategy
 from src.strategy.stochastic import StochasticStrategy
+from src.strategy.stoch_rsi import StochRSIStrategy
 from src.strategy.macd_strategy import MACDStrategy
 from src.strategy.ichimoku import IchimokuStrategy
 from src.strategy.williams_r import WilliamsRStrategy
@@ -102,6 +103,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "bb_reversion": BBReversionStrategy,
     "candle_pattern": CandlePatternStrategy,
     "stochastic": StochasticStrategy,
+    "stoch_rsi": StochRSIStrategy,
     "macd": MACDStrategy,
     "ichimoku": IchimokuStrategy,
     "williams_r": WilliamsRStrategy,
