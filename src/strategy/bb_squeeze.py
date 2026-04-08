@@ -14,7 +14,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _BB_PERIOD = 20
 _BB_STD = 2.0
 _PERCENTILE_WINDOW = 50
-_SQUEEZE_PERCENTILE = 20  # bottom 20%
+_SQUEEZE_PERCENTILE = 30  # bottom 30% — 신호 빈도 증가 (기존 20%)
 
 
 class BbSqueezeStrategy(BaseStrategy):
