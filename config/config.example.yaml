@@ -1,6 +1,6 @@
 exchange:
-  name: binance          # ccxt 지원 거래소명
-  sandbox: true          # 테스트넷 여부
+  name: bybit            # 거래소: bybit (국내 권장), binance, okx 등
+  sandbox: true          # true=테스트넷, false=실거래
 
 trading:
   symbol: BTC/USDT
@@ -8,8 +8,8 @@ trading:
   max_position_size: 0.1  # 포트폴리오 대비 최대 비중
   limit: 500              # 가져올 OHLCV 캔들 수
 
-strategy: donchian_breakout  # "ema_cross" | "donchian_breakout"
-dry_run: true                # true면 주문 미제출 (시뮬레이션)
+strategy: donchian_breakout  # 전략 목록: ema_cross, donchian_breakout, funding_rate 등
+dry_run: true                # true면 주문 미제출 (시뮬레이션) ← 처음엔 반드시 true!
 
 risk:
   max_drawdown: 0.05        # 최대 허용 낙폭 5%
