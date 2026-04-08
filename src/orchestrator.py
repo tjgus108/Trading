@@ -79,6 +79,7 @@ from src.strategy.tema_cross import TEMACrossStrategy
 from src.strategy.heikin_ashi import HeikinAshiStrategy
 from src.strategy.coppock import CoppockStrategy
 from src.strategy.fisher_transform import FisherTransformStrategy
+from src.strategy.ppo import PPOStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -131,6 +132,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "tema_cross": TEMACrossStrategy,
     "heikin_ashi": HeikinAshiStrategy,
     "coppock": CoppockStrategy,
+    "fisher_transform": FisherTransformStrategy,
+    "ppo": PPOStrategy,
 }
 
 
