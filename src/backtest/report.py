@@ -44,6 +44,8 @@ class BacktestReport:
     profit_factor: float         # 총이익 / 총손실
     avg_win: float               # 평균 수익 (거래당)
     avg_loss: float              # 평균 손실 (거래당, 양수)
+    win_loss_ratio: float        # avg_win / avg_loss
+    max_consecutive_losses: int  # 최대 연속 손실 횟수
 
     # 메타
     annualization: int
@@ -61,6 +63,8 @@ class BacktestReport:
             f"Profit Factor:   {self.profit_factor:.2f}\n"
             f"Avg Win:         {self.avg_win:+.4f}\n"
             f"Avg Loss:        {self.avg_loss:.4f}\n"
+            f"Win/Loss Ratio:  {self.win_loss_ratio:.2f}\n"
+            f"Max Cons. Loss:  {self.max_consecutive_losses}\n"
             f"Total Trades:    {self.total_trades}\n"
         )
 
@@ -116,6 +120,19 @@ class BacktestReport:
         total_loss = float(abs(losses.sum())) if len(losses) > 0 else 0.0
         profit_factor = total_win / total_loss if total_loss > 1e-9 else float("inf")
 
+        # avg win / avg loss ratio
+        win_loss_ratio = avg_win / avg_loss if avg_loss > 1e-9 else float("inf")
+
+        # 최대 연속 손실 횟수
+        max_cons_loss = 0
+        cur_cons_loss = 0
+        for p in pnls:
+            if p < 0:
+                cur_cons_loss += 1
+                max_cons_loss = max(max_cons_loss, cur_cons_loss)
+            else:
+                cur_cons_loss = 0
+
         return cls(
             total_return=total_return,
             ann_return=ann_return,
@@ -128,6 +145,8 @@ class BacktestReport:
             profit_factor=profit_factor,
             avg_win=avg_win,
             avg_loss=avg_loss,
+            win_loss_ratio=win_loss_ratio,
+            max_consecutive_losses=max_cons_loss,
             annualization=annualization,
         )
 
@@ -153,6 +172,8 @@ class BacktestReport:
             profit_factor=result.profit_factor,
             avg_win=0.0,
             avg_loss=0.0,
+            win_loss_ratio=0.0,
+            max_consecutive_losses=0,
             annualization=annualization,
         )
 
@@ -162,5 +183,6 @@ class BacktestReport:
             total_return=0.0, ann_return=0.0, ann_volatility=0.0,
             sharpe_ratio=0.0, calmar_ratio=0.0, max_drawdown=0.0,
             total_trades=0, win_rate=0.0, profit_factor=0.0,
-            avg_win=0.0, avg_loss=0.0, annualization=annualization,
+            avg_win=0.0, avg_loss=0.0, win_loss_ratio=0.0,
+            max_consecutive_losses=0, annualization=annualization,
         )
