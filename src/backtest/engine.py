@@ -20,6 +20,7 @@ MIN_SHARPE = 1.0
 MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
 MIN_TRADES = 15
+MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
 
 ANNUALIZATION = {
     "1m": 252 * 24 * 60,
@@ -90,7 +91,7 @@ class BacktestEngine:
         trades = []
         equity_curve = [balance]
 
-        position = None  # {"side": "BUY"/"SELL", "entry": float, "sl": float, "tp": float, "size": float}
+        position = None  # {"side": "BUY"/"SELL", "entry": float, "sl": float, "tp": float, "size": float, "hold_candles": int}
 
         # 최소 지표 warmup 확보 (50 캔들 이후부터 시작)
         start_idx = 52
@@ -110,12 +111,21 @@ class BacktestEngine:
 
             # 열린 포지션 청산 체크
             if position:
-                pnl, closed = self._check_exit(position, candle)
-                if closed:
+                position["hold_candles"] += 1
+                # MAX_HOLD_CANDLES 초과 시 강제 청산
+                if position["hold_candles"] >= MAX_HOLD_CANDLES:
+                    pnl = self._market_close(position, candle["close"])
                     balance += pnl
                     trades.append(pnl)
                     peak_balance = max(peak_balance, balance)
                     position = None
+                else:
+                    pnl, closed = self._check_exit(position, candle)
+                    if closed:
+                        balance += pnl
+                        trades.append(pnl)
+                        peak_balance = max(peak_balance, balance)
+                        position = None
 
             # 신호 생성 (포지션 없을 때만)
             if position is None:
@@ -139,7 +149,7 @@ class BacktestEngine:
 
                         cost = size * entry * self.commission
                         balance -= cost
-                        position = {"side": signal.action.value, "entry": entry, "sl": sl, "tp": tp, "size": size}
+                        position = {"side": signal.action.value, "entry": entry, "sl": sl, "tp": tp, "size": size, "hold_candles": 0}
 
             equity_curve.append(balance)
 
@@ -160,24 +170,29 @@ class BacktestEngine:
         if side == "BUY":
             if candle["low"] <= sl:
                 exit_price = sl * (1 - self.slippage)
-                return (exit_price - entry) * size, True
+                commission_cost = size * exit_price * self.commission
+                return (exit_price - entry) * size - commission_cost, True
             if candle["high"] >= tp:
                 exit_price = tp * (1 - self.slippage)
-                return (exit_price - entry) * size, True
+                commission_cost = size * exit_price * self.commission
+                return (exit_price - entry) * size - commission_cost, True
         else:
             if candle["high"] >= sl:
                 exit_price = sl * (1 + self.slippage)
-                return (entry - exit_price) * size, True
+                commission_cost = size * exit_price * self.commission
+                return (entry - exit_price) * size - commission_cost, True
             if candle["low"] <= tp:
                 exit_price = tp * (1 + self.slippage)
-                return (entry - exit_price) * size, True
+                commission_cost = size * exit_price * self.commission
+                return (entry - exit_price) * size - commission_cost, True
         return 0.0, False
 
     def _market_close(self, position: dict, close_price: float) -> float:
         entry, size, side = position["entry"], position["size"], position["side"]
+        commission_cost = size * close_price * self.commission
         if side == "BUY":
-            return (close_price - entry) * size
-        return (entry - close_price) * size
+            return (close_price - entry) * size - commission_cost
+        return (entry - close_price) * size - commission_cost
 
     def _compute_metrics(self, name: str, trades: list, equity: list) -> BacktestResult:
         if not trades:

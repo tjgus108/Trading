@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest.engine import ANNUALIZATION, BacktestEngine, BacktestResult
+from src.backtest.engine import ANNUALIZATION, MAX_HOLD_CANDLES, BacktestEngine, BacktestResult
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
 
@@ -226,3 +226,44 @@ def test_funding_zero_no_effect():
     r1 = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
     r2 = BacktestEngine(funding_cost_per_candle=0.0).run(strategy, df)
     assert r1.total_return == r2.total_return
+
+
+# ---------------------------------------------------------------------------
+# 수정 4: 청산 수수료 + MAX_HOLD_CANDLES 테스트
+# ---------------------------------------------------------------------------
+
+def test_exit_commission_reduces_profit():
+    """청산 수수료가 반영되면 commission=0 대비 수익이 낮아야 한다."""
+    df = make_df(n=300, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+    r_no_comm = BacktestEngine(commission=0.0, slippage=0.0).run(strategy, df)
+    r_comm = BacktestEngine(commission=0.001, slippage=0.0).run(strategy, df)
+    assert r_comm.total_return < r_no_comm.total_return, (
+        f"수수료 적용 시 수익 감소 필요: comm={r_comm.total_return:.4f} vs no-comm={r_no_comm.total_return:.4f}"
+    )
+
+
+def test_profit_factor_zero_division_guard():
+    """손실 거래가 없어도 profit_factor가 계산돼야 한다 (ZeroDivisionError 없음)."""
+    df = make_df(n=200, close_trend=0.005)
+    result = BacktestEngine(commission=0.0, slippage=0.0).run(AlwaysBuyStrategy(), df)
+    assert isinstance(result.profit_factor, float)
+    assert result.profit_factor >= 0
+
+
+def test_max_hold_candles_constant():
+    """MAX_HOLD_CANDLES 상수가 24로 정의되어야 한다."""
+    assert MAX_HOLD_CANDLES == 24
+
+
+def test_max_hold_candles_forces_close():
+    """MAX_HOLD_CANDLES 제한으로 강제 청산 → 거래 수가 0이 아니어야 한다."""
+    df = make_df(n=300, close_trend=0.0)  # 가격 변동 거의 없음 → SL/TP 미도달
+    result = BacktestEngine(
+        atr_multiplier_sl=100.0,  # SL/TP 매우 멀리 → 자연 청산 안 됨
+        atr_multiplier_tp=200.0,
+        commission=0.0,
+        slippage=0.0,
+    ).run(AlwaysBuyStrategy(), df)
+    # MAX_HOLD_CANDLES마다 강제 청산되므로 거래 발생해야 함
+    assert result.total_trades > 0
