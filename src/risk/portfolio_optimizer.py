@@ -3,7 +3,7 @@ G3. 멀티에셋 포트폴리오 최적화기.
 
 3가지 방법론 (numpy only, scipy 금지):
   1. Mean-Variance (Markowitz): 최대 Sharpe 포트폴리오
-  2. Risk Parity: 각 자산의 리스크 기여도 균등화
+  2. Risk Parity: 각 자산의 리스크 기여도 균등화 (iterative)
   3. Equal Weight: 동일 비중 (기준선)
 
 입력: 심볼별 수익률 Series dict → 최적 비중 dict
@@ -15,13 +15,13 @@ G3. 멀티에셋 포트폴리오 최적화기.
 
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Dict, Literal, Optional
 
 
 @dataclass
 class OptimizationResult:
-    weights: dict[str, float]       # 심볼 → 비중 (합=1.0)
+    weights: Dict[str, float]       # 심볼 → 비중 (합=1.0)
     method: str
     expected_return: float          # 연환산 기대수익률
     expected_volatility: float      # 연환산 변동성
@@ -50,14 +50,16 @@ class PortfolioOptimizer:
         annualization: int = 252 * 24,  # 1h 기준
         max_weight: float = 0.5,        # 단일 자산 최대 50%
         min_weight: float = 0.05,       # 단일 자산 최소 5%
+        n_simulations: int = 2000,      # mean_variance 몬테카를로 샘플 수
     ):
         self.method = method
         self.risk_free_rate = risk_free_rate
         self.annualization = annualization
         self.max_weight = max_weight
         self.min_weight = min_weight
+        self.n_simulations = n_simulations
 
-    def optimize(self, returns_dict: dict[str, pd.Series]) -> OptimizationResult:
+    def optimize(self, returns_dict: Dict[str, pd.Series]) -> OptimizationResult:
         """심볼별 수익률 Series → 최적 비중. 데이터 1개 또는 부족 시 equal_weight fallback."""
         symbols = list(returns_dict.keys())
         n = len(symbols)
@@ -75,16 +77,19 @@ class PortfolioOptimizer:
         # fallback: 자산 1개
         if n == 1:
             sym = symbols[0]
-            r = returns_dict[sym].dropna()
+            r = returns_dict[sym].dropna().values
             ann_r = float(r.mean()) * self.annualization
             ann_v = float(r.std()) * np.sqrt(self.annualization)
             sharpe = (ann_r - self.risk_free_rate) / ann_v if ann_v > 0 else 0.0
+            var_95, cvar_95 = self._compute_var_cvar(r) if len(r) >= 2 else (0.0, 0.0)
             return OptimizationResult(
                 weights={sym: 1.0},
                 method="equal_weight",
                 expected_return=ann_r,
                 expected_volatility=ann_v,
                 sharpe_ratio=sharpe,
+                var_95=var_95,
+                cvar_95=cvar_95,
             )
 
         # 공통 인덱스로 수익률 행렬 구성
@@ -146,12 +151,16 @@ class PortfolioOptimizer:
         Returns:
             (var, cvar) — 양수 (손실)
         """
+        if len(port_returns) == 0:
+            return 0.0, 0.0
         sorted_r = np.sort(port_returns)
-        cutoff_idx = int(len(sorted_r) * (1 - confidence))
-        if cutoff_idx <= 0:
-            cutoff_idx = 1
-        var = -float(sorted_r[cutoff_idx])
-        cvar = -float(sorted_r[:cutoff_idx].mean()) if cutoff_idx > 0 else var
+        T = len(sorted_r)
+        # 하위 (1-confidence) 분위수 인덱스
+        cutoff_idx = max(1, int(T * (1 - confidence)))
+        # VaR: 5번째 퍼센타일 (cutoff_idx - 1번째 값)
+        var = -float(sorted_r[cutoff_idx - 1])
+        # CVaR: 하위 cutoff_idx개 수익률의 평균
+        cvar = -float(sorted_r[:cutoff_idx].mean())
         return max(0.0, var), max(0.0, cvar)
 
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
@@ -173,7 +182,10 @@ class PortfolioOptimizer:
         return w / w.sum()
 
     def _mean_variance(self, returns_matrix: np.ndarray, symbols: list) -> np.ndarray:
-        """그리드 서치: 1000개 랜덤 포트폴리오 중 최대 Sharpe 선택."""
+        """몬테카를로: n_simulations개 랜덤 포트폴리오 중 최대 Sharpe 선택.
+
+        Dirichlet 분포로 샘플링하여 제약 전 분포를 더 균일하게 탐색.
+        """
         T, n = returns_matrix.shape
         per_period_rf = self.risk_free_rate / self.annualization
 
@@ -181,10 +193,11 @@ class PortfolioOptimizer:
         best_weights = np.ones(n) / n
 
         rng = np.random.default_rng(42)
-        for _ in range(1000):
-            raw = rng.random(n)
+        for _ in range(self.n_simulations):
+            # Dirichlet(1,...,1) = Uniform on simplex → 더 고른 탐색
+            raw = rng.exponential(scale=1.0, size=n)
             w = raw / raw.sum()
-            # 제약 적용
+            # min/max 제약 적용
             w = self._apply_constraints(w)
 
             port_r = returns_matrix @ w
@@ -200,13 +213,45 @@ class PortfolioOptimizer:
         return best_weights
 
     def _risk_parity(self, returns_matrix: np.ndarray, symbols: list) -> np.ndarray:
-        """Risk Parity: 각 자산 변동성 역수 비중."""
-        vols = returns_matrix.std(axis=0)
-        # 0 변동성 방지
+        """Risk Parity: 각 자산의 리스크 기여도(MRC) 균등화 (iterative).
+
+        공분산 행렬 기반 MRC를 반복 수렴시켜 역변동성보다 정확한 RP 비중 산출.
+        수렴 실패 시 역변동성 초기값 반환.
+        """
+        T, n = returns_matrix.shape
+        cov = np.cov(returns_matrix.T)  # (n, n)
+        if cov.ndim == 0:
+            cov = np.array([[cov]])
+
+        # 0 분산 방지
+        vols = np.sqrt(np.diag(cov))
         vols = np.where(vols <= 0, 1e-8, vols)
+
+        # 초기값: 역변동성
         inv_vol = 1.0 / vols
-        weights = inv_vol / inv_vol.sum()
-        return self._apply_constraints(weights)
+        w = inv_vol / inv_vol.sum()
+
+        # Iterative Risk Parity (최대 200회)
+        tol = 1e-8
+        for _ in range(200):
+            port_var = float(w @ cov @ w)
+            if port_var <= 0:
+                break
+            # 한계 리스크 기여도 (MRC)
+            mrc = cov @ w / np.sqrt(port_var)
+            # 리스크 기여도 (RC = w * MRC)
+            rc = w * mrc
+            rc_mean = rc.mean()
+            # 리스크 기여도 균등화를 위한 비중 업데이트
+            w_new = w * rc_mean / np.where(mrc > 0, mrc, 1e-8)
+            w_new = np.clip(w_new, 1e-10, None)
+            w_new = w_new / w_new.sum()
+            if np.max(np.abs(w_new - w)) < tol:
+                w = w_new
+                break
+            w = w_new
+
+        return self._apply_constraints(w)
 
     def _equal_weight(self, n: int) -> np.ndarray:
         return np.ones(n) / n
