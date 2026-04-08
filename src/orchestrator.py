@@ -57,6 +57,7 @@ from src.strategy.candle_pattern import CandlePatternStrategy
 from src.strategy.stochastic import StochasticStrategy
 from src.strategy.macd_strategy import MACDStrategy
 from src.strategy.ichimoku import IchimokuStrategy
+from src.strategy.williams_r import WilliamsRStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "stochastic": StochasticStrategy,
     "macd": MACDStrategy,
     "ichimoku": IchimokuStrategy,
+    "williams_r": WilliamsRStrategy,
 }
 
 
