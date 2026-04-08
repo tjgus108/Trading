@@ -65,6 +65,7 @@ from src.strategy.cci import CCIStrategy
 from src.strategy.cmf import CMFStrategy
 from src.strategy.trix import TRIXStrategy
 from src.strategy.mfi import MFIStrategy
+from src.strategy.obv import OBVStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "cmf": CMFStrategy,
     "trix": TRIXStrategy,
     "mfi": MFIStrategy,
+    "obv": OBVStrategy,
 }
 
 
