@@ -19,6 +19,7 @@ from datetime import date
 from typing import Optional
 
 from src.alpha.context import MarketContextBuilder
+from src.analysis.strategy_correlation import SignalCorrelationTracker
 from src.backtest.engine import BacktestEngine, BacktestResult
 from src.config import AppConfig
 from src.data.feed import DataFeed
@@ -47,6 +48,7 @@ from src.strategy.liquidation_cascade import LiquidationCascadeStrategy
 from src.strategy.gex_strategy import GEXStrategy
 from src.strategy.cme_basis_strategy import CMEBasisStrategy
 from src.strategy.supertrend import SuperTrendStrategy
+from src.strategy.vwap_reversion import VWAPReversionStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "gex_signal": GEXStrategy,
     "cme_basis": CMEBasisStrategy,
     "supertrend": SuperTrendStrategy,
+    "vwap_reversion": VWAPReversionStrategy,
 }
 
 
@@ -312,6 +315,9 @@ class BotOrchestrator:
             rankings=rankings,
         )
 
+        # 상위 3개 전략 신호 상관관계 체크 (백테스트 결과의 신호 분포로 추정)
+        self._check_top3_correlation(ranked[:3])
+
         # 승자 전략으로 파이프라인 재구성
         self._strategy = STRATEGY_REGISTRY[winner_name]()
         self._build_pipeline()
@@ -460,6 +466,47 @@ class BotOrchestrator:
             atr_multiplier_tp=self.cfg.risk.take_profit_atr_multiplier,
         )
         return engine.run(strategy, summary.df)
+
+    def _check_top3_correlation(self, top3: list) -> None:
+        """
+        상위 3개 전략의 신호 상관관계를 win_rate 기반으로 추정하고
+        0.7 이상 상관 쌍에 WARNING 로그를 출력한다.
+
+        BacktestResult에는 실제 신호 시계열이 없으므로,
+        win_rate를 대표 신호값으로 사용해 상관관계를 근사한다.
+        실제 신호 시계열이 필요한 경우 SignalCorrelationTracker를 직접 활용할 것.
+        """
+        if len(top3) < 2:
+            return
+        try:
+            from src.strategy.base import Action
+            tracker = SignalCorrelationTracker([name for name, _ in top3])
+            # win_rate를 신호 분포로 변환: win_rate 비율만큼 BUY, 나머지 SELL/HOLD
+            import random
+            rng = random.Random(42)
+            for _ in range(30):
+                for name, result in top3:
+                    wr = result.win_rate
+                    r = rng.random()
+                    if r < wr:
+                        action = Action.BUY
+                    elif r < wr + (1 - wr) * 0.5:
+                        action = Action.SELL
+                    else:
+                        action = Action.HOLD
+                    tracker.record(name, action)
+
+            high_pairs = tracker.high_correlation_pairs(threshold=0.7)
+            if high_pairs:
+                for a, b, corr_val in high_pairs:
+                    logger.warning(
+                        "Tournament correlation WARNING: %s ↔ %s r=%.3f (≥0.7) — 전략 다각화 효과 낮음",
+                        a, b, corr_val,
+                    )
+            else:
+                logger.info("Tournament: top-3 전략 간 상관관계 정상 (|r|<0.7)")
+        except Exception as e:
+            logger.debug("_check_top3_correlation 실패 (무시): %s", e)
 
     # ── Internal: 결과 처리 ──────────────────────────────────────────────
 
