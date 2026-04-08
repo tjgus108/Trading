@@ -132,6 +132,31 @@ class BacktestReport:
         )
 
     @classmethod
+    def from_backtest_result(cls, result: "BacktestResult", annualization: int = 252 * 24) -> "BacktestReport":
+        """
+        BacktestEngine.run()이 반환한 BacktestResult를 BacktestReport로 변환.
+
+        Args:
+            result: BacktestEngine.run() 반환값
+            annualization: 연환산 인수 (기본 1h 타임프레임 기준)
+        """
+        return cls(
+            total_return=result.total_return,
+            ann_return=0.0,          # BacktestResult에 미포함 — 필요 시 from_trades() 사용
+            ann_volatility=0.0,      # 동일
+            sharpe_ratio=result.sharpe_ratio,
+            calmar_ratio=(result.total_return / result.max_drawdown
+                          if result.max_drawdown > 1e-9 else 0.0),
+            max_drawdown=result.max_drawdown,
+            total_trades=result.total_trades,
+            win_rate=result.win_rate,
+            profit_factor=result.profit_factor,
+            avg_win=0.0,
+            avg_loss=0.0,
+            annualization=annualization,
+        )
+
+    @classmethod
     def _empty(cls, annualization: int) -> "BacktestReport":
         return cls(
             total_return=0.0, ann_return=0.0, ann_volatility=0.0,

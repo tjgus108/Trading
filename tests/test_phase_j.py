@@ -146,6 +146,29 @@ class TestBacktestReport:
         report = BacktestReport.from_trades(trades)
         assert report.total_trades == 5
 
+    def test_from_backtest_result(self):
+        """BacktestResult → BacktestReport 변환."""
+        from src.backtest.engine import BacktestResult
+        br = BacktestResult(
+            strategy="ema_cross",
+            total_trades=50,
+            win_rate=0.55,
+            profit_factor=1.8,
+            sharpe_ratio=1.4,
+            max_drawdown=0.12,
+            total_return=0.25,
+            passed=True,
+            fail_reasons=[],
+        )
+        report = BacktestReport.from_backtest_result(br)
+        assert report.total_trades == 50
+        assert report.win_rate == 0.55
+        assert report.profit_factor == 1.8
+        assert report.sharpe_ratio == 1.4
+        assert report.max_drawdown == 0.12
+        assert report.total_return == 0.25
+        assert abs(report.calmar_ratio - (0.25 / 0.12)) < 1e-9
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # J3. SignalCorrelationTracker
