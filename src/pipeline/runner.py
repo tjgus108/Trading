@@ -12,6 +12,7 @@ from src.data.feed import DataFeed, DataSummary
 from src.exchange.connector import ExchangeConnector
 from src.risk.manager import RiskManager, RiskResult, RiskStatus
 from src.risk.kelly_sizer import KellySizer
+from src.risk.vol_targeting import VolTargeting
 from src.exchange.twap import TWAPExecutor
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
@@ -83,9 +84,10 @@ class TradingPipeline:
         self.llm_analyst = None          # LLMAnalyst (선택적, C2)
         self.ensemble = None             # MultiLLMEnsemble (선택적, D1)
         self.specialist_ensemble = None  # SpecialistEnsemble (선택적, F1)
-        self.kelly_sizer: Optional[KellySizer] = None    # H1: Kelly position sizer
-        self.twap_executor: Optional[TWAPExecutor] = None  # H4: TWAP order execution
-        self._trade_history: list[dict] = []             # H1: 거래 기록 (kelly 계산용)
+        self.kelly_sizer: Optional[KellySizer] = None       # H1: Kelly position sizer
+        self.twap_executor: Optional[TWAPExecutor] = None   # H4: TWAP order execution
+        self.vol_targeting: Optional[VolTargeting] = None   # I3: Vol-targeted sizing
+        self._trade_history: list[dict] = []               # H1: 거래 기록 (kelly 계산용)
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -250,6 +252,19 @@ class TradingPipeline:
                         logger.info("[pipeline] Kelly size=%.6f", kelly_size)
                 except Exception as e:
                     logger.debug("Kelly sizing failed: %s", e)
+
+            # I3: VolTargeting — position_size 추가 조정
+            if self.vol_targeting is not None:
+                try:
+                    adjusted = self.vol_targeting.adjust(
+                        base_size=risk_result.position_size,
+                        df=summary.df,
+                    )
+                    if adjusted > 0:
+                        risk_result.position_size = adjusted
+                        result.notes.append(f"VolTarget size: {adjusted:.6f}")
+                except Exception as e:
+                    logger.debug("VolTargeting adjustment failed: %s", e)
 
             logger.info("[pipeline] risk APPROVED — size=%.4f", risk_result.position_size)
         except Exception as e:

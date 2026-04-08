@@ -46,6 +46,7 @@ from src.strategy.cross_exchange_arb import CrossExchangeArbStrategy
 from src.strategy.liquidation_cascade import LiquidationCascadeStrategy
 from src.strategy.gex_strategy import GEXStrategy
 from src.strategy.cme_basis_strategy import CMEBasisStrategy
+from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,9 @@ class BotOrchestrator:
         self._demo: bool = False
         self._tournament_interval: int = 72  # C3: 자동 재평가 주기 (캔들 수)
         self._last_run_date: Optional[date] = None
+        self._drawdown_monitor = DrawdownMonitor(
+            max_drawdown_pct=getattr(cfg.risk, "max_drawdown", 0.20),
+        )
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -163,6 +167,24 @@ class BotOrchestrator:
             if self._risk_manager:
                 self._risk_manager.reset_daily()
         self._last_run_date = today
+
+        # DrawdownMonitor 체크 (거래 전)
+        try:
+            balance = self._pipeline._fetch_balance_usd()
+            dd_status = self._drawdown_monitor.update(balance)
+            if dd_status.halted:
+                from src.pipeline.runner import PipelineResult
+                from datetime import datetime, timezone
+                ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+                logger.warning("DrawdownMonitor HALT: %s", dd_status.reason)
+                self._notifier.notify_error(f"[DRAWDOWN HALT] {dd_status.reason}")
+                return PipelineResult(
+                    timestamp=ts, symbol=self.cfg.trading.symbol,
+                    pipeline_step="drawdown_check", status="BLOCKED",
+                    notes=[f"DrawdownMonitor halted: {dd_status.reason}"],
+                )
+        except Exception as e:
+            logger.debug("DrawdownMonitor check failed (non-fatal): %s", e)
 
         result = self._pipeline.run()
         self._handle_result(result)
