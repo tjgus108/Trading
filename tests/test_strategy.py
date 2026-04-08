@@ -59,7 +59,7 @@ def test_signal_has_bull_bear_case():
 
 
 def test_ema_cross_buy_on_crossover():
-    """EMA20이 EMA50을 상향 돌파하는 시나리오를 직접 주입."""
+    """EMA20이 EMA50을 상향 돌파하는 시나리오를 직접 주입 (ATR/VWAP 필터 포함)."""
     df = _make_df(100)
     # 마지막 두 캔들에 크로스오버 주입
     df.iloc[-3, df.columns.get_loc("ema20")] = 49000
@@ -67,5 +67,11 @@ def test_ema_cross_buy_on_crossover():
     df.iloc[-2, df.columns.get_loc("ema20")] = 49200
     df.iloc[-2, df.columns.get_loc("ema50")] = 49100  # ema20 > ema50
     df.iloc[-2, df.columns.get_loc("rsi14")] = 55     # 과매수 아님
+    # ATR 필터: 충분한 변동성 주입 (평균 atr 수준으로 설정)
+    avg_atr = df["atr14"].iloc[-21:-1].mean()
+    df.iloc[-2, df.columns.get_loc("atr14")] = avg_atr * 1.0  # >= 0.8 * avg_atr
+    # VWAP 필터: close > vwap (BUY 조건)
+    close_val = df.iloc[-2]["close"]
+    df.iloc[-2, df.columns.get_loc("vwap")] = close_val * 0.99  # close > vwap
     signal = EmaCrossStrategy().generate(df)
     assert signal.action == Action.BUY
