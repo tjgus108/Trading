@@ -71,7 +71,7 @@ def test_strategy_name():
 
 def test_buy_signal_on_trend_reversal_up():
     """sell→buy 추세 전환 시 BUY HIGH 신호 생성."""
-    st = SuperTrendStrategy(period=10, multiplier=3.0)
+    st = SuperTrendStrategy(period=10, multiplier=2.5)
     df = _make_buy_signal_df()
     signal = st.generate(df)
     assert signal.action == Action.BUY
@@ -80,7 +80,7 @@ def test_buy_signal_on_trend_reversal_up():
 
 def test_sell_signal_on_trend_reversal_down():
     """buy→sell 추세 전환 시 SELL HIGH 신호 생성."""
-    st = SuperTrendStrategy(period=10, multiplier=3.0)
+    st = SuperTrendStrategy(period=10, multiplier=2.5)
     df = _make_sell_signal_df()
     signal = st.generate(df)
     assert signal.action == Action.SELL
@@ -89,7 +89,7 @@ def test_sell_signal_on_trend_reversal_down():
 
 def test_hold_on_insufficient_data():
     """데이터 부족 시 HOLD 반환."""
-    st = SuperTrendStrategy(period=10, multiplier=3.0)
+    st = SuperTrendStrategy(period=10, multiplier=2.5)
     df = _make_df(n=5)
     signal = st.generate(df)
     assert signal.action == Action.HOLD
@@ -97,7 +97,7 @@ def test_hold_on_insufficient_data():
 
 def test_hold_on_trend_continuation():
     """추세 지속(전환 없음) 시 HOLD 반환."""
-    st = SuperTrendStrategy(period=10, multiplier=3.0)
+    st = SuperTrendStrategy(period=10, multiplier=2.5)
     # 지속 상승 → buy 추세 유지
     df = _make_df(n=30, atr=0.5)
     signal = st.generate(df)

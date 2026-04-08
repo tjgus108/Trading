@@ -14,7 +14,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 class SuperTrendStrategy(BaseStrategy):
     name = "supertrend"
 
-    def __init__(self, period: int = 10, multiplier: float = 3.0):
+    def __init__(self, period: int = 10, multiplier: float = 2.5):
         self.period = period
         self.multiplier = multiplier
 
