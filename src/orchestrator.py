@@ -20,6 +20,7 @@ from typing import Optional
 
 from src.alpha.context import MarketContextBuilder
 from src.analysis.strategy_correlation import SignalCorrelationTracker
+from src.analysis.regime_detector import SimpleRegimeDetector
 from src.backtest.engine import BacktestEngine, BacktestResult
 from src.config import AppConfig
 from src.data.feed import DataFeed
@@ -49,6 +50,7 @@ from src.strategy.gex_strategy import GEXStrategy
 from src.strategy.cme_basis_strategy import CMEBasisStrategy
 from src.strategy.supertrend import SuperTrendStrategy
 from src.strategy.vwap_reversion import VWAPReversionStrategy
+from src.strategy.volume_breakout import VolumeBreakoutStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -73,6 +75,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "cme_basis": CMEBasisStrategy,
     "supertrend": SuperTrendStrategy,
     "vwap_reversion": VWAPReversionStrategy,
+    "volume_breakout": VolumeBreakoutStrategy,
 }
 
 
@@ -192,6 +195,15 @@ class BotOrchestrator:
         except Exception as e:
             logger.debug("DrawdownMonitor check failed (non-fatal): %s", e)
 
+        try:
+            _summary = self._data_feed.fetch(
+                self.cfg.trading.symbol, self.cfg.trading.timeframe, limit=100
+            )
+            regime = SimpleRegimeDetector.detect(_summary.df)
+            logger.info("Market regime: %s", regime)
+        except Exception as _e:
+            logger.debug("Regime detection failed (non-fatal): %s", _e)
+
         result = self._pipeline.run()
         self._handle_result(result)
         self._update_position_from_result(result)
@@ -262,6 +274,15 @@ class BotOrchestrator:
         names = candidates or [
             k for k in STRATEGY_REGISTRY.keys() if k not in _EXCLUDE_FROM_TOURNAMENT
         ]
+        try:
+            _summary = self._data_feed.fetch(
+                self.cfg.trading.symbol, self.cfg.trading.timeframe, limit=100
+            )
+            regime = SimpleRegimeDetector.detect(_summary.df)
+            logger.info("Market regime: %s", regime)
+        except Exception as _e:
+            logger.debug("Regime detection failed (non-fatal): %s", _e)
+
         logger.info("Tournament starting — candidates: %s", names)
 
         strategies = []
