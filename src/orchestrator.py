@@ -54,6 +54,8 @@ from src.strategy.volume_breakout import VolumeBreakoutStrategy
 from src.strategy.momentum import MomentumStrategy
 from src.strategy.bb_reversion import BBReversionStrategy
 from src.strategy.candle_pattern import CandlePatternStrategy
+from src.strategy.stochastic import StochasticStrategy
+from src.strategy.macd_strategy import MACDStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum": MomentumStrategy,
     "bb_reversion": BBReversionStrategy,
     "candle_pattern": CandlePatternStrategy,
+    "stochastic": StochasticStrategy,
+    "macd": MACDStrategy,
 }
 
 
@@ -133,6 +137,8 @@ class BotOrchestrator:
         self._context_builder: Optional[MarketContextBuilder] = None
         self._demo: bool = False
         self._tournament_interval: int = 72  # C3: 자동 재평가 주기 (캔들 수)
+        self._last_regime: Optional[str] = None
+        self._last_tournament_winner: Optional[str] = None
         self._last_run_date: Optional[date] = None
         self._drawdown_monitor = DrawdownMonitor(
             max_drawdown_pct=getattr(cfg.risk, "max_drawdown", 0.20),
@@ -206,6 +212,7 @@ class BotOrchestrator:
                 self.cfg.trading.symbol, self.cfg.trading.timeframe, limit=100
             )
             regime = SimpleRegimeDetector.detect(_summary.df)
+            self._last_regime = regime
             logger.info("Market regime: %s", regime)
         except Exception as _e:
             logger.debug("Regime detection failed (non-fatal): %s", _e)
@@ -285,6 +292,7 @@ class BotOrchestrator:
                 self.cfg.trading.symbol, self.cfg.trading.timeframe, limit=100
             )
             regime = SimpleRegimeDetector.detect(_summary.df)
+            self._last_regime = regime
             logger.info("Market regime: %s", regime)
         except Exception as _e:
             logger.debug("Regime detection failed (non-fatal): %s", _e)
@@ -346,6 +354,7 @@ class BotOrchestrator:
         self._check_top3_correlation(ranked[:3])
 
         # 승자 전략으로 파이프라인 재구성
+        self._last_tournament_winner = winner_name
         self._strategy = STRATEGY_REGISTRY[winner_name]()
         self._build_pipeline()
         logger.info("Tournament winner: %s (Sharpe=%.3f)", winner_name, winner_result.sharpe_ratio)
