@@ -197,7 +197,13 @@ from src.strategy.engulfing_zone import BullishEngulfingZoneStrategy
 from src.strategy.three_bar_reversal import ThreeBarReversalStrategy
 from src.strategy.tii_strategy import TrendIntensityIndexStrategy
 from src.strategy.htf_ema import HigherTimeframeEMAStrategy
+from src.strategy.donchian_midline import DonchianMidlineStrategy
+from src.strategy.triple_screen import TripleScreenStrategy
+from src.strategy.poc_strategy import POCStrategy
+from src.strategy.bid_ask_imbalance import BidAskImbalanceStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
+from src.strategy.price_deviation import PriceDeviationStrategy
+from src.strategy.acceleration_band import AccelerationBandStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -368,6 +374,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "three_bar_reversal": ThreeBarReversalStrategy,
     "tii_strategy": TrendIntensityIndexStrategy,
     "htf_ema": HigherTimeframeEMAStrategy,
+    "donchian_midline": DonchianMidlineStrategy,
+    "triple_screen": TripleScreenStrategy,
+    "price_deviation": PriceDeviationStrategy,
+    "acceleration_band": AccelerationBandStrategy,
+    "poc_strategy": POCStrategy,
+    "bid_ask_imbalance": BidAskImbalanceStrategy,
 }
 
 
