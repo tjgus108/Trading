@@ -336,6 +336,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "rsi_ob_os": RSIOBOSStrategy,
     "lr_channel": LRChannelStrategy,
     "momentum_reversal": MomentumReversalStrategy,
+    "cup_handle": CupHandleStrategy,
+    "flag_pennant": FlagPennantStrategy,
     "relative_volume": RelativeVolumeStrategy,
     "pmo_strategy": PriceMomentumOscillator,
 }
