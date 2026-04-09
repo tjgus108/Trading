@@ -226,6 +226,8 @@ from src.strategy.renko_trend import RenkoTrendStrategy
 from src.strategy.wick_reversal import WickReversalStrategy
 from src.strategy.ichimoku_breakout import IchimokuBreakoutStrategy
 from src.strategy.macd_slope import MACDSlopeStrategy
+from src.strategy.ema_ribbon import EMARibbonStrategy
+from src.strategy.price_channel_break import PriceChannelBreakStrategy
 
 logger = logging.getLogger(__name__)
 
