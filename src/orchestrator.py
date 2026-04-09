@@ -113,6 +113,8 @@ from src.strategy.nr7 import NR7Strategy
 from src.strategy.inside_bar import InsideBarStrategy
 from src.strategy.gap_strategy import GapStrategy
 from src.strategy.star_pattern import StarPatternStrategy
+from src.strategy.doji_pattern import DojiPatternStrategy
+from src.strategy.three_candles import ThreeCandlesStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -200,6 +202,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "inside_bar": InsideBarStrategy,
     "gap_strategy": GapStrategy,
     "star_pattern": StarPatternStrategy,
+    "doji_pattern": DojiPatternStrategy,
+    "three_candles": ThreeCandlesStrategy,
 }
 
 
