@@ -163,6 +163,16 @@ from src.strategy.stochrsi_div import StochRSIDivStrategy
 from src.strategy.trix_signal import TRIXSignalStrategy
 from src.strategy.kama import KAMAStrategy
 from src.strategy.atr_channel import ATRChannelStrategy
+from src.strategy.double_top_bottom import DoubleTopBottomStrategy
+from src.strategy.macd_hist_div import MACDHistDivStrategy
+from src.strategy.vcp import VCPStrategy
+from src.strategy.ema_stack import EMAStackStrategy
+from src.strategy.supertrend_rsi import SupertrendRSIStrategy
+from src.strategy.bb_bandwidth import BBBandwidthStrategy
+from src.strategy.volume_surge import VolumeSurgeStrategy
+from src.strategy.price_velocity import PriceVelocityStrategy
+from src.strategy.multi_score import MultiScoreStrategy
+from src.strategy.adx_regime import ADXRegimeStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -300,6 +310,14 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "three_soldiers_crows": ThreeSoldiersAndCrowsStrategy,
     "kama": KAMAStrategy,
     "atr_channel": ATRChannelStrategy,
+    "double_top_bottom": DoubleTopBottomStrategy,
+    "macd_hist_div": MACDHistDivStrategy,
+    "vcp": VCPStrategy,
+    "ema_stack": EMAStackStrategy,
+    "supertrend_rsi": SupertrendRSIStrategy,
+    "bb_bandwidth": BBBandwidthStrategy,
+    "volume_surge": VolumeSurgeStrategy,
+    "price_velocity": PriceVelocityStrategy,
 }
 
 
