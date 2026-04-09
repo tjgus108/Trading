@@ -109,6 +109,8 @@ from src.strategy.guppy import GuppyStrategy
 from src.strategy.apo import APOStrategy
 from src.strategy.zscore_mean_reversion import ZScoreMeanReversionStrategy
 from src.strategy.median_price import MedianPriceStrategy
+from src.strategy.nr7 import NR7Strategy
+from src.strategy.inside_bar import InsideBarStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -192,6 +194,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "apo": APOStrategy,
     "zscore_mean_reversion": ZScoreMeanReversionStrategy,
     "median_price": MedianPriceStrategy,
+    "nr7": NR7Strategy,
+    "inside_bar": InsideBarStrategy,
 }
 
 
