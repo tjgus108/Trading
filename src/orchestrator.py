@@ -87,6 +87,10 @@ from src.strategy.zlema_cross import ZLEMACrossStrategy
 from src.strategy.mcginley import McGinleyStrategy
 from src.strategy.roc import ROCStrategy
 from src.strategy.awesome_oscillator import AwesomeOscillatorStrategy
+from src.strategy.connors_rsi import ConnorsRSIStrategy
+from src.strategy.linear_regression import LinearRegressionStrategy
+from src.strategy.williams_fractal import WilliamsFractalStrategy
+from src.strategy.mass_index import MassIndexStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -148,6 +152,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "mcginley": McGinleyStrategy,
     "roc": ROCStrategy,
     "awesome_oscillator": AwesomeOscillatorStrategy,
+    "connors_rsi": ConnorsRSIStrategy,
+    "linear_regression": LinearRegressionStrategy,
+    "williams_fractal": WilliamsFractalStrategy,
+    "mass_index": MassIndexStrategy,
 }
 
 
