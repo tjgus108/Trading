@@ -105,6 +105,8 @@ from src.strategy.tsi import TSIStrategy
 from src.strategy.bop import BOPStrategy
 from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy
 from src.strategy.ichimoku_advanced import IchimokuAdvancedStrategy
+from src.strategy.ichimoku_cloud_pos import IchimokuCloudPosStrategy
+from src.strategy.consecutive_candles import ConsecutiveCandlesStrategy
 from src.strategy.guppy import GuppyStrategy
 from src.strategy.apo import APOStrategy
 from src.strategy.zscore_mean_reversion import ZScoreMeanReversionStrategy
@@ -256,6 +258,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "bop": BOPStrategy,
     "volatility_breakout_lw": VolatilityBreakoutLWStrategy,
     "ichimoku_advanced": IchimokuAdvancedStrategy,
+    "ichimoku_cloud_pos": IchimokuCloudPosStrategy,
+    "consecutive_candles": ConsecutiveCandlesStrategy,
     "guppy": GuppyStrategy,
     "apo": APOStrategy,
     "zscore_mean_reversion": ZScoreMeanReversionStrategy,
