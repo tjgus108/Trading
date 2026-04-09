@@ -298,6 +298,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trix_signal": TRIXSignalStrategy,
     "morning_evening_star": MorningEveningStarStrategy,
     "three_soldiers_crows": ThreeSoldiersAndCrowsStrategy,
+    "kama": KAMAStrategy,
+    "atr_channel": ATRChannelStrategy,
 }
 
 
