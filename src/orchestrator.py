@@ -103,6 +103,8 @@ from src.strategy.disparity_index import DisparityIndexStrategy
 from src.strategy.psychological_line import PsychologicalLineStrategy
 from src.strategy.tsi import TSIStrategy
 from src.strategy.bop import BOPStrategy
+from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy
+from src.strategy.ichimoku_advanced import IchimokuAdvancedStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -180,6 +182,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "psychological_line": PsychologicalLineStrategy,
     "tsi": TSIStrategy,
     "bop": BOPStrategy,
+    "volatility_breakout_lw": VolatilityBreakoutLWStrategy,
+    "ichimoku_advanced": IchimokuAdvancedStrategy,
 }
 
 
