@@ -148,6 +148,8 @@ from src.strategy.vw_macd import VWMACDStrategy
 from src.strategy.chandelier_exit import ChandelierExitStrategy
 from src.strategy.vol_adj_momentum import VolAdjMomentumStrategy
 from src.strategy.elder_impulse import ElderImpulseStrategy
+from src.strategy.ha_trend import HATrendStrategy
+from src.strategy.engulfing import EngulfingStrategy
 from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
 from src.strategy.pivot_reversal import PivotReversalStrategy
 from src.strategy.range_expansion import RangeExpansionStrategy
@@ -280,6 +282,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "range_expansion": RangeExpansionStrategy,
     "rsi_momentum_div": RSIMomentumDivStrategy,
     "dpo_cross": DPOCrossStrategy,
+    "ha_trend": HATrendStrategy,
+    "engulfing": EngulfingStrategy,
+    "trend_strength": TrendStrengthStrategy,
+    "vpt_signal": VPTSignalStrategy,
+    "chandelier_exit": ChandelierExitStrategy,
+    "vol_adj_momentum": VolAdjMomentumStrategy,
 }
 
 
