@@ -210,6 +210,8 @@ from src.strategy.supertrend_multi import SupertrendMultiStrategy
 from src.strategy.narrow_range import NarrowRangeStrategy
 from src.strategy.parabolic_move import ParabolicMoveStrategy
 from src.strategy.failed_breakout import FailedBreakoutStrategy
+from src.strategy.coppock_enhanced import CoppockEnhancedStrategy
+from src.strategy.vwrsi import VolumeWeightedRSIStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +394,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "elder_force": ElderForceIndexStrategy,
     "parabolic_move": ParabolicMoveStrategy,
     "failed_breakout": FailedBreakoutStrategy,
+    "coppock_enhanced": CoppockEnhancedStrategy,
+    "vwrsi": VolumeWeightedRSIStrategy,
 }
 
 
