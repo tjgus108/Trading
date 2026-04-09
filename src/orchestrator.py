@@ -183,6 +183,8 @@ from src.strategy.cup_handle import CupHandleStrategy
 from src.strategy.flag_pennant import FlagPennantStrategy
 from src.strategy.relative_volume import RelativeVolumeStrategy
 from src.strategy.pmo_strategy import PriceMomentumOscillator
+from src.strategy.fib_retracement import FibRetracementStrategy
+from src.strategy.stoch_divergence import StochDivergenceStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -340,6 +342,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "flag_pennant": FlagPennantStrategy,
     "relative_volume": RelativeVolumeStrategy,
     "pmo_strategy": PriceMomentumOscillator,
+    "fib_retracement": FibRetracementStrategy,
+    "stoch_divergence": StochDivergenceStrategy,
 }
 
 
