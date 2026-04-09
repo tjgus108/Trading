@@ -318,6 +318,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "bb_bandwidth": BBBandwidthStrategy,
     "volume_surge": VolumeSurgeStrategy,
     "price_velocity": PriceVelocityStrategy,
+    "multi_score": MultiScoreStrategy,
+    "adx_regime": ADXRegimeStrategy,
 }
 
 
