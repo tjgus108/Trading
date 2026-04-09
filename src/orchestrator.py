@@ -216,6 +216,14 @@ from src.strategy.hurst_strategy import HurstExponentStrategy
 from src.strategy.entropy_strategy import ApproximateEntropyStrategy
 from src.strategy.sr_bounce import SRBounceStrategy
 from src.strategy.candle_score import CandleScoreStrategy
+from src.strategy.trend_quality import TrendQualityStrategy
+from src.strategy.momentum_div import MomentumDivergenceStrategy
+from src.strategy.roc_ma_cross import ROCMACrossStrategy
+from src.strategy.vpt_confirm import VolumePriceTrendConfirmStrategy
+from src.strategy.gap_fill import GapFillStrategy
+from src.strategy.opening_momentum import OpeningMomentumStrategy
+from src.strategy.renko_trend import RenkoTrendStrategy
+from src.strategy.wick_reversal import WickReversalStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -404,6 +412,14 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "entropy_strategy": ApproximateEntropyStrategy,
     "sr_bounce": SRBounceStrategy,
     "candle_score": CandleScoreStrategy,
+    "trend_quality": TrendQualityStrategy,
+    "momentum_div": MomentumDivergenceStrategy,
+    "roc_ma_cross": ROCMACrossStrategy,
+    "vpt_confirm": VolumePriceTrendConfirmStrategy,
+    "gap_fill": GapFillStrategy,
+    "opening_momentum": OpeningMomentumStrategy,
+    "renko_trend": RenkoTrendStrategy,
+    "wick_reversal": WickReversalStrategy,
 }
 
 
