@@ -115,10 +115,16 @@ from src.strategy.gap_strategy import GapStrategy
 from src.strategy.star_pattern import StarPatternStrategy
 from src.strategy.doji_pattern import DojiPatternStrategy
 from src.strategy.three_candles import ThreeCandlesStrategy
+from src.strategy.harami import HaramiStrategy
+from src.strategy.cloud_cover import CloudCoverStrategy
 from src.strategy.tweezer import TweezerStrategy
 from src.strategy.pin_bar import PinBarStrategy
 from src.strategy.vwap_cross import VWAPCrossStrategy
 from src.strategy.ease_of_movement import EaseOfMovementStrategy
+from src.strategy.sr_breakout import SRBreakoutStrategy
+from src.strategy.trend_channel import TrendChannelStrategy
+from src.strategy.hhll_channel import HHLLChannelStrategy
+from src.strategy.vpt import VPTStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -212,6 +218,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "pin_bar": PinBarStrategy,
     "vwap_cross": VWAPCrossStrategy,
     "ease_of_movement": EaseOfMovementStrategy,
+    "harami": HaramiStrategy,
+    "cloud_cover": CloudCoverStrategy,
+    "sr_breakout": SRBreakoutStrategy,
+    "trend_channel": TrendChannelStrategy,
+    "hhll_channel": HHLLChannelStrategy,
+    "vpt": VPTStrategy,
 }
 
 
