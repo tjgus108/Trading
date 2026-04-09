@@ -2,7 +2,83 @@
 
 _Last updated: 2026-04-09_
 
-## Status: **943 passed** | 전략 47종 등록 | Phase G~L 완료 + 커뮤니티 리서치 완료
+## Status: **28 new passed** | GapStrategy + StarPatternStrategy 추가
+
+## 최근 작업 (2026-04-09) — GapStrategy + StarPatternStrategy 구현
+
+- `src/strategy/gap_strategy.py`: 갭 모멘텀 전략 (Gap Up/Down + 볼륨 필터, HIGH/MEDIUM confidence)
+- `src/strategy/star_pattern.py`: 별형 캔들 패턴 전략 (Morning/Evening Star, ATR 기반 body 크기 검증)
+- `tests/test_gap_strategy.py`: 14개 테스트 통과
+- `tests/test_star_pattern.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `gap_strategy`, `star_pattern` 등록
+
+## 이전 작업 (2026-04-09) — VolatilityBreakoutLW + IchimokuAdvanced 구현
+
+- `src/strategy/volatility_breakout.py`: 래리 윌리엄스 변동성 돌파 (k=0.5, RSI14+볼륨 필터)
+- `src/strategy/ichimoku_advanced.py`: Chikou Span 추가 고도화 Ichimoku (3중 조건, _MIN_ROWS=80)
+- `tests/test_volatility_breakout_lw.py`: 16개 테스트 통과
+- `tests/test_ichimoku_advanced.py`: 16개 테스트 통과
+- `src/orchestrator.py`: `volatility_breakout_lw`, `ichimoku_advanced` 등록
+
+
+## 이전 작업 (2026-04-09) — Guppy + APO 전략 구현
+
+- `src/strategy/guppy.py`: Guppy MMA 전략 (단기6 + 장기6 EMA 그룹, Short/Long Avg 비교)
+- `src/strategy/apo.py`: APO 전략 (EMA10-EMA20 절대 차이, Signal 크로스 기반)
+- `tests/test_guppy.py`: 23개 테스트 통과
+- `tests/test_apo.py`: 20개 테스트 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 `guppy`, `apo` 등록
+
+
+## 최근 작업 (2026-04-09) — TSI + BOP 전략 구현
+
+- `src/strategy/tsi.py`: True Strength Index 전략 (EMA×2 이중 평활 모멘텀, 크로스 기반)
+- `src/strategy/bop.py`: Balance of Power 전략 (EMA14 평활, ema50 필터)
+- `tests/test_tsi.py`: 19개 테스트 통과
+- `tests/test_bop.py`: 19개 테스트 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 `tsi`, `bop` 등록
+
+
+## 최근 작업 (2026-04-09) — SMI + TRIMA 전략 구현
+
+- `src/strategy/smi.py`: Stochastic Momentum Index 전략 (period=14, smooth=3, 과매도<-40/과매수>40)
+- `src/strategy/trima.py`: Triangular Moving Average 크로스 + 볼륨 증가 전략 (period=20)
+- `tests/test_smi.py`: 20개 테스트 통과
+- `tests/test_trima.py`: 17개 테스트 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 `smi`, `trima` 등록
+
+
+## 최근 작업 (2026-04-09) — Williams Fractal + Mass Index 전략 구현
+
+- `src/strategy/williams_fractal.py`: 5봉 Fractal 패턴 기반 지지/저항 돌파 전략
+- `src/strategy/mass_index.py`: Reversal Bulge(>27→<26.5) 기반 추세 전환 전략
+- `tests/test_williams_fractal.py`: 17개 테스트 (모두 통과)
+- `tests/test_mass_index.py`: 15개 테스트 (모두 통과)
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 `williams_fractal`, `mass_index` 등록
+
+## 최근 작업 (2026-04-09) — ZLEMA Crossover + McGinley Dynamic 전략 구현
+
+- `src/strategy/zlema_cross.py`: ZLEMA(9) vs ZLEMA(21) 크로스오버 전략 (HIGH_CONF ≥ 0.5%)
+- `src/strategy/mcginley.py`: McGinley Dynamic 상/하향 돌파 전략 (HIGH_CONF ≥ 1%)
+- `tests/test_zlema_cross.py`: 14개 테스트 (모두 통과)
+- `tests/test_mcginley.py`: 14개 테스트 (모두 통과)
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 `zlema_cross`, `mcginley` 등록
+
+## 최근 작업 (2026-04-09) — BacktestEngine 수수료/슬리피지 파라미터 추가
+
+- `src/backtest/engine.py`: `fee_rate` / `slippage_pct` 파라미터 추가 (기존 `commission`/`slippage` 하위 호환)
+- `BacktestResult`에 `total_fees`, `total_slippage_cost` 필드 추가
+- `_market_close` 청산 시에도 슬리피지 적용 (기존 누락)
+- 진입/청산별 수수료·슬리피지 비용 개별 추적
+- 기존 테스트 전체 통과
+
+## 최근 작업 (2026-04-09) — config limit 확장 & portfolio_optimizer 버그 수정
+
+- `config/config.yaml`, `config/config.example.yaml`, `src/config.py`: limit 500 → 1000
+- `src/risk/portfolio_optimizer.py`: `_apply_constraints` iterative projection으로 개선
+  - 버그: 마지막 정규화 후 재클리핑 시 max_weight 미세 초과 (1.77e-6)
+  - 수정: 500회 iterative clip+normalize로 합=1.0 & max_weight 제약 동시 보장
+- `tests/test_portfolio_optimizer.py`: 16개 테스트 전체 통과
 
 ## 최근 작업 (2026-04-09) — 커뮤니티 실패/성공 사례 리서치
 
