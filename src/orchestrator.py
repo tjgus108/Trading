@@ -230,6 +230,12 @@ from src.strategy.ema_ribbon import EMARibbonStrategy
 from src.strategy.price_channel_break import PriceChannelBreakStrategy
 from src.strategy.pivot_bounce import PivotBounceStrategy
 from src.strategy.momentum_score import MomentumScoreStrategy
+from src.strategy.mean_rev_band import MeanReversionBandStrategy
+from src.strategy.trend_continuation import TrendContinuationStrategy
+from src.strategy.bb_keltner_squeeze import BBKeltnerSqueezeStrategy
+from src.strategy.rsi_trend_filter import RSITrendFilterStrategy
+from src.strategy.volume_climax import VolumeClimaxStrategy
+from src.strategy.key_reversal import KeyReversalStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -432,6 +438,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_channel_break": PriceChannelBreakStrategy,
     "pivot_bounce": PivotBounceStrategy,
     "momentum_score": MomentumScoreStrategy,
+    "mean_rev_band": MeanReversionBandStrategy,
+    "trend_continuation": TrendContinuationStrategy,
+    "bb_keltner_squeeze": BBKeltnerSqueezeStrategy,
+    "rsi_trend_filter": RSITrendFilterStrategy,
+    "volume_climax": VolumeClimaxStrategy,
+    "key_reversal": KeyReversalStrategy,
 }
 
 
