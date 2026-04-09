@@ -224,6 +224,8 @@ from src.strategy.gap_fill import GapFillStrategy
 from src.strategy.opening_momentum import OpeningMomentumStrategy
 from src.strategy.renko_trend import RenkoTrendStrategy
 from src.strategy.wick_reversal import WickReversalStrategy
+from src.strategy.ichimoku_breakout import IchimokuBreakoutStrategy
+from src.strategy.macd_slope import MACDSlopeStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -420,6 +422,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "opening_momentum": OpeningMomentumStrategy,
     "renko_trend": RenkoTrendStrategy,
     "wick_reversal": WickReversalStrategy,
+    "ichimoku_breakout": IchimokuBreakoutStrategy,
+    "macd_slope": MACDSlopeStrategy,
 }
 
 
