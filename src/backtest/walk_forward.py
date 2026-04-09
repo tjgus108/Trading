@@ -359,3 +359,137 @@ def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardRe
         n_windows=n_windows,
     )
     return opt.run(df)
+
+
+# ------------------------------------------------------------------
+# WalkForwardValidator — rolling train/test window 검증
+# ------------------------------------------------------------------
+
+from dataclasses import dataclass as _dataclass
+from typing import List as _List
+import numpy as _np
+
+
+@_dataclass
+class WalkForwardValidationResult:
+    """
+    WalkForwardValidator.validate() 반환값.
+    (WalkForwardResult와 이름 충돌 방지를 위해 별도 클래스 사용)
+    """
+    windows: int              # 총 윈도우 수
+    mean_return: float        # 평균 수익률
+    std_return: float         # 수익률 표준편차
+    win_rate: float           # 수익 윈도우 비율 (= consistency_score)
+    consistency_score: float  # 일관성 점수 (0~1)
+    results: _List[dict]      # 각 윈도우 결과
+
+
+class WalkForwardValidator:
+    """
+    Rolling train/test window로 전략을 검증한다.
+
+    각 스텝에서:
+      - train_window + test_window 크기의 슬라이스를 BacktestEngine에 실행
+      - test 구간의 성과를 기록
+      - step_size만큼 앞으로 이동
+
+    사용:
+        validator = WalkForwardValidator(train_window=200, test_window=50, step_size=50)
+        result = validator.validate(df, strategy)
+        print(result.consistency_score)
+    """
+
+    def __init__(
+        self,
+        train_window: int = 200,  # 학습 기간 (봉 수)
+        test_window: int = 50,    # 테스트 기간 (봉 수)
+        step_size: int = 50,      # 슬라이딩 스텝
+    ):
+        self.train_window = train_window
+        self.test_window = test_window
+        self.step_size = step_size
+
+    def validate(
+        self,
+        df: pd.DataFrame,
+        strategy: BaseStrategy,
+        fee_rate: float = 0.001,
+        slippage_pct: float = 0.0005,
+    ) -> WalkForwardValidationResult:
+        """
+        df에 대해 walk-forward validation 실행.
+
+        Args:
+            df: OHLCV + 지표 포함 DataFrame
+            strategy: BaseStrategy 인스턴스
+            fee_rate: 수수료율
+            slippage_pct: 슬리피지 비율
+
+        Returns:
+            WalkForwardValidationResult
+
+        Raises:
+            ValueError: 데이터가 train_window + test_window보다 짧을 때
+        """
+        min_required = self.train_window + self.test_window
+        if len(df) < min_required:
+            raise ValueError(
+                f"데이터 부족: {len(df)}봉 < 최소 {min_required}봉 "
+                f"(train={self.train_window} + test={self.test_window})"
+            )
+
+        engine = BacktestEngine(fee_rate=fee_rate, slippage_pct=slippage_pct)
+        window_results: _List[dict] = []
+
+        start = 0
+        while True:
+            test_start = start + self.train_window
+            test_end = test_start + self.test_window
+
+            if test_end > len(df):
+                break
+
+            # train + test 구간 전체를 엔진에 전달 (지표 warmup 포함)
+            window_df = df.iloc[start:test_end].reset_index(drop=True)
+            result = engine.run(strategy, window_df)
+
+            window_results.append({
+                "window_index": len(window_results),
+                "start": start,
+                "end": test_end - 1,
+                "train_start": start,
+                "train_end": test_start - 1,
+                "test_start": test_start,
+                "test_end": test_end - 1,
+                "total_return": result.total_return,
+                "sharpe_ratio": result.sharpe_ratio,
+                "max_drawdown": result.max_drawdown,
+                "total_trades": result.total_trades,
+                "win_rate": result.win_rate,
+                "passed": result.passed,
+            })
+
+            start += self.step_size
+
+        if not window_results:
+            return WalkForwardValidationResult(
+                windows=0,
+                mean_return=0.0,
+                std_return=0.0,
+                win_rate=0.0,
+                consistency_score=0.0,
+                results=[],
+            )
+
+        returns = _np.array([r["total_return"] for r in window_results])
+        profitable_count = sum(1 for r in window_results if r["total_return"] > 0)
+        consistency = profitable_count / len(window_results)
+
+        return WalkForwardValidationResult(
+            windows=len(window_results),
+            mean_return=float(returns.mean()),
+            std_return=float(returns.std()) if len(returns) > 1 else 0.0,
+            win_rate=consistency,
+            consistency_score=consistency,
+            results=window_results,
+        )
