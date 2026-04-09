@@ -193,6 +193,10 @@ from src.strategy.anchored_vwap import AnchoredVWAPStrategy
 from src.strategy.volatility_regime import VolatilityRegimeStrategy
 from src.strategy.zlmacd import ZeroLagMACDStrategy
 from src.strategy.adaptive_stop import AdaptiveStopStrategy
+from src.strategy.engulfing_zone import BullishEngulfingZoneStrategy
+from src.strategy.three_bar_reversal import ThreeBarReversalStrategy
+from src.strategy.tii_strategy import TrendIntensityIndexStrategy
+from src.strategy.htf_ema import HigherTimeframeEMAStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -360,6 +364,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volatility_regime": VolatilityRegimeStrategy,
     "zlmacd": ZeroLagMACDStrategy,
     "adaptive_stop": AdaptiveStopStrategy,
+    "engulfing_zone": BullishEngulfingZoneStrategy,
+    "three_bar_reversal": ThreeBarReversalStrategy,
 }
 
 
