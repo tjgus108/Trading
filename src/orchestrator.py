@@ -91,6 +91,10 @@ from src.strategy.connors_rsi import ConnorsRSIStrategy
 from src.strategy.linear_regression import LinearRegressionStrategy
 from src.strategy.williams_fractal import WilliamsFractalStrategy
 from src.strategy.mass_index import MassIndexStrategy
+from src.strategy.smi import SMIStrategy
+from src.strategy.trima import TRIMAStrategy
+from src.strategy.choppiness import ChoppinessStrategy
+from src.strategy.alma import ALMAStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -156,6 +160,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "linear_regression": LinearRegressionStrategy,
     "williams_fractal": WilliamsFractalStrategy,
     "mass_index": MassIndexStrategy,
+    "smi": SMIStrategy,
+    "trima": TRIMAStrategy,
 }
 
 
