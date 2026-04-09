@@ -23,7 +23,7 @@ class TradingConfig:
     symbol: str
     timeframe: str
     max_position_size: float
-    limit: int = 500  # OHLCV 캔들 수
+    limit: int = 1000  # OHLCV 캔들 수
 
 
 @dataclass

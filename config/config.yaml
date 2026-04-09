@@ -1,6 +1,6 @@
 exchange:
   name: bybit            # 거래소: bybit (국내 권장), binance, okx 등
-  sandbox: true          # true=테스트넷, false=실거래
+  sandbox: false          # true=테스트넷, false=실거래
 
 trading:
   symbol: BTC/USDT
