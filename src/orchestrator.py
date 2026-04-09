@@ -150,6 +150,8 @@ from src.strategy.vol_adj_momentum import VolAdjMomentumStrategy
 from src.strategy.elder_impulse import ElderImpulseStrategy
 from src.strategy.ha_trend import HATrendStrategy
 from src.strategy.engulfing import EngulfingStrategy
+from src.strategy.morning_evening_star import MorningEveningStarStrategy
+from src.strategy.three_soldiers_crows import ThreeSoldiersAndCrowsStrategy
 from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
 from src.strategy.pivot_reversal import PivotReversalStrategy
 from src.strategy.range_expansion import RangeExpansionStrategy
@@ -157,6 +159,10 @@ from src.strategy.rsi_momentum_div import RSIMomentumDivStrategy
 from src.strategy.dpo_cross import DPOCrossStrategy
 from src.strategy.trend_strength import TrendStrengthStrategy
 from src.strategy.vpt_signal import VPTSignalStrategy
+from src.strategy.stochrsi_div import StochRSIDivStrategy
+from src.strategy.trix_signal import TRIXSignalStrategy
+from src.strategy.kama import KAMAStrategy
+from src.strategy.atr_channel import ATRChannelStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -288,6 +294,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "vpt_signal": VPTSignalStrategy,
     "chandelier_exit": ChandelierExitStrategy,
     "vol_adj_momentum": VolAdjMomentumStrategy,
+    "stochrsi_div": StochRSIDivStrategy,
+    "trix_signal": TRIXSignalStrategy,
+    "morning_evening_star": MorningEveningStarStrategy,
+    "three_soldiers_crows": ThreeSoldiersAndCrowsStrategy,
 }
 
 
