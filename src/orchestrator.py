@@ -179,6 +179,10 @@ from src.strategy.obv_divergence import OBVDivergenceStrategy
 from src.strategy.rsi_ob_os import RSIOBOSStrategy
 from src.strategy.lr_channel import LRChannelStrategy
 from src.strategy.momentum_reversal import MomentumReversalStrategy
+from src.strategy.cup_handle import CupHandleStrategy
+from src.strategy.flag_pennant import FlagPennantStrategy
+from src.strategy.relative_volume import RelativeVolumeStrategy
+from src.strategy.pmo_strategy import PriceMomentumOscillator
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -332,6 +336,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "rsi_ob_os": RSIOBOSStrategy,
     "lr_channel": LRChannelStrategy,
     "momentum_reversal": MomentumReversalStrategy,
+    "relative_volume": RelativeVolumeStrategy,
+    "pmo_strategy": PriceMomentumOscillator,
 }
 
 
