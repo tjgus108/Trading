@@ -228,6 +228,8 @@ from src.strategy.ichimoku_breakout import IchimokuBreakoutStrategy
 from src.strategy.macd_slope import MACDSlopeStrategy
 from src.strategy.ema_ribbon import EMARibbonStrategy
 from src.strategy.price_channel_break import PriceChannelBreakStrategy
+from src.strategy.pivot_bounce import PivotBounceStrategy
+from src.strategy.momentum_score import MomentumScoreStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -426,6 +428,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "wick_reversal": WickReversalStrategy,
     "ichimoku_breakout": IchimokuBreakoutStrategy,
     "macd_slope": MACDSlopeStrategy,
+    "ema_ribbon": EMARibbonStrategy,
+    "price_channel_break": PriceChannelBreakStrategy,
+    "pivot_bounce": PivotBounceStrategy,
+    "momentum_score": MomentumScoreStrategy,
 }
 
 
