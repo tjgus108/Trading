@@ -101,6 +101,8 @@ from src.strategy.pmo import PMOStrategy
 from src.strategy.rvi import RVIStrategy
 from src.strategy.disparity_index import DisparityIndexStrategy
 from src.strategy.psychological_line import PsychologicalLineStrategy
+from src.strategy.tsi import TSIStrategy
+from src.strategy.bop import BOPStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -176,6 +178,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "rvi": RVIStrategy,
     "disparity_index": DisparityIndexStrategy,
     "psychological_line": PsychologicalLineStrategy,
+    "tsi": TSIStrategy,
+    "bop": BOPStrategy,
 }
 
 
