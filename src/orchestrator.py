@@ -85,6 +85,8 @@ from src.strategy.cmo import CMOStrategy
 from src.strategy.ultimate_oscillator import UltimateOscillatorStrategy
 from src.strategy.zlema_cross import ZLEMACrossStrategy
 from src.strategy.mcginley import McGinleyStrategy
+from src.strategy.roc import ROCStrategy
+from src.strategy.awesome_oscillator import AwesomeOscillatorStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -142,6 +144,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "klinger": KlingerStrategy,
     "cmo": CMOStrategy,
     "ultimate_oscillator": UltimateOscillatorStrategy,
+    "zlema_cross": ZLEMACrossStrategy,
+    "mcginley": McGinleyStrategy,
+    "roc": ROCStrategy,
+    "awesome_oscillator": AwesomeOscillatorStrategy,
 }
 
 
