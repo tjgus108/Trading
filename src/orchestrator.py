@@ -162,6 +162,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "mass_index": MassIndexStrategy,
     "smi": SMIStrategy,
     "trima": TRIMAStrategy,
+    "choppiness": ChoppinessStrategy,
+    "alma": ALMAStrategy,
 }
 
 
