@@ -2,9 +2,165 @@
 
 _Last updated: 2026-04-09_
 
-## Status: **662+ passed** | 전략 33종 등록 | Phase G~L 완료
+## Status: **943 passed** | 전략 47종 등록 | Phase G~L 완료 + 커뮤니티 리서치 완료
 
-## 최근 작업 (2026-04-09) — PortfolioOptimizer 개선
+## 최근 작업 (2026-04-09) — 커뮤니티 실패/성공 사례 리서치
+
+- `RESEARCH_REPORT.md` 생성: 트레이딩봇 커뮤니티 연구 리포트
+- 핵심 발견: 백테스트 수수료/슬리피지 미반영이 가장 큰 위험
+- 즉시 개선 필요: 백테스트 데이터 limit 5000 확장, 수수료 반영
+- 다음 우선순위: BacktestEngine에 fee_rate + slippage_pct 파라미터 추가
+
+## 최근 작업 (2026-04-09) — HeikinAshiStrategy 구현
+
+- `src/strategy/heikin_ashi.py` 신규 생성: Heikin-Ashi 캔들 기반 추세 추종 전략
+- `tests/test_heikin_ashi.py` 신규 생성: 13개 테스트 전체 통과
+- `src/orchestrator.py` 수정: import 및 STRATEGY_REGISTRY에 "heikin_ashi" 등록
+- `src/orchestrator.py`: import 및 STRATEGY_REGISTRY에 `"fisher_transform": FisherTransformStrategy` 등록
+- BUY: Fisher 상향 크로스 + Fisher>0, SELL: Fisher 하향 크로스 + Fisher<0
+- confidence: |Fisher|>2.0 → HIGH, otherwise MEDIUM
+
+## 최근 작업 (2026-04-09) — TEMACrossStrategy 구현
+
+- `src/strategy/tema_cross.py` 신규 생성: TEMA(8) vs TEMA(21) 크로스오버 전략
+- `tests/test_tema_cross.py` 신규 생성: 12개 테스트 (monkeypatch 방식) 전부 통과
+- `src/orchestrator.py`: import 및 STRATEGY_REGISTRY에 `"tema_cross": TEMACrossStrategy` 등록
+
+## 최근 작업 (2026-04-09) — BacktestReport 메트릭 추가
+
+- `src/backtest/report.py` 개선:
+  - `win_loss_ratio` 필드 추가 (avg_win / avg_loss)
+  - `max_consecutive_losses` 필드 추가 (최대 연속 손실 횟수)
+  - `from_trades()`, `from_backtest_result()`, `_empty()` 모두 신규 필드 반영
+  - `summary()` 출력에 Win/Loss Ratio, Max Cons. Loss 항목 추가
+- backtest engine 테스트 19/19 통과
+- commit 97478b2 완료
+
+## 최근 작업 (2026-04-09) — StochRSIStrategy 구현
+
+- `src/strategy/stoch_rsi.py` 신규 생성
+  - RSI14 기반 Stochastic RSI 전략
+  - BUY: K<20, D<20, K>D (상향 크로스 in 과매도)
+  - SELL: K>80, D>80, K<D (하향 크로스 in 과매수)
+  - confidence: HIGH(K<10 BUY / K>90 SELL), MEDIUM otherwise
+  - 최소 35행 필요
+- `tests/test_stoch_rsi.py` 신규 생성 (15개 테스트 전부 통과)
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 `"stoch_rsi"` 등록
+- commit e04966b 완료
+
+## 최근 작업 (2026-04-09) — VortexStrategy 구현
+
+- `src/strategy/vortex.py` 신규 생성
+  - Vortex Indicator (period=14): VI+ = VM+/TR, VI- = VM-/TR
+  - BUY: VI+ 크로스오버 VI- AND VI+ > 1.0
+  - SELL: VI- 크로스오버 VI+ AND VI- > 1.0
+  - confidence: HIGH(|VI+-VI-|>0.2), MEDIUM otherwise
+  - 최소 20행 필요
+- `tests/test_vortex.py` 신규 생성 (12개 테스트 전부 통과)
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 `"vortex"` 등록
+- commit 68d0681 완료
+
+## 최근 작업 (2026-04-09) — KeltnerChannelStrategy 구현
+
+- `src/strategy/keltner_channel.py` 신규 생성
+  - EMA(20) + ATR14 기반 Keltner Channel
+  - BUY: close < Lower AND RSI14 < 40
+  - SELL: close > Upper AND RSI14 > 60
+  - confidence: HIGH(RSI<30 or RSI>70), MEDIUM otherwise
+  - 내장 `_rsi()` 함수 포함
+- `tests/test_keltner_channel.py` 신규 생성 (14개 테스트 전부 통과)
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 `"keltner_channel"` 등록
+- commit bfbeb97 완료
+
+## 최근 작업 (2026-04-09) — RSI Divergence 개선 + 테스트 커버리지 확대
+
+- `src/strategy/rsi_divergence.py`:
+  - 최소 swing 크기 필터 추가: RSI diff < 3 또는 가격 변화 < 0.5% → 무시
+  - 상수 추가: `_MIN_RSI_DIFF = 3.0`, `_MIN_PRICE_CHG = 0.005`
+  - EMA50 추세 필터: 기존 테스트 깨짐 → 스킵
+- `tests/test_new_strategies.py`: 테스트 7개 추가 (14 → 21)
+  - `test_small_rsi_diff_filtered_out`, `test_small_price_change_filtered_out`
+  - `test_high_confidence_threshold`, `test_none_df_returns_hold`
+  - `test_bull_case_bear_case_populated_on_signal`
+  - `test_bullish_signal_reasoning_mentions_rsi`, `test_bearish_signal_reasoning_mentions_rsi`
+- commit 22f8111 완료
+
+## 최근 작업 (2026-04-09) — PivotPointsStrategy 구현
+
+- `src/strategy/pivot_points.py` 신규 생성:
+  - Pivot Points (P/R1/S1/R2/S2) 기반 반전 전략
+  - BUY: close < S1 AND RSI14 < 40 (S2 근처면 HIGH, 아니면 MEDIUM)
+  - SELL: close > R1 AND RSI14 > 60 (R2 근처면 HIGH, 아니면 MEDIUM)
+  - 최소 5행 필요
+- `tests/test_pivot_points.py` 신규 생성: 14 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 "pivot_points" 추가
+- commit 87a6425 완료.
+
+## 최근 작업 (2026-04-09) — ElderRayStrategy 구현
+
+- `src/strategy/elder_ray.py` 신규 생성:
+  - Elder Ray Index (Bull Power + Bear Power) 전략
+  - EMA13 기반 추세 + Bear/Bull Power 조건 복합 판단
+  - BUY: EMA13 상승 AND Bear Power < 0 AND Bear Power 개선
+  - SELL: EMA13 하락 AND Bull Power > 0 AND Bull Power 감소
+  - Confidence: HIGH if |power| > 0.5 * ATR14, MEDIUM otherwise
+  - 최소 20행 필요
+- `tests/test_elder_ray.py` 신규 생성: 12 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 "elder_ray" 추가
+- commit 8628764 완료
+
+## 최근 작업 (2026-04-09) — OBVStrategy 구현
+
+- `src/strategy/obv.py` 신규 생성:
+  - OBV (On-Balance Volume) 볼륨/가격 다이버전스 전략
+  - OBV = 종가 방향에 따라 ±volume 누적, OBV_EMA = 20기간 EMA
+  - BUY: OBV가 OBV_EMA 상향 돌파 AND close > ema50
+  - SELL: OBV가 OBV_EMA 하향 돌파 AND close < ema50
+  - Confidence: HIGH if 2봉 전에도 같은 방향, MEDIUM if 방금 크로스
+  - 최소 30행 필요
+- `tests/test_obv.py` 신규 생성: 14 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 "obv" 추가
+- commit 83df04f 완료.
+
+## 최근 작업 (2026-04-09) — MFIStrategy 구현
+
+- `src/strategy/mfi.py` 신규 생성:
+  - MFI (Money Flow Index) 볼륨 가중 RSI 기반 과매수/과매도 전략
+  - Typical Price / Raw Money Flow / Positive·Negative MF 분리 / 14기간 rolling
+  - BUY: MFI < 20 AND 상승 중 / SELL: MFI > 80 AND 하락 중
+  - Confidence: HIGH if MFI < 10 (BUY) or MFI > 90 (SELL), MEDIUM otherwise
+  - 최소 20행 필요
+- `tests/test_mfi.py` 신규 생성: 11 passed, 2 skipped (13개)
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 "mfi" 추가
+- commit beeb799 완료.
+
+## 최근 작업 (2026-04-09) — TRIXStrategy 구현
+
+- `src/strategy/trix.py` 신규 생성:
+  - Triple EMA (EMA1→EMA2→EMA3, period=15) 기반 모멘텀 전략
+  - TRIX = (EMA3 - EMA3.shift(1)) / EMA3.shift(1) * 100
+  - Signal = TRIX의 9기간 SMA
+  - BUY: TRIX > 0 AND 상향 크로스 / SELL: TRIX < 0 AND 하향 크로스
+  - Confidence: HIGH if |TRIX| > 0.1, MEDIUM otherwise
+  - 최소 60행 필요
+- `tests/test_trix.py` 신규 생성: 14 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY에 "trix" 추가
+- commit cb91982 완료.
+
+## 최근 작업 (2026-04-09) — EMA Cross / Supertrend 성능 개선
+
+- `src/strategy/ema_cross.py` 개선:
+  - ema9/ema21 컬럼 존재 시 크로스 확인 (cross_up/cross_down) 추가
+  - EMA50 방향 필터: BUY=close>ema50, SELL=close<ema50
+  - 볼륨 필터: 20봉 평균 1.2배 이상
+  - 컬럼 미존재 시 기존 ema20/ema50 로직 그대로 유지 (graceful degradation)
+- `src/strategy/supertrend.py` 개선:
+  - 볼륨 필터: volume 컬럼 존재 시 20봉 평균 이상일 때만 BUY/SELL 신호
+  - 볼륨 미달 시 HOLD 반환 + 사유 메시지
+- 테스트: 14 passed (기존 전부 통과), 전체 719 passed
+- commit 7f47de8 완료.
+
+## 이전 작업 (2026-04-09) — PortfolioOptimizer 개선
 
 - `src/risk/portfolio_optimizer.py` 개선:
   - `_risk_parity`: 단순 역변동성 → 공분산 기반 iterative MRC 균등화 (최대 200회 수렴)
