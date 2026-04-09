@@ -366,6 +366,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "adaptive_stop": AdaptiveStopStrategy,
     "engulfing_zone": BullishEngulfingZoneStrategy,
     "three_bar_reversal": ThreeBarReversalStrategy,
+    "tii_strategy": TrendIntensityIndexStrategy,
+    "htf_ema": HigherTimeframeEMAStrategy,
 }
 
 
