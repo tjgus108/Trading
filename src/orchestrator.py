@@ -105,6 +105,10 @@ from src.strategy.tsi import TSIStrategy
 from src.strategy.bop import BOPStrategy
 from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy
 from src.strategy.ichimoku_advanced import IchimokuAdvancedStrategy
+from src.strategy.guppy import GuppyStrategy
+from src.strategy.apo import APOStrategy
+from src.strategy.zscore_mean_reversion import ZScoreMeanReversionStrategy
+from src.strategy.median_price import MedianPriceStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -184,6 +188,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "bop": BOPStrategy,
     "volatility_breakout_lw": VolatilityBreakoutLWStrategy,
     "ichimoku_advanced": IchimokuAdvancedStrategy,
+    "guppy": GuppyStrategy,
+    "apo": APOStrategy,
+    "zscore_mean_reversion": ZScoreMeanReversionStrategy,
+    "median_price": MedianPriceStrategy,
 }
 
 
