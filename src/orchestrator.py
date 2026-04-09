@@ -143,6 +143,8 @@ from src.strategy.opening_range_breakout import OpeningRangeBreakoutStrategy
 from src.strategy.session_high_low import SessionHighLowStrategy
 from src.strategy.cci_breakout import CCIBreakoutStrategy
 from src.strategy.squeeze_momentum import SqueezeMomentumStrategy
+from src.strategy.frama import FRAMAStrategy
+from src.strategy.vw_macd import VWMACDStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -260,6 +262,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "session_high_low": SessionHighLowStrategy,
     "cci_breakout": CCIBreakoutStrategy,
     "squeeze_momentum": SqueezeMomentumStrategy,
+    "frama": FRAMAStrategy,
+    "vw_macd": VWMACDStrategy,
 }
 
 
