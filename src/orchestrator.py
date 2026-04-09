@@ -201,9 +201,13 @@ from src.strategy.donchian_midline import DonchianMidlineStrategy
 from src.strategy.triple_screen import TripleScreenStrategy
 from src.strategy.poc_strategy import POCStrategy
 from src.strategy.bid_ask_imbalance import BidAskImbalanceStrategy
+from src.strategy.gann_swing import GannSwingStrategy
+from src.strategy.elder_force import ElderForceIndexStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 from src.strategy.price_deviation import PriceDeviationStrategy
 from src.strategy.acceleration_band import AccelerationBandStrategy
+from src.strategy.supertrend_multi import SupertrendMultiStrategy
+from src.strategy.narrow_range import NarrowRangeStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +384,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "acceleration_band": AccelerationBandStrategy,
     "poc_strategy": POCStrategy,
     "bid_ask_imbalance": BidAskImbalanceStrategy,
+    "supertrend_multi": SupertrendMultiStrategy,
+    "narrow_range": NarrowRangeStrategy,
+    "gann_swing": GannSwingStrategy,
+    "elder_force": ElderForceIndexStrategy,
 }
 
 
