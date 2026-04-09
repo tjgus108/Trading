@@ -115,6 +115,10 @@ from src.strategy.gap_strategy import GapStrategy
 from src.strategy.star_pattern import StarPatternStrategy
 from src.strategy.doji_pattern import DojiPatternStrategy
 from src.strategy.three_candles import ThreeCandlesStrategy
+from src.strategy.tweezer import TweezerStrategy
+from src.strategy.pin_bar import PinBarStrategy
+from src.strategy.vwap_cross import VWAPCrossStrategy
+from src.strategy.ease_of_movement import EaseOfMovementStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -204,6 +208,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "star_pattern": StarPatternStrategy,
     "doji_pattern": DojiPatternStrategy,
     "three_candles": ThreeCandlesStrategy,
+    "tweezer": TweezerStrategy,
+    "pin_bar": PinBarStrategy,
+    "vwap_cross": VWAPCrossStrategy,
+    "ease_of_movement": EaseOfMovementStrategy,
 }
 
 
