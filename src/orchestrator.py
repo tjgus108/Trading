@@ -212,6 +212,10 @@ from src.strategy.parabolic_move import ParabolicMoveStrategy
 from src.strategy.failed_breakout import FailedBreakoutStrategy
 from src.strategy.coppock_enhanced import CoppockEnhancedStrategy
 from src.strategy.vwrsi import VolumeWeightedRSIStrategy
+from src.strategy.hurst_strategy import HurstExponentStrategy
+from src.strategy.entropy_strategy import ApproximateEntropyStrategy
+from src.strategy.sr_bounce import SRBounceStrategy
+from src.strategy.candle_score import CandleScoreStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +400,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "failed_breakout": FailedBreakoutStrategy,
     "coppock_enhanced": CoppockEnhancedStrategy,
     "vwrsi": VolumeWeightedRSIStrategy,
+    "hurst_strategy": HurstExponentStrategy,
+    "entropy_strategy": ApproximateEntropyStrategy,
+    "sr_bounce": SRBounceStrategy,
+    "candle_score": CandleScoreStrategy,
 }
 
 
