@@ -151,6 +151,10 @@ from src.strategy.elder_impulse import ElderImpulseStrategy
 from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
 from src.strategy.pivot_reversal import PivotReversalStrategy
 from src.strategy.range_expansion import RangeExpansionStrategy
+from src.strategy.rsi_momentum_div import RSIMomentumDivStrategy
+from src.strategy.dpo_cross import DPOCrossStrategy
+from src.strategy.trend_strength import TrendStrengthStrategy
+from src.strategy.vpt_signal import VPTSignalStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -274,6 +278,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "mean_reversion_channel": MeanReversionChannelStrategy,
     "pivot_reversal": PivotReversalStrategy,
     "range_expansion": RangeExpansionStrategy,
+    "rsi_momentum_div": RSIMomentumDivStrategy,
+    "dpo_cross": DPOCrossStrategy,
 }
 
 
