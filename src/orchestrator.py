@@ -187,6 +187,12 @@ from src.strategy.fib_retracement import FibRetracementStrategy
 from src.strategy.stoch_divergence import StochDivergenceStrategy
 from src.strategy.ha_smoothed import HeikinAshiSmoothedStrategy
 from src.strategy.keltner_rsi import KeltnerRSIStrategy
+from src.strategy.chaikin_osc import ChaikinOscillatorStrategy
+from src.strategy.alligator import AlligatorStrategy
+from src.strategy.anchored_vwap import AnchoredVWAPStrategy
+from src.strategy.volatility_regime import VolatilityRegimeStrategy
+from src.strategy.zlmacd import ZeroLagMACDStrategy
+from src.strategy.adaptive_stop import AdaptiveStopStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -348,6 +354,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "stoch_divergence": StochDivergenceStrategy,
     "ha_smoothed": HeikinAshiSmoothedStrategy,
     "keltner_rsi": KeltnerRSIStrategy,
+    "chaikin_osc": ChaikinOscillatorStrategy,
+    "alligator": AlligatorStrategy,
+    "anchored_vwap": AnchoredVWAPStrategy,
+    "volatility_regime": VolatilityRegimeStrategy,
+    "zlmacd": ZeroLagMACDStrategy,
+    "adaptive_stop": AdaptiveStopStrategy,
 }
 
 
