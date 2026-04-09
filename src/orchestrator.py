@@ -111,6 +111,8 @@ from src.strategy.zscore_mean_reversion import ZScoreMeanReversionStrategy
 from src.strategy.median_price import MedianPriceStrategy
 from src.strategy.nr7 import NR7Strategy
 from src.strategy.inside_bar import InsideBarStrategy
+from src.strategy.gap_strategy import GapStrategy
+from src.strategy.star_pattern import StarPatternStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -196,6 +198,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "median_price": MedianPriceStrategy,
     "nr7": NR7Strategy,
     "inside_bar": InsideBarStrategy,
+    "gap_strategy": GapStrategy,
+    "star_pattern": StarPatternStrategy,
 }
 
 
