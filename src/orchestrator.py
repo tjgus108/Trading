@@ -131,6 +131,10 @@ from src.strategy.marubozu import MarubozuStrategy
 from src.strategy.spinning_top import SpinningTopStrategy
 from src.strategy.proc_trend import PRoCTrendStrategy
 from src.strategy.dual_thrust import DualThrustStrategy
+from src.strategy.r_squared import RSquaredStrategy
+from src.strategy.body_momentum import BodyMomentumStrategy
+from src.strategy.turtle_trading import TurtleTradingStrategy
+from src.strategy.atr_trailing import ATRTrailingStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -236,6 +240,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "spinning_top": SpinningTopStrategy,
     "proc_trend": PRoCTrendStrategy,
     "dual_thrust": DualThrustStrategy,
+    "r_squared": RSquaredStrategy,
+    "body_momentum": BodyMomentumStrategy,
+    "turtle_trading": TurtleTradingStrategy,
+    "atr_trailing": ATRTrailingStrategy,
 }
 
 

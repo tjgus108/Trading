@@ -2,9 +2,57 @@
 
 _Last updated: 2026-04-09_
 
-## Status: **28 new passed** | GapStrategy + StarPatternStrategy 추가
+## Status: **30 new passed** | RSquaredStrategy + BodyMomentumStrategy 추가
 
-## 최근 작업 (2026-04-09) — GapStrategy + StarPatternStrategy 구현
+## 최근 작업 (2026-04-09) — RSquaredStrategy + BodyMomentumStrategy 구현
+
+- `src/strategy/r_squared.py`: 선형 회귀 R² 기반 추세 강도 필터 전략 (R²>0.7+slope+ema50, HIGH/MEDIUM confidence)
+- `src/strategy/body_momentum.py`: 캔들 몸통 크기 기반 모멘텀 전략 (BM_EMA, BM_SUM3, HIGH/MEDIUM confidence)
+- `tests/test_r_squared.py`: 15개 테스트 통과
+- `tests/test_body_momentum.py`: 15개 테스트 통과
+- `src/orchestrator.py`: `r_squared`, `body_momentum` 등록
+
+## 이전 작업 (2026-04-09) — PRoCTrendStrategy + DualThrustStrategy 구현
+
+- `src/strategy/proc_trend.py`: Price Rate of Change + Trend Filter 복합 전략 (PROC_EMA + EMA50 기울기, HIGH/MEDIUM confidence)
+- `src/strategy/dual_thrust.py`: Dual Thrust 돌파 전략 (전일 Range 기반 Buy/Sell Level, 볼륨 필터, HIGH/MEDIUM confidence)
+- `tests/test_proc_trend.py`: 16개 테스트 통과
+- `tests/test_dual_thrust.py`: 16개 테스트 통과
+- `src/orchestrator.py`: `proc_trend`, `dual_thrust` 등록
+
+## 이전 작업 (2026-04-09) — HHLLChannelStrategy + VPTStrategy 구현
+
+- `src/strategy/hhll_channel.py`: Highest High / Lowest Low 채널 모멘텀 전략 (Position 0~100%, BUY>80, SELL<20, vol 필터, HIGH/MEDIUM confidence)
+- `src/strategy/vpt.py`: Volume Price Trend 전략 (VPT EMA14 크로스, HIGH=2봉 유지, MEDIUM=방금 크로스)
+- `tests/test_hhll_channel.py`: 16개 테스트 통과
+- `tests/test_vpt.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `hhll_channel`, `vpt` 등록
+
+## 이전 작업 (2026-04-09) — VWAPCrossStrategy + EaseOfMovementStrategy 구현
+
+- `src/strategy/vwap_cross.py`: VWAP20/VWAP50 Rolling 크로스오버 전략 (골든/데드 크로스, HIGH/MEDIUM confidence)
+- `src/strategy/ease_of_movement.py`: EOM 전략 (EMV EMA14 기반, close>ema50 필터, HIGH/MEDIUM confidence)
+- `tests/test_vwap_cross.py`: 14개 테스트 통과
+- `tests/test_ease_of_movement.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `vwap_cross`, `ease_of_movement` 등록
+
+## 이전 작업 (2026-04-09) — ZScoreMeanReversionStrategy + MedianPriceStrategy 구현
+
+- `src/strategy/zscore_mean_reversion.py`: Z-Score 기반 평균 회귀 전략 (period=20, BUY<-2.0, SELL>2.0, HIGH/MEDIUM confidence)
+- `src/strategy/median_price.py`: Median Price EMA 전략 (MP vs MP_EMA, 방향성 + close 위치 확인)
+- `tests/test_zscore_mean_reversion.py`: 16개 테스트 통과
+- `tests/test_median_price.py`: 15개 테스트 통과
+- `src/orchestrator.py`: `zscore_mean_reversion`, `median_price` 등록
+
+## 이전 작업 (2026-04-09) — DojiPatternStrategy + ThreeCandlesStrategy 구현
+
+- `src/strategy/doji_pattern.py`: Doji 캔들 반전 전략 (body < range*0.1, RSI14, ATR 기반, HIGH/MEDIUM confidence)
+- `src/strategy/three_candles.py`: 3연속 캔들 패턴 전략 (Three White Soldiers / Three Black Crows)
+- `tests/test_doji_pattern.py`: 13개 테스트 통과
+- `tests/test_three_candles.py`: 13개 테스트 통과
+- `src/orchestrator.py`: `doji_pattern`, `three_candles` 등록
+
+## 이전 작업 (2026-04-09) — GapStrategy + StarPatternStrategy 구현
 
 - `src/strategy/gap_strategy.py`: 갭 모멘텀 전략 (Gap Up/Down + 볼륨 필터, HIGH/MEDIUM confidence)
 - `src/strategy/star_pattern.py`: 별형 캔들 패턴 전략 (Morning/Evening Star, ATR 기반 body 크기 검증)
