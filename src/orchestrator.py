@@ -208,6 +208,8 @@ from src.strategy.price_deviation import PriceDeviationStrategy
 from src.strategy.acceleration_band import AccelerationBandStrategy
 from src.strategy.supertrend_multi import SupertrendMultiStrategy
 from src.strategy.narrow_range import NarrowRangeStrategy
+from src.strategy.parabolic_move import ParabolicMoveStrategy
+from src.strategy.failed_breakout import FailedBreakoutStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -388,6 +390,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "narrow_range": NarrowRangeStrategy,
     "gann_swing": GannSwingStrategy,
     "elder_force": ElderForceIndexStrategy,
+    "parabolic_move": ParabolicMoveStrategy,
+    "failed_breakout": FailedBreakoutStrategy,
 }
 
 
