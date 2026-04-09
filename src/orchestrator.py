@@ -99,6 +99,8 @@ from src.strategy.adaptive_rsi import AdaptiveRSIStrategy
 from src.strategy.volatility_ratio import VolatilityRatioStrategy
 from src.strategy.pmo import PMOStrategy
 from src.strategy.rvi import RVIStrategy
+from src.strategy.disparity_index import DisparityIndexStrategy
+from src.strategy.psychological_line import PsychologicalLineStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -172,6 +174,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volatility_ratio": VolatilityRatioStrategy,
     "pmo": PMOStrategy,
     "rvi": RVIStrategy,
+    "disparity_index": DisparityIndexStrategy,
+    "psychological_line": PsychologicalLineStrategy,
 }
 
 
