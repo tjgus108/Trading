@@ -1,6 +1,6 @@
 # 🤖 트레이딩 봇 진행 상황
 
-## 📅 최근 업데이트: 2026-04-09
+## 📅 최근 업데이트: 2026-04-10
 
 ---
 
@@ -8,52 +8,56 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **1,527개** |
-| ❌ 실패 테스트 | 6개 (zscore_mean_reversion 기존 이슈) |
+| ✅ 통과 테스트 | **2,171개** |
+| ❌ 실패 테스트 | **0개** |
 | ⏭️ 스킵 | 17개 |
-| 🎯 전략 수 | **86개** |
+| 🎯 전략 수 | **125개** |
 
 ---
 
-## 🚀 이번 세션 추가 전략
+## 🚀 이번 세션 추가 전략 (+39개)
 
 | 전략 | 키 |
 |------|----|
-| Rate of Change | `roc` |
-| Awesome Oscillator | `awesome_oscillator` |
-| Chande Momentum Oscillator | `cmo` |
-| Ultimate Oscillator | `ultimate_oscillator` |
-| ZLEMA Cross | `zlema_cross` |
-| McGinley Dynamic | `mcginley` |
-| Connors RSI | `connors_rsi` |
-| Linear Regression | `linear_regression` |
-| Williams Fractal | `williams_fractal` |
-| Mass Index | `mass_index` |
-| Stochastic Momentum Index | `smi` |
-| Triangular MA | `trima` |
-| True Strength Index | `tsi` |
-| Balance of Power | `bop` |
-| Adaptive RSI | `adaptive_rsi` |
-| Volatility Ratio | `volatility_ratio` |
-| Choppiness Index | `choppiness` |
-| ALMA | `alma` |
-| Disparity Index | `disparity_index` |
-| Psychological Line | `psychological_line` |
-| Price Momentum Oscillator | `pmo` |
-| Relative Vigor Index | `rvi` |
-| Guppy MMA | `guppy` |
-| Absolute Price Oscillator | `apo` |
-| NR7 | `nr7` |
-| Inside Bar | `inside_bar` |
-| Gap Strategy | `gap_strategy` |
-| Star Pattern | `star_pattern` |
-| Doji Pattern | `doji_pattern` |
-| Three Candles | `three_candles` |
-| Median Price | `median_price` |
-| Price Channel | `price_channel` |
-| ZScore Mean Reversion | `zscore_mean_reversion` |
-| Volatility Breakout LW | `volatility_breakout_lw` |
-| Ichimoku Advanced | `ichimoku_advanced` |
+| Tweezer Pattern | `tweezer` |
+| Pin Bar | `pin_bar` |
+| Harami | `harami` |
+| Cloud Cover | `cloud_cover` |
+| SR Breakout | `sr_breakout` |
+| Trend Channel | `trend_channel` |
+| HHLL Channel | `hhll_channel` |
+| VPT | `vpt` |
+| VWAP Cross | `vwap_cross` |
+| Ease of Movement | `ease_of_movement` |
+| ADL | `adl` |
+| Force Index | `force_index` |
+| Marubozu | `marubozu` |
+| Spinning Top | `spinning_top` |
+| Turtle Trading | `turtle_trading` |
+| ATR Trailing | `atr_trailing` |
+| PRoC Trend | `proc_trend` |
+| Dual Thrust | `dual_thrust` |
+| R Squared | `r_squared` |
+| Body Momentum | `body_momentum` |
+| Historical Volatility | `historical_volatility` |
+| Price Action Momentum | `price_action_momentum` |
+| Volume Oscillator | `volume_oscillator` |
+| Price Envelope | `price_envelope` |
+| Opening Range Breakout | `opening_range_breakout` |
+| Session High Low | `session_high_low` |
+| Elder Impulse | `elder_impulse` |
+| Mean Reversion Channel | `mean_reversion_channel` |
+| Chandelier Exit | `chandelier_exit` |
+| Vol Adj Momentum | `vol_adj_momentum` |
+| Pivot Reversal | `pivot_reversal` |
+| Range Expansion | `range_expansion` |
+| CCI Breakout | `cci_breakout` |
+| Squeeze Momentum | `squeeze_momentum` |
+| FRAMA | `frama` |
+| VW MACD | `vw_macd` |
+| RSI Momentum Div | `rsi_momentum_div` |
+| DPO Cross | `dpo_cross` |
+| HA Trend | `ha_trend` |
 
 ---
 
@@ -69,7 +73,7 @@
 
 ---
 
-## 📋 전략 전체 목록 (86개)
+## 📋 전략 전체 목록 (125개)
 
 <details>
 <summary>펼치기</summary>
