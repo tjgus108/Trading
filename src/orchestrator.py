@@ -95,6 +95,10 @@ from src.strategy.smi import SMIStrategy
 from src.strategy.trima import TRIMAStrategy
 from src.strategy.choppiness import ChoppinessStrategy
 from src.strategy.alma import ALMAStrategy
+from src.strategy.adaptive_rsi import AdaptiveRSIStrategy
+from src.strategy.volatility_ratio import VolatilityRatioStrategy
+from src.strategy.pmo import PMOStrategy
+from src.strategy.rvi import RVIStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -164,6 +168,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trima": TRIMAStrategy,
     "choppiness": ChoppinessStrategy,
     "alma": ALMAStrategy,
+    "adaptive_rsi": AdaptiveRSIStrategy,
+    "volatility_ratio": VolatilityRatioStrategy,
+    "pmo": PMOStrategy,
+    "rvi": RVIStrategy,
 }
 
 
