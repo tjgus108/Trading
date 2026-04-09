@@ -139,6 +139,10 @@ from src.strategy.historical_volatility import HistoricalVolatilityStrategy
 from src.strategy.price_action_momentum import PriceActionMomentumStrategy
 from src.strategy.volume_oscillator import VolumeOscillatorStrategy
 from src.strategy.price_envelope import PriceEnvelopeStrategy
+from src.strategy.opening_range_breakout import OpeningRangeBreakoutStrategy
+from src.strategy.session_high_low import SessionHighLowStrategy
+from src.strategy.cci_breakout import CCIBreakoutStrategy
+from src.strategy.squeeze_momentum import SqueezeMomentumStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -252,6 +256,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_action_momentum": PriceActionMomentumStrategy,
     "volume_oscillator": VolumeOscillatorStrategy,
     "price_envelope": PriceEnvelopeStrategy,
+    "opening_range_breakout": OpeningRangeBreakoutStrategy,
+    "session_high_low": SessionHighLowStrategy,
+    "cci_breakout": CCIBreakoutStrategy,
+    "squeeze_momentum": SqueezeMomentumStrategy,
 }
 
 
