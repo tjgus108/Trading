@@ -125,6 +125,12 @@ from src.strategy.sr_breakout import SRBreakoutStrategy
 from src.strategy.trend_channel import TrendChannelStrategy
 from src.strategy.hhll_channel import HHLLChannelStrategy
 from src.strategy.vpt import VPTStrategy
+from src.strategy.adl import ADLStrategy
+from src.strategy.force_index import ForceIndexStrategy
+from src.strategy.marubozu import MarubozuStrategy
+from src.strategy.spinning_top import SpinningTopStrategy
+from src.strategy.proc_trend import PRoCTrendStrategy
+from src.strategy.dual_thrust import DualThrustStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -224,6 +230,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_channel": TrendChannelStrategy,
     "hhll_channel": HHLLChannelStrategy,
     "vpt": VPTStrategy,
+    "adl": ADLStrategy,
+    "force_index": ForceIndexStrategy,
+    "marubozu": MarubozuStrategy,
+    "spinning_top": SpinningTopStrategy,
+    "proc_trend": PRoCTrendStrategy,
+    "dual_thrust": DualThrustStrategy,
 }
 
 
