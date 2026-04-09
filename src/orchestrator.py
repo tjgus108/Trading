@@ -173,6 +173,10 @@ from src.strategy.volume_surge import VolumeSurgeStrategy
 from src.strategy.price_velocity import PriceVelocityStrategy
 from src.strategy.multi_score import MultiScoreStrategy
 from src.strategy.adx_regime import ADXRegimeStrategy
+from src.strategy.obv_divergence import OBVDivergenceStrategy
+from src.strategy.rsi_ob_os import RSIOBOSStrategy
+from src.strategy.lr_channel import LRChannelStrategy
+from src.strategy.momentum_reversal import MomentumReversalStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -320,6 +324,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_velocity": PriceVelocityStrategy,
     "multi_score": MultiScoreStrategy,
     "adx_regime": ADXRegimeStrategy,
+    "obv_divergence": OBVDivergenceStrategy,
+    "rsi_ob_os": RSIOBOSStrategy,
+    "lr_channel": LRChannelStrategy,
+    "momentum_reversal": MomentumReversalStrategy,
 }
 
 
