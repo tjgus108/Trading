@@ -135,6 +135,10 @@ from src.strategy.r_squared import RSquaredStrategy
 from src.strategy.body_momentum import BodyMomentumStrategy
 from src.strategy.turtle_trading import TurtleTradingStrategy
 from src.strategy.atr_trailing import ATRTrailingStrategy
+from src.strategy.historical_volatility import HistoricalVolatilityStrategy
+from src.strategy.price_action_momentum import PriceActionMomentumStrategy
+from src.strategy.volume_oscillator import VolumeOscillatorStrategy
+from src.strategy.price_envelope import PriceEnvelopeStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -244,6 +248,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "body_momentum": BodyMomentumStrategy,
     "turtle_trading": TurtleTradingStrategy,
     "atr_trailing": ATRTrailingStrategy,
+    "historical_volatility": HistoricalVolatilityStrategy,
+    "price_action_momentum": PriceActionMomentumStrategy,
+    "volume_oscillator": VolumeOscillatorStrategy,
+    "price_envelope": PriceEnvelopeStrategy,
 }
 
 
