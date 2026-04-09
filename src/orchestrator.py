@@ -145,6 +145,12 @@ from src.strategy.cci_breakout import CCIBreakoutStrategy
 from src.strategy.squeeze_momentum import SqueezeMomentumStrategy
 from src.strategy.frama import FRAMAStrategy
 from src.strategy.vw_macd import VWMACDStrategy
+from src.strategy.chandelier_exit import ChandelierExitStrategy
+from src.strategy.vol_adj_momentum import VolAdjMomentumStrategy
+from src.strategy.elder_impulse import ElderImpulseStrategy
+from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
+from src.strategy.pivot_reversal import PivotReversalStrategy
+from src.strategy.range_expansion import RangeExpansionStrategy
 from src.risk.drawdown_monitor import DrawdownMonitor
 
 logger = logging.getLogger(__name__)
@@ -264,6 +270,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "squeeze_momentum": SqueezeMomentumStrategy,
     "frama": FRAMAStrategy,
     "vw_macd": VWMACDStrategy,
+    "elder_impulse": ElderImpulseStrategy,
+    "mean_reversion_channel": MeanReversionChannelStrategy,
+    "pivot_reversal": PivotReversalStrategy,
+    "range_expansion": RangeExpansionStrategy,
 }
 
 
