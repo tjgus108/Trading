@@ -580,6 +580,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "market_structure_break": MarketStructureBreakStrategy,
     "price_action_quality": PriceActionQualityStrategy,
     "regime_filter": RegimeFilterStrategy,
+    "candle_pattern_score": CandlePatternScoreStrategy,
+    "multi_tf_trend": MultiTFTrendStrategy,
 }
 
 
