@@ -1,55 +1,35 @@
-"""RangeExpansionStrategy 단위 테스트 (14개).
-
-전략 로직:
-  bar_range = high - low
-  avg_range = bar_range.rolling(14).mean()
-  range_ratio = bar_range / avg_range
-  close_pos = (close - low) / (high - low)
-  BUY: range_ratio > 1.5 AND close_pos > 0.7
-  SELL: range_ratio > 1.5 AND close_pos < 0.3
-  HOLD: range_ratio <= 1.5
-"""
+"""ParabolicSARTrendStrategy 단위 테스트 (14개)."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.range_expansion import RangeExpansionStrategy
+from src.strategy.parabolic_sar_trend import ParabolicSARTrendStrategy
 from src.strategy.base import Action, Confidence, Signal
 
 
-# ── 헬퍼 ────────────────────────────────────────────────────────────────────
-
-def _make_df(n: int = 25, base_range: float = 1.0) -> pd.DataFrame:
-    """기본 테스트 DataFrame (range_ratio ≈ 1.0)."""
-    close = np.linspace(100.0, 110.0, n)
-    high = close + base_range / 2
-    low = close - base_range / 2
+def _make_df(n: int = 30, base: float = 100.0) -> pd.DataFrame:
+    close = np.linspace(base, base + 10, n)
     return pd.DataFrame({
-        "open": close - 0.1,
-        "high": high,
-        "low": low,
+        "open": close - 0.3,
+        "high": close + 0.5,
+        "low": close - 0.5,
         "close": close,
         "volume": np.ones(n) * 1000,
     })
 
 
 def _make_buy_df() -> pd.DataFrame:
-    """range_ratio > 1.5, close_pos > 0.7 → BUY."""
-    n = 25
-    base_range = 1.0
-    close = np.linspace(100.0, 110.0, n)
-    high = close + base_range / 2
-    low = close - base_range / 2
-
-    # idx = n-2: 큰 범위 + 위쪽 마감
-    big_range = base_range * 3.0  # ratio > 2.0 → HIGH confidence
-    high[-2] = close[-2] + big_range * 0.9
-    low[-2] = close[-2] - big_range * 0.1
-    # close_pos = (close - low) / (high - low) = 0.9 / 1.0 = 0.9 > 0.7
-
+    """하락 추세 후 idx=-2에서 상승 전환 유도."""
+    n = 40
+    falling = np.linspace(200.0, 80.0, n - 2)
+    # 급등으로 SAR(위) 돌파
+    close = np.append(falling, [300.0, 310.0])
+    high = close + 2.0
+    low = close - 2.0
+    high[-2] = 310.0
     return pd.DataFrame({
-        "open": close - 0.1,
+        "open": close - 0.3,
         "high": high,
         "low": low,
         "close": close,
@@ -58,37 +38,16 @@ def _make_buy_df() -> pd.DataFrame:
 
 
 def _make_sell_df() -> pd.DataFrame:
-    """range_ratio > 1.5, close_pos < 0.3 → SELL."""
-    n = 25
-    base_range = 1.0
-    close = np.linspace(100.0, 110.0, n)
-    high = close + base_range / 2
-    low = close - base_range / 2
-
-    # idx = n-2: 큰 범위 + 아래쪽 마감
-    big_range = base_range * 3.0
-    high[-2] = close[-2] + big_range * 0.9
-    low[-2] = close[-2] - big_range * 0.1
-    # 아래쪽 마감: close = low + big_range * 0.1
-    close[-2] = low[-2] + big_range * 0.1
-
+    """상승 추세 후 idx=-2에서 하락 전환 유도."""
+    n = 40
+    rising = np.linspace(50.0, 200.0, n - 2)
+    # 급락으로 SAR(아래) 돌파
+    close = np.append(rising, [0.5, 0.4])
+    high = close + 2.0
+    low = np.maximum(close - 2.0, 0.01)
+    low[-2] = 0.01
     return pd.DataFrame({
-        "open": close - 0.1,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": np.ones(n) * 1000,
-    })
-
-
-def _make_equal_hl_df() -> pd.DataFrame:
-    """high == low 케이스 (close_pos = 0.5 처리 확인)."""
-    n = 25
-    close = np.linspace(100.0, 110.0, n)
-    high = close.copy()
-    low = close.copy()
-    return pd.DataFrame({
-        "open": close,
+        "open": close - 0.3,
         "high": high,
         "low": low,
         "close": close,
@@ -98,18 +57,18 @@ def _make_equal_hl_df() -> pd.DataFrame:
 
 # ── 1. 전략명 확인 ──────────────────────────────────────────────────────────
 def test_strategy_name():
-    assert RangeExpansionStrategy.name == "range_expansion"
+    assert ParabolicSARTrendStrategy.name == "parabolic_sar_trend"
 
 
 # ── 2. 인스턴스 생성 ─────────────────────────────────────────────────────────
 def test_instantiation():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     assert strat is not None
 
 
 # ── 3. 데이터 부족 → HOLD ────────────────────────────────────────────────────
 def test_insufficient_data_hold():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     df = _make_df(n=10)
     sig = strat.generate(df)
     assert sig.action == Action.HOLD
@@ -117,14 +76,14 @@ def test_insufficient_data_hold():
 
 # ── 4. None 입력 → HOLD ──────────────────────────────────────────────────────
 def test_none_input_hold():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     sig = strat.generate(None)
     assert sig.action == Action.HOLD
 
 
 # ── 5. 데이터 부족 reasoning 확인 ───────────────────────────────────────────
 def test_insufficient_data_reasoning():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     df = _make_df(n=5)
     sig = strat.generate(df)
     assert "Insufficient" in sig.reasoning or "부족" in sig.reasoning
@@ -132,20 +91,20 @@ def test_insufficient_data_reasoning():
 
 # ── 6. 정상 데이터 → Signal 반환 ────────────────────────────────────────────
 def test_normal_data_returns_signal():
-    strat = RangeExpansionStrategy()
-    df = _make_df(n=25)
+    strat = ParabolicSARTrendStrategy()
+    df = _make_df(n=30)
     sig = strat.generate(df)
     assert isinstance(sig, Signal)
 
 
 # ── 7. Signal 필드 완성 ──────────────────────────────────────────────────────
 def test_signal_fields_complete():
-    strat = RangeExpansionStrategy()
-    df = _make_df(n=25)
+    strat = ParabolicSARTrendStrategy()
+    df = _make_df(n=30)
     sig = strat.generate(df)
     assert sig.action is not None
     assert sig.confidence is not None
-    assert sig.strategy == "range_expansion"
+    assert sig.strategy == "parabolic_sar_trend"
     assert isinstance(sig.entry_price, float)
     assert isinstance(sig.reasoning, str) and len(sig.reasoning) > 0
     assert isinstance(sig.invalidation, str)
@@ -153,84 +112,73 @@ def test_signal_fields_complete():
 
 # ── 8. BUY reasoning 키워드 확인 ────────────────────────────────────────────
 def test_buy_reasoning_keyword():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     df = _make_buy_df()
     sig = strat.generate(df)
     if sig.action == Action.BUY:
-        assert "확장" in sig.reasoning or "range" in sig.reasoning.lower()
+        assert "SAR" in sig.reasoning
     else:
         pytest.skip("BUY signal not triggered for this dataset")
 
 
 # ── 9. SELL reasoning 키워드 확인 ───────────────────────────────────────────
 def test_sell_reasoning_keyword():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     df = _make_sell_df()
     sig = strat.generate(df)
     if sig.action == Action.SELL:
-        assert "확장" in sig.reasoning or "range" in sig.reasoning.lower()
+        assert "SAR" in sig.reasoning
     else:
         pytest.skip("SELL signal not triggered for this dataset")
 
 
-# ── 10. HIGH confidence (range_ratio > 2.0) ────────────────────────────────
-def test_high_confidence_buy():
-    strat = RangeExpansionStrategy()
+# ── 10. HIGH confidence 테스트 ──────────────────────────────────────────────
+def test_high_confidence():
+    """close와 SAR 거리가 2% 초과하면 HIGH."""
+    strat = ParabolicSARTrendStrategy()
     df = _make_buy_df()
     sig = strat.generate(df)
     if sig.action == Action.BUY:
-        # _make_buy_df는 ratio=3.0 > 2.0 → HIGH
-        assert sig.confidence == Confidence.HIGH
+        sar = strat._compute_sar(df)
+        idx = len(df) - 2
+        dist = abs(float(df["close"].iloc[idx]) - float(sar.iloc[idx])) / float(df["close"].iloc[idx])
+        if dist > 0.02:
+            assert sig.confidence == Confidence.HIGH
+        else:
+            assert sig.confidence == Confidence.MEDIUM
     else:
         pytest.skip("BUY not triggered")
 
 
-# ── 11. MEDIUM confidence (1.5 < ratio <= 2.0) ──────────────────────────────
-def test_medium_confidence_buy():
-    """range_ratio 1.5~2.0 구간 → MEDIUM confidence BUY."""
-    n = 25
-    base_range = 1.0
-    close = np.linspace(100.0, 110.0, n)
-    high = close + base_range / 2
-    low = close - base_range / 2
-    # ratio = 1.8 (> 1.5 but <= 2.0) → MEDIUM
-    big_range = base_range * 1.8
-    high[-2] = close[-2] + big_range * 0.9
-    low[-2] = close[-2] - big_range * 0.1
-    df = pd.DataFrame({
-        "open": close - 0.1,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": np.ones(n) * 1000,
-    })
-    strat = RangeExpansionStrategy()
+# ── 11. MEDIUM confidence 테스트 ────────────────────────────────────────────
+def test_medium_confidence_hold():
+    """HOLD 신호는 MEDIUM confidence."""
+    strat = ParabolicSARTrendStrategy()
+    df = _make_df(n=30)
     sig = strat.generate(df)
-    if sig.action == Action.BUY:
+    if sig.action == Action.HOLD and sig.confidence != Confidence.LOW:
         assert sig.confidence == Confidence.MEDIUM
-    else:
-        pytest.skip("BUY not triggered at medium ratio")
 
 
 # ── 12. entry_price > 0 ─────────────────────────────────────────────────────
 def test_entry_price_positive():
-    strat = RangeExpansionStrategy()
-    df = _make_df(n=25)
+    strat = ParabolicSARTrendStrategy()
+    df = _make_df(n=30)
     sig = strat.generate(df)
     assert sig.entry_price > 0
 
 
 # ── 13. strategy 필드 값 확인 ───────────────────────────────────────────────
 def test_strategy_field():
-    strat = RangeExpansionStrategy()
-    df = _make_df(n=25)
+    strat = ParabolicSARTrendStrategy()
+    df = _make_df(n=30)
     sig = strat.generate(df)
-    assert sig.strategy == "range_expansion"
+    assert sig.strategy == "parabolic_sar_trend"
 
 
-# ── 14. 최소 행 수(20)에서 동작 ────────────────────────────────────────────
+# ── 14. 최소 행 수에서 동작 ─────────────────────────────────────────────────
 def test_min_rows_works():
-    strat = RangeExpansionStrategy()
+    strat = ParabolicSARTrendStrategy()
     df = _make_df(n=20)
     sig = strat.generate(df)
     assert isinstance(sig, Signal)
