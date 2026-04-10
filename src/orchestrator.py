@@ -60,6 +60,7 @@ from src.strategy.macd_strategy import MACDStrategy
 from src.strategy.ichimoku import IchimokuStrategy
 from src.strategy.williams_r import WilliamsRStrategy
 from src.strategy.parabolic_sar import ParabolicSARStrategy
+from src.strategy.parabolic_sar_trend import ParabolicSARTrendStrategy
 from src.strategy.adx_trend import ADXTrendStrategy
 from src.strategy.aroon import AroonStrategy
 from src.strategy.cci import CCIStrategy
@@ -82,6 +83,7 @@ from src.strategy.fisher_transform import FisherTransformStrategy
 from src.strategy.ppo import PPOStrategy
 from src.strategy.klinger import KlingerStrategy
 from src.strategy.cmo import CMOStrategy
+from src.strategy.chande_momentum import ChandeMomentumStrategy
 from src.strategy.ultimate_oscillator import UltimateOscillatorStrategy
 from src.strategy.zlema_cross import ZLEMACrossStrategy
 from src.strategy.mcginley import McGinleyStrategy
@@ -347,6 +349,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ppo": PPOStrategy,
     "klinger": KlingerStrategy,
     "cmo": CMOStrategy,
+    "chande_momentum": ChandeMomentumStrategy,
     "ultimate_oscillator": UltimateOscillatorStrategy,
     "zlema_cross": ZLEMACrossStrategy,
     "mcginley": McGinleyStrategy,
