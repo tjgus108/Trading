@@ -441,6 +441,8 @@ from src.strategy.trend_break_confirm import TrendBreakConfirmStrategy
 from src.strategy.momentum_mean_rev import MomentumMeanRevStrategy
 from src.strategy.spread_momentum import SpreadMomentumStrategy
 from src.strategy.trend_exhaustion_signal import TrendExhaustionSignalStrategy
+from src.strategy.higher_high_momentum import HigherHighMomentumStrategy
+from src.strategy.mean_rev_bounce import MeanRevBounceStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -855,6 +857,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_mean_rev": MomentumMeanRevStrategy,
     "spread_momentum": SpreadMomentumStrategy,
     "trend_exhaustion_signal": TrendExhaustionSignalStrategy,
+    "higher_high_momentum": HigherHighMomentumStrategy,
+    "mean_rev_bounce": MeanRevBounceStrategy,
 }
 
 
