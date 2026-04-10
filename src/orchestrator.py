@@ -406,6 +406,8 @@ from src.strategy.momentum_divergence_v2 import MomentumDivergenceV2Strategy
 from src.strategy.volume_spread_analysis_v2 import VolumeSpreadAnalysisV2Strategy
 from src.strategy.gap_momentum import GapMomentumStrategy
 from src.strategy.consolidation_break import ConsolidationBreakStrategy
+from src.strategy.range_trading import RangeTradingStrategy
+from src.strategy.trend_acceleration import TrendAccelerationStrategy
 
 logger = logging.getLogger(__name__)
 
