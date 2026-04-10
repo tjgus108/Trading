@@ -427,6 +427,10 @@ from src.strategy.trend_fibonacci import TrendFibonacciStrategy
 from src.strategy.mean_reversion_score import MeanReversionScoreStrategy
 from src.strategy.stochastic_momentum import StochasticMomentumStrategy
 from src.strategy.price_channel_filter import PriceChannelFilterStrategy
+from src.strategy.volume_momentum_break import VolumeMomentumBreakStrategy
+from src.strategy.price_structure_analysis import PriceStructureAnalysisStrategy
+from src.strategy.adaptive_volatility import AdaptiveVolatilityStrategy
+from src.strategy.trend_persistence import TrendPersistenceStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -826,6 +830,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "mean_reversion_score": MeanReversionScoreStrategy,
     "stochastic_momentum": StochasticMomentumStrategy,
     "price_channel_filter": PriceChannelFilterStrategy,
+    "volume_momentum_break": VolumeMomentumBreakStrategy,
+    "price_structure_analysis": PriceStructureAnalysisStrategy,
 }
 
 
