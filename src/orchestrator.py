@@ -552,6 +552,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "inverse_fisher_rsi": InverseFisherRSIStrategy,
     "value_area": ValueAreaStrategy,
     "divergence_score": DivergenceScoreStrategy,
+    "adaptive_threshold": AdaptiveThresholdStrategy,
+    "volatility_cluster": VolatilityClusterStrategy,
+    "seasonal_cycle": SeasonalCycleStrategy,
+    "trend_follow_break": TrendFollowBreakStrategy,
 }
 
 
