@@ -254,6 +254,8 @@ from src.strategy.linear_channel_rev import LinearChannelReversionStrategy
 from src.strategy.consolidation_breakout import ConsolidationBreakoutStrategy
 from src.strategy.price_rsi_div import PriceRSIDivergenceStrategy
 from src.strategy.momentum_accel import MomentumAccelerationStrategy
+from src.strategy.parabolic_momentum import ParabolicMomentumStrategy
+from src.strategy.exhaustion_reversal import ExhaustionReversalStrategy
 from src.strategy.swing_point import SwingPointStrategy
 from src.strategy.confluence_zone import ConfluenceZoneStrategy
 from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
@@ -363,10 +365,14 @@ from src.strategy.oscillator_band import OscillatorBandStrategy
 from src.strategy.price_action_filter import PriceActionFilterStrategy
 from src.strategy.price_pattern_recog import PricePatternRecogStrategy
 from src.strategy.trend_momentum_blend import TrendMomentumBlendStrategy
+from src.strategy.ema_cloud import EMACloudStrategy
+from src.strategy.trend_strength_composite import TrendStrengthCompositeStrategy
 from src.strategy.tick_volume import TickVolumeStrategy
 from src.strategy.market_breadth_proxy import MarketBreadthProxyStrategy
 from src.strategy.harmonic_pattern import HarmonicPatternStrategy
 from src.strategy.divergence_confirmation import DivergenceConfirmationStrategy
+from src.strategy.dual_momentum import DualMomentumStrategy
+from src.strategy.carry_strategy import CarryStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -704,6 +710,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_momentum_blend": TrendMomentumBlendStrategy,
     "tick_volume": TickVolumeStrategy,
     "market_breadth_proxy": MarketBreadthProxyStrategy,
+    "harmonic_pattern": HarmonicPatternStrategy,
+    "divergence_confirmation": DivergenceConfirmationStrategy,
+    "parabolic_momentum": ParabolicMomentumStrategy,
+    "exhaustion_reversal": ExhaustionReversalStrategy,
+    "dual_momentum": DualMomentumStrategy,
+    "carry_strategy": CarryStrategy,
 }
 
 
