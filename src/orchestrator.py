@@ -375,6 +375,8 @@ from src.strategy.dual_momentum import DualMomentumStrategy
 from src.strategy.carry_strategy import CarryStrategy
 from src.strategy.intraday_momentum import IntradayMomentumStrategy
 from src.strategy.volatility_surface import VolatilitySurfaceStrategy
+from src.strategy.regime_momentum import RegimeMomentumStrategy
+from src.strategy.liquidity_score import LiquidityScoreStrategy
 
 logger = logging.getLogger(__name__)
 
