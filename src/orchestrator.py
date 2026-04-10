@@ -724,6 +724,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_strength_composite": TrendStrengthCompositeStrategy,
     "intraday_momentum": IntradayMomentumStrategy,
     "volatility_surface": VolatilitySurfaceStrategy,
+    "regime_momentum": RegimeMomentumStrategy,
+    "liquidity_score": LiquidityScoreStrategy,
 }
 
 
