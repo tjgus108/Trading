@@ -264,6 +264,12 @@ from src.strategy.pa_confirm import PriceActionConfirmStrategy
 from src.strategy.ema_dynamic_support import EMADynamicSupportStrategy
 from src.strategy.autocorr_strategy import AutoCorrelationStrategy
 from src.strategy.adaptive_rsi_thresh import AdaptiveRSIThresholdStrategy
+from src.strategy.mr_entry import MeanReversionEntryStrategy
+from src.strategy.vol_mean_rev import VolatilityMeanReversionStrategy
+from src.strategy.kijun_bounce import KijunBounceStrategy
+from src.strategy.vol_price_confirm import VolumePriceConfirmStrategy
+from src.strategy.trend_strength_filter import TrendStrengthFilterStrategy
+from src.strategy.vol_spread_analysis import VolSpreadAnalysisStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -500,6 +506,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_dynamic_support": EMADynamicSupportStrategy,
     "autocorr_strategy": AutoCorrelationStrategy,
     "adaptive_rsi_thresh": AdaptiveRSIThresholdStrategy,
+    "mr_entry": MeanReversionEntryStrategy,
+    "vol_mean_rev": VolatilityMeanReversionStrategy,
+    "kijun_bounce": KijunBounceStrategy,
+    "vol_price_confirm": VolumePriceConfirmStrategy,
+    "trend_strength_filter": TrendStrengthFilterStrategy,
+    "vol_spread_analysis": VolSpreadAnalysisStrategy,
 }
 
 
