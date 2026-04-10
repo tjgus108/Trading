@@ -114,7 +114,7 @@ from src.strategy.disparity_index import DisparityIndexStrategy
 from src.strategy.psychological_line import PsychologicalLineStrategy
 from src.strategy.tsi import TSIStrategy
 from src.strategy.bop import BOPStrategy
-from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy
+from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy, VolatilityBreakoutStrategy
 from src.strategy.ichimoku_advanced import IchimokuAdvancedStrategy
 from src.strategy.ichimoku_cloud_pos import IchimokuCloudPosStrategy
 from src.strategy.consecutive_candles import ConsecutiveCandlesStrategy
@@ -439,6 +439,8 @@ from src.strategy.heikin_ashi_trend import HeikinAshiTrendStrategy
 from src.strategy.volume_weighted_rsi_v2 import VolumeWeightedRSIV2Strategy
 from src.strategy.trend_break_confirm import TrendBreakConfirmStrategy
 from src.strategy.momentum_mean_rev import MomentumMeanRevStrategy
+from src.strategy.spread_momentum import SpreadMomentumStrategy
+from src.strategy.trend_exhaustion_signal import TrendExhaustionSignalStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +522,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "tsi": TSIStrategy,
     "bop": BOPStrategy,
     "volatility_breakout_lw": VolatilityBreakoutLWStrategy,
+    "volatility_breakout": VolatilityBreakoutStrategy,
     "ichimoku_advanced": IchimokuAdvancedStrategy,
     "ichimoku_cloud_pos": IchimokuCloudPosStrategy,
     "consecutive_candles": ConsecutiveCandlesStrategy,
@@ -850,6 +853,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volume_weighted_rsi_v2": VolumeWeightedRSIV2Strategy,
     "trend_break_confirm": TrendBreakConfirmStrategy,
     "momentum_mean_rev": MomentumMeanRevStrategy,
+    "spread_momentum": SpreadMomentumStrategy,
+    "trend_exhaustion_signal": TrendExhaustionSignalStrategy,
 }
 
 
