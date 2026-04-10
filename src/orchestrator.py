@@ -318,6 +318,10 @@ from src.strategy.pivot_point_rev import PivotPointRevStrategy
 from src.strategy.heiken_ashi_trend import HeikenAshiTrendStrategy
 from src.strategy.roc_divergence import ROCDivergenceStrategy
 from src.strategy.tema_strategy import TEMAStrategy
+from src.strategy.vwap_deviation import VWAPDeviationStrategy
+from src.strategy.balance_of_power import BalanceOfPowerStrategy
+from src.strategy.money_flow_index import MoneyFlowIndexStrategy
+from src.strategy.trend_strength_index import TrendStrengthIndexStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -608,6 +612,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "heiken_ashi_trend": HeikenAshiTrendStrategy,
     "roc_divergence": ROCDivergenceStrategy,
     "tema_strategy": TEMAStrategy,
+    "vwap_deviation": VWAPDeviationStrategy,
+    "balance_of_power": BalanceOfPowerStrategy,
+    "money_flow_index": MoneyFlowIndexStrategy,
+    "trend_strength_index": TrendStrengthIndexStrategy,
 }
 
 
