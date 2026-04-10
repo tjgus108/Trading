@@ -250,6 +250,8 @@ from src.strategy.momentum_accel import MomentumAccelerationStrategy
 from src.strategy.swing_point import SwingPointStrategy
 from src.strategy.confluence_zone import ConfluenceZoneStrategy
 from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
+from src.strategy.range_bound import RangeBoundStrategy
+from src.strategy.pre_breakout import PreBreakoutStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -472,6 +474,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "swing_point": SwingPointStrategy,
     "confluence_zone": ConfluenceZoneStrategy,
     "adaptive_ma_cross": AdaptiveMACrossStrategy,
+    "range_bound": RangeBoundStrategy,
+    "pre_breakout": PreBreakoutStrategy,
 }
 
 
