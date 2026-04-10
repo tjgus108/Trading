@@ -333,6 +333,8 @@ from src.strategy.vortex_indicator import VortexIndicatorStrategy
 from src.strategy.linear_reg_channel import LinearRegChannelStrategy
 from src.strategy.wavetrend_osc import WaveTrendOscStrategy
 from src.strategy.cyber_cycle import CyberCycleStrategy
+from src.strategy.gaussian_channel import GaussianChannelStrategy
+from src.strategy.ehlers_fisher import EhlersFisherStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -638,6 +640,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "cyber_cycle": CyberCycleStrategy,
     "laguerre_rsi": LaguerreRSIStrategy,
     "zero_lag_ema": ZeroLagEMAStrategy,
+    "gaussian_channel": GaussianChannelStrategy,
+    "ehlers_fisher": EhlersFisherStrategy,
 }
 
 
