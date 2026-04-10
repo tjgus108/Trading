@@ -335,6 +335,9 @@ from src.strategy.wavetrend_osc import WaveTrendOscStrategy
 from src.strategy.cyber_cycle import CyberCycleStrategy
 from src.strategy.gaussian_channel import GaussianChannelStrategy
 from src.strategy.ehlers_fisher import EhlersFisherStrategy
+from src.strategy.sine_wave import SineWaveStrategy
+from src.strategy.adaptive_cycle import AdaptiveCycleStrategy
+from src.strategy.demarker import DeMarkerStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +402,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "roc": ROCStrategy,
     "awesome_oscillator": AwesomeOscillatorStrategy,
     "connors_rsi": ConnorsRSIStrategy,
+    "demarker": DeMarkerStrategy,
     "linear_regression": LinearRegressionStrategy,
     "williams_fractal": WilliamsFractalStrategy,
     "mass_index": MassIndexStrategy,
@@ -642,6 +646,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "zero_lag_ema": ZeroLagEMAStrategy,
     "gaussian_channel": GaussianChannelStrategy,
     "ehlers_fisher": EhlersFisherStrategy,
+    "sine_wave": SineWaveStrategy,
+    "adaptive_cycle": AdaptiveCycleStrategy,
 }
 
 
