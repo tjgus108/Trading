@@ -71,6 +71,8 @@ from src.strategy.obv import OBVStrategy
 from src.strategy.keltner_channel import KeltnerChannelStrategy
 from src.strategy.price_channel import PriceChannelStrategy
 from src.strategy.pivot_points import PivotPointsStrategy
+from src.strategy.pivot_point import PivotPointStrategy
+from src.strategy.night_star import NightStarStrategy
 from src.strategy.elder_ray import ElderRayStrategy
 from src.strategy.vortex import VortexStrategy
 from src.strategy.dpo import DPOStrategy
@@ -377,6 +379,8 @@ from src.strategy.intraday_momentum import IntradayMomentumStrategy
 from src.strategy.volatility_surface import VolatilitySurfaceStrategy
 from src.strategy.regime_momentum import RegimeMomentumStrategy
 from src.strategy.liquidity_score import LiquidityScoreStrategy
+from src.strategy.trend_consistency import TrendConsistencyStrategy
+from src.strategy.volume_weighted_momentum import VolumeWeightedMomentumStrategy
 from src.strategy.price_velocity_filter import PriceVelocityFilterStrategy
 from src.strategy.momentum_quality_v2 import MomentumQualityV2Strategy
 
@@ -730,6 +734,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "liquidity_score": LiquidityScoreStrategy,
     "price_velocity_filter": PriceVelocityFilterStrategy,
     "momentum_quality_v2": MomentumQualityV2Strategy,
+    "trend_consistency": TrendConsistencyStrategy,
+    "volume_weighted_momentum": VolumeWeightedMomentumStrategy,
+    "pivot_point": PivotPointStrategy,
+    "night_star": NightStarStrategy,
 }
 
 
