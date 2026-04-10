@@ -373,6 +373,8 @@ from src.strategy.harmonic_pattern import HarmonicPatternStrategy
 from src.strategy.divergence_confirmation import DivergenceConfirmationStrategy
 from src.strategy.dual_momentum import DualMomentumStrategy
 from src.strategy.carry_strategy import CarryStrategy
+from src.strategy.intraday_momentum import IntradayMomentumStrategy
+from src.strategy.volatility_surface import VolatilitySurfaceStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -716,6 +718,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "exhaustion_reversal": ExhaustionReversalStrategy,
     "dual_momentum": DualMomentumStrategy,
     "carry_strategy": CarryStrategy,
+    "ema_cloud": EMACloudStrategy,
+    "trend_strength_composite": TrendStrengthCompositeStrategy,
 }
 
 
