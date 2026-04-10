@@ -400,6 +400,8 @@ from src.strategy.price_action_scorer import PriceActionScorerStrategy
 from src.strategy.volatility_trend import VolatilityTrendStrategy
 from src.strategy.momentum_divergence_v2 import MomentumDivergenceV2Strategy
 from src.strategy.volume_spread_analysis_v2 import VolumeSpreadAnalysisV2Strategy
+from src.strategy.gap_momentum import GapMomentumStrategy
+from src.strategy.consolidation_break import ConsolidationBreakStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -770,6 +772,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volatility_trend": VolatilityTrendStrategy,
     "adaptive_trend": AdaptiveTrendStrategy,
     "price_compression_signal": PriceCompressionSignalStrategy,
+    "momentum_divergence_v2": MomentumDivergenceV2Strategy,
+    "volume_spread_analysis_v2": VolumeSpreadAnalysisV2Strategy,
 }
 
 
