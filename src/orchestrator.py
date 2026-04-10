@@ -216,6 +216,8 @@ from src.strategy.narrow_range import NarrowRangeStrategy
 from src.strategy.parabolic_move import ParabolicMoveStrategy
 from src.strategy.failed_breakout import FailedBreakoutStrategy
 from src.strategy.coppock_enhanced import CoppockEnhancedStrategy
+from src.strategy.cumulative_delta import CumulativeDeltaStrategy
+from src.strategy.spread_analysis import SpreadAnalysisStrategy
 from src.strategy.vwrsi import VolumeWeightedRSIStrategy
 from src.strategy.hurst_strategy import HurstExponentStrategy
 from src.strategy.entropy_strategy import ApproximateEntropyStrategy
@@ -664,6 +666,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_quality": MomentumQualityStrategy,
     "normalized_price_osc": NormalizedPriceOscStrategy,
     "ema_envelope": EMAEnvelopeStrategy,
+    "cumulative_delta": CumulativeDeltaStrategy,
+    "spread_analysis": SpreadAnalysisStrategy,
 }
 
 
