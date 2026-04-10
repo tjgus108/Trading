@@ -363,6 +363,10 @@ from src.strategy.oscillator_band import OscillatorBandStrategy
 from src.strategy.price_action_filter import PriceActionFilterStrategy
 from src.strategy.price_pattern_recog import PricePatternRecogStrategy
 from src.strategy.trend_momentum_blend import TrendMomentumBlendStrategy
+from src.strategy.tick_volume import TickVolumeStrategy
+from src.strategy.market_breadth_proxy import MarketBreadthProxyStrategy
+from src.strategy.harmonic_pattern import HarmonicPatternStrategy
+from src.strategy.divergence_confirmation import DivergenceConfirmationStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -696,6 +700,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_dynamic_band": EMADynamicBandStrategy,
     "oscillator_band": OscillatorBandStrategy,
     "price_action_filter": PriceActionFilterStrategy,
+    "price_pattern_recog": PricePatternRecogStrategy,
+    "trend_momentum_blend": TrendMomentumBlendStrategy,
+    "tick_volume": TickVolumeStrategy,
+    "market_breadth_proxy": MarketBreadthProxyStrategy,
 }
 
 
