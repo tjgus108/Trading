@@ -295,6 +295,8 @@ from src.strategy.seasonal_cycle import SeasonalCycleStrategy
 from src.strategy.trend_follow_break import TrendFollowBreakStrategy
 from src.strategy.adaptive_threshold import AdaptiveThresholdStrategy
 from src.strategy.volatility_cluster import VolatilityClusterStrategy
+from src.strategy.volume_profile import VolumeProfileStrategy
+from src.strategy.order_flow_imbalance import OrderFlowImbalanceStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -562,6 +564,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volatility_cluster": VolatilityClusterStrategy,
     "seasonal_cycle": SeasonalCycleStrategy,
     "trend_follow_break": TrendFollowBreakStrategy,
+    "volume_profile": VolumeProfileStrategy,
+    "order_flow_imbalance": OrderFlowImbalanceStrategy,
 }
 
 
