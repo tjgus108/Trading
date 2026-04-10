@@ -322,6 +322,12 @@ from src.strategy.vwap_deviation import VWAPDeviationStrategy
 from src.strategy.balance_of_power import BalanceOfPowerStrategy
 from src.strategy.money_flow_index import MoneyFlowIndexStrategy
 from src.strategy.trend_strength_index import TrendStrengthIndexStrategy
+from src.strategy.klinger_oscillator import KlingerOscillatorStrategy
+from src.strategy.price_oscillator import PriceOscillatorStrategy
+from src.strategy.detrended_price_osc import DetrendedPriceOscStrategy
+from src.strategy.schaff_trend_cycle import SchaffTrendCycleStrategy
+from src.strategy.vortex_indicator import VortexIndicatorStrategy
+from src.strategy.linear_reg_channel import LinearRegChannelStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -616,6 +622,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "balance_of_power": BalanceOfPowerStrategy,
     "money_flow_index": MoneyFlowIndexStrategy,
     "trend_strength_index": TrendStrengthIndexStrategy,
+    "klinger_oscillator": KlingerOscillatorStrategy,
+    "price_oscillator": PriceOscillatorStrategy,
+    "detrended_price_osc": DetrendedPriceOscStrategy,
+    "schaff_trend_cycle": SchaffTrendCycleStrategy,
+    "vortex_indicator": VortexIndicatorStrategy,
+    "linear_reg_channel": LinearRegChannelStrategy,
 }
 
 
