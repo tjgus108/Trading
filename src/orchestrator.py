@@ -297,6 +297,10 @@ from src.strategy.adaptive_threshold import AdaptiveThresholdStrategy
 from src.strategy.volatility_cluster import VolatilityClusterStrategy
 from src.strategy.volume_profile import VolumeProfileStrategy
 from src.strategy.order_flow_imbalance import OrderFlowImbalanceStrategy
+from src.strategy.mean_rev_zscore import MeanRevZScoreStrategy
+from src.strategy.momentum_persistence import MomentumPersistenceStrategy
+from src.strategy.fractal_break import FractalBreakStrategy
+from src.strategy.market_structure_break import MarketStructureBreakStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -566,6 +570,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_follow_break": TrendFollowBreakStrategy,
     "volume_profile": VolumeProfileStrategy,
     "order_flow_imbalance": OrderFlowImbalanceStrategy,
+    "mean_rev_zscore": MeanRevZScoreStrategy,
+    "momentum_persistence": MomentumPersistenceStrategy,
 }
 
 
