@@ -31,6 +31,8 @@ from src.position_tracker import Position, PositionTracker
 from src.risk.manager import CircuitBreaker, RiskManager
 from src.scheduler import CandleScheduler
 from src.strategy.base import Action, BaseStrategy
+from src.strategy.wick_analysis import WickAnalysisStrategy
+from src.strategy.price_flow_index import PriceFlowIndexStrategy
 from src.strategy.scalping_signal import ScalpingSignalStrategy
 from src.strategy.swing_momentum import SwingMomentumStrategy
 from src.strategy.order_flow_imbalance_v2 import OrderFlowImbalanceV2Strategy
@@ -796,6 +798,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_fan": EMAFanStrategy,
     "entropy_momentum": EntropyMomentumStrategy,
     "fractal_dimension": FractalDimensionStrategy,
+    "wick_analysis": WickAnalysisStrategy,
+    "price_flow_index": PriceFlowIndexStrategy,
 }
 
 
