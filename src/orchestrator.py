@@ -270,6 +270,10 @@ from src.strategy.kijun_bounce import KijunBounceStrategy
 from src.strategy.vol_price_confirm import VolumePriceConfirmStrategy
 from src.strategy.trend_strength_filter import TrendStrengthFilterStrategy
 from src.strategy.vol_spread_analysis import VolSpreadAnalysisStrategy
+from src.strategy.wedge_pattern import WedgePatternStrategy
+from src.strategy.crossover_confluence import CrossoverConfluenceStrategy
+from src.strategy.breakout_retest import BreakoutRetestStrategy
+from src.strategy.volatility_expansion import VolatilityExpansionStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -512,6 +516,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "vol_price_confirm": VolumePriceConfirmStrategy,
     "trend_strength_filter": TrendStrengthFilterStrategy,
     "vol_spread_analysis": VolSpreadAnalysisStrategy,
+    "wedge_pattern": WedgePatternStrategy,
+    "crossover_confluence": CrossoverConfluenceStrategy,
+    "breakout_retest": BreakoutRetestStrategy,
+    "volatility_expansion": VolatilityExpansionStrategy,
 }
 
 
