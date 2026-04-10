@@ -282,6 +282,8 @@ from src.strategy.stoch_momentum import StochasticMomentumStrategy
 from src.strategy.volume_roc import VolumeROCStrategy
 from src.strategy.smc_strategy import SmartMoneyConceptStrategy
 from src.strategy.positional_scaling import PositionalScalingStrategy
+from src.strategy.relative_strength import RelativeStrengthStrategy
+from src.strategy.momentum_breadth import MomentumBreadthStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -536,6 +538,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volume_roc": VolumeROCStrategy,
     "smc_strategy": SmartMoneyConceptStrategy,
     "positional_scaling": PositionalScalingStrategy,
+    "relative_strength": RelativeStrengthStrategy,
+    "momentum_breadth": MomentumBreadthStrategy,
 }
 
 
