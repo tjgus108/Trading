@@ -228,6 +228,7 @@ from src.strategy.parabolic_move import ParabolicMoveStrategy
 from src.strategy.failed_breakout import FailedBreakoutStrategy
 from src.strategy.coppock_enhanced import CoppockEnhancedStrategy
 from src.strategy.cumulative_delta import CumulativeDeltaStrategy
+from src.strategy.volume_price_trend_v2 import VolumePriceTrendV2Strategy
 from src.strategy.spread_analysis import SpreadAnalysisStrategy
 from src.strategy.vwrsi import VolumeWeightedRSIStrategy
 from src.strategy.hurst_strategy import HurstExponentStrategy
@@ -416,6 +417,12 @@ from src.strategy.entropy_momentum import EntropyMomentumStrategy
 from src.strategy.fractal_dimension import FractalDimensionStrategy
 from src.strategy.tail_risk_filter import TailRiskFilterStrategy
 from src.strategy.price_path_efficiency import PricePathEfficiencyStrategy
+from src.strategy.bollinger_squeeze import BollingerSqueezeStrategy
+from src.strategy.relative_momentum_index import RelativeMomentumIndexStrategy
+from src.strategy.cyclic_momentum import CyclicMomentumStrategy
+from src.strategy.price_rhythm import PriceRhythmStrategy
+from src.strategy.trend_fibonacci import TrendFibonacciStrategy
+from src.strategy.mean_reversion_score import MeanReversionScoreStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -737,6 +744,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_envelope": EMAEnvelopeStrategy,
     "volatility_breakout_v2": VolatilityBreakoutV2Strategy,
     "cumulative_delta": CumulativeDeltaStrategy,
+    "volume_price_trend_v2": VolumePriceTrendV2Strategy,
     "spread_analysis": SpreadAnalysisStrategy,
     "velocity_entry": VelocityEntryStrategy,
     "range_bias": RangeBiasStrategy,
@@ -804,6 +812,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_flow_index": PriceFlowIndexStrategy,
     "tail_risk_filter": TailRiskFilterStrategy,
     "price_path_efficiency": PricePathEfficiencyStrategy,
+    "bollinger_squeeze": BollingerSqueezeStrategy,
+    "relative_momentum_index": RelativeMomentumIndexStrategy,
+    "cyclic_momentum": CyclicMomentumStrategy,
+    "price_rhythm": PriceRhythmStrategy,
+    "trend_fibonacci": TrendFibonacciStrategy,
+    "mean_reversion_score": MeanReversionScoreStrategy,
 }
 
 
