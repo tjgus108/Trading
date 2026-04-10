@@ -157,6 +157,8 @@ from src.strategy.ha_trend import HATrendStrategy
 from src.strategy.engulfing import EngulfingStrategy
 from src.strategy.morning_evening_star import MorningEveningStarStrategy
 from src.strategy.three_soldiers_crows import ThreeSoldiersAndCrowsStrategy
+from src.strategy.laguerre_rsi import LaguerreRSIStrategy
+from src.strategy.zero_lag_ema import ZeroLagEMAStrategy
 from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
 from src.strategy.pivot_reversal import PivotReversalStrategy
 from src.strategy.range_expansion import RangeExpansionStrategy
@@ -634,6 +636,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "linear_reg_channel": LinearRegChannelStrategy,
     "wavetrend_osc": WaveTrendOscStrategy,
     "cyber_cycle": CyberCycleStrategy,
+    "laguerre_rsi": LaguerreRSIStrategy,
+    "zero_lag_ema": ZeroLagEMAStrategy,
 }
 
 
