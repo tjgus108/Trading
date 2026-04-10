@@ -419,10 +419,14 @@ from src.strategy.tail_risk_filter import TailRiskFilterStrategy
 from src.strategy.price_path_efficiency import PricePathEfficiencyStrategy
 from src.strategy.bollinger_squeeze import BollingerSqueezeStrategy
 from src.strategy.relative_momentum_index import RelativeMomentumIndexStrategy
+from src.strategy.market_pressure import MarketPressureStrategy
+from src.strategy.trend_quality_filter import TrendQualityFilterStrategy
 from src.strategy.cyclic_momentum import CyclicMomentumStrategy
 from src.strategy.price_rhythm import PriceRhythmStrategy
 from src.strategy.trend_fibonacci import TrendFibonacciStrategy
 from src.strategy.mean_reversion_score import MeanReversionScoreStrategy
+from src.strategy.stochastic_momentum import StochasticMomentumStrategy
+from src.strategy.price_channel_filter import PriceChannelFilterStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -814,10 +818,14 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_path_efficiency": PricePathEfficiencyStrategy,
     "bollinger_squeeze": BollingerSqueezeStrategy,
     "relative_momentum_index": RelativeMomentumIndexStrategy,
+    "market_pressure": MarketPressureStrategy,
+    "trend_quality_filter": TrendQualityFilterStrategy,
     "cyclic_momentum": CyclicMomentumStrategy,
     "price_rhythm": PriceRhythmStrategy,
     "trend_fibonacci": TrendFibonacciStrategy,
     "mean_reversion_score": MeanReversionScoreStrategy,
+    "stochastic_momentum": StochasticMomentumStrategy,
+    "price_channel_filter": PriceChannelFilterStrategy,
 }
 
 
