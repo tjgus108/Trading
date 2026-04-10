@@ -388,6 +388,8 @@ from src.strategy.price_velocity_filter import PriceVelocityFilterStrategy
 from src.strategy.momentum_quality_v2 import MomentumQualityV2Strategy
 from src.strategy.multi_timeframe_momentum import MultiTimeframeMomentumStrategy
 from src.strategy.smart_beta import SmartBetaStrategy
+from src.strategy.high_low_reversal import HighLowReversalStrategy
+from src.strategy.trend_filtered_mean_rev import TrendFilteredMeanRevStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -746,6 +748,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "night_star": NightStarStrategy,
     "price_range_breakout": PriceRangeBreakoutStrategy,
     "volume_oscillator_v2": VolumeOscillatorV2Strategy,
+    "multi_timeframe_momentum": MultiTimeframeMomentumStrategy,
+    "smart_beta": SmartBetaStrategy,
+    "high_low_reversal": HighLowReversalStrategy,
+    "trend_filtered_mean_rev": TrendFilteredMeanRevStrategy,
 }
 
 
