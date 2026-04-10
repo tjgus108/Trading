@@ -377,6 +377,8 @@ from src.strategy.intraday_momentum import IntradayMomentumStrategy
 from src.strategy.volatility_surface import VolatilitySurfaceStrategy
 from src.strategy.regime_momentum import RegimeMomentumStrategy
 from src.strategy.liquidity_score import LiquidityScoreStrategy
+from src.strategy.price_velocity_filter import PriceVelocityFilterStrategy
+from src.strategy.momentum_quality_v2 import MomentumQualityV2Strategy
 
 logger = logging.getLogger(__name__)
 
@@ -726,6 +728,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volatility_surface": VolatilitySurfaceStrategy,
     "regime_momentum": RegimeMomentumStrategy,
     "liquidity_score": LiquidityScoreStrategy,
+    "price_velocity_filter": PriceVelocityFilterStrategy,
+    "momentum_quality_v2": MomentumQualityV2Strategy,
 }
 
 
