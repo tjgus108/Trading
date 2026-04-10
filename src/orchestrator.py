@@ -720,6 +720,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "carry_strategy": CarryStrategy,
     "ema_cloud": EMACloudStrategy,
     "trend_strength_composite": TrendStrengthCompositeStrategy,
+    "intraday_momentum": IntradayMomentumStrategy,
+    "volatility_surface": VolatilitySurfaceStrategy,
 }
 
 
