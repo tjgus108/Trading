@@ -359,6 +359,10 @@ from src.strategy.price_impact import PriceImpactStrategy
 from src.strategy.smart_money_flow import SmartMoneyFlowStrategy
 from src.strategy.micro_trend import MicroTrendStrategy
 from src.strategy.ema_dynamic_band import EMADynamicBandStrategy
+from src.strategy.oscillator_band import OscillatorBandStrategy
+from src.strategy.price_action_filter import PriceActionFilterStrategy
+from src.strategy.price_pattern_recog import PricePatternRecogStrategy
+from src.strategy.trend_momentum_blend import TrendMomentumBlendStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -690,6 +694,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "smart_money_flow": SmartMoneyFlowStrategy,
     "micro_trend": MicroTrendStrategy,
     "ema_dynamic_band": EMADynamicBandStrategy,
+    "oscillator_band": OscillatorBandStrategy,
+    "price_action_filter": PriceActionFilterStrategy,
 }
 
 
