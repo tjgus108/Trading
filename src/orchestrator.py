@@ -398,6 +398,8 @@ from src.strategy.breakout_pullback import BreakoutPullbackStrategy
 from src.strategy.trend_follow_filter import TrendFollowFilterStrategy
 from src.strategy.price_action_scorer import PriceActionScorerStrategy
 from src.strategy.volatility_trend import VolatilityTrendStrategy
+from src.strategy.momentum_divergence_v2 import MomentumDivergenceV2Strategy
+from src.strategy.volume_spread_analysis_v2 import VolumeSpreadAnalysisV2Strategy
 
 logger = logging.getLogger(__name__)
 
@@ -764,6 +766,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "rsi_band": RSIBandStrategy,
     "breakout_pullback": BreakoutPullbackStrategy,
     "trend_follow_filter": TrendFollowFilterStrategy,
+    "price_action_scorer": PriceActionScorerStrategy,
+    "volatility_trend": VolatilityTrendStrategy,
+    "adaptive_trend": AdaptiveTrendStrategy,
+    "price_compression_signal": PriceCompressionSignalStrategy,
 }
 
 
