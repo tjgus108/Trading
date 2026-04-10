@@ -340,6 +340,12 @@ from src.strategy.adaptive_cycle import AdaptiveCycleStrategy
 from src.strategy.demarker import DeMarkerStrategy
 from src.strategy.trend_exhaustion import TrendExhaustionStrategy
 from src.strategy.high_low_channel import HighLowChannelStrategy
+from src.strategy.pivot_band import PivotBandStrategy
+from src.strategy.trend_intensity_index import TrendIntensityIndexV2Strategy
+from src.strategy.price_cycle_detector import PriceCycleDetectorStrategy
+from src.strategy.momentum_quality import MomentumQualityStrategy
+from src.strategy.normalized_price_osc import NormalizedPriceOscStrategy
+from src.strategy.ema_envelope import EMAEnvelopeStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -652,6 +658,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "adaptive_cycle": AdaptiveCycleStrategy,
     "trend_exhaustion": TrendExhaustionStrategy,
     "high_low_channel": HighLowChannelStrategy,
+    "pivot_band": PivotBandStrategy,
+    "trend_intensity_index": TrendIntensityIndexV2Strategy,
+    "price_cycle_detector": PriceCycleDetectorStrategy,
+    "momentum_quality": MomentumQualityStrategy,
+    "normalized_price_osc": NormalizedPriceOscStrategy,
+    "ema_envelope": EMAEnvelopeStrategy,
 }
 
 
