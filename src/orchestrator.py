@@ -31,6 +31,10 @@ from src.position_tracker import Position, PositionTracker
 from src.risk.manager import CircuitBreaker, RiskManager
 from src.scheduler import CandleScheduler
 from src.strategy.base import Action, BaseStrategy
+from src.strategy.scalping_signal import ScalpingSignalStrategy
+from src.strategy.swing_momentum import SwingMomentumStrategy
+from src.strategy.order_flow_imbalance_v2 import OrderFlowImbalanceV2Strategy
+from src.strategy.market_microstructure import MarketMicrostructureStrategy
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
 from src.strategy.funding_rate import FundingRateStrategy
@@ -776,6 +780,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volume_spread_analysis_v2": VolumeSpreadAnalysisV2Strategy,
     "gap_momentum": GapMomentumStrategy,
     "consolidation_break": ConsolidationBreakStrategy,
+    "scalping_signal": ScalpingSignalStrategy,
+    "swing_momentum": SwingMomentumStrategy,
 }
 
 
