@@ -258,6 +258,12 @@ from src.strategy.order_block import OrderBlockStrategy
 from src.strategy.fvg_strategy import FairValueGapStrategy
 from src.strategy.gartley_pattern import SimplifiedGartleyStrategy
 from src.strategy.price_cluster import PriceClusterStrategy
+from src.strategy.liquidity_sweep import LiquiditySweepStrategy
+from src.strategy.market_maker_sig import MarketMakerStrategy
+from src.strategy.pa_confirm import PriceActionConfirmStrategy
+from src.strategy.ema_dynamic_support import EMADynamicSupportStrategy
+from src.strategy.autocorr_strategy import AutoCorrelationStrategy
+from src.strategy.adaptive_rsi_thresh import AdaptiveRSIThresholdStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -488,6 +494,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "fvg_strategy": FairValueGapStrategy,
     "gartley_pattern": SimplifiedGartleyStrategy,
     "price_cluster": PriceClusterStrategy,
+    "liquidity_sweep": LiquiditySweepStrategy,
+    "market_maker_sig": MarketMakerStrategy,
+    "pa_confirm": PriceActionConfirmStrategy,
+    "ema_dynamic_support": EMADynamicSupportStrategy,
+    "autocorr_strategy": AutoCorrelationStrategy,
+    "adaptive_rsi_thresh": AdaptiveRSIThresholdStrategy,
 }
 
 
