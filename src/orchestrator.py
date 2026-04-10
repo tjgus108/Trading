@@ -305,6 +305,9 @@ from src.strategy.price_action_quality import PriceActionQualityStrategy
 from src.strategy.regime_filter import RegimeFilterStrategy
 from src.strategy.candle_pattern_score import CandlePatternScoreStrategy
 from src.strategy.multi_tf_trend import MultiTFTrendStrategy
+from src.strategy.keltner_breakout import KeltnerBreakoutStrategy
+from src.strategy.acc_dist import AccDistStrategy
+from src.strategy.price_momentum_osc import PriceMomentumOscStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -582,6 +585,9 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "regime_filter": RegimeFilterStrategy,
     "candle_pattern_score": CandlePatternScoreStrategy,
     "multi_tf_trend": MultiTFTrendStrategy,
+    "keltner_breakout": KeltnerBreakoutStrategy,
+    "acc_dist": AccDistStrategy,
+    "price_momentum_osc": PriceMomentumOscStrategy,
 }
 
 
