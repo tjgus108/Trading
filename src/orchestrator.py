@@ -145,6 +145,8 @@ from src.strategy.atr_trailing import ATRTrailingStrategy
 from src.strategy.historical_volatility import HistoricalVolatilityStrategy
 from src.strategy.price_action_momentum import PriceActionMomentumStrategy
 from src.strategy.volume_oscillator import VolumeOscillatorStrategy
+from src.strategy.price_range_breakout import PriceRangeBreakoutStrategy
+from src.strategy.volume_oscillator_v2 import VolumeOscillatorV2Strategy
 from src.strategy.price_envelope import PriceEnvelopeStrategy
 from src.strategy.opening_range_breakout import OpeningRangeBreakoutStrategy
 from src.strategy.session_high_low import SessionHighLowStrategy
@@ -738,6 +740,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "volume_weighted_momentum": VolumeWeightedMomentumStrategy,
     "pivot_point": PivotPointStrategy,
     "night_star": NightStarStrategy,
+    "price_range_breakout": PriceRangeBreakoutStrategy,
+    "volume_oscillator_v2": VolumeOscillatorV2Strategy,
 }
 
 
