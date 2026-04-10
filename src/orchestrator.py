@@ -431,6 +431,10 @@ from src.strategy.volume_momentum_break import VolumeMomentumBreakStrategy
 from src.strategy.price_structure_analysis import PriceStructureAnalysisStrategy
 from src.strategy.adaptive_volatility import AdaptiveVolatilityStrategy
 from src.strategy.trend_persistence import TrendPersistenceStrategy
+from src.strategy.price_divergence_index import PriceDivergenceIndexStrategy
+from src.strategy.trend_momentum_score import TrendMomentumScoreStrategy
+from src.strategy.impulse_system import ImpulseSystemStrategy
+from src.strategy.colored_candles import ColoredCandlesStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -834,6 +838,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_structure_analysis": PriceStructureAnalysisStrategy,
     "adaptive_volatility": AdaptiveVolatilityStrategy,
     "trend_persistence": TrendPersistenceStrategy,
+    "price_divergence_index": PriceDivergenceIndexStrategy,
+    "trend_momentum_score": TrendMomentumScoreStrategy,
+    "impulse_system": ImpulseSystemStrategy,
+    "colored_candles": ColoredCandlesStrategy,
 }
 
 
