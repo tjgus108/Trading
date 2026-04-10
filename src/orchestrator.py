@@ -327,6 +327,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ichimoku": IchimokuStrategy,
     "williams_r": WilliamsRStrategy,
     "parabolic_sar": ParabolicSARStrategy,
+    "parabolic_sar_trend": ParabolicSARTrendStrategy,
     "adx_trend": ADXTrendStrategy,
     "aroon": AroonStrategy,
     "cci": CCIStrategy,
