@@ -286,6 +286,12 @@ from src.strategy.relative_strength import RelativeStrengthStrategy
 from src.strategy.momentum_breadth import MomentumBreadthStrategy
 from src.strategy.price_squeeze import PriceSqueezeStrategy
 from src.strategy.inverse_fisher_rsi import InverseFisherRSIStrategy
+from src.strategy.value_area import ValueAreaStrategy
+from src.strategy.divergence_score import DivergenceScoreStrategy
+from src.strategy.seasonal_cycle import SeasonalCycleStrategy
+from src.strategy.trend_follow_break import TrendFollowBreakStrategy
+from src.strategy.adaptive_threshold import AdaptiveThresholdStrategy
+from src.strategy.volatility_cluster import VolatilityClusterStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -544,6 +550,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_breadth": MomentumBreadthStrategy,
     "price_squeeze": PriceSqueezeStrategy,
     "inverse_fisher_rsi": InverseFisherRSIStrategy,
+    "value_area": ValueAreaStrategy,
+    "divergence_score": DivergenceScoreStrategy,
 }
 
 
