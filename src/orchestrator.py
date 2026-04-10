@@ -252,6 +252,12 @@ from src.strategy.confluence_zone import ConfluenceZoneStrategy
 from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
 from src.strategy.range_bound import RangeBoundStrategy
 from src.strategy.pre_breakout import PreBreakoutStrategy
+from src.strategy.bull_bear_power import BullBearPowerStrategy
+from src.strategy.overextension import OverextensionStrategy
+from src.strategy.order_block import OrderBlockStrategy
+from src.strategy.fvg_strategy import FairValueGapStrategy
+from src.strategy.gartley_pattern import SimplifiedGartleyStrategy
+from src.strategy.price_cluster import PriceClusterStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -476,6 +482,12 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "adaptive_ma_cross": AdaptiveMACrossStrategy,
     "range_bound": RangeBoundStrategy,
     "pre_breakout": PreBreakoutStrategy,
+    "bull_bear_power": BullBearPowerStrategy,
+    "overextension": OverextensionStrategy,
+    "order_block": OrderBlockStrategy,
+    "fvg_strategy": FairValueGapStrategy,
+    "gartley_pattern": SimplifiedGartleyStrategy,
+    "price_cluster": PriceClusterStrategy,
 }
 
 
