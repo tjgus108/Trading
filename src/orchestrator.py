@@ -155,6 +155,7 @@ from src.strategy.squeeze_momentum import SqueezeMomentumStrategy
 from src.strategy.frama import FRAMAStrategy
 from src.strategy.vw_macd import VWMACDStrategy
 from src.strategy.chandelier_exit import ChandelierExitStrategy
+from src.strategy.vwap_band import VWAPBandStrategy
 from src.strategy.vol_adj_momentum import VolAdjMomentumStrategy
 from src.strategy.elder_impulse import ElderImpulseStrategy
 from src.strategy.ha_trend import HATrendStrategy
@@ -385,6 +386,8 @@ from src.strategy.trend_consistency import TrendConsistencyStrategy
 from src.strategy.volume_weighted_momentum import VolumeWeightedMomentumStrategy
 from src.strategy.price_velocity_filter import PriceVelocityFilterStrategy
 from src.strategy.momentum_quality_v2 import MomentumQualityV2Strategy
+from src.strategy.multi_timeframe_momentum import MultiTimeframeMomentumStrategy
+from src.strategy.smart_beta import SmartBetaStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +523,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_strength": TrendStrengthStrategy,
     "vpt_signal": VPTSignalStrategy,
     "chandelier_exit": ChandelierExitStrategy,
+    "vwap_band": VWAPBandStrategy,
     "vol_adj_momentum": VolAdjMomentumStrategy,
     "stochrsi_div": StochRSIDivStrategy,
     "trix_signal": TRIXSignalStrategy,
