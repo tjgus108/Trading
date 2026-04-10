@@ -774,6 +774,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_compression_signal": PriceCompressionSignalStrategy,
     "momentum_divergence_v2": MomentumDivergenceV2Strategy,
     "volume_spread_analysis_v2": VolumeSpreadAnalysisV2Strategy,
+    "gap_momentum": GapMomentumStrategy,
+    "consolidation_break": ConsolidationBreakStrategy,
 }
 
 
