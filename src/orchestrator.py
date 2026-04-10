@@ -794,6 +794,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_acceleration": TrendAccelerationStrategy,
     "candle_body_filter": CandleBodyFilterStrategy,
     "ema_fan": EMAFanStrategy,
+    "entropy_momentum": EntropyMomentumStrategy,
+    "fractal_dimension": FractalDimensionStrategy,
 }
 
 
