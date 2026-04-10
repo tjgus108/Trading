@@ -390,6 +390,14 @@ from src.strategy.multi_timeframe_momentum import MultiTimeframeMomentumStrategy
 from src.strategy.smart_beta import SmartBetaStrategy
 from src.strategy.high_low_reversal import HighLowReversalStrategy
 from src.strategy.trend_filtered_mean_rev import TrendFilteredMeanRevStrategy
+from src.strategy.adaptive_trend import AdaptiveTrendStrategy
+from src.strategy.price_compression_signal import PriceCompressionSignalStrategy
+from src.strategy.keltner_channel_v2 import KeltnerChannelV2Strategy
+from src.strategy.rsi_band import RSIBandStrategy
+from src.strategy.breakout_pullback import BreakoutPullbackStrategy
+from src.strategy.trend_follow_filter import TrendFollowFilterStrategy
+from src.strategy.price_action_scorer import PriceActionScorerStrategy
+from src.strategy.volatility_trend import VolatilityTrendStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -752,6 +760,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "smart_beta": SmartBetaStrategy,
     "high_low_reversal": HighLowReversalStrategy,
     "trend_filtered_mean_rev": TrendFilteredMeanRevStrategy,
+    "keltner_channel_v2": KeltnerChannelV2Strategy,
+    "rsi_band": RSIBandStrategy,
+    "breakout_pullback": BreakoutPullbackStrategy,
+    "trend_follow_filter": TrendFollowFilterStrategy,
 }
 
 
