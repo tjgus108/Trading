@@ -308,6 +308,12 @@ from src.strategy.multi_tf_trend import MultiTFTrendStrategy
 from src.strategy.keltner_breakout import KeltnerBreakoutStrategy
 from src.strategy.acc_dist import AccDistStrategy
 from src.strategy.price_momentum_osc import PriceMomentumOscStrategy
+from src.strategy.channel_midline import ChannelMidlineStrategy
+from src.strategy.breakout_confirm_v2 import BreakoutConfirmV2Strategy
+from src.strategy.trendline_break import TrendlineBreakStrategy
+from src.strategy.sr_flip import SRFlipStrategy
+from src.strategy.volume_weighted_rsi import VolumeWeightedRSIStrategy as VolumeWeightedRSINewStrategy
+from src.strategy.adaptive_momentum import AdaptiveMomentumStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -588,6 +594,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "keltner_breakout": KeltnerBreakoutStrategy,
     "acc_dist": AccDistStrategy,
     "price_momentum_osc": PriceMomentumOscStrategy,
+    "channel_midline": ChannelMidlineStrategy,
+    "breakout_confirm_v2": BreakoutConfirmV2Strategy,
+    "trendline_break": TrendlineBreakStrategy,
+    "sr_flip": SRFlipStrategy,
 }
 
 
