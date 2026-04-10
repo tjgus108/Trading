@@ -353,6 +353,8 @@ from src.strategy.velocity_entry import VelocityEntryStrategy
 from src.strategy.range_bias import RangeBiasStrategy
 from src.strategy.composite_momentum import CompositeMomentumStrategy
 from src.strategy.signal_line_cross import SignalLineCrossStrategy
+from src.strategy.breakout_vol_ratio import BreakoutVolRatioStrategy
+from src.strategy.mean_rev_band_v2 import MeanRevBandV2Strategy
 
 logger = logging.getLogger(__name__)
 
@@ -678,6 +680,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "range_bias": RangeBiasStrategy,
     "composite_momentum": CompositeMomentumStrategy,
     "signal_line_cross": SignalLineCrossStrategy,
+    "breakout_vol_ratio": BreakoutVolRatioStrategy,
+    "mean_rev_band_v2": MeanRevBandV2Strategy,
 }
 
 
