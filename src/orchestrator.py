@@ -256,6 +256,7 @@ from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
 from src.strategy.range_bound import RangeBoundStrategy
 from src.strategy.pre_breakout import PreBreakoutStrategy
 from src.strategy.bull_bear_power import BullBearPowerStrategy
+from src.strategy.absolute_strength_hist import AbsoluteStrengthHistStrategy
 from src.strategy.overextension import OverextensionStrategy
 from src.strategy.order_block import OrderBlockStrategy
 from src.strategy.fvg_strategy import FairValueGapStrategy
@@ -328,6 +329,8 @@ from src.strategy.detrended_price_osc import DetrendedPriceOscStrategy
 from src.strategy.schaff_trend_cycle import SchaffTrendCycleStrategy
 from src.strategy.vortex_indicator import VortexIndicatorStrategy
 from src.strategy.linear_reg_channel import LinearRegChannelStrategy
+from src.strategy.wavetrend_osc import WaveTrendOscStrategy
+from src.strategy.cyber_cycle import CyberCycleStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -556,6 +559,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "range_bound": RangeBoundStrategy,
     "pre_breakout": PreBreakoutStrategy,
     "bull_bear_power": BullBearPowerStrategy,
+    "absolute_strength_hist": AbsoluteStrengthHistStrategy,
     "overextension": OverextensionStrategy,
     "order_block": OrderBlockStrategy,
     "fvg_strategy": FairValueGapStrategy,
@@ -628,6 +632,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "schaff_trend_cycle": SchaffTrendCycleStrategy,
     "vortex_indicator": VortexIndicatorStrategy,
     "linear_reg_channel": LinearRegChannelStrategy,
+    "wavetrend_osc": WaveTrendOscStrategy,
+    "cyber_cycle": CyberCycleStrategy,
 }
 
 
