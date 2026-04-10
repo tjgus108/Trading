@@ -248,6 +248,8 @@ from src.strategy.consolidation_breakout import ConsolidationBreakoutStrategy
 from src.strategy.price_rsi_div import PriceRSIDivergenceStrategy
 from src.strategy.momentum_accel import MomentumAccelerationStrategy
 from src.strategy.swing_point import SwingPointStrategy
+from src.strategy.confluence_zone import ConfluenceZoneStrategy
+from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -468,6 +470,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_rsi_div": PriceRSIDivergenceStrategy,
     "momentum_accel": MomentumAccelerationStrategy,
     "swing_point": SwingPointStrategy,
+    "confluence_zone": ConfluenceZoneStrategy,
+    "adaptive_ma_cross": AdaptiveMACrossStrategy,
 }
 
 
