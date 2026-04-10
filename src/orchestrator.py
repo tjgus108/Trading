@@ -244,6 +244,10 @@ from src.strategy.dual_ema_cross import DualEMACrossStrategy
 from src.strategy.breakout_confirm import BreakoutConfirmationStrategy
 from src.strategy.exhaustion_bar import ExhaustionBarStrategy
 from src.strategy.linear_channel_rev import LinearChannelReversionStrategy
+from src.strategy.consolidation_breakout import ConsolidationBreakoutStrategy
+from src.strategy.price_rsi_div import PriceRSIDivergenceStrategy
+from src.strategy.momentum_accel import MomentumAccelerationStrategy
+from src.strategy.swing_point import SwingPointStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -460,6 +464,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "breakout_confirm": BreakoutConfirmationStrategy,
     "exhaustion_bar": ExhaustionBarStrategy,
     "linear_channel_rev": LinearChannelReversionStrategy,
+    "consolidation_breakout": ConsolidationBreakoutStrategy,
+    "price_rsi_div": PriceRSIDivergenceStrategy,
+    "momentum_accel": MomentumAccelerationStrategy,
+    "swing_point": SwingPointStrategy,
 }
 
 
