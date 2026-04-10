@@ -832,6 +832,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "price_channel_filter": PriceChannelFilterStrategy,
     "volume_momentum_break": VolumeMomentumBreakStrategy,
     "price_structure_analysis": PriceStructureAnalysisStrategy,
+    "adaptive_volatility": AdaptiveVolatilityStrategy,
+    "trend_persistence": TrendPersistenceStrategy,
 }
 
 
