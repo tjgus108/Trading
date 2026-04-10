@@ -1,10 +1,1731 @@
 # Next Steps
 
-_Last updated: 2026-04-09_
+_Last updated: 2026-04-10_
 
-## Status: **30 new passed** | RSquaredStrategy + BodyMomentumStrategy 추가
+## Status: **30 passed** | KeltnerChannelV2 + RSIBand 전략 추가 완료
 
-## 최근 작업 (2026-04-09) — RSquaredStrategy + BodyMomentumStrategy 구현
+## 최근 작업 (2026-04-10) — KeltnerChannelV2 + RSIBand 신규 추가
+
+- `src/strategy/keltner_channel_v2.py`: `KeltnerChannelV2Strategy` (name=`keltner_channel_v2`)
+  - EMA 기반 Keltner Channel 평균 회귀 전략
+  - BUY: close < lower(EMA20 - ATR14*2) AND close > prev_close
+  - SELL: close > upper(EMA20 + ATR14*2) AND close < prev_close
+  - confidence: HIGH if abs(close-ema20) > atr14*2.5 else MEDIUM
+- `src/strategy/rsi_band.py`: `RSIBandStrategy` (name=`rsi_band`)
+  - 동적 과매수/과매도 임계값 RSI 밴드 전략
+  - BUY: rsi < rsi_ma-rsi_std AND rsi > prev_rsi
+  - SELL: rsi > rsi_ma+rsi_std AND rsi < prev_rsi
+  - confidence: HIGH if extreme deviation else MEDIUM
+- `tests/test_keltner_channel_v2.py`, `tests/test_rsi_band.py`: 각 15개 테스트 (30 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — PriceActionScorer + VolatilityTrend 신규 추가
+
+## 최근 작업 (2026-04-10) — PriceActionScorer + VolatilityTrend 신규 추가
+
+- `src/strategy/price_action_scorer.py`: `PriceActionScorerStrategy` (name=`price_action_scorer`)
+  - 여러 가격 행동 지표 합산 점수 기반 진입
+  - bull_score/bear_score (0~4): 양/음봉 + body_ratio>0.6 + wick 비율 + 거래량
+  - BUY/SELL: score >= 3, HIGH if == 4 else MEDIUM
+- `src/strategy/volatility_trend.py`: `VolatilityTrendStrategy` (name=`volatility_trend`)
+  - ATR 확장 + 기울기 양수 + EMA20 방향으로 진입
+  - BUY: atr>atr_ma AND atr_slope>0 AND close>close_ma
+  - SELL: atr>atr_ma AND atr_slope>0 AND close<close_ma
+  - confidence: HIGH if atr > atr_ma * 1.5 else MEDIUM
+- `tests/test_price_action_scorer.py`, `tests/test_volatility_trend.py`: 각 14개 테스트 (28 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료, push to main
+
+## 이전 작업 (2026-04-10) — OrderFlowImbalanceV2 + MarketMicrostructure 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — OrderFlowImbalanceV2 + MarketMicrostructure 신규 추가
+
+- `src/strategy/order_flow_imbalance_v2.py`: `OrderFlowImbalanceV2Strategy` (name=`order_flow_imbalance_v2`)
+  - 가격+거래량 기반 주문 흐름 불균형 v2
+  - buy_vol/sell_vol delta → cum_delta(10) / total_vol → imbalance(-1~+1)
+  - BUY: imbalance > 0.2 AND > imbalance_ma AND close > EWM(10)
+  - SELL: imbalance < -0.2 AND < imbalance_ma AND close < EWM(10)
+  - confidence: HIGH if abs(imbalance) > 0.4 else MEDIUM
+- `src/strategy/market_microstructure.py`: `MarketMicrostructureStrategy` (name=`market_microstructure`)
+  - 시장 미시구조 기반 (bid-ask spread 대리 + 가격 충격)
+  - effective_spread = (high-low)/(close+1e-10), price_impact = |pct_change|/vol_ratio
+  - BUY: good_liquidity(spread < spread_ma*0.8) AND close↑ AND price_impact < impact_ma
+  - SELL: good_liquidity AND close↓ AND price_impact < impact_ma
+  - confidence: HIGH if spread < spread_ma * 0.5 else MEDIUM
+- `tests/test_order_flow_imbalance_v2.py`, `tests/test_market_microstructure.py`: 각 17개 테스트 (34 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료, push to main
+
+## 이전 작업 (2026-04-10) — ScalpingSignal + SwingMomentum 신규 추가
+
+- `src/strategy/scalping_signal.py`: `ScalpingSignalStrategy` (name=`scalping_signal`)
+  - EMA(3/8/13) 정렬 + RSI7(50~70 BUY, 30~50 SELL) + 볼륨 필터
+- `src/strategy/swing_momentum.py`: `SwingMomentumStrategy` (name=`swing_momentum`)
+  - 확인된 스윙 고/저점(rolling 5, shift 2) 돌파 + 볼륨 필터
+- `tests/test_scalping_signal.py`, `tests/test_swing_momentum.py`: 각 14개 테스트 (28 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료, push to main
+
+## 이전 작업 (2026-04-10) — GapMomentum + ConsolidationBreak 신규 추가
+
+- `src/strategy/gap_momentum.py`: `GapMomentumStrategy` (name=`gap_momentum`)
+  - 갭 발생 후 모멘텀 지속 전략
+  - BUY: gap_up_pct > 0.3 AND close > open AND volume > vol_ma(10)
+  - SELL: gap_down_pct > 0.3 AND close < open AND volume > vol_ma(10)
+  - confidence: HIGH if gap_pct > 1.0 else MEDIUM
+- `src/strategy/consolidation_break.py`: `ConsolidationBreakStrategy` (name=`consolidation_break`)
+  - 횡보 후 돌파 전략 (lookback=10, consolidating = range_width < range_ma*0.6)
+  - BUY: consolidating.shift(1) AND close > hi.shift(1)
+  - SELL: consolidating.shift(1) AND close < lo.shift(1)
+  - confidence: HIGH if vol > vol_ma*1.5 AND range_width < range_ma*0.4 else MEDIUM
+- 테스트: `tests/test_gap_momentum.py` (15개), `tests/test_consolidation_break.py` (15개), 30 passed
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+- git push origin main 완료
+
+## 이전 작업 (2026-04-10) — MomentumDivergenceV2 + VolumeSpreadAnalysisV2 신규 추가
+
+- `src/strategy/momentum_divergence_v2.py`: `MomentumDivergenceV2Strategy` (name=`momentum_divergence_v2`)
+  - MACD(12,26,9) + 가격 divergence 기반
+  - Bullish: close < price_low[idx-5] AND macd > macd_low[idx-5] → BUY
+  - Bearish: close > price_high[idx-5] AND macd < macd_high[idx-5] → SELL
+  - confidence: HIGH if hist > 0 (bullish) or hist < 0 (bearish) else MEDIUM
+- `src/strategy/volume_spread_analysis_v2.py`: `VolumeSpreadAnalysisV2Strategy` (name=`volume_spread_analysis_v2`)
+  - spread/volume MA(10) 기반 VSA v2
+  - BUY: wide_spread(>1.2x) AND high_vol(>1.2x) AND close_position > 0.7
+  - SELL: wide_spread(>1.2x) AND high_vol(>1.2x) AND close_position < 0.3
+  - confidence: HIGH if spread>1.5x AND vol>1.5x else MEDIUM
+- 테스트: `tests/test_momentum_divergence_v2.py` (18개), `tests/test_volume_spread_analysis_v2.py` (18개), 36 passed
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — AdaptiveTrend + PriceCompressionSignal 신규 추가
+
+- `src/strategy/adaptive_trend.py`: `AdaptiveTrendStrategy` (name=`adaptive_trend`)
+  - volatility percentile 기반 adaptive EMA span (5~50)
+  - BUY: fast_ema > adaptive_ema > slow_ema AND close > fast_ema
+  - SELL: fast_ema < adaptive_ema < slow_ema AND close < fast_ema
+  - confidence: HIGH if vol_percentile < 0.3 else MEDIUM
+- `src/strategy/price_compression_signal.py`: `PriceCompressionSignalStrategy` (name=`price_compression_signal`)
+  - NR7 압축 감지 + 방향 돌파
+  - BUY: nr7 AND close > prev 3봉 rolling max
+  - SELL: nr7 AND close < prev 3봉 rolling min
+  - confidence: HIGH if range < avg_range*0.5 else MEDIUM
+- 테스트: `tests/test_adaptive_trend.py` (16개), `tests/test_price_compression_signal.py` (16개)
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — BreakoutPullback + TrendFollowFilter 신규 추가
+
+- `src/strategy/breakout_pullback.py`: `BreakoutPullbackStrategy` (name=`breakout_pullback`)
+  - resistance=high.rolling(20).max().shift(1), support=low.rolling(20).min().shift(1)
+  - BUY: broke_up_recently AND pullback_to_resistance AND close > close.shift(1)
+  - SELL: broke_down_recently AND pullback_to_support AND close < close.shift(1)
+  - confidence: HIGH if volume > vol_avg*1.5 else MEDIUM
+- `src/strategy/trend_follow_filter.py`: `TrendFollowFilterStrategy` (name=`trend_follow_filter`)
+  - 간소화 ADX (DI+/DI- 14봉), ema20/ema50
+  - BUY: adx>20 AND di_up>di_down AND close>ema20 AND ema20>ema50
+  - SELL: adx>20 AND di_down>di_up AND close<ema20 AND ema20<ema50
+  - confidence: HIGH if adx>35 else MEDIUM
+- 테스트: `tests/test_breakout_pullback.py` (14개), `tests/test_trend_follow_filter.py` (14개)
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+- 커밋: 8c6b243, push → main
+
+## 이전 작업 (2026-04-10) — PriceRangeBreakout + VolumeOscillatorV2 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — PriceRangeBreakout + VolumeOscillatorV2 신규 추가
+
+- `src/strategy/price_range_breakout.py`: `PriceRangeBreakoutStrategy` (name=`price_range_breakout`)
+  - range_high/low rolling(15).max/min, range_width rolling(20).mean
+  - compression = range_width < range_ma * 0.7
+  - BUY: compression AND close > range_high.shift(1)
+  - SELL: compression AND close < range_low.shift(1)
+  - confidence: HIGH if range_width < range_ma * 0.5 else MEDIUM
+- `src/strategy/volume_oscillator_v2.py`: `VolumeOscillatorV2Strategy` (name=`volume_oscillator_v2`)
+  - fast_vol EWM(5), slow_vol EWM(20), vol_osc=(fast-slow)/(slow+1e-10)*100
+  - vol_osc_ma = vol_osc.rolling(5)
+  - BUY: vol_osc>0 AND vol_osc>vol_osc_ma AND price_up
+  - SELL: vol_osc>0 AND vol_osc>vol_osc_ma AND NOT price_up
+  - confidence: HIGH if vol_osc>20 else MEDIUM
+- 테스트: `tests/test_price_range_breakout.py` (16개), `tests/test_volume_oscillator_v2.py` (16개)
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+- 커밋: af22618, push → main
+
+## 이전 작업 (2026-04-10) — PriceVelocityFilter + MomentumQualityV2 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — PriceVelocityFilter + MomentumQualityV2 신규 추가
+
+- `src/strategy/price_velocity_filter.py`: `PriceVelocityFilterStrategy` (name=`price_velocity_filter`)
+  - EMA(5)-EMA(20) 속도 + rolling vel_ma + diff(3) 가속도 필터
+  - BUY: vel>0 AND vel>vel_ma AND accel>0
+  - SELL: vel<0 AND vel<vel_ma AND accel<0
+  - confidence: HIGH if |vel|>vel_std else MEDIUM
+- `src/strategy/momentum_quality_v2.py`: `MomentumQualityV2Strategy` (name=`momentum_quality_v2`)
+  - roc5/10/20 기반 consistency(0~3) + strength(rolling mean)
+  - BUY: consistency>=3 AND strength>0 AND roc5>roc10
+  - SELL: consistency<=0 AND strength<0 AND roc5<roc10
+- 테스트: `tests/test_price_velocity_filter.py` (16개), `tests/test_momentum_quality_v2.py` (16개)
+- orchestrator.py STRATEGY_REGISTRY 등록 완료
+- 커밋: f426293, push → main
+
+## 이전 작업 (2026-04-10) — MultiTimeframeMomentum + SmartBeta 신규 추가
+
+- `src/strategy/multi_timeframe_momentum.py`: `MultiTimeframeMomentumStrategy` (name=`multi_timeframe_momentum`)
+  - mom_short/mid/long (5/10/20봉) + vol_confirm(rolling 10 mean)
+  - BUY: bull_score>=3 AND vol_confirm / SELL: bear_score>=3 AND vol_confirm
+  - confidence HIGH if all aligned AND abs(mom_short) > rolling 20 mean, MIN_ROWS=30
+- `src/strategy/smart_beta.py`: `SmartBetaStrategy` (name=`smart_beta`)
+  - realized_vol rank + momentum_12 rank -> composite_score = (1-vol_rank)*0.5 + mom_rank*0.5
+  - BUY: composite_score>0.6 AND >score_ma / SELL: composite_score<0.4 AND <score_ma
+  - confidence HIGH if composite_score>0.75 or <0.25, MIN_ROWS=30
+- tests: `tests/test_multi_timeframe_momentum.py` (14개), `tests/test_smart_beta.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+---
+
+## 이전 작업 (2026-04-10) — HighLowReversal + TrendFilteredMeanRev 신규 추가
+
+- `src/strategy/high_low_reversal.py`: `HighLowReversalStrategy` (name=`high_low_reversal`)
+  - position = (close-low)/(high-low+1e-10), pos_ma = position.rolling(10, min_periods=1).mean()
+  - BUY: position<0.2 AND position>pos_ma / SELL: position>0.8 AND position<pos_ma
+  - confidence HIGH if position<0.1(BUY) or position>0.9(SELL), MIN_ROWS=20
+- `src/strategy/trend_filtered_mean_rev.py`: `TrendFilteredMeanRevStrategy` (name=`trend_filtered_mean_rev`)
+  - ema50 + BB(20, 1.5std) / BUY: trend_up AND close<lower / SELL: trend_down AND close>upper
+  - confidence HIGH if abs(close-bb_mid)>bb_std*2.0, MIN_ROWS=30
+- tests: `tests/test_high_low_reversal.py` (16개), `tests/test_trend_filtered_mean_rev.py` (14개) = 30 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+---
+
+## Status (이전): **28 passed** | ChandelierExit(재구현) + VWAPBand 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — ChandelierExit 재구현 + VWAPBand 신규 추가
+
+- `src/strategy/chandelier_exit.py`: `ChandelierExitStrategy` (name=`chandelier_exit`) 재구현
+  - atr14 = (high-low).rolling(14, min_periods=1).mean() (True Range 간소화)
+  - chandelier_long = highest_high22 - atr14*3.0 / chandelier_short = lowest_low22 + atr14*3.0
+  - BUY: close > CL AND close > prev_close / SELL: close < CS AND close < prev_close
+  - confidence HIGH if close > CL*1.01 (BUY) or close < CS*0.99 (SELL), MIN_ROWS=25
+- `src/strategy/vwap_band.py`: `VWAPBandStrategy` (name=`vwap_band`) 신규
+  - vwap = (close*vol).rolling(20).sum() / vol.rolling(20).sum()
+  - BUY: close < lower_band AND close > prev_close (하단 밴드 반등)
+  - SELL: close > upper_band AND close < prev_close (상단 밴드 반락)
+  - confidence HIGH if abs(deviation) > dev_std*2.5, MIN_ROWS=20
+- tests: `tests/test_chandelier_exit.py` (14개), `tests/test_vwap_band.py` (14개) = 28 passed
+- `src/orchestrator.py`: vwap_band import + STRATEGY_REGISTRY 등록 (chandelier_exit는 기존 유지)
+
+## 이전 작업 (2026-04-10) — TrendConsistency + VolumeWeightedMomentum 전략 추가
+
+- `src/strategy/trend_consistency.py`: `TrendConsistencyStrategy` (name=`trend_consistency`)
+  - 다중 시간대 EMA 일관성 점수 (ema5/ema10/ema20)
+  - BUY: bull_count==3 AND close > prev_close / SELL: bear_count==3 AND close < prev_close
+  - confidence HIGH if count==3, MIN_ROWS=25
+- `src/strategy/volume_weighted_momentum.py`: `VolumeWeightedMomentumStrategy` (name=`volume_weighted_momentum`)
+  - 거래량 가중 모멘텀: vw_momentum = (returns * vol_norm).rolling(10).sum()
+  - BUY: vw_momentum > vw_mom_ma AND vw_momentum > 0
+  - SELL: vw_momentum < vw_mom_ma AND vw_momentum < 0
+  - confidence HIGH if abs(vw_momentum) > std20, MIN_ROWS=20
+- tests: `tests/test_trend_consistency.py` (16개), `tests/test_volume_weighted_momentum.py` (16개) = 32 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+## Status: **33 passed** | PivotPoint + NightStar 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — PivotPoint + NightStar 전략 추가
+
+- `src/strategy/pivot_point.py`: `PivotPointStrategy` (name=`pivot_point`)
+  - 이전 봉 기반 피벗 포인트 돌파 전략
+  - BUY: close > pivot AND close > r1 / SELL: close < pivot AND close < s1
+  - confidence HIGH if close > r2 (BUY) or close < s2 (SELL), MIN_ROWS=20
+- `src/strategy/night_star.py`: `NightStarStrategy` (name=`night_star`)
+  - Morning Star (BUY) / Evening Star (SELL) 3봉 반전 패턴
+  - doji star 또는 high volume 시 HIGH confidence, MIN_ROWS=15
+- tests: `tests/test_pivot_point.py` (16개), `tests/test_night_star.py` (17개) = 33 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+## Status: **28 passed** | PricePatternRecog + TrendMomentumBlend 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — PricePatternRecog + TrendMomentumBlend 전략 추가
+
+- `src/strategy/price_pattern_recog.py`: `PricePatternRecogStrategy` (name=`price_pattern_recog`)
+  - Morning Star, Evening Star, Three White Soldiers, Three Black Crows 4가지 다중 캔들 패턴
+  - BUY: morning_star OR three_white | SELL: evening_star OR three_black
+  - confidence HIGH if three_white/three_black, MEDIUM if morning/evening star, MIN_ROWS=8
+- `src/strategy/trend_momentum_blend.py`: `TrendMomentumBlendStrategy` (name=`trend_momentum_blend`)
+  - EMA50 기울기(추세) + ROC10 크로스오버(모멘텀) + RSI(14) 블렌딩
+  - BUY: slope>0 AND roc>roc_ma AND 50<rsi<70 | SELL: slope<0 AND roc<roc_ma AND 30<rsi<50
+  - confidence HIGH if abs(slope) > std20/close*0.005, MIN_ROWS=60
+- tests: `tests/test_price_pattern_recog.py` (14개), `tests/test_trend_momentum_blend.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main (bcc6744)
+
+## 이전 작업 (2026-04-10) — IntradayMomentum + VolatilitySurface 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — IntradayMomentum + VolatilitySurface 전략 추가
+
+- `src/strategy/intraday_momentum.py`: `IntradayMomentumStrategy` (name=`intraday_momentum`)
+  - 봉 내 위치(position) + 거래량 흐름 기반 단기 모멘텀
+  - BUY: momentum_score > score_ma AND position > 0.7 AND volume > vol_ma
+  - SELL: momentum_score < score_ma AND position < 0.3 AND volume > vol_ma
+  - confidence HIGH if position > 0.85 (BUY) or < 0.15 (SELL), MIN_ROWS=20
+- `src/strategy/volatility_surface.py`: `VolatilitySurfaceStrategy` (name=`volatility_surface`)
+  - 단기/장기 실현 변동성 비율(term structure) 기반
+  - BUY: vol_ratio < 0.8 AND close > ma20 AND vol_ratio < vol_ratio_ma
+  - SELL: vol_ratio < 0.8 AND close < ma20 AND vol_ratio < vol_ratio_ma
+  - confidence HIGH if vol_ratio < 0.6, MIN_ROWS=30
+- tests: `tests/test_intraday_momentum.py` (14개), `tests/test_volatility_surface.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main (ccd2fad)
+
+## 이전 작업 (2026-04-10) — RegimeMomentum + LiquidityScore 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — RegimeMomentum + LiquidityScore 전략 추가
+
+- `src/strategy/regime_momentum.py`: `RegimeMomentumStrategy` (name=`regime_momentum`)
+  - efficiency_ratio 기반 레짐 판단 (> 0.4 추세장, ≤ 0.4 횡보장)
+  - 추세장: EMA10/EMA20 크로스 모멘텀 BUY/SELL
+  - 횡보장: BB 밴드 이탈 반전 BUY/SELL
+  - confidence HIGH if ER > 0.6 or < 0.2, MIN_ROWS=30
+- `src/strategy/liquidity_score.py`: `LiquidityScoreStrategy` (name=`liquidity_score`)
+  - spread_proxy + vol_score + price_impact 기반 유동성 점수
+  - BUY: liq > liq_ma AND close > close_ma AND vol_score > 1.2
+  - SELL: liq > liq_ma AND close < close_ma AND vol_score > 1.2
+  - confidence HIGH if vol_score > 2.0 AND liq > liq_ma * 1.5, MIN_ROWS=20
+- tests: `tests/test_regime_momentum.py` (16개), `tests/test_liquidity_score.py` (16개) = 32 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — HarmonicPattern + DivergenceConfirmation 전략 추가
+
+## 최근 작업 (2026-04-10) — HarmonicPattern + DivergenceConfirmation 전략 추가
+
+- `src/strategy/harmonic_pattern.py`: `HarmonicPatternStrategy` (name=`harmonic_pattern`)
+  - 피보나치 ABCD 패턴, BC/AB 0.382~0.886, CD/BC 1.13~1.618
+  - BUY: CD > 0, SELL: CD < 0, confidence HIGH if BC/AB ≈ 0.618±0.02
+  - MIN_ROWS=20 (completed < 20 → HOLD)
+- `src/strategy/divergence_confirmation.py`: `DivergenceConfirmationStrategy` (name=`divergence_confirmation`)
+  - RSI(14) divergence, lookback=10
+  - Bullish: price↓ + RSI↑, Bearish: price↑ + RSI↓
+  - confidence HIGH if RSI <= 30 (bullish) or >= 70 (bearish), MIN_ROWS=30
+- tests: `tests/test_harmonic_pattern.py` (14개), `tests/test_divergence_confirmation.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — TickVolume + MarketBreadthProxy 전략 추가
+
+- `src/strategy/tick_volume.py`: `TickVolumeStrategy` (name=`tick_volume`)
+  - volume을 틱 대리로 사용, cum_delta rolling(10) + cum_delta_ma rolling(5)
+  - BUY: cum_delta > cum_delta_ma AND cum_delta > 0 AND vol > tick_vol_ma
+  - SELL: cum_delta < cum_delta_ma AND cum_delta < 0 AND vol > tick_vol_ma
+  - confidence: HIGH if vol > tick_vol_ma * 1.5, MIN_ROWS=20
+- `src/strategy/market_breadth_proxy.py`: `MarketBreadthProxyStrategy` (name=`market_breadth_proxy`)
+  - 단일 심볼 breadth 대리: advances/declines rolling(20), ad_ratio = advances/(declines+1)
+  - BUY: ad_ratio > 1.5 AND ad_ratio > ad_ma AND close > EMA(20)
+  - SELL: ad_ratio < 0.67 AND ad_ratio < ad_ma AND close < EMA(20)
+  - confidence: HIGH if ad_ratio > 2.0 (BUY) or < 0.5 (SELL), MIN_ROWS=30
+- tests: `tests/test_tick_volume.py` (16개), `tests/test_market_breadth_proxy.py` (17개) = 33 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — OscillatorBand + PriceActionFilter 전략 추가
+
+- `src/strategy/oscillator_band.py`: `OscillatorBandStrategy` (name=`oscillator_band`)
+  - RSI(14) + Stochastic(14) 합성 오실레이터 밴드 (0~100)
+  - BUY: osc < 30 AND osc 상승 AND K > D / SELL: osc > 70 AND osc 하락 AND K < D
+  - confidence: HIGH if osc < 20 (BUY) or osc > 80 (SELL), MIN_ROWS=20
+- `src/strategy/price_action_filter.py`: `PriceActionFilterStrategy` (name=`price_action_filter`)
+  - 추세(EMA50) + 변곡(강한 봉 body_ratio>0.6) + 거래량(vol>rolling10 mean) 3중 필터
+  - BUY: trend_up + strong_bull + vol_confirm / SELL: trend_down + strong_bear + vol_confirm
+  - confidence: HIGH if body_ratio > 0.8, MIN_ROWS=55
+- tests: `tests/test_oscillator_band.py` (14개), `tests/test_price_action_filter.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — PriceImpact + SmartMoneyFlow 전략 추가
+
+- `src/strategy/price_impact.py`: `PriceImpactStrategy` (name=`price_impact`)
+  - Kyle's Lambda 간소화: price_change / volume * 1000 → impact_ma(ewm span=20)
+  - BUY: impact > impact_ma * 1.5 AND dir_ma > 0 / SELL: 반대
+  - confidence: HIGH if impact > impact_ma * 2.0 else MEDIUM, MIN_ROWS=25
+- `src/strategy/smart_money_flow.py`: `SmartMoneyFlowStrategy` (name=`smart_money_flow`)
+  - otc_return * volume → rolling(10).sum() = smf, ewm(span=5) = smf_signal
+  - BUY: smf > smf_signal AND smf < 0 / SELL: smf < smf_signal AND smf > 0
+  - confidence: HIGH if abs(smf) > smf.rolling(20).std() else MEDIUM, MIN_ROWS=20
+- tests: `tests/test_price_impact.py` (14개), `tests/test_smart_money_flow.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — BreakoutVolRatio + MeanRevBandV2 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — BreakoutVolRatio + MeanRevBandV2 전략 추가
+
+- `src/strategy/breakout_vol_ratio.py`: `BreakoutVolRatioStrategy` (name=`breakout_vol_ratio`)
+  - 20봉 고점/저점 돌파 + 거래량 비율(vol/vol_ma20) 신뢰성 판단
+  - BUY: broke_up AND vol_ratio > 1.5 / SELL: broke_down AND vol_ratio > 1.5
+  - confidence: HIGH if vol_ratio > 2.0 else MEDIUM
+  - ATR14 기반 breakout_size 계산, MIN_ROWS=25
+- `src/strategy/mean_rev_band_v2.py`: `MeanRevBandV2Strategy` (name=`mean_rev_band_v2`)
+  - EMA20 ± N*ATR14 다중 밴드 (band1=1x, band2=2x)
+  - BUY: band2 아래 복귀 OR band1 아래 반등 / SELL: band2 위 반락 OR band1 위 반락
+  - confidence: HIGH if band2 조건 else MEDIUM, MIN_ROWS=25
+- tests: `tests/test_breakout_vol_ratio.py` (14개), `tests/test_mean_rev_band_v2.py` (14개) = 28 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — VelocityEntry + RangeBias 전략 추가
+
+## 최근 작업 (2026-04-10) — VelocityEntry + RangeBias 전략 추가
+
+- `src/strategy/velocity_entry.py`: `VelocityEntryStrategy` (name=`velocity_entry`)
+  - 가격 속도(1차 미분) + 가속도(2차 미분) 기반 진입
+  - BUY: velocity > velocity_ma AND acceleration > 0
+  - SELL: velocity < velocity_ma AND acceleration < 0
+  - confidence: HIGH if |velocity| > velocity.rolling(20).std() else MEDIUM
+  - MIN_ROWS=20
+- `src/strategy/range_bias.py`: `RangeBiasStrategy` (name=`range_bias`)
+  - 봉의 위치 편향 — 범위 내 종가 위치 추세
+  - BUY: bias > 0.6 AND bias_trend > 0
+  - SELL: bias < 0.4 AND bias_trend < 0
+  - confidence: HIGH if bias > 0.75 (BUY) or bias < 0.25 (SELL) else MEDIUM
+  - MIN_ROWS=20
+- tests: `tests/test_velocity_entry.py` (16개), `tests/test_range_bias.py` (17개) = 33 passed
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- pushed to main
+
+## 이전 작업 (2026-04-10) — CompositeMomentum + SignalLineCross 전략 추가
+
+- `src/strategy/composite_momentum.py`: `CompositeMomentumStrategy` (name=`composite_momentum`)
+  - RSI14 + ROC10 + MACD방향 정규화 합성 점수, BUY>0.65, SELL<0.35
+- `src/strategy/signal_line_cross.py`: `SignalLineCrossStrategy` (name=`signal_line_cross`)
+  - EMA(8)/EMA(21) diff의 signal line(EMA9) 크로스오버, 음수/양수 구간 필터
+- tests: `tests/test_composite_momentum.py` (14개), `tests/test_signal_line_cross.py` (14개)
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- 28 tests PASSED, pushed to main
+
+## 이전 작업 (2026-04-10) — DualThrust + VolatilityBreakoutV2 전략 추가
+
+- `src/strategy/dual_thrust.py`: `DualThrustStrategy` (name=`dual_thrust`)
+  - rolling N=4 고가/저가 범위 기반, k=0.5
+  - BUY: close > open + 0.5 * range_val; SELL: close < open - 0.5 * range_val
+  - confidence: HIGH if ratio > 0.02, MIN_ROWS=10
+- `src/strategy/volatility_breakout_v2.py`: `VolatilityBreakoutV2Strategy` (name=`volatility_breakout_v2`)
+  - ATR(14) 배수로 진입 레벨 설정, upper=prev_close+0.5*atr, lower=prev_close-0.5*atr
+  - BUY: close > upper; SELL: close < lower
+  - confidence: HIGH if (close-upper)/atr > 0.3, MIN_ROWS=20
+- tests: 14 + 14 = 28 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+---
+
+## 이전 작업 (2026-04-10) — CumulativeDelta + SpreadAnalysis 전략 추가
+
+## Status: **28 passed** | CumulativeDelta + SpreadAnalysis 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — CumulativeDelta + SpreadAnalysis 전략 추가
+
+- `src/strategy/cumulative_delta.py`: `CumulativeDeltaStrategy` (name=`cumulative_delta`)
+  - 봉 구조로 매수/매도 거래량 추정, rolling(20) 누적 델타
+  - BUY: cum_delta crosses above cum_delta_ma AND cum_delta < 0
+  - SELL: cum_delta crosses below cum_delta_ma AND cum_delta > 0
+  - confidence: HIGH if abs(cum_delta) > std, MIN_ROWS=30
+- `src/strategy/spread_analysis.py`: `SpreadAnalysisStrategy` (name=`spread_analysis`)
+  - (high-low)/close 스프레드 프록시로 유동성 판단
+  - BUY: low_spread AND close_pos > 0.7 AND close_pos > close_pos_ma
+  - SELL: low_spread AND close_pos < 0.3 AND close_pos < close_pos_ma
+  - confidence: HIGH if spread < ma*0.6, MIN_ROWS=20
+- tests: 14 + 14 = 28 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+---
+
+## 이전 작업 (2026-04-10) — PivotBand + TrendIntensityIndex 전략 추가
+
+## 최근 작업 (2026-04-10) — PivotBand + TrendIntensityIndex 전략 추가
+
+- `src/strategy/pivot_band.py`: `PivotBandStrategy` (name=`pivot_band`)
+  - 피벗 포인트 기반 동적 밴드 (r1+r2)/2, (s1+s2)/2
+  - BUY: prev_close < band_lower → curr_close >= band_lower (하단 복귀)
+  - SELL: prev_close > band_upper → curr_close <= band_upper (상단 이탈)
+  - confidence: HIGH if curr < s2 or curr > r2, MIN_ROWS=5
+- `src/strategy/trend_intensity_index.py`: `TrendIntensityIndexV2Strategy` (name=`trend_intensity_index`)
+  - TII = (above - below) / period * 100 (-100~+100), tii_ma = TII.rolling(9)
+  - BUY: tii crosses above tii_ma AND tii < 0
+  - SELL: tii crosses below tii_ma AND tii > 0
+  - confidence: HIGH if abs(tii) > 40, MIN_ROWS=45
+- tests: 16 + 16 = 32 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+## 이전 작업 (2026-04-10) — PriceCycleDetector + MomentumQuality 전략 추가
+
+- `src/strategy/price_cycle_detector.py`: `PriceCycleDetectorStrategy` (name=`price_cycle_detector`)
+  - 자기상관(autocorrelation) lag 2~10에서 최대 상관 탐색
+  - BUY: best_corr > 0.5 AND cycle_momentum > 0.01; SELL: best_corr > 0.5 AND cycle_momentum < -0.01
+  - confidence: HIGH if best_corr > 0.7, MIN_ROWS=35
+- `src/strategy/momentum_quality.py`: `MomentumQualityStrategy` (name=`momentum_quality`)
+  - quality_score = consistency*2-1 + (acceleration>0); 범위 -1~2
+  - BUY: quality_score > 1.0 AND mom20 > 0; SELL: quality_score < -0.5 AND mom20 < 0
+  - confidence: HIGH if score > 1.5 (BUY) or < -0.8 (SELL), MIN_ROWS=25
+- tests: 16 + 16 = 32 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+## 이전 작업 (2026-04-10) — NormalizedPriceOsc + EMAEnvelope 전략 추가
+
+- `src/strategy/normalized_price_osc.py`: `NormalizedPriceOscStrategy` (name=`normalized_price_osc`)
+  - rolling min-max 정규화(0~100), npo_ma(5) 필터
+  - BUY: npo crosses above 20 AND npo>npo_ma; SELL: npo crosses below 80 AND npo<npo_ma
+  - confidence: HIGH if npo<10 (BUY) or >90 (SELL), MIN_ROWS=25
+- `src/strategy/ema_envelope.py`: `EMAEnvelopeStrategy` (name=`ema_envelope`)
+  - EMA20 ±2.5% 엔벨로프 밴드
+  - BUY: prev<lower AND curr>lower; SELL: prev>upper AND curr<upper
+  - confidence: HIGH if curr<ema20*0.97 (BUY) or >ema20*1.03 (SELL), MIN_ROWS=25
+- tests: 14 + 14 = 28 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+## 이전 작업 (2026-04-10) — TrendExhaustion + HighLowChannel 전략 추가
+
+- `src/strategy/trend_exhaustion.py`: `TrendExhaustionStrategy` (name=`trend_exhaustion`)
+  - EMA20 기반 bars_up + ROC5 모멘텀으로 추세 소진 감지
+  - BUY: bars_up<=3 AND roc5>0 AND roc5>roc5_ma; SELL: bars_up>=8 AND trend_up AND mom_weak_up
+  - confidence: HIGH if bars_up<=2 (BUY) or >=9 (SELL), MIN_ROWS=25
+- `src/strategy/high_low_channel.py`: `HighLowChannelStrategy` (name=`high_low_channel`)
+  - 14기간 High-Low 채널 position 기반 반등/반락
+  - BUY: position<0.25 AND price_up; SELL: position>0.75 AND price_down
+  - confidence: HIGH if position<0.1 (BUY) or >0.9 (SELL), MIN_ROWS=20
+- tests: 17 + 17 = 34 passed
+- orchestrator: 두 전략 import + registry 등록, pushed
+
+## 이전 작업 (2026-04-10) — DeMarker + ConnorsRSI 전략 추가
+
+- `src/strategy/demarker.py`: `DeMarkerStrategy` (name=`demarker`)
+  - DeMax/DeMin 14기간 평활 → DeMarker oscillator [0,1]
+  - BUY: dem crosses above 0.3, SELL: crosses below 0.7
+  - confidence: HIGH if dem < 0.2 (BUY) or dem > 0.8 (SELL), MIN_ROWS=20
+- `src/strategy/connors_rsi.py`: `ConnorsRSIStrategy` 재작성 (name=`connors_rsi`)
+  - CRSI = (RSI(3) EWM + StreakRSI(2) + ROC Percentile(100)) / 3
+  - BUY: crsi crosses above 10, SELL: crosses below 90
+  - confidence: HIGH if crsi < 5 or > 95, MIN_ROWS=110
+- tests: 17 + 18 = 35 passed
+- orchestrator: demarker 추가 등록, pushed
+
+## 이전 작업 (2026-04-10) — SineWave + AdaptiveCycle 전략 추가
+
+- `src/strategy/sine_wave.py`: `SineWaveStrategy` (name=`sine_wave`)
+  - Ehlers Sine Wave: HP filter + z-score 위상 → arcsin → sine/lead 크로스오버
+  - BUY: sine crosses above lead, SELL: sine crosses below lead
+  - confidence: HIGH if |sine| > 0.7 else MEDIUM, MIN_ROWS=25
+- `src/strategy/adaptive_cycle.py`: `AdaptiveCycleStrategy` (name=`adaptive_cycle`)
+  - Rolling 극값으로 사이클 위치(0~1) 계산
+  - BUY: cycle_pos < 0.2 AND dir > 0, SELL: cycle_pos > 0.8 AND dir < 0
+  - confidence: HIGH if pos < 0.1 (BUY) or pos > 0.9 (SELL) else MEDIUM, MIN_ROWS=15
+- tests: 18 + 18 = 36 passed
+- orchestrator: 두 전략 등록 완료, pushed
+
+## 이전 작업 (2026-04-10) — GaussianChannel + EhlersFisher 전략 추가
+
+- `src/strategy/gaussian_channel.py`: `GaussianChannelStrategy` (name=`gaussian_channel`)
+  - 4-pole Gaussian 필터 (4단계 EMA) + ATR 채널
+  - BUY: prev_close < lower AND curr_close > lower (하단 채널 복귀)
+  - SELL: prev_close > upper AND curr_close < upper (상단 채널 이탈)
+  - confidence: HIGH if gauss_rising (BUY) or not gauss_rising (SELL) else MEDIUM
+- `src/strategy/ehlers_fisher.py`: `EhlersFisherStrategy` (name=`ehlers_fisher`)
+  - Ehlers Fisher Transform (period=10): 가격 정규분포 변환
+  - BUY: fish cross up signal AND fish < 0, SELL: cross down AND fish > 0
+  - confidence: HIGH if |fish| > 2.0 else MEDIUM
+- tests: 18 + 18 = 36 passed
+- orchestrator: 두 전략 등록 완료, pushed
+
+## 이전 상태: **30 passed** | MassIndex + UltimateOscillator 전략 확인 완료
+
+## 최근 작업 (2026-04-10) — MassIndex + UltimateOscillator 전략 확인
+
+- `src/strategy/mass_index.py`: `MassIndexStrategy` (name=`mass_index`) — 이미 존재
+  - Reversal Bulge: MI > 27 → < 26.5, BUY if close > ema50, SELL if close < ema50
+- `src/strategy/ultimate_oscillator.py`: `UltimateOscillatorStrategy` (name=`ultimate_oscillator`) — 이미 존재
+  - BUY: UO < 30 AND 상승 중, SELL: UO > 70 AND 하락 중
+- tests: 15 + 15 = 30 passed
+- orchestrator: 두 전략 이미 등록됨
+
+## 이전 상태: **35 passed** | WaveTrendOsc + CyberCycle 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — WaveTrendOsc + CyberCycle 전략 추가
+
+- `src/strategy/wavetrend_osc.py`: `WaveTrendOscStrategy` (name=`wavetrend_osc`)
+  - WaveTrend Oscillator (LazyBear): hlc3 기반 EMA/CCI 체인
+  - BUY: wt1 cross up wt2 AND wt1 < -60, SELL: cross down AND wt1 > 60
+  - confidence: HIGH if |wt1| > 80 else MEDIUM
+- `src/strategy/cyber_cycle.py`: `CyberCycleStrategy` (name=`cyber_cycle`)
+  - Ehlers Cyber Cycle (alpha=0.07): recursive 주기 추출
+  - BUY: cycle cross up trigger AND cycle < 0, SELL: cross down AND cycle > 0
+  - warmup: idx < 10 → HOLD
+- tests: 17 + 18 = 35 passed
+- orchestrator: 두 전략 등록 완료, pushed
+
+## 이전 상태: **28 passed** | LaguerreRSI + ZeroLagEMA 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — LaguerreRSI + ZeroLagEMA 전략 추가
+
+- `src/strategy/laguerre_rsi.py`: `LaguerreRSIStrategy` (name=`laguerre_rsi`)
+  - Ehlers Laguerre 필터 기반 RSI (0~1), gamma=0.5
+  - BUY: lrsi crosses above 0.2, SELL: crosses below 0.8
+- `src/strategy/zero_lag_ema.py`: `ZeroLagEMAStrategy` (name=`zero_lag_ema`)
+  - Zero-lag EMA (2*EMA - EMA(EMA)), fast=10/slow=25
+  - BUY: fast crosses above slow, SELL: crosses below
+- `tests/test_laguerre_rsi.py` + `tests/test_zero_lag_ema.py`: 각 14개 = 28 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY 등록
+- commit: `feat: add LaguerreRSI + ZeroLagEMA strategies (28 tests)` → pushed
+
+## 이전 상태: **14 passed** | AbsoluteStrengthHist 전략 추가 완료
+
+## 이전 작업 (2026-04-10) — AbsoluteStrengthHist 전략 추가
+
+- `src/strategy/absolute_strength_hist.py`: `AbsoluteStrengthHistStrategy` (name=`absolute_strength_hist`)
+  - ASH: bulls/bears 이중 EWM 평활(span=9→3), diff_val = smooth2_bulls - smooth2_bears
+  - BUY: diff_val 0선 상향 돌파, SELL: 0선 하향 이탈
+  - confidence: HIGH if abs(diff_val) > (s2_bulls + s2_bears) * 0.3 else MEDIUM
+- `tests/test_absolute_strength_hist.py`: 14개 테스트 — 14 passed
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY 등록
+- commit: `feat: add AbsoluteStrengthHist strategy (14 tests)` → pushed
+
+## 이전 상태: **30 passed** | VortexIndicator + LinearRegChannel 테스트 추가 완료
+
+## 최근 작업 (2026-04-10) — VortexIndicator + LinearRegChannel 테스트 작성
+
+- `tests/test_vortex_indicator.py`: `VortexIndicatorStrategy` (name=`vortex_indicator`) 테스트 15개
+  - VI+ 크로스오버 BUY, VI+ 크로스 하방 SELL, HIGH conf (sep>0.1), 데이터 부족 HOLD
+- `tests/test_linear_reg_channel.py`: `LinearRegChannelStrategy` (name=`linear_reg_channel`) 테스트 15개
+  - 하단 채널 이탈 후 복귀 BUY, 상단 채널 이탈 후 복귀 SELL, 최소 35행
+- commit: `feat: add tests for VortexIndicator + LinearRegChannel (28 tests)` → pushed
+
+## 이전 상태: **23 passed, 5 skipped** | MoneyFlowIndex + TrendStrengthIndex 추가 완료
+
+## 최근 작업 (2026-04-10) — MoneyFlowIndex + TrendStrengthIndex 구현
+
+- `src/strategy/money_flow_index.py`: `MoneyFlowIndexStrategy` (name=`money_flow_index`)
+  - MFI crossover: above 20 = BUY (과매도 탈출), below 80 = SELL (과매수 이탈)
+  - HIGH conf if mfi < 10 (BUY) or mfi > 90 (SELL), 최소 20행, 14 tests
+- `src/strategy/trend_strength_index.py`: `TrendStrengthIndexStrategy` (name=`trend_strength_index`)
+  - Double-smoothed TSI (span 25/13), signal EMA-7
+  - BUY: TSI crosses above signal AND TSI < 0; SELL: crosses below AND TSI > 0
+  - HIGH conf if abs(TSI) > 25, 최소 40행, 14 tests
+- `src/orchestrator.py`: import + STRATEGY_REGISTRY 등록 완료
+- commit: `feat: add MoneyFlowIndex + TrendStrengthIndex strategies (28 tests)` → pushed
+
+## 이전 상태: **36 passed** | PivotPointRev + HeikenAshiTrend 추가 완료
+
+## 최근 작업 (2026-04-10) — PivotPointRev + HeikenAshiTrend 구현
+
+- `src/strategy/pivot_point_rev.py`: `PivotPointRevStrategy` (name=`pivot_point_rev`)
+  - BUY: close 근처 S1(MEDIUM) 또는 S2(HIGH), SELL: R1(MEDIUM) 또는 R2(HIGH)
+  - ATR14 포함, 최소 20행, 18 tests PASSED
+- `src/strategy/heiken_ashi_trend.py`: `HeikenAshiTrendStrategy` (name=`heiken_ashi_trend`)
+  - 순수 HA (EMA 스무딩 없음), 3봉 연속 + 방향 확인
+  - HIGH conf if 5연속, 최소 10행, 18 tests PASSED
+- commit: `feat: add PivotPointRev + HeikenAshiTrend strategies (36 tests)` → pushed
+
+## 이전 상태: **28 passed** | VolumeWeightedRSI + AdaptiveMomentum 추가 완료
+
+## 최근 작업 (2026-04-10) — VolumeWeightedRSI + AdaptiveMomentum 구현
+
+- `src/strategy/volume_weighted_rsi.py`: `VolumeWeightedRSIStrategy` (name=`volume_weighted_rsi`)
+  - 거래량으로 가중된 RSI: vol_weight = volume / volume.rolling(14).mean()
+  - BUY: VRSI crosses above 30, SELL: VRSI crosses below 70
+  - HIGH conf if vrsi_prev < 20 (BUY) or vrsi_prev > 80 (SELL), 최소 20행, 14 tests PASSED
+- `src/strategy/adaptive_momentum.py`: `AdaptiveMomentumStrategy` (name=`adaptive_momentum`)
+  - ATR14 기반 vol_rank(rolling 50) → lookback 동적 결정 (5/10/20봉)
+  - BUY: mom > 0.02 AND mom > mom_prev, SELL: mom < -0.02 AND mom < mom_prev
+  - HIGH conf if |mom| > 0.05, 최소 60행, 14 tests PASSED
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- commit: `feat: add VolumeWeightedRSI + AdaptiveMomentum strategies (28 tests)` → pushed
+
+## 이전 작업 (2026-04-10) — KeltnerBreakout + SqueezeMomentum 구현
+
+- `src/strategy/keltner_breakout.py`: `KeltnerBreakoutStrategy` (name=`keltner_breakout`)
+  - 순수 Keltner Channel 돌파: EMA20 ± 2*ATR14(rolling)
+  - BUY: 이전봉 < kc_upper AND 현재봉 > kc_upper (상단 돌파)
+  - SELL: 이전봉 > kc_lower AND 현재봉 < kc_lower (하단 붕괴)
+  - HIGH conf if close > kc_upper * 1.005, 최소 25행, 14 tests PASSED
+- `src/strategy/squeeze_momentum.py`: `SqueezeMomentumStrategy` (name=`squeeze_momentum`) **재작성**
+  - Lazybear 공식: momentum = close - (roll_high_max + roll_low_min)/2 - sma20
+  - BUY: squeeze 해제 AND momentum > 0 AND momentum > prev_momentum
+  - SELL: squeeze 해제 AND momentum < 0 AND momentum < prev_momentum
+  - HIGH conf if abs(momentum) > momentum.rolling(20).std(), 최소 30행, 14 tests PASSED
+- `src/orchestrator.py`: keltner_breakout import + STRATEGY_REGISTRY 등록
+- commit: `feat: add KeltnerBreakout + SqueezeMomentum strategies (28 tests)` → pushed
+
+## 이전 작업 (2026-04-10) — AccDist + PriceMomentumOsc 구현
+
+- `src/strategy/acc_dist.py`: `AccDistStrategy` (name=`acc_dist`)
+  - CLV → A/D Line cumsum, 3봉 전 대비 A/D vs 가격 divergence 감지
+  - BUY: A/D 상승 + 가격 하락 (bullish divergence), SELL: 반대
+  - HIGH conf if abs(ad_change) > rolling(20).std(), 최소 20행, 14 tests PASSED
+- `src/strategy/price_momentum_osc.py`: `PriceMomentumOscStrategy` (name=`price_momentum_osc`)
+  - PPO = 100*(EMA12-EMA26)/EMA26, ppo_hist = PPO - Signal(9)
+  - BUY: ppo_hist 상향 크로스 0 + PPO < 0, SELL: 하향 크로스 + PPO > 0
+  - HIGH conf if abs(ppo) > 2.0, 최소 35행, 14 tests PASSED
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록 완료
+- commit: `feat: add AccDist + PriceMomentumOsc strategies (28 tests)` → pushed
+
+## 이전 작업 (2026-04-10) — CandlePatternScore + MultiTFTrend 구현
+
+- `src/strategy/candle_pattern_score.py`: `CandlePatternScoreStrategy` (name=`candle_pattern_score`)
+  - 7개 캔들 패턴 점수화 (Hammer, Shooting Star, Engulfing, Strong 봉, Doji)
+  - score >= 3 → BUY, <= -3 → SELL, HIGH conf if abs(score) >= 4
+  - 최소 5행, 14 tests PASSED
+- `src/strategy/multi_tf_trend.py`: `MultiTFTrendStrategy` (name=`multi_tf_trend`)
+  - EMA10/20/50/100 기반 fast/mid/slow 추세 합성, score 0~3
+  - score==3 → BUY, score==0 → SELL, HIGH conf if new alignment
+  - 최소 110행, 14 tests PASSED
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록 완료
+- commit: `feat: add CandlePatternScore + MultiTFTrend strategies (28 tests)` → pushed
+
+## 이전 작업 (2026-04-10) — PriceActionQuality + RegimeFilter 구현
+
+- `src/strategy/price_action_quality.py`: `PriceActionQualityStrategy` (name=`price_action_quality`)
+  - 봉 품질 점수화 (body_ratio, wick_ratio), 3연속 강한 양/음봉 → BUY/SELL
+  - confidence: HIGH if body_ratio > 0.8 else MEDIUM, 최소 10행
+- `src/strategy/regime_filter.py`: `RegimeFilterStrategy` (name=`regime_filter`)
+  - EMA20/50 + ATR 기반 레짐 감지 (TREND_UP/DOWN/RANGING/HIGH_VOL)
+  - BUY: TREND_UP+5bar_max 돌파 / SELL: TREND_DOWN+5bar_min 붕괴 / HOLD: 비추세
+  - confidence: HIGH if TREND_UP + atr_ratio < mean*0.8 else MEDIUM, 최소 60행
+- 각 전략 14개 테스트, 총 28 passed
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `price_action_quality`, `regime_filter` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — FractalBreak + MarketStructureBreak 구현
+
+- `src/strategy/fractal_break.py`: `FractalBreakStrategy` (name=`fractal_break`)
+  - 5봉 Williams Fractal 탐지, 최근 20봉 내 last_up/down fractal 탐색
+  - BUY: close > last_up_fractal / SELL: close < last_down_fractal
+  - confidence: HIGH if atr14>0 and deviation>1% else MEDIUM, 최소 15행
+- `src/strategy/market_structure_break.py`: `MarketStructureBreakStrategy` (name=`market_structure_break`)
+  - swing high/low (3봉 패턴) 탐지, 마지막 2개 swing 비교
+  - BUY: HH+HL / SELL: LH+LL / HOLD: 혼합
+  - confidence: HIGH if swing 2개씩 확보, 최소 20행
+- 각 전략 14개 테스트, 총 28 passed
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `fractal_break`, `market_structure_break` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — MeanRevZScore + MomentumPersistence 구현
+
+- `src/strategy/mean_rev_zscore.py`: `MeanRevZScoreStrategy` (name=`mean_rev_zscore`)
+  - sma20/std20/zscore 계산, zscore_ma(5) 평활
+  - BUY: zscore < -2.0 AND rising / SELL: zscore > 2.0 AND falling
+  - confidence: HIGH if |zscore| > 2.5 else MEDIUM, 최소 30행
+- `src/strategy/momentum_persistence.py`: `MomentumPersistenceStrategy` (name=`momentum_persistence`)
+  - 최근 10봉 연속 상승/하락 스트릭 계산, avg_return rolling(20)
+  - BUY: pos_streak >= 3 AND avg_return > 0 / SELL: neg_streak >= 3 AND avg_return < 0
+  - confidence: HIGH if streak >= 5 else MEDIUM, 최소 25행
+- 각 전략 14개 테스트, 총 28 passed
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `mean_rev_zscore`, `momentum_persistence` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — VolumeProfile + OrderFlowImbalance 구현
+
+- `src/strategy/volume_profile.py`: `VolumeProfileStrategy` (name=`volume_profile`)
+  - 최근 20봉 가격대별 거래량 집계, POC 버킷 중간가 계산
+  - BUY: close < poc*0.99 AND 이전봉 대비 반등 / SELL: close > poc*1.01 AND 반락
+  - confidence: HIGH if dist_ratio > 2% else MEDIUM, 최소 25행
+- `src/strategy/order_flow_imbalance.py`: `OrderFlowImbalanceStrategy` (name=`order_flow_imbalance`)
+  - 봉 내부 body/wick 구조로 buy/sell pressure 추정, imbalance rolling(10) MA
+  - BUY: imbalance > ma AND > 0.3 / SELL: imbalance < ma AND < -0.3
+  - confidence: HIGH if |imbalance| > 0.5 else MEDIUM, 최소 15행
+- 각 전략 14개 테스트, 총 28 passed
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `volume_profile`, `order_flow_imbalance` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — DEMACross(spec 재정렬) + TrendSlopeFilter 구현
+
+- `src/strategy/dema_cross.py`: fast=10/slow=25, min 35행, threshold=0.01 로 재구현
+- `src/strategy/trend_slope_filter.py`: `TrendSlopeFilterStrategy` (name=`trend_slope_filter`)
+  - numpy.polyfit 기반 선형 회귀 기울기, slope_norm > threshold AND 가속 시 BUY/SELL
+  - confidence: HIGH if |slope_norm| > threshold*2 else MEDIUM, 최소 25행
+- 각 전략 14개 테스트, 총 28 passed
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `trend_slope_filter` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — ParabolicSARTrend + RangeExpansion 구현
+
+- `src/strategy/parabolic_sar_trend.py`: `ParabolicSARTrendStrategy` (name=`parabolic_sar_trend`)
+  - 간소화 SAR 루프 직접 계산, prev/curr bullish 비교로 전환 감지, 최소 20행
+  - confidence: HIGH if |close-SAR|/close > 0.02 else MEDIUM
+- `src/strategy/range_expansion.py`: `RangeExpansionStrategy` (name=`range_expansion`) 재구현
+  - bar_range=high-low, avg_range rolling(14), close_pos 기반 신호, 최소 20행
+  - high==low 시 close_pos=0.5 division by zero 방지
+- 각 전략 14개 테스트, 총 25 passed / 3 skipped
+- `src/orchestrator.py` STRATEGY_REGISTRY에 `parabolic_sar_trend` 추가, push 완료
+
+## 이전 작업 (2026-04-10) — SeasonalCycleStrategy + TrendFollowBreakStrategy 구현
+
+- `src/strategy/seasonal_cycle.py`: `SeasonalCycleStrategy` (name=`seasonal_cycle`)
+  - numpy.polyfit 선형 회귀 디트렌딩 + rolling std 정규화, cycle_pos 크로스오버 신호, 최소 30행
+- `src/strategy/trend_follow_break.py`: `TrendFollowBreakStrategy` (name=`trend_follow_break`)
+  - rolling mean ADX(14) + rolling 20봉 최고/최저 돌파 신호, 최소 40행
+- 각 전략 14개 테스트 (총 28개 PASSED)
+- `src/orchestrator.py` STRATEGY_REGISTRY에 두 전략 추가, push 완료
+
+## 이전 작업 (2026-04-10) — AdaptiveThresholdStrategy + VolatilityClusterStrategy 구현
+
+- `src/strategy/adaptive_threshold.py`: `AdaptiveThresholdStrategy` (name=`adaptive_threshold`)
+  - ATR14 기반 정규화 가격, 동적 임계값(quantile 0.8/0.2), 크로스오버 신호, 최소 40행
+- `src/strategy/volatility_cluster.py`: `VolatilityClusterStrategy` (name=`volatility_cluster`)
+  - vol5/vol20 비율로 저변동성 구간 감지, direction으로 방향 판단, 최소 30행
+- 각 전략 14개 테스트 (총 28개 PASSED)
+- `src/orchestrator.py` STRATEGY_REGISTRY에 두 전략 추가, push 완료
+
+## 이전 작업 (2026-04-10) — ValueAreaStrategy + DivergenceScoreStrategy 구현
+
+- `src/strategy/value_area.py`: `ValueAreaStrategy` (name=`value_area`)
+  - VWAP 기반 Value Area 이탈 후 재진입 신호, HIGH conf: |close-vwap| < std*0.3, 최소 25행
+- `src/strategy/divergence_score.py`: `DivergenceScoreStrategy` (name=`divergence_score`)
+  - RSI14 + CCI20 + mom10 방향 점수화(-3~+3), BUY: score>=2 AND 개선, HIGH: |score|==3, 최소 35행
+- 각 전략 14개 테스트 (총 28개 PASSED)
+- `src/orchestrator.py` STRATEGY_REGISTRY에 두 전략 추가, push 완료
+
+## 이전 작업 (2026-04-10) — PriceSqueezeStrategy + InverseFisherRSIStrategy 구현
+
+- `src/strategy/price_squeeze.py`: `PriceSqueezeStrategy` (name=`price_squeeze`)
+  - BB+KC squeeze 감지, squeeze_release+momentum 방향으로 BUY/SELL, 최소 30행
+- `src/strategy/inverse_fisher_rsi.py`: `InverseFisherRSIStrategy` (name=`inverse_fisher_rsi`)
+  - RSI(10) → Inverse Fisher Transform, -0.5/+0.5 크로스오버 신호, 최소 20행
+- 각 전략 14개 테스트 (총 28개 PASSED)
+- `src/orchestrator.py` STRATEGY_REGISTRY에 두 전략 추가, push 완료
+
+## 이전 작업 (2026-04-10) — RelativeStrengthStrategy + MomentumBreadthStrategy 구현
+
+- `src/strategy/relative_strength.py`: `RelativeStrengthStrategy` (name=`relative_strength`)
+  - roc_n/roc_avg/roc_std 기반, BUY/SELL/HOLD, 최소 40행
+- `src/strategy/momentum_breadth.py`: `MomentumBreadthStrategy` (name=`momentum_breadth`)
+  - mom5/mom10/mom20 score 0~3 기반, BUY score==3 / SELL score==0, 최소 35행
+- 각 전략 14개 테스트 (총 28개 PASSED)
+- `src/orchestrator.py` STRATEGY_REGISTRY에 두 전략 추가
+
+## 이전 작업 (2026-04-10) — SmartMoneyConceptStrategy + PositionalScalingStrategy 구현
+
+- `src/strategy/smc_strategy.py`: `SmartMoneyConceptStrategy` (name=`smc_strategy`)
+  - CHoCH BUY: prev_structure_down AND close > recent_hh; CHoCH SELL: prev_structure_up AND close < recent_ll
+  - HIGH conf: volume > avg * 1.5; 최소 15행
+- `src/strategy/positional_scaling.py`: `PositionalScalingStrategy` (name=`positional_scaling`)
+  - BUY: EMA20>EMA50>EMA100 AND pullback(close/EMA20-1 in [-0.01,0.02]) AND 양봉
+  - HIGH conf: volume > avg * 1.2; 최소 105행
+- `tests/test_smc_strategy.py`: 14개 테스트 전부 통과
+- `tests/test_positional_scaling.py`: 14개 테스트 전부 통과
+- `src/orchestrator.py`: `smc_strategy`, `positional_scaling` 등록 및 push 완료
+
+## 이전 작업 (2026-04-10) — StochasticMomentumStrategy + VolumeROCStrategy 구현
+
+- `src/strategy/stoch_momentum.py`: `StochasticMomentumStrategy` (name=`stoch_momentum`)
+  - SMI = (distance.ewm(5) / (HL_range/2).ewm(5)) * 100, SMI_signal = SMI.ewm(3)
+  - BUY: SMI crosses above signal AND SMI < 0; SELL: SMI crosses below signal AND SMI > 0
+  - HIGH conf: |SMI| >= 40; 최소 20행
+- `src/strategy/volume_roc.py`: `VolumeROCStrategy` (name=`volume_roc`)
+  - vol_roc = (volume - volume.shift(10)) / volume.shift(10) * 100; vol_roc_ema = ewm(5)
+  - BUY: vol_roc_ema > 50 AND 상승; SELL: vol_roc_ema > 50 AND 하락; HOLD: < 20
+  - HIGH conf: vol_roc_ema > 100; 최소 15행
+- `tests/test_stoch_momentum.py`: 13개 테스트 전부 통과
+- `tests/test_volume_roc.py`: 13개 테스트 전부 통과
+- `src/orchestrator.py`: `stoch_momentum`, `volume_roc` 등록 및 push 완료
+
+## 이전 작업 (2026-04-10) — CCIDivergenceStrategy + DynamicPivotChannelStrategy 구현
+
+- `src/strategy/cci_divergence.py`: `CCIDivergenceStrategy` (name=`cci_divergence`)
+  - CCI14 계산, bullish/bearish divergence 감지
+  - Bullish: price lower low + CCI higher low (CCI < -100)
+  - Bearish: price higher high + CCI lower high (CCI > 100)
+  - HIGH conf: divergence gap > 30, 최소 20행
+- `src/strategy/dynamic_pivot_channel.py`: `DynamicPivotChannelStrategy` (name=`dynamic_pivot_channel`)
+  - Rolling 7봉 max/min으로 upper/lower pivot 계산
+  - BUY: close < lower pivot, SELL: close > upper pivot
+  - HIGH conf: channel_width < ATR14 * 2, 최소 20행
+- `tests/test_cci_divergence.py`: 15개 테스트 전부 통과
+- `tests/test_dynamic_pivot_channel.py`: 16개 테스트 전부 통과
+- `src/orchestrator.py`: `cci_divergence`, `dynamic_pivot_channel` 등록 및 push 완료
+
+## 이전 작업 (2026-04-10) — HybridTrendReversionStrategy + MultiFactorScoreStrategy 구현
+
+- `src/strategy/hybrid_trend_rev.py`: `HybridTrendReversionStrategy` (name=`hybrid_trend_rev`)
+  - ADX EWM span=14, trending(>25)/ranging(<=25) 자동 감지
+  - trending: EMA9>21>50 & RSI>50 → BUY; EMA9<21<50 & RSI<50 → SELL
+  - ranging: close < BB_lower → BUY; close > BB_upper → SELL
+  - HIGH confidence: ADX>40 or ADX<15; 최소 30행
+- `src/strategy/multi_factor.py`: `MultiFactorScoreStrategy` (name=`multi_factor`)
+  - 7팩터 점수화: RSI, MACD hist, EMA20, volume, BB, ATR, price trend
+  - BUY: score>=4.0, SELL: score<=-4.0, HIGH conf: |score|>=5
+  - 최소 25행
+- `tests/test_hybrid_trend_rev.py`: 21개 테스트 전부 통과
+- `tests/test_multi_factor.py`: 22개 테스트 전부 통과
+- `src/orchestrator.py`: `hybrid_trend_rev`, `multi_factor` 등록 및 push 완료
+
+## 최근 작업 (2026-04-10) — MeanReversionEntryStrategy + VolatilityMeanReversionStrategy 구현
+
+- `src/strategy/mr_entry.py`: `MeanReversionEntryStrategy` (name=`mr_entry`)
+  - consecutive_down/up(5봉), Wilder RSI14, vol > avg_vol 조건
+  - BUY/SELL 신호, HIGH confidence: c_down>=4 AND rsi<30
+  - 최소 20행
+- `src/strategy/vol_mean_rev.py`: `VolatilityMeanReversionStrategy` (name=`vol_mean_rev`)
+  - hist_vol(10봉) / vol_mean(30봉) = vol_ratio
+  - 저변동성(< 0.5) + SMA20 방향, 고변동성(> 2) + RSI 극값
+  - HIGH confidence: vol_ratio < 0.3 or > 3
+  - 최소 45행, NaN 안전 처리
+- `tests/test_mr_entry.py`: 15개 테스트 전부 통과
+- `tests/test_vol_mean_rev.py`: 16개 테스트 전부 통과
+- `src/orchestrator.py`: `mr_entry`, `vol_mean_rev` 등록 및 push 완료
+
+## Status: **30 passed** | BreakoutRetestStrategy + VolatilityExpansionStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — BreakoutRetestStrategy + VolatilityExpansionStrategy 구현
+
+- `src/strategy/breakout_retest.py`: 돌파 후 되돌림(retest) 진입 전략 (resistance/support rolling(20).shift(3), ±0.5% tolerance, 양/음봉 확인, 최소 30행)
+- `src/strategy/volatility_expansion.py`: 수축→팽창 추세 시작 감지 (hist_vol_5/hist_vol_20 비율, expansion<0.7 수축/expansion>1.2 팽창, HIGH confidence: expansion>1.8, 최소 25행)
+- `tests/test_breakout_retest.py`: 15개 테스트 전부 통과
+- `tests/test_volatility_expansion.py`: 15개 테스트 전부 통과
+- `src/orchestrator.py`: `breakout_retest`, `volatility_expansion` 등록 및 push 완료
+
+## Status: **35 passed** | WedgePatternStrategy + CrossoverConfluenceStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — WedgePatternStrategy + CrossoverConfluenceStrategy 구현
+
+- `src/strategy/wedge_pattern.py`: Rising/Falling wedge 패턴 감지 (polyfit 선형회귀, 수렴각 HIGH confidence, 최소 25행)
+- `src/strategy/crossover_confluence.py`: EMA9/21/50 크로스오버 컨플루언스 + RSI14 필터 (최소 55행)
+- `tests/test_wedge_pattern.py`: 17개 테스트 통과
+- `tests/test_crossover_confluence.py`: 18개 테스트 통과
+- `src/orchestrator.py`: `wedge_pattern`, `crossover_confluence` 등록
+
+## Status: **32 passed** | TrendStrengthFilterStrategy + VolSpreadAnalysisStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — TrendStrengthFilterStrategy + VolSpreadAnalysisStrategy 구현
+
+- `src/strategy/trend_strength_filter.py`: `TrendStrengthFilterStrategy` (name=`trend_strength_filter`)
+  - EMA21 추세 + EWM 방식 ADX/DI 복합 필터
+  - BUY: ADX>20 AND DI+>DI- AND close>EMA21; ADX>35 → HIGH
+  - SELL: ADX>20 AND DI->DI+ AND close<EMA21; ADX>35 → HIGH
+  - 최소 30행; `tests/test_trend_strength_filter.py`: 16개 테스트 전부 통과
+- `src/strategy/vol_spread_analysis.py`: `VolSpreadAnalysisStrategy` (name=`vol_spread_analysis`)
+  - VSA: 가격 스프레드 + 볼륨 상호작용 분석
+  - SELL: Upthrust bar (spread>1.5x + vol>1.5x + close near low)
+  - BUY: Test for supply (spread<0.7x + vol<0.7x + close near high)
+  - vol>2x or <0.5x avg → HIGH; 최소 25행; `tests/test_vol_spread_analysis.py`: 16개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + commit + push
+
+## 이전 작업 (2026-04-10) — KijunBounceStrategy + VolumePriceConfirmStrategy 구현
+
+- `src/strategy/kijun_bounce.py`: `KijunBounceStrategy` (name=`kijun_bounce`)
+  - Ichimoku Kijun-sen(26) 동적 지지/저항 반등 전략
+  - BUY: kijun ±0.5% 터치 + 양봉 + cloud bullish(tenkan>kijun); kijun rising → HIGH
+  - SELL: kijun ±0.5% 터치 + 음봉 + cloud bearish(tenkan<kijun); kijun falling → HIGH
+  - 최소 30행; `tests/test_kijun_bounce.py`: 15개 테스트 전부 통과
+- `src/strategy/vol_price_confirm.py`: `VolumePriceConfirmStrategy` (name=`vol_price_confirm`)
+  - 거래량-가격 방향 확인 전략
+  - BUY: up_vol_days≥3 + close>EMA20 + RSI14 40-65; up_vol_days==5 → HIGH
+  - SELL: down_vol_days≥3 + close<EMA20 + RSI14 35-60; down_vol_days==5 → HIGH
+  - 최소 25행; `tests/test_vol_price_confirm.py`: 15개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + commit + push
+
+## 이전 작업 (2026-04-10) — LiquiditySweepStrategy + MarketMakerStrategy 구현
+
+- `src/strategy/liquidity_sweep.py`: `LiquiditySweepStrategy` (name=`liquidity_sweep`)
+  - rolling(10) 고/저점 sweep 후 반전. Bullish: low<recent_low + close 복귀 → BUY; Bearish: high>recent_high + close 복귀 → SELL
+  - sweep크기/ATR14 > 0.5 → HIGH; 최소 15행
+  - `tests/test_liquidity_sweep.py`: 16개 테스트 전부 통과
+- `src/strategy/market_maker_sig.py`: `MarketMakerStrategy` (name=`market_maker_sig`)
+  - 축적(candle range rolling(10) < baseline rolling(20) * 0.7) + 조작(spike down/up) + 분배(close 이탈)
+  - spike/ATR > 2.0 → HIGH; 최소 20행
+  - `tests/test_market_maker_sig.py`: 16개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + commit + push
+
+## 이전 작업 (2026-04-10) — AutoCorrelationStrategy + AdaptiveRSIThresholdStrategy 구현
+
+- `src/strategy/autocorr_strategy.py`: `AutoCorrelationStrategy` (name=`autocorr_strategy`)
+  - 가격 수익률 rolling(20) 자기상관 기반. Positive AC>0.1: 추세, Negative AC<-0.1: 평균회귀
+  - |AC|>0.3 → HIGH confidence; 최소 25행
+  - `tests/test_autocorr_strategy.py`: 16개 테스트 전부 통과
+- `src/strategy/adaptive_rsi_thresh.py`: `AdaptiveRSIThresholdStrategy` (name=`adaptive_rsi_thresh`)
+  - ADX EWM14 레짐 판단 + RSI Wilder EWM14. Trending(ADX>25): buy<40/sell>60; Range: buy<30/sell>70
+  - RSI<20(trending) or RSI>80(trending) → HIGH; 최소 20행
+  - `tests/test_adaptive_rsi_thresh.py`: 17개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + commit
+
+## 이전 작업 (2026-04-10) — PAConfirmStrategy + EMADynamicSupportStrategy 구현
+
+- `src/strategy/pa_confirm.py`: `PriceActionConfirmStrategy` (name=`pa_confirm`)
+  - PA + 볼륨 + 모멘텀 3중 확인. body>ATR*0.8, vol>avg20*1.2, mom3 방향 일치
+  - HIGH: body>ATR*1.5 AND vol>avg*1.5; 최소 25행
+  - `tests/test_pa_confirm.py`: 22개 테스트 전부 통과
+- `src/strategy/ema_dynamic_support.py`: `EMADynamicSupportStrategy` (name=`ema_dynamic_support`)
+  - EMA21/EMA55 동적 지지저항. ±0.3% 터치 후 반등/반락 + 추세 방향 확인
+  - EMA55 터치(±0.5%)도 신호; EMA200 완전 정렬 시 HIGH; 최소 60행
+  - `tests/test_ema_dynamic_support.py`: 22개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + push
+
+## 이전 작업 (2026-04-10) — BullBearPowerStrategy + OverextensionStrategy 구현
+
+- `src/strategy/bull_bear_power.py`: `BullBearPowerStrategy` (name=`bull_bear_power`)
+  - Elder's Bull Bear Power: EMA13 기반 Bull/Bear Power 계산
+  - BUY: Bear<0 AND Bear rising AND EMA rising / SELL: Bull>0 AND Bull falling AND EMA falling
+  - |power| > EMA13*1% → HIGH; 최소 20행
+  - `tests/test_bull_bear_power.py`: 12개 테스트 전부 통과
+- `src/strategy/overextension.py`: `OverextensionStrategy` (name=`overextension`)
+  - (close-EMA50)/EMA50*100 distance, rolling 20 std 기반 2σ 이탈 탐지
+  - BUY: 과매도 이탈 후 close 상승 / SELL: 과매수 이탈 후 close 하락
+  - |distance| > 3σ → HIGH; 최소 75행
+  - `tests/test_overextension.py`: 12개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + push
+
+## 이전 작업 (2026-04-10) — SimplifiedGartleyStrategy + PriceClusterStrategy 구현
+
+- `src/strategy/gartley_pattern.py`: `SimplifiedGartleyStrategy` (name=`gartley_pattern`)
+  - XABCD Gartley 패턴 단순화: swing_low/high 기반 78.6% retracement D-point 탐지
+  - 오차 < 1% → HIGH, < 2% → MEDIUM; 최소 35행
+  - `tests/test_gartley_pattern.py`: 16개 테스트 전부 통과
+- `src/strategy/price_cluster.py`: `PriceClusterStrategy` (name=`price_cluster`)
+  - 50봉 close를 5 bin으로 나눠 최빈 cluster 탐지
+  - BUY: cluster 하단 이탈 후 복귀 / SELL: cluster 상단 돌파 후 복귀
+  - 빈도 > 평균의 2배 → HIGH; 최소 55행
+  - `tests/test_price_cluster.py`: 16개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + push
+
+## 이전 작업 (2026-04-10) — OrderBlockStrategy + FairValueGapStrategy 구현
+
+- `src/strategy/order_block.py`: `OrderBlockStrategy` (name=`order_block`)
+  - Smart Money OB: 강한 상승/하락(3봉, 5%) 직전 마지막 음봉/양봉 탐색
+  - OB 존 진입 시 BUY/SELL; OB size > ATR14 → HIGH; 최소 15행
+  - `tests/test_order_block.py`: 15개 테스트 전부 통과
+- `src/strategy/fvg_strategy.py`: `FairValueGapStrategy` (name=`fvg_strategy`)
+  - FVG mean reversion; gap > ATR14*1.5 → HIGH; 최근 10봉 탐색; 최소 15행
+  - `tests/test_fvg_strategy.py`: 15개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 + push
+
+## 이전 작업 (2026-04-10) — RangeBoundStrategy + PreBreakoutStrategy 구현
+
+- `src/strategy/range_bound.py`: `RangeBoundStrategy` (name=`range_bound`)
+  - CI(Choppiness Index, n=14) > 61.8 횡보 감지 후 SMA20 밴드 반전 매매
+  - CI > 70 → HIGH confidence; 최소 20행
+  - `tests/test_range_bound.py`: 16개 테스트 전부 통과
+- `src/strategy/pre_breakout.py`: `PreBreakoutStrategy` (name=`pre_breakout`)
+  - ATR14/ATR14.rolling(20).mean() < 0.7 + vol < avg*0.8 수축 감지 후 SMA50 방향 진입
+  - range_ratio < 0.5 AND vol < avg*0.6 → HIGH confidence; 최소 25행
+  - `tests/test_pre_breakout.py`: 17개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록 후 push
+
+## 이전 작업 (2026-04-10) — MomentumAccelerationStrategy + SwingPointStrategy 구현
+
+- `src/strategy/momentum_accel.py`: `MomentumAccelerationStrategy` (name=`momentum_accel`)
+  - mom5/mom10/accel/accel_ema 계산, accel_ema > 0.5 AND mom5 > 0 AND close > EMA20 → BUY
+  - HIGH confidence: |accel_ema| > 1.5; 최소 20행
+  - `tests/test_momentum_accel.py`: 14개 테스트 전부 통과
+- `src/strategy/swing_point.py`: `SwingPointStrategy` (name=`swing_point`)
+  - swing_high = high.rolling(3).max().shift(1), swing_low = low.rolling(3).min().shift(1)
+  - close > swing_high → BUY, close < swing_low → SELL
+  - 돌파 크기 > ATR14*0.5 → HIGH confidence; 최소 10행
+  - `tests/test_swing_point.py`: 14개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록 후 push
+
+## 이전 작업 (2026-04-10) — ConfluenceZoneStrategy + AdaptiveMACrossStrategy 구현
+
+- `src/strategy/confluence_zone.py`: `ConfluenceZoneStrategy` (name=`confluence_zone`)
+  - SMA20/SMA50/Pivot/RoundNumber 레벨 confluence 분석
+  - zone_tolerance = ATR14*0.5, count>=2 신호, count>=3 HIGH confidence; 최소 55행
+  - `tests/test_confluence_zone.py`: 22개 테스트 전부 통과
+- `src/strategy/adaptive_ma_cross.py`: `AdaptiveMACrossStrategy` (name=`adaptive_ma_cross`)
+  - ATR_ratio 기반 변동성 판단 → fast/slow 기간 동적 조절 (고변동성: 5/15, 저변동성: 15/40)
+  - gap > ATR*0.3 → HIGH confidence; 최소 45행
+  - `tests/test_adaptive_ma_cross.py`: 22개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록 후 push
+
+## 이전 작업 (2026-04-10) — ConsolidationBreakoutStrategy + PriceRSIDivergenceStrategy 구현
+
+- `src/strategy/consolidation_breakout.py`: `ConsolidationBreakoutStrategy` (name=`consolidation_breakout`)
+  - 최근 10봉 3% 이내 range → consolidation, 이후 돌파 시 BUY/SELL
+  - volume > avg*2.0 → HIGH confidence; 최소 15행
+  - `tests/test_consolidation_breakout.py`: 15개 테스트 전부 통과
+- `src/strategy/price_rsi_div.py`: `PriceRSIDivergenceStrategy` (name=`price_rsi_div`)
+  - 30봉 pivot 기반 RSI divergence (좌우 3봉 wing)
+  - Wilder EWM RSI14 직접 계산; RSI diff > 10 → HIGH confidence; 최소 35행
+  - `tests/test_price_rsi_div.py`: 15개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록 후 push
+
+## 이전 작업 (2026-04-10) — VolAdjustedTrendStrategy + TrendReversalPatternStrategy 구현
+
+- `src/strategy/vol_adj_trend.py`: `VolAdjustedTrendStrategy` (name=`vol_adj_trend`)
+  - ATR14로 정규화된 가격 이동으로 추세 강도+가속 측정
+  - `tests/test_vol_adj_trend.py`: 12개 테스트 전부 통과
+- `src/strategy/trend_reversal.py`: `TrendReversalPatternStrategy` (name=`trend_reversal`)
+  - 20봉 신고/저점 + RSI divergence + 반전 캔들 복합 감지
+  - `tests/test_trend_reversal.py`: 12개 테스트 전부 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+## 이전 작업 (2026-04-10) — DualEMACrossStrategy + BreakoutConfirmationStrategy 구현
+
+- `src/strategy/dual_ema_cross.py`: `DualEMACrossStrategy` (name=`dual_ema_cross`)
+  - EMA 3개(5/13/34 피보나치) 완전 정렬 + EMA5/EMA13 크로스 확인
+  - BUY: EMA5>EMA13>EMA34 AND 상향 크로스; SELL: 반대
+  - HIGH conf: (EMA5-EMA34)/close > 1.5%; 최소 40행, 테스트 14개 통과
+- `src/strategy/breakout_confirm.py`: `BreakoutConfirmationStrategy` (name=`breakout_confirm`)
+  - resistance/support = rolling(20).max/min().shift(2)
+  - 2봉 연속 돌파 + vol > avg*1.3 → BUY/SELL; HIGH conf: vol > avg*2.0
+  - 최소 25행, 테스트 15개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+## 이전 작업 — ExhaustionBarStrategy + LinearChannelReversionStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — BBKeltnerSqueezeStrategy + RSITrendFilterStrategy 구현
+
+- `src/strategy/bb_keltner_squeeze.py`: `BBKeltnerSqueezeStrategy` (name=`bb_keltner_squeeze`)
+  - BB(20,2σ)가 KC(20,1.5×ATR) 내부에 있으면 squeeze. 해제 시 momentum 방향으로 신호
+  - Momentum = close - SMA(hl3, 20); HIGH conf: |mom| > mom.rolling(10).std()
+  - 최소 25행, 테스트 14개 통과
+- `src/strategy/rsi_trend_filter.py`: `RSITrendFilterStrategy` (name=`rsi_trend_filter`)
+  - RSI14(EWM Wilder) + RSI_SMA(9) 추세 필터
+  - BUY: RSI>50, RSI>SMA, prev<60 AND now>=60 크로스
+  - SELL: RSI<50, RSI<SMA, prev>40 AND now<=40 크로스; HIGH conf: RSI>65/RSI<35
+  - 최소 25행, 테스트 14개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+## 이전 작업 (2026-04-10) — VolumeClimaxStrategy + KeyReversalStrategy 구현
+
+- `src/strategy/volume_climax.py`: `VolumeClimaxStrategy` (name=`volume_climax`)
+  - Buying climax(극단 거래량+음봉) → SELL, Selling climax(극단 거래량+양봉) → BUY
+  - RSI14 < 30 (BUY) / RSI14 > 70 (SELL) 추가 조건
+  - HIGH conf: vol > avg*5.0, 최소 25행, 테스트 14개 통과
+  - RSI 순수 상승/하락 추세에서 NaN 방지 처리 포함
+- `src/strategy/key_reversal.py`: `KeyReversalStrategy` (name=`key_reversal`)
+  - Bullish: 20봉 신저점 + close > prev_close + vol > avg*1.5 → BUY
+  - Bearish: 20봉 신고점 + close < prev_close + vol > avg*1.5 → SELL
+  - HIGH conf: 52주(260봉) 저점/고점 돌파, 최소 25행, 테스트 15개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+## 이전 작업 (2026-04-10) — EMARibbonStrategy + PriceChannelBreakStrategy 구현
+
+- `src/strategy/ema_ribbon.py`: `EMARibbonStrategy` (name=`ema_ribbon`)
+  - 5개 EMA 리본(5/10/20/40/80) + EMA5/EMA10 크로스 감지
+  - BUY: 완전 bullish alignment + EMA5 cross above EMA10
+  - SELL: 완전 bearish alignment + EMA5 cross below EMA10
+  - HIGH conf: spread(ema5-ema80) > 2% of close, 최소 85행, 테스트 20개 통과
+- `src/strategy/price_channel_break.py`: `PriceChannelBreakStrategy` (name=`price_channel_break`)
+  - 20봉 채널 신규 돌파 (직전 3봉 이미 돌파 시 HOLD)
+  - BUY: close > entry_high AND 직전 3봉 모두 ≤ entry_high
+  - SELL: close < entry_low AND 직전 3봉 모두 ≥ entry_low
+  - HIGH conf: 0.5% 이상 돌파, 최소 25행, 테스트 20개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+---
+
+## 이전 상태: **32 passed** | TrendQualityStrategy + MomentumDivergenceStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — TrendQualityStrategy + MomentumDivergenceStrategy 구현
+
+- `src/strategy/trend_quality.py`: `TrendQualityStrategy` (name=`trend_quality`)
+  - R² + normalized_slope 결합 quality_score 기반 추세 품질 전략
+  - BUY: r_squared>0.8 AND slope>0 AND quality_score>0.05 / SELL: 반대
+  - HIGH conf: r_squared>0.9 AND quality_score>0.09, 최소 25행, 테스트 16개 통과
+- `src/strategy/momentum_div.py`: `MomentumDivergenceStrategy` (name=`momentum_div`)
+  - 가격 모멘텀(10봉) vs 볼륨 모멘텀 다이버전스 + RSI14 필터
+  - BUY: price_mom<0 AND vol_mom>0.5 AND RSI14<50 / SELL: 반대
+  - HIGH conf: |vol_mom|>1.0, 최소 20행, 테스트 16개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+---
+
+## 이전 상태: **34 passed** | IchimokuBreakoutStrategy + MACDSlopeStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — IchimokuBreakoutStrategy + MACDSlopeStrategy 구현
+
+- `src/strategy/ichimoku_breakout.py`: `IchimokuBreakoutStrategy` (name=`ichimoku_breakout`)
+  - TK Cross(tenkan 크로스 순간) + close > kumo_top/< kumo_bottom 조건
+  - confidence: kumo까지 거리 > 2% → HIGH, 최소 80행, 테스트 17개 통과
+- `src/strategy/macd_slope.py`: `MACDSlopeStrategy` (name=`macd_slope`)
+  - hist_slope(3봉 기울기) + slope_acceleration(가속도) 기반
+  - BUY: hist<0 AND slope>0 AND accel>0, SELL: 반대
+  - |accel| > accel rolling std → HIGH confidence, 최소 35행, 테스트 17개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+---
+
+## 이전 작업 (2026-04-10) — RenkoTrendStrategy + WickReversalStrategy 구현
+
+- `src/strategy/renko_trend.py`: `RenkoTrendStrategy` (name=`renko_trend`)
+  - OHLCV → Renko brick 시뮬레이션 (ATR14 EWM brick_size)
+  - 연속 상승/하락 >=3 → BUY/SELL, >=5 → HIGH confidence
+  - atr14 컬럼 없으면 자체 계산, 최소 20행, 테스트 15개 통과
+- `src/strategy/wick_reversal.py`: `WickReversalStrategy` (name=`wick_reversal`)
+  - lower/upper wick ratio + SMA20 + volume 필터
+  - Hammer(lower>0.6, close>SMA*0.97) → BUY, Shooting Star(upper>0.6, close<SMA*1.03) → SELL
+  - wick_ratio>0.7 → HIGH confidence, 최소 15행, 테스트 15개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+---
+
+## Status (이전): **32 passed** | ROCMACrossStrategy + VolumePriceTrendConfirmStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — ROCMACrossStrategy + VolumePriceTrendConfirmStrategy 구현
+
+- `src/strategy/roc_ma_cross.py`: `ROCMACrossStrategy` (name=`roc_ma_cross`)
+  - ROC(12) + 3봉 MA 스무딩 + EMA50 필터, 최소 20행, 테스트 16개 통과
+- `src/strategy/vpt_confirm.py`: `VolumePriceTrendConfirmStrategy` (name=`vpt_confirm`)
+  - VPT + EWM(14) Signal + Histogram 확인 + EMA20 필터, 최소 25행, 테스트 16개 통과
+- `src/orchestrator.py`: STRATEGY_REGISTRY에 두 전략 등록
+
+---
+
+## Status (이전): **34 passed** | SRBounceStrategy + CandleScoreStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — SRBounceStrategy + CandleScoreStrategy 구현
+
+- `src/strategy/sr_bounce.py`: `SRBounceStrategy` (name=`sr_bounce`)
+  - 동적 지지/저항 레벨 반등 감지, pivot 50봉 윈도우, 좌우 5봉 기준
+  - BUY/SELL: 레벨 ±1% 터치 + vol > avg*1.1, touches>=3 → HIGH, 최소 60행
+  - 테스트 16개 전부 통과
+- `src/strategy/candle_score.py`: `CandleScoreStrategy` (name=`candle_score`)
+  - 5개 항목 점수화 (양봉, upper/lower shadow, volume, body), score>=4 → 신호
+  - score==5 → HIGH confidence, 최소 15행
+  - 테스트 18개 전부 통과
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+## 이전 작업 (2026-04-10) — HurstExponentStrategy + ApproximateEntropyStrategy 구현
+
+- `src/strategy/hurst_strategy.py`: `HurstExponentStrategy` (name=`hurst_strategy`)
+  - RS Analysis로 Hurst Exponent 추정 (numpy만, scipy 불필요)
+  - H > 0.55 추세 추종, H < 0.45 평균 회귀, 최소 40행
+  - HIGH confidence: H > 0.65 or H < 0.35, 테스트 17개 전부 통과
+- `src/strategy/entropy_strategy.py`: `ApproximateEntropyStrategy` (name=`entropy_strategy`)
+  - Shannon entropy로 시장 무질서도 측정 (최근 20봉 price_changes 기준)
+  - entropy < 0.7 추세 추종, entropy > 1.0 평균 회귀, 최소 25행
+  - HIGH confidence: entropy < 0.5 or > 1.05, 테스트 17개 전부 통과
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+## 이전 작업 (2026-04-10) — CoppockEnhancedStrategy + VolumeWeightedRSIStrategy 구현
+
+- `src/strategy/coppock_enhanced.py`: `CoppockEnhancedStrategy` (name=`coppock_enhanced`)
+  - Coppock = WMA(11) of (ROC14 + ROC11), RSI14 필터
+  - BUY: Coppock crosses above 0 AND rising AND RSI > 50
+  - SELL: Coppock crosses below 0 AND falling AND RSI < 50
+  - HIGH confidence: |Coppock| > rolling(20).std()
+  - 최소 30행, 테스트 15개 전부 통과
+- `src/strategy/vwrsi.py`: `VolumeWeightedRSIStrategy` (name=`vwrsi`)
+  - Volume-Weighted RSI, EWM span=14
+  - BUY: VWRSI crosses above 30 (HIGH if prev < 20)
+  - SELL: VWRSI crosses below 70 (HIGH if prev > 80)
+  - 최소 20행, 테스트 17개 전부 통과
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+
+## 이전 작업 (2026-04-10) — ParabolicMoveStrategy + FailedBreakoutStrategy 구현
+
+- `src/strategy/parabolic_move.py`: `ParabolicMoveStrategy` (name=`parabolic_move`)
+  - ROC5/ROC10 가속 감지, RSI14 소진 역매매
+  - SELL: Parabolic up + RSI > 80 (HIGH if RSI > 85)
+  - BUY: Parabolic down + RSI < 20 (HIGH if RSI < 15)
+  - 최소 20행, 테스트 15개 전부 통과
+- `src/strategy/failed_breakout.py`: `FailedBreakoutStrategy` (name=`failed_breakout`)
+  - resistance/support = rolling(20).max/min.shift(1)
+  - Fake 상향돌파(high > res, close < res) → SELL
+  - Fake 하향돌파(low < sup, close > sup) → BUY
+  - HIGH confidence: 돌파범위/ATR14 > 0.5
+  - 최소 25행, 테스트 15개 전부 통과
+- `src/orchestrator.py`: 두 전략 import + STRATEGY_REGISTRY 등록
+- commit: 5c4b8f9, pushed to origin/main
+
+## 이전 작업 | SupertrendMultiStrategy + NarrowRangeStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — SupertrendMultiStrategy + NarrowRangeStrategy 구현
+
+- `src/strategy/supertrend_multi.py`: `SupertrendMultiStrategy` (name=`supertrend_multi`)
+  - Supertrend 3개: (ATR10, mult=1.5), (ATR14, mult=2.0), (ATR20, mult=3.0)
+  - 자체 ATR 계산 (EWM), final_upper/lower 추적
+  - BUY: 3개 모두 trend==1, SELL: 3개 모두 trend==-1
+  - HIGH confidence: 조건 충족 + volume > avg_vol * 1.1
+  - 최소 25행, 테스트 14개 전부 통과
+- `src/strategy/narrow_range.py`: `NarrowRangeStrategy` (name=`narrow_range`)
+  - NR7: prev봉이 최근 7봉 중 최소 range
+  - NR4: prev봉이 최근 4봉 중 최소 range
+  - BUY: prev봉 NR7 + current close > prev high
+  - SELL: prev봉 NR7 + current close < prev low
+  - HIGH confidence: NR4+NR7 둘 다 충족
+  - 기존 nr7과 차별화: 돌파 확인 로직 포함
+  - 최소 10행, 테스트 14개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, 커밋 및 push 완료
+
+## Status: **29 passed** | DonchianMidlineStrategy + TripleScreenStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — DonchianMidlineStrategy + TripleScreenStrategy 구현
+
+- `src/strategy/donchian_midline.py`: `DonchianMidlineStrategy` (name=`donchian_midline`)
+  - Donchian Channel upper/lower 20봉, midline = (upper+lower)/2
+  - BUY: close crosses above midline + close > EMA50
+  - SELL: close crosses below midline + close < EMA50
+  - HIGH confidence: BUY시 close > upper*0.98, SELL시 close < lower*1.02
+  - 최소 55행, 테스트 14개 전부 통과
+- `src/strategy/triple_screen.py`: `TripleScreenStrategy` (name=`triple_screen`)
+  - Screen1 (Tide): EMA26 기울기 → bullish/bearish tide
+  - Screen2 (Wave): Stochastic %K < 30 (bullish tide), > 70 (bearish tide)
+  - Screen3 (Ripple): 양봉(BUY) / 음봉(SELL) 확인
+  - HIGH confidence: stoch_k < 20 (BUY) / > 80 (SELL), 최소 30행
+  - 테스트 15개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, 커밋 및 push 완료
+
+## Status: **28 passed** | POCStrategy + BidAskImbalanceStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — POCStrategy + BidAskImbalanceStrategy 구현
+
+- `src/strategy/poc_strategy.py`: `POCStrategy` (name=`poc_strategy`)
+  - 최근 20봉 고저 범위를 10 bin으로 나눠 볼륨 가중 분포 계산
+  - POC = 가장 많은 볼륨 bin 중앙값, VAH/VAL = 70% value area 경계
+  - BUY: close < VAL, SELL: close > VAH
+  - HIGH confidence: |close - POC| / POC > 2%, 최소 25행
+- `src/strategy/bid_ask_imbalance.py`: `BidAskImbalanceStrategy` (name=`bid_ask_imbalance`)
+  - Buy/Sell volume 추정: volume * (close-low)/(high-low), volume * (high-close)/(high-low)
+  - Imbalance EMA(span=10) 계산
+  - BUY: imbalance_ema > 0.2 AND close > EMA20, SELL: imbalance_ema < -0.2 AND close < EMA20
+  - HIGH confidence: |imbalance_ema| > 0.4, 최소 20행
+- 각 전략 테스트 14개씩, 28개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, 커밋 및 push 완료
+
+## Status: **30 passed** | PriceDeviationStrategy + AccelerationBandStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — PriceDeviationStrategy + AccelerationBandStrategy 구현
+
+- `src/strategy/price_deviation.py`: `PriceDeviationStrategy` (name=`price_deviation`)
+  - SMA20 편차 Z-Score 기반 평균 복귀: deviation=(close-sma20)/sma20*100, z=deviation/dev_std
+  - BUY: z < -1.5, SELL: z > 1.5
+  - HIGH confidence: |z| > 2.0, 최소 25행
+- `src/strategy/acceleration_band.py`: `AccelerationBandStrategy` (name=`acceleration_band`)
+  - Headley Acceleration Bands: upper/lower = sma20 ± 4*sma20*SMA20((h-l)/(h+l))
+  - BUY: close crosses above upper, SELL: close crosses below lower
+  - HIGH confidence: 1% 이상 돌파, 최소 25행
+- 각 전략 테스트 15개씩, 30개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, 커밋 및 push 완료
+
+## Status: **30 passed** | BullishEngulfingZoneStrategy + ThreeBarReversalStrategy 구현 완료
+
+## 최근 작업 (2026-04-10) — BullishEngulfingZoneStrategy + ThreeBarReversalStrategy 구현
+
+- `src/strategy/engulfing_zone.py`: `BullishEngulfingZoneStrategy` (name=`engulfing_zone`)
+  - 20봉 내 pivot high/low (좌우 3봉) 탐색
+  - Bullish Engulfing: 음봉→양봉, body비율>1.1, close ±1% support zone
+  - Bearish Engulfing: 양봉→음봉, body비율>1.1, close ±1% resistance zone
+  - HIGH confidence: ratio > 1.5, 최소 25행
+- `src/strategy/three_bar_reversal.py`: `ThreeBarReversalStrategy` (name=`three_bar_reversal`)
+  - prev2/prev1(inside bar)/current 3봉 패턴
+  - Bullish: prev2 음봉, prev1 inside, current 양봉 AND close > prev2 open, vol > avg*1.2
+  - Bearish: prev2 양봉, prev1 inside, current 음봉 AND close < prev2 open, vol > avg*1.2
+  - HIGH confidence: current range > 2× prev1 range, 최소 15행
+- 각 전략 테스트 15개씩, 30개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, 커밋 완료
+
+## Status: **30 passed** | AnchoredVWAPStrategy + VolatilityRegimeStrategy 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — AnchoredVWAPStrategy + VolatilityRegimeStrategy 구현
+
+- `src/strategy/anchored_vwap.py`: `AnchoredVWAPStrategy` (name=`anchored_vwap`)
+  - 최근 50봉 gap(>3%) anchor 또는 20봉 lowest low/highest high anchor
+  - Anchored VWAP = Σ(close×vol) / Σ(vol) from anchor
+  - BUY: close > AVWAP AND close > EMA20 AND vol > avg_vol_20
+  - SELL: close < AVWAP AND close < EMA20 AND vol > avg_vol_20
+  - HIGH confidence: gap anchor + |close/avwap - 1| > 1%, 최소 25행
+- `src/strategy/volatility_regime.py`: `VolatilityRegimeStrategy` (name=`volatility_regime`)
+  - ATR14 EWM 기반 high/low vol 레짐 감지
+  - Low vol + BB squeeze → Breakout (BUY/SELL)
+  - High vol → Mean reversion (BUY/SELL)
+  - HIGH confidence: ATR_ratio > 2×mean 또는 < 0.5×mean, 최소 35행
+- 각 전략 테스트 15개씩, 30개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, push 완료
+
+## 최근 작업 (2026-04-10) — TIIStrategy + HTFEMAStrategy 구현
+
+- `src/strategy/tii_strategy.py`: `TrendIntensityIndexStrategy` (name=`tii_strategy`)
+  - SMA30 기반 TII (0~100): 30봉 중 SMA30 위 비율 × 100
+  - BUY: TII > 80 AND close > SMA30 / SELL: TII < 20 AND close < SMA30
+  - HIGH confidence: TII > 90 or TII < 10, 최소 35행
+- `src/strategy/htf_ema.py`: `HigherTimeframeEMAStrategy` (name=`htf_ema`)
+  - HTF 시뮬레이션: 4봉마다 샘플링 후 EMA21, current EMA9
+  - BUY: HTF EMA 상승 + close crosses above EMA9
+  - SELL: HTF EMA 하락 + close crosses below EMA9
+  - HIGH confidence: HTF EMA 3연속 상승/하락, 최소 50행
+- 각 전략 테스트 16개/21개, 37개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, push 완료
+
+## 최근 작업 (2026-04-10) — ZeroLagMACDStrategy + AdaptiveStopStrategy 구현
+
+- `src/strategy/zlmacd.py`: `ZeroLagMACDStrategy` (name=`zlmacd`)
+  - ZL EMA = ema + (ema - ema.ewm(span).mean())
+  - BUY: Histogram 음→양 AND ZL MACD rising
+  - SELL: Histogram 양→음 AND ZL MACD falling
+  - HIGH confidence: |hist| > rolling(20).std(), 최소 35행
+- `src/strategy/adaptive_stop.py`: `AdaptiveStopStrategy` (name=`adaptive_stop`)
+  - ATR14 EWM, Long/Short stop, Wilder RSI14
+  - BUY: close > long_stop AND close > EMA50 AND RSI > 50
+  - SELL: close < short_stop AND close < EMA50 AND RSI < 50
+  - HIGH confidence: RSI > 60 or RSI < 40, 최소 25행
+- 각 전략 테스트 15+16개, 31개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, push 완료
+
+---
+
+## 이전 작업 (2026-04-10) — ChaikinOscillatorStrategy + AlligatorStrategy 구현
+
+- `src/strategy/chaikin_osc.py`: `ChaikinOscillatorStrategy` (name=`chaikin_osc`)
+  - MFM→MFV→ADL→Chaikin Osc (EWM span3 - span10)
+  - BUY: Osc crosses above 0 AND close > EMA20
+  - SELL: Osc crosses below 0 AND close < EMA20
+  - HIGH confidence: |Osc| > rolling(20).std(), 최소 25행
+- `src/strategy/alligator.py`: `AlligatorStrategy` (name=`alligator`)
+  - SMMA: Jaw(13), Teeth(8), Lips(5)
+  - BUY: lips > teeth > jaw AND close > lips
+  - SELL: lips < teeth < jaw AND close < lips
+  - HIGH confidence: spread > avg_spread, 최소 20행
+- 각 전략 테스트 15개씩, 30개 전부 통과
+- STRATEGY_REGISTRY 등록 완료, push 완료
+
+---
+
+## 이전 Status: **28 passed** | HeikinAshiSmoothedStrategy + KeltnerRSIStrategy 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — HeikinAshiSmoothedStrategy + KeltnerRSIStrategy 구현
+
+- `src/strategy/ha_smoothed.py`: `HeikinAshiSmoothedStrategy` 구현 (name=`ha_smoothed`)
+  - HA 캔들 + 5기간 EMA 스무딩, 연속 3봉 + wick 없음 조건
+  - BUY: >=3 연속 양봉 + lower wick 없음, SELL: >=3 연속 음봉 + upper wick 없음
+  - HIGH confidence: >=5연속 + wick 없음, 최소 20행
+- `src/strategy/keltner_rsi.py`: `KeltnerRSIStrategy` 구현 (name=`keltner_rsi`)
+  - EMA20 ± 2*ATR14 채널, RSI14 (ewm 방식)
+  - BUY: close < lower AND RSI < 35, SELL: close > upper AND RSI > 65
+  - HIGH confidence: RSI < 25 or RSI > 75, 최소 25행
+- 각 전략 테스트 14개씩, 28개 전부 통과 (0 fail)
+- STRATEGY_REGISTRY 등록 완료, push 완료
+
+## 이전 작업 (2026-04-10) — FibRetracementStrategy + StochDivergenceStrategy 구현
+
+- `src/strategy/fib_retracement.py`: `FibRetracementStrategy` 구현 (name=`fib_retracement`)
+  - 50봉 swing_high/low, Fibonacci 레벨 0~100%, SMA50 추세 필터
+  - BUY: 상승추세 + 38.2%~61.8% 존 반등, SELL: 하락추세 + 저항
+  - HIGH confidence: 61.8% 황금비율 ±0.5%, 최소 55행
+- `src/strategy/stoch_divergence.py`: `StochDivergenceStrategy` 구현 (name=`stoch_divergence`)
+  - K(14)/D(3) 스토캐스틱, bullish/bearish divergence + K×D 크로스
+  - HIGH confidence: divergence gap > 10, 최소 20행
+- 각 전략 테스트 14개씩, 28개 전부 통과 (0 fail)
+- STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — CupHandleStrategy + FlagPennantStrategy 구현
+
+- `src/strategy/cup_handle.py`: `CupHandleStrategy` 구현 (name=`cup_handle`)
+  - Cup: 좌우 고점 U자형, 너비 20~50봉, 깊이 10~40%
+  - Handle: cup_right 후 3~10봉 소폭 조정 (깊이 < Cup깊이/3)
+  - BUY: close > 우측 고점 돌파
+  - HIGH confidence: 돌파 볼륨 > 평균 1.5배
+  - 최소 60행, Python 3.9 호환
+- `src/strategy/flag_pennant.py`: `FlagPennantStrategy` 구현 (name=`flag_pennant`)
+  - Pole: 10봉 내 5% 이상 급등/급락
+  - Consolidation: pole 이후 5~15봉 변동폭 감소
+  - BUY: Bullish pole + consolidation 상단 돌파
+  - SELL: Bearish pole + consolidation 하단 이탈
+  - HIGH confidence: pole > 8%
+  - 최소 30행, Python 3.9 호환
+- `src/orchestrator.py`: "cup_handle", "flag_pennant" STRATEGY_REGISTRY 등록
+- `tests/test_cup_handle.py`: 15개 테스트 (전부 통과)
+- `tests/test_flag_pennant.py`: 16개 테스트 (전부 통과)
+
+## 이전 작업 (2026-04-10) — RelativeVolumeStrategy + PriceMomentumOscillator 구현
+
+- `src/strategy/relative_volume.py`: `RelativeVolumeStrategy` 구현 (name=`relative_volume`)
+  - RVOL = volume / avg_volume_20 (look-ahead 방지)
+  - VWAP = rolling 20 거래량 가중 평균
+  - BUY: RVOL > 2.0 AND 양봉 AND close > VWAP
+  - SELL: RVOL > 2.0 AND 음봉 AND close < VWAP
+  - HIGH confidence: RVOL > 3.0 AND 볼린저 상/하단 돌파
+  - 최소 25행, Python 3.9 호환
+- `src/strategy/pmo_strategy.py`: `PriceMomentumOscillator` 구현 (name=`pmo_strategy`)
+  - ROC_1 → Smoothed1(EWM span=35)*10 → PMO(EWM span=20) → Signal(EWM span=10)
+  - BUY: PMO crosses above Signal AND PMO < 0 (oversold)
+  - SELL: PMO crosses below Signal AND PMO > 0 (overbought)
+  - HIGH confidence: |PMO - Signal| > 0.5
+  - 최소 60행, Python 3.9 호환
+- `src/orchestrator.py`: "relative_volume", "pmo_strategy" STRATEGY_REGISTRY 등록
+- `tests/test_relative_volume.py`: 16개 테스트 (전부 통과)
+- `tests/test_pmo_strategy.py`: 17개 테스트 (전부 통과)
+
+## 이전 작업 (2026-04-09) — IchimokuCloudPosStrategy + ConsecutiveCandlesStrategy 구현
+
+- `src/strategy/ichimoku_cloud_pos.py`: `IchimokuCloudPosStrategy` 구현
+  - 현재 구름 위치 기반 신호 (senkou_a.shift(26), senkou_b.shift(26))
+  - BUY: close > cloud_top AND tenkan > kijun
+  - SELL: close < cloud_bottom AND tenkan < kijun
+  - confidence: HIGH if dist > 2%, MEDIUM 그 외
+  - 최소 80행, Python 3.9 호환
+- `src/strategy/consecutive_candles.py`: `ConsecutiveCandlesStrategy` 구현
+  - 연속 양봉/음봉 + volume 증가 확인
+  - BUY: bull_count >= 4 AND volume 단조 증가
+  - SELL: bear_count >= 4 AND volume 단조 증가
+  - confidence: HIGH if count >= 6, MEDIUM if >= 4
+  - 최소 15행, Python 3.9 호환
+- `src/orchestrator.py`: "ichimoku_cloud_pos", "consecutive_candles" STRATEGY_REGISTRY 등록
+- `tests/test_ichimoku_cloud_pos.py`: 15개 테스트 (전부 통과)
+- `tests/test_consecutive_candles.py`: 15개 테스트 (전부 통과)
+
+## 이전 작업 (2026-04-09) — OBVDivergenceStrategy + RSIOBOSStrategy 구현
+
+- `src/strategy/obv_divergence.py`: `OBVDivergenceStrategy` 구현
+  - OBV = cumsum(volume * sign(close diff)), OBV_EMA = EWM(span=20)
+  - Bullish: close < close.shift(10)*1.01 AND OBV_EMA > OBV_EMA.shift(10) → BUY
+  - Bearish: close > close.shift(10)*0.99 AND OBV_EMA < OBV_EMA.shift(10) → SELL
+  - confidence: HIGH if OBV_EMA 변화 > std(OBV_EMA, 20), MEDIUM 그 외
+  - 최소 25행, Python 3.9 호환
+- `src/strategy/rsi_ob_os.py`: `RSIOBOSStrategy` 구현
+  - RSI14 + vol_avg 20기간 확인
+  - BUY: RSI14 < 30 AND volume > vol_avg*1.2 AND RSI 반전(상승)
+  - SELL: RSI14 > 70 AND volume > vol_avg*1.2 AND RSI 꺾임(하락)
+  - confidence: HIGH if RSI < 25 or > 75, MEDIUM 그 외
+  - 최소 25행, Python 3.9 호환
+- `src/orchestrator.py`: "obv_divergence", "rsi_ob_os" STRATEGY_REGISTRY 등록
+- `tests/test_obv_divergence.py`: 14개 테스트 (전부 통과)
+- `tests/test_rsi_ob_os.py`: 14개 테스트 (전부 통과)
+
+## 이전 작업 (2026-04-09) — MultiScoreStrategy + ADXRegimeStrategy 구현
+
+- `src/strategy/multi_score.py`: `MultiScoreStrategy` 구현
+  - 5개 지표 앙상블: close>EMA50, RSI14>50, close>SMA20, volume>vol_sma20*1.1, MACD_hist>0
+  - BUY: bull_score >= 4, SELL: bear_score >= 4
+  - confidence: HIGH if score==5, MEDIUM if score==4
+  - 최소 30행, Python 3.9 호환
+- `src/strategy/adx_regime.py`: `ADXRegimeStrategy` 구현
+  - EWM 방식으로 ATR14/+DM/-DM 계산 (adx_trend.py와 다른 접근)
+  - 트렌딩(ADX>25): +DI>-DI→BUY, -DI>+DI→SELL
+  - 횡보(ADX<20): HOLD
+  - confidence: HIGH if ADX>35, MEDIUM if ADX>25
+  - 최소 30행, Python 3.9 호환
+- `src/orchestrator.py`: "multi_score", "adx_regime" STRATEGY_REGISTRY 등록
+- `tests/test_multi_score.py`: 16개 테스트 (전체 통과)
+- `tests/test_adx_regime.py`: 16개 테스트 (전체 통과)
+
+## 이전 작업 (2026-04-09) — LRChannelStrategy + MomentumReversalStrategy 구현
+
+- `src/strategy/lr_channel.py`: `LRChannelStrategy` 구현
+  - numpy 직접 계산으로 slope/intercept 산출 (scipy 미사용)
+  - upper/lower channel = lr_center ± 2 * std(residuals)
+  - BUY: close < lower_channel AND slope > 0
+  - SELL: close > upper_channel AND slope < 0
+  - confidence: |residual| > 2.5*std → HIGH, > 2.0*std → MEDIUM, 최소 30행
+- `src/strategy/momentum_reversal.py`: `MomentumReversalStrategy` 구현
+  - mom14 = close - close.shift(14), mom_ema = EWM(mom14, span=9)
+  - BUY: mom14 < 0 AND mom_ema 상승 AND close 상승봉
+  - SELL: mom14 > 0 AND mom_ema 하락 AND close 하락봉
+  - confidence: |mom14| > std(mom14, 20) → HIGH, 최소 25행
+- `src/orchestrator.py`: "lr_channel", "momentum_reversal" STRATEGY_REGISTRY 등록
+- `tests/test_lr_channel.py`: 18개 테스트
+- `tests/test_momentum_reversal.py`: 18개 테스트 (총 36개 통과)
+
+## 이전 작업 (2026-04-09) — DoubleTopBottomStrategy + MACDHistDivStrategy 구현
+
+- `src/strategy/double_top_bottom.py`: `DoubleTopBottomStrategy` 구현
+  - Double Bottom (BUY): 최근 20봉 pivot low 2개, 2% 이내 수렴, 넥라인 돌파
+  - Double Top (SELL): 최근 20봉 pivot high 2개, 2% 이내 수렴, 넥라인 하향 돌파
+  - confidence: 돌파폭 > 1% → HIGH, 최소 25행
+- `src/strategy/macd_hist_div.py`: `MACDHistDivStrategy` 구현
+  - Bullish Div (BUY): close 10봉 최저, histogram 개선 중 (< 0)
+  - Bearish Div (SELL): close 10봉 최고, histogram 약화 중 (> 0)
+  - confidence: |hist 변화| > std(hist, 20) → HIGH, 최소 40행
+- `src/orchestrator.py`: "double_top_bottom", "macd_hist_div" STRATEGY_REGISTRY 등록
+- `tests/test_double_top_bottom.py`: 15개 테스트
+- `tests/test_macd_hist_div.py`: 15개 테스트 (총 30개 통과)
+
+## 이전 작업 (2026-04-09) — VolumeSurgeStrategy + PriceVelocityStrategy 구현
+
+- `src/strategy/volume_surge.py`: `VolumeSurgeStrategy` 구현
+  - vol_ratio > 2.5 AND 20봉 고점 돌파 AND 양봉 → BUY
+  - vol_ratio > 2.5 AND 20봉 저점 붕괴 AND 음봉 → SELL
+  - confidence: vol_ratio > 4.0 → HIGH / 최소 25행
+- `src/strategy/price_velocity.py`: `PriceVelocityStrategy` 구현
+  - velocity = (close - close.shift(5)) / 5, accel = velocity - velocity.shift(5)
+  - BUY: velocity > 0 AND accel > 0 AND velocity > vol_vel * 0.5
+  - SELL: velocity < 0 AND accel < 0 AND |velocity| > vol_vel * 0.5
+  - confidence: |velocity| > vol_vel * 1.0 → HIGH / 최소 20행
+- `src/orchestrator.py`: "volume_surge", "price_velocity" STRATEGY_REGISTRY 등록
+- `tests/test_volume_surge.py`: 13개 테스트
+- `tests/test_price_velocity.py`: 14개 테스트 (총 27개 통과)
+
+## 이전 작업 (2026-04-09) — SupertrendRSIStrategy + BBBandwidthStrategy 구현
+
+- `src/strategy/supertrend_rsi.py`: `SupertrendRSIStrategy` 구현
+  - EWM ATR(span=10) 기반 Supertrend + RSI14 복합
+  - BUY: Supertrend bullish AND RSI 50~70
+  - SELL: Supertrend bearish AND RSI 30~50
+  - confidence: |RSI-50|>15 AND ST거리>1% → HIGH / 최소 25행
+- `src/strategy/bb_bandwidth.py`: `BBBandwidthStrategy` 구현
+  - BB 폭(bandwidth) 수축 감지 + 상/하단 돌파 예상
+  - BUY: BW < BW_SMA*0.7 AND close > upper*0.99
+  - SELL: BW < BW_SMA*0.7 AND close < lower*1.01
+  - confidence: BW < BW_SMA*0.5 → HIGH / 최소 45행
+- `src/orchestrator.py`: "supertrend_rsi", "bb_bandwidth" STRATEGY_REGISTRY 등록
+- `tests/test_supertrend_rsi.py`: 14개 테스트
+- `tests/test_bb_bandwidth.py`: 14개 테스트 (총 28개 통과)
+
+## 이전 작업 (2026-04-09) — StrategyPerformanceTracker 신규 생성
+
+- `src/analytics/__init__.py`: analytics 패키지 초기화
+- `src/analytics/strategy_tracker.py`: `StrategyPerformanceTracker` + `StrategyMetrics` 구현
+  - record_trade(): 전략별 거래 기록 (pnl, is_win)
+  - get_ranking(): sort_by total_pnl / win_rate / avg_pnl_per_trade
+  - get_top_n() / get_bottom_n(): 상위/하위 N개 반환
+  - to_dict() / from_dict(): JSON 직렬화 지원
+- `tests/test_strategy_tracker.py`: 12개 단위 테스트 (전부 통과)
+
+## 이전 작업 (2026-04-09) — KAMA + ATR Channel Breakout 전략 추가
+
+- `src/strategy/kama.py`: `KAMAStrategy` 구현
+  - ER 기반 SC(스무딩 상수) 계산, KAMA 시리즈 생성
+  - BUY: close가 KAMA 상향 돌파 / SELL: 하향 돌파
+  - confidence: 이격 > 1% → HIGH, 그 외 MEDIUM / 최소 20행
+- `src/strategy/atr_channel.py`: `ATRChannelStrategy` 구현
+  - mid=SMA20, upper=mid+2*ATR14, lower=mid-2*ATR14
+  - BUY: close > upper / SELL: close < lower
+  - confidence: 돌파폭 > ATR*0.5 → HIGH, 그 외 MEDIUM / 최소 25행
+  - atr14 컬럼 없을 때 자체 TR 계산 폴백
+- `src/orchestrator.py`: 두 전략 STRATEGY_REGISTRY 등록 ("kama", "atr_channel")
+- `tests/test_kama.py`: 14개 테스트
+- `tests/test_atr_channel.py`: 12개 테스트 (총 26개 통과)
+
+## 이전 작업 (2026-04-09) — Morning/Evening Star + Three Soldiers/Crows 전략 추가
+
+- `src/strategy/morning_evening_star.py`: `MorningEveningStarStrategy` 구현
+  - Morning Star: 봉-3 강한 음봉 + 봉-2 소형 + 봉-1 양봉 50% 이상 회복 → BUY
+  - Evening Star: 봉-3 강한 양봉 + 봉-2 소형 + 봉-1 음봉 50% 이상 침범 → SELL
+  - confidence: >75% → HIGH, >50% → MEDIUM / 최소 10행
+- `src/strategy/three_soldiers_crows.py`: `ThreeSoldiersAndCrowsStrategy` 구현
+  - Three White Soldiers: 3봉 연속 양봉 + 상승 close + body>range*0.6 → BUY
+  - Three Black Crows: 3봉 연속 음봉 + 하락 close + body>range*0.6 → SELL
+  - confidence: avg_body > ATR*0.8 → HIGH, 그 외 MEDIUM / 최소 8행
+- `src/orchestrator.py`: 두 전략 STRATEGY_REGISTRY 등록
+- `tests/test_morning_evening_star.py`: 15개 테스트
+- `tests/test_three_soldiers_crows.py`: 14개 테스트 (총 29개 통과)
+
+## Status: **28 passed** | StochRSIDivStrategy + TRIXSignalStrategy 구현 완료
+
+## 최근 작업 (2026-04-09) — StochRSI Divergence + TRIX Signal Cross 전략 추가
+
+- `src/strategy/stochrsi_div.py`: `StochRSIDivStrategy` 구현
+  - %K < 0.2 + %K > %D + close 상승 → BUY
+  - %K > 0.8 + %K < %D + close 하락 → SELL
+  - confidence: |%K - 0.5| > 0.3 → HIGH, 그 외 MEDIUM
+  - 최소 30행
+- `src/strategy/trix_signal.py`: `TRIXSignalStrategy` 구현
+  - histogram 음→양 크로스 → BUY
+  - histogram 양→음 크로스 → SELL
+  - confidence: |histogram| > std(20) → HIGH, 그 외 MEDIUM
+  - 최소 50행
+- `src/orchestrator.py`: 두 전략 STRATEGY_REGISTRY 등록
+- `tests/test_stochrsi_div.py`, `tests/test_trix_signal.py`: 각 14개 테스트 (28개 통과)
+
+## Status: **26 passed** | PaperTrader + CircuitBreaker 구현 완료
+
+## 최근 작업 (2026-04-09) — Paper Trading 모드 + Drawdown 자동 중단
+
+- `src/exchange/paper_trader.py`: `PaperTrader` 구현
+  - `execute_signal(BUY/SELL)`: 가상 잔고 차감, 포지션 관리, 수수료 계산, P&L 추적
+  - `get_summary()`: total_return%, trade_count, win_rate 반환
+- `src/risk/circuit_breaker.py`: `CircuitBreaker` 구현
+  - 일일 낙폭 -5%, 전체 낙폭 -15% 초과 시 자동 트리거
+  - `reset_daily()`: 일일 트리거만 해제 (전체 낙폭 트리거 유지)
+  - `reset_all()`: 전체 초기화
+- `tests/test_paper_trader.py`: 15개 테스트 통과
+- `tests/test_circuit_breaker.py`: 11개 테스트 통과
+- push to main 완료 (commit eff0aca)
+
+## 이전 작업 (2026-04-09) — Lookahead Bias 감사 도구 + Kelly Criterion 연결 강화
+
+- `src/utils/lookahead_audit.py`: `audit_strategy()` / `audit_all_strategies()` 구현
+  - 탐지 패턴: `shift(-N)`, `iloc[-1]`, `.tail(1)`, `rolling().mean()` 뒤 shift 없음
+  - 주석 줄 무시, 파일 없음 에러 처리
+- `src/risk/position_sizer.py`: `kelly_position_size(win_rate, win_loss_ratio, capital, kelly_fraction=0.25)` 신규
+  - KellySizer를 실제 호출하는 단순 함수 인터페이스 (USD 금액 반환)
+  - Full Kelly * fraction, 상한 25% cap
+- `tests/test_lookahead_audit.py`: 12개 테스트 통과
+- `tests/test_kelly_integration.py`: 12개 테스트 통과
+- push to main 완료 (commit 219a3b5)
+
+## 이전 작업 (2026-04-09) — WalkForwardValidator 구현
+
+- `src/backtest/walk_forward.py`: `WalkForwardValidator` + `WalkForwardValidationResult` 추가 (기존 `WalkForwardOptimizer` 유지)
+- rolling train/test window 분할, `BacktestEngine` 재사용, consistency_score/win_rate/mean_return 집계
+- `tests/test_walk_forward.py`: 10개 테스트 전부 통과, push to main 완료
+
+## 이전 작업 (2026-04-09) — ChandelierExitStrategy + VolAdjMomentumStrategy 구현
+
+- `src/strategy/chandelier_exit.py`: ATR22(EWM) 기반 chandelier_long/short 계산, prev_short→cur_long=BUY / prev_long→cur_short=SELL, HIGH(전환폭>ATR*0.5)/MEDIUM confidence, 최소 30행
+- `src/strategy/vol_adj_momentum.py`: raw_momentum/hist_vol 정규화, EWM signal_line(span=9) 크로스, HIGH(|vam|>2.0)/MEDIUM confidence, 최소 25행
+- `tests/test_chandelier_exit.py`: 15개 테스트 통과
+- `tests/test_vol_adj_momentum.py`: 18개 테스트 통과
+- `src/orchestrator.py`: `chandelier_exit`, `vol_adj_momentum` 등록
+
+## 이전 작업 (2026-04-09) — TrendStrengthStrategy + VPTSignalStrategy 구현
+
+- `src/strategy/trend_strength.py`: directional_move 기반 TSI bull ratio, >0.65+EMA50=BUY/<0.35+EMA50=SELL, HIGH(>0.75/<0.25)/MEDIUM confidence, 최소 20행
+- `src/strategy/vpt_signal.py`: VPT EWM(14) vs EWM(21) 크로스 + EMA50 필터, HIGH(|diff|>std20)/MEDIUM confidence, 최소 30행
+- `tests/test_trend_strength.py`: 14개 테스트 통과
+- `tests/test_vpt_signal.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `trend_strength`, `vpt_signal` 등록
+
+## 이전 작업 (2026-04-09) — ElderImpulseStrategy + MeanReversionChannelStrategy 구현
+
+- `src/strategy/elder_impulse.py`: EMA13 + MACD_hist로 GREEN/RED/BLUE 색상 판단, RED→GREEN=BUY/GREEN→RED=SELL, HIGH(|hist|>std20)/MEDIUM confidence, 최소 35행
+- `src/strategy/mean_reversion_channel.py`: SMA50 채널 + z_score, <-2 반전=BUY/>+2 반전=SELL, HIGH(|z|>2.5)/MEDIUM(>2.0) confidence, 최소 55행
+- `tests/test_elder_impulse.py`: 14개 테스트 통과 (`_impulse_color` 단위 테스트 포함)
+- `tests/test_mean_reversion_channel.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `elder_impulse`, `mean_reversion_channel` 등록
+
+## 이전 작업 (2026-04-09) — HATrendStrategy + EngulfingStrategy 구현
+
+- `src/strategy/ha_trend.py`: HA 계산 후 연속 양봉/음봉 카운트, 꼬리없음 조건(ha_low>=ha_open*0.999 / ha_high<=ha_open*1.001), HIGH(5봉+)/MEDIUM(3봉) confidence, 최소 15행
+- `src/strategy/engulfing.py`: Bullish/Bearish Engulfing 패턴, HIGH(body>1.5x)/MEDIUM confidence, 최소 5행
+- `tests/test_ha_trend.py`: 14개 테스트 통과
+- `tests/test_engulfing.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `ha_trend`, `engulfing` 등록
+
+## 이전 작업 (2026-04-09) — RSIMomentumDivStrategy + DPOCrossStrategy 구현
+
+- `src/strategy/rsi_momentum_div.py`: RSI14 + Momentum 다이버전스, 10봉 최저/최고 근처 + RSI 방향 확인, HIGH(|RSI변화|>5)/MEDIUM confidence, 최소 25행
+- `src/strategy/dpo_cross.py`: DPO=close.shift(11)-SMA20, Signal=EWM(DPO,span=9), 크로스 BUY/SELL, HIGH(|diff|>std)/MEDIUM confidence, 최소 35행
+- `tests/test_rsi_momentum_div.py`: 14개 테스트 통과
+- `tests/test_dpo_cross.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `rsi_momentum_div`, `dpo_cross` 등록
+
+## 이전 작업 (2026-04-09) — PivotReversalStrategy + RangeExpansionStrategy 구현
+
+- `src/strategy/pivot_reversal.py`: Pivot High/Low 탐지 (앞뒤 2봉), 최근 5봉 내 반등/반락 확인, HIGH(>1%)/MEDIUM confidence, 최소 15행
+- `src/strategy/range_expansion.py`: True Range 계산, avg_tr_20 기준 1.5x/2.0x 확장, 양/음봉 방향 확인, 최소 25행
+- `tests/test_pivot_reversal.py`: 16개 테스트 통과
+- `tests/test_range_expansion.py`: 16개 테스트 통과
+- `src/orchestrator.py`: `pivot_reversal`, `range_expansion` 등록
+
+## 이전 작업 (2026-04-09) — FRAMAStrategy + VWMACDStrategy 추가
+
+## 최근 작업 (2026-04-09) — FRAMAStrategy + VWMACDStrategy 구현
+
+- `src/strategy/frama.py`: Fractal Adaptive MA, alpha=exp(-4.6*(D-1)), period=16, 크로스 BUY/SELL, HIGH(이격>1%)/MEDIUM confidence
+- `src/strategy/vw_macd.py`: 거래량 가중 EMA MACD, histogram 0선 크로스 BUY/SELL, HIGH(|hist|>std)/MEDIUM confidence
+- `tests/test_frama.py`: 17개 테스트 통과
+- `tests/test_vw_macd.py`: 17개 테스트 통과
+- `src/orchestrator.py`: `frama`, `vw_macd` 등록
+
+## 이전 작업 (2026-04-09) — VolumeOscillatorStrategy + PriceEnvelopeStrategy 추가
+
+## 최근 작업 (2026-04-09) — VolumeOscillatorStrategy + PriceEnvelopeStrategy 구현
+
+- `src/strategy/volume_oscillator.py`: Short/Long Vol EMA 차이 VO 지표, VO>5+ema50 방향으로 BUY/SELL, HIGH(VO>20)/MEDIUM confidence
+- `src/strategy/price_envelope.py`: EMA20 ±2% 밴드, 밴드 이탈 시 반전 신호, HIGH(dist>3%)/MEDIUM(dist>2%) confidence
+- `tests/test_volume_oscillator.py`: 14개 테스트 통과
+- `tests/test_price_envelope.py`: 14개 테스트 통과
+- `src/orchestrator.py`: `volume_oscillator`, `price_envelope` 등록
+
+## 이전 작업 (2026-04-09) — HistoricalVolatilityStrategy + PriceActionMomentumStrategy 구현
+
+- `src/strategy/historical_volatility.py`: Log Return 기반 HV5/HV20 비율 수축 전략 (ratio<0.7 신호, HIGH/MEDIUM confidence)
+- `src/strategy/price_action_momentum.py`: 5개 조건 스코어링 모멘텀 전략 (bull/bear_score>=4 신호, HIGH/MEDIUM confidence)
+- `tests/test_historical_volatility.py`: 17개 테스트 통과
+- `tests/test_price_action_momentum.py`: 17개 테스트 통과
+- `src/orchestrator.py`: `historical_volatility`, `price_action_momentum` 등록
+
+## 이전 작업 (2026-04-09) — MarubozuStrategy + SpinningTopStrategy 구현
+
+- `src/strategy/marubozu.py`: 꼬리 없는 강한 추세 캔들 전략 (body>ATR*0.7, 꼬리 오차 ATR*0.05 이내, HIGH/MEDIUM confidence)
+- `src/strategy/spinning_top.py`: 팽이형 이후 방향 돌파 전략 (body<range*0.25, 양쪽꼬리>body*0.5, RSI 필터, HIGH/MEDIUM confidence)
+- `tests/test_marubozu.py`: 14개 테스트 통과
+- `tests/test_spinning_top.py`: 13개 테스트 통과
+- `src/orchestrator.py`: `marubozu`, `spinning_top` 등록
+
+## 이전 작업 (2026-04-09) — TurtleTradingStrategy + ATRTrailingStrategy 구현
+
+- `src/strategy/turtle_trading.py`: 20봉/55봉 채널 돌파 전략 (볼륨 필터, HIGH/MEDIUM confidence, ATR 포지션 사이징 ref)
+- `src/strategy/atr_trailing.py`: ATR 트레일링 스탑 추세 전략 (EMA50 기울기, trail rising/falling, HIGH/MEDIUM confidence)
+- `tests/test_turtle_trading.py`: 18개 테스트 통과
+- `tests/test_atr_trailing.py`: 16개 테스트 통과
+- `src/orchestrator.py`: `turtle_trading`, `atr_trailing` 등록
+
+## 이전 작업 (2026-04-09) — RSquaredStrategy + BodyMomentumStrategy 구현
 
 - `src/strategy/r_squared.py`: 선형 회귀 R² 기반 추세 강도 필터 전략 (R²>0.7+slope+ema50, HIGH/MEDIUM confidence)
 - `src/strategy/body_momentum.py`: 캔들 몸통 크기 기반 모멘텀 전략 (BM_EMA, BM_SUM3, HIGH/MEDIUM confidence)
