@@ -338,6 +338,8 @@ from src.strategy.ehlers_fisher import EhlersFisherStrategy
 from src.strategy.sine_wave import SineWaveStrategy
 from src.strategy.adaptive_cycle import AdaptiveCycleStrategy
 from src.strategy.demarker import DeMarkerStrategy
+from src.strategy.trend_exhaustion import TrendExhaustionStrategy
+from src.strategy.high_low_channel import HighLowChannelStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -648,6 +650,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ehlers_fisher": EhlersFisherStrategy,
     "sine_wave": SineWaveStrategy,
     "adaptive_cycle": AdaptiveCycleStrategy,
+    "trend_exhaustion": TrendExhaustionStrategy,
+    "high_low_channel": HighLowChannelStrategy,
 }
 
 
