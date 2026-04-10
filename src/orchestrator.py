@@ -274,6 +274,10 @@ from src.strategy.wedge_pattern import WedgePatternStrategy
 from src.strategy.crossover_confluence import CrossoverConfluenceStrategy
 from src.strategy.breakout_retest import BreakoutRetestStrategy
 from src.strategy.volatility_expansion import VolatilityExpansionStrategy
+from src.strategy.cci_divergence import CCIDivergenceStrategy
+from src.strategy.dynamic_pivot_channel import DynamicPivotChannelStrategy
+from src.strategy.hybrid_trend_rev import HybridTrendReversionStrategy
+from src.strategy.multi_factor import MultiFactorScoreStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +524,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "crossover_confluence": CrossoverConfluenceStrategy,
     "breakout_retest": BreakoutRetestStrategy,
     "volatility_expansion": VolatilityExpansionStrategy,
+    "cci_divergence": CCIDivergenceStrategy,
+    "dynamic_pivot_channel": DynamicPivotChannelStrategy,
+    "hybrid_trend_rev": HybridTrendReversionStrategy,
+    "multi_factor": MultiFactorScoreStrategy,
 }
 
 
