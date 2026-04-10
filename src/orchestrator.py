@@ -351,6 +351,8 @@ from src.strategy.ema_envelope import EMAEnvelopeStrategy
 from src.strategy.volatility_breakout_v2 import VolatilityBreakoutV2Strategy
 from src.strategy.velocity_entry import VelocityEntryStrategy
 from src.strategy.range_bias import RangeBiasStrategy
+from src.strategy.composite_momentum import CompositeMomentumStrategy
+from src.strategy.signal_line_cross import SignalLineCrossStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -674,6 +676,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "spread_analysis": SpreadAnalysisStrategy,
     "velocity_entry": VelocityEntryStrategy,
     "range_bias": RangeBiasStrategy,
+    "composite_momentum": CompositeMomentumStrategy,
+    "signal_line_cross": SignalLineCrossStrategy,
 }
 
 
