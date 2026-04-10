@@ -280,6 +280,8 @@ from src.strategy.hybrid_trend_rev import HybridTrendReversionStrategy
 from src.strategy.multi_factor import MultiFactorScoreStrategy
 from src.strategy.stoch_momentum import StochasticMomentumStrategy
 from src.strategy.volume_roc import VolumeROCStrategy
+from src.strategy.smc_strategy import SmartMoneyConceptStrategy
+from src.strategy.positional_scaling import PositionalScalingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -532,6 +534,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "multi_factor": MultiFactorScoreStrategy,
     "stoch_momentum": StochasticMomentumStrategy,
     "volume_roc": VolumeROCStrategy,
+    "smc_strategy": SmartMoneyConceptStrategy,
+    "positional_scaling": PositionalScalingStrategy,
 }
 
 
