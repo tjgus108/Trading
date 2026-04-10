@@ -1,13 +1,13 @@
-"""CumulativeDeltaStrategy 단위 테스트 (14개)."""
+"""VolumePriceTrendV2Strategy 단위 테스트 (14개)."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.strategy.base import Action, Confidence, Signal
-from src.strategy.cumulative_delta import CumulativeDeltaStrategy
+from src.strategy.volume_price_trend_v2 import VolumePriceTrendV2Strategy
 
-strategy = CumulativeDeltaStrategy()
+strategy = VolumePriceTrendV2Strategy()
 
 
 def _make_df(n=40):
@@ -26,15 +26,14 @@ def _make_df(n=40):
 
 
 def _make_buy_df(n=50):
-    """
-    cum_delta > cum_delta_ma AND cum_delta > 0 AND close > close_ma 유도.
-    양봉(close > open) 위주로 구성.
-    """
+    """vpt_hist > 0, 상승 중, vpt > vpt_signal 조건 유도."""
     closes = np.linspace(100.0, 120.0, n)
-    opens = closes - 2.0   # 양봉: open < close
+    volumes = np.ones(n) * 2000.0
+    # 마지막 몇 봉 볼륨을 크게 올려 vpt를 빠르게 올림
+    volumes[-5:] = 10000.0
+    opens = closes - 0.5
     highs = closes + 1.0
-    lows = opens - 1.0
-    volumes = np.ones(n) * 1000.0
+    lows = closes - 1.0
     return pd.DataFrame({
         "open": opens,
         "close": closes,
@@ -45,15 +44,13 @@ def _make_buy_df(n=50):
 
 
 def _make_sell_df(n=50):
-    """
-    cum_delta < cum_delta_ma AND cum_delta < 0 AND close < close_ma 유도.
-    음봉(close < open) 위주로 구성.
-    """
+    """vpt_hist < 0, 하락 중, vpt < vpt_signal 조건 유도."""
     closes = np.linspace(120.0, 100.0, n)
-    opens = closes + 2.0   # 음봉: open > close
-    highs = opens + 1.0
+    volumes = np.ones(n) * 2000.0
+    volumes[-5:] = 10000.0
+    opens = closes + 0.5
+    highs = closes + 1.0
     lows = closes - 1.0
-    volumes = np.ones(n) * 1000.0
     return pd.DataFrame({
         "open": opens,
         "close": closes,
@@ -65,13 +62,13 @@ def _make_sell_df(n=50):
 
 # 1. 전략 이름
 def test_strategy_name():
-    assert strategy.name == "cumulative_delta"
+    assert strategy.name == "volume_price_trend_v2"
 
 
 # 2. 인스턴스 타입
 def test_instance():
-    s = CumulativeDeltaStrategy()
-    assert isinstance(s, CumulativeDeltaStrategy)
+    s = VolumePriceTrendV2Strategy()
+    assert isinstance(s, VolumePriceTrendV2Strategy)
 
 
 # 3. 데이터 부족 → HOLD (n < 20)
@@ -109,7 +106,7 @@ def test_signal_fields():
     sig = strategy.generate(df)
     assert sig.action is not None
     assert sig.confidence is not None
-    assert sig.strategy == "cumulative_delta"
+    assert sig.strategy == "volume_price_trend_v2"
     assert isinstance(sig.entry_price, float)
     assert isinstance(sig.reasoning, str)
     assert isinstance(sig.invalidation, str)
@@ -117,20 +114,20 @@ def test_signal_fields():
     assert isinstance(sig.bear_case, str)
 
 
-# 8. BUY reasoning에 "CumDelta" 포함
-def test_buy_reasoning():
+# 8. BUY 시 reasoning에 "VPT" 포함
+def test_buy_reasoning_contains_vpt():
     df = _make_buy_df()
     sig = strategy.generate(df)
     if sig.action == Action.BUY:
-        assert "CumDelta" in sig.reasoning
+        assert "VPT" in sig.reasoning
 
 
-# 9. SELL reasoning에 "CumDelta" 포함
-def test_sell_reasoning():
+# 9. SELL 시 reasoning에 "VPT" 포함
+def test_sell_reasoning_contains_vpt():
     df = _make_sell_df()
     sig = strategy.generate(df)
     if sig.action == Action.SELL:
-        assert "CumDelta" in sig.reasoning
+        assert "VPT" in sig.reasoning
 
 
 # 10. confidence는 HIGH/MEDIUM/LOW 중 하나
@@ -151,7 +148,7 @@ def test_entry_price_non_negative():
 def test_strategy_field():
     df = _make_df(n=40)
     sig = strategy.generate(df)
-    assert sig.strategy == "cumulative_delta"
+    assert sig.strategy == "volume_price_trend_v2"
 
 
 # 13. 경계값 n=20 실행 가능
