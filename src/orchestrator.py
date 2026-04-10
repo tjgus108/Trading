@@ -355,6 +355,8 @@ from src.strategy.composite_momentum import CompositeMomentumStrategy
 from src.strategy.signal_line_cross import SignalLineCrossStrategy
 from src.strategy.breakout_vol_ratio import BreakoutVolRatioStrategy
 from src.strategy.mean_rev_band_v2 import MeanRevBandV2Strategy
+from src.strategy.price_impact import PriceImpactStrategy
+from src.strategy.smart_money_flow import SmartMoneyFlowStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -682,6 +684,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "signal_line_cross": SignalLineCrossStrategy,
     "breakout_vol_ratio": BreakoutVolRatioStrategy,
     "mean_rev_band_v2": MeanRevBandV2Strategy,
+    "price_impact": PriceImpactStrategy,
+    "smart_money_flow": SmartMoneyFlowStrategy,
 }
 
 
