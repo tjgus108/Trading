@@ -316,6 +316,8 @@ from src.strategy.volume_weighted_rsi import VolumeWeightedRSIStrategy as Volume
 from src.strategy.adaptive_momentum import AdaptiveMomentumStrategy
 from src.strategy.pivot_point_rev import PivotPointRevStrategy
 from src.strategy.heiken_ashi_trend import HeikenAshiTrendStrategy
+from src.strategy.roc_divergence import ROCDivergenceStrategy
+from src.strategy.tema_strategy import TEMAStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -604,6 +606,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "adaptive_momentum": AdaptiveMomentumStrategy,
     "pivot_point_rev": PivotPointRevStrategy,
     "heiken_ashi_trend": HeikenAshiTrendStrategy,
+    "roc_divergence": ROCDivergenceStrategy,
+    "tema_strategy": TEMAStrategy,
 }
 
 
