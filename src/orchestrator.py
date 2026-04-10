@@ -435,6 +435,8 @@ from src.strategy.price_divergence_index import PriceDivergenceIndexStrategy
 from src.strategy.trend_momentum_score import TrendMomentumScoreStrategy
 from src.strategy.impulse_system import ImpulseSystemStrategy
 from src.strategy.colored_candles import ColoredCandlesStrategy
+from src.strategy.heikin_ashi_trend import HeikinAshiTrendStrategy
+from src.strategy.volume_weighted_rsi_v2 import VolumeWeightedRSIV2Strategy
 
 logger = logging.getLogger(__name__)
 
