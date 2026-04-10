@@ -1,5 +1,5 @@
 """
-PriceActionMomentumStrategy 단위 테스트 (mock DataFrame만, API 호출 없음).
+VolatilityBreakoutStrategy 단위 테스트 (mock DataFrame만, API 호출 없음).
 """
 
 import math
@@ -8,91 +8,71 @@ import pandas as pd
 import pytest
 
 from src.strategy.base import Action, Confidence, Signal
-from src.strategy.price_action_momentum import PriceActionMomentumStrategy
+from src.strategy.volatility_breakout import VolatilityBreakoutStrategy
 
 _MIN_ROWS = 20
 
 
-def _make_base_df(n: int = 30) -> pd.DataFrame:
+def _make_base_df(n: int = 30, close_val: float = 100.0) -> pd.DataFrame:
     """기본 flat DataFrame."""
-    closes = [100.0] * n
-    opens = [100.0] * n
-    highs = [101.0] * n
-    lows = [99.0] * n
     return pd.DataFrame({
-        "open": opens,
-        "close": closes,
-        "high": highs,
-        "low": lows,
+        "open": [close_val] * n,
+        "close": [close_val] * n,
+        "high": [close_val + 1.0] * n,
+        "low": [close_val - 1.0] * n,
         "volume": [1000.0] * n,
     })
 
 
-def _make_buy_df(n: int = 40) -> pd.DataFrame:
+def _make_buy_df(n: int = 45) -> pd.DataFrame:
     """
-    BUY 조건:
-    - body > 0 (양봉)
-    - body_strength > 0.5
-    - roc5 > roc5_ma AND roc5 > 0
-    앞 35개: 완만한 상승(roc5 작고 roc5_ma 작게 수렴)
-    마지막 5개(idx 35~39): 급등하여 roc5[idx=38] >> roc5_ma[idx=38]
-    idx=38에서 roc5=(close[38]-close[33])/close[33], close[33]=완만 구간
-    roc5_ma[38]=rolling 10개 roc5 평균, 대부분 완만 → 작음
+    BUY 조건: BB 확장(bb_width > bb_width_ma) + close > bb_upper
+    - 처음 35개: flat at 100.0 → bb_width_ma 낮게 유지
+    - 마지막 10개: 매우 급등 → BB 확장 + 상단 돌파
+    idx=43(n-2): close가 bb_upper 초과 보장
     """
-    closes = [100.0 + i * 0.05 for i in range(35)]  # 완만한 상승
-    # 마지막 5개 급등
-    base = closes[-1]
-    for i in range(1, 6):
-        closes.append(base + i * 10.0)
+    closes = [100.0] * 35
+    for i in range(n - 35):
+        closes.append(100.0 + (i + 1) * 30.0)
 
-    opens = [c - 0.8 for c in closes]   # 양봉
-    highs = [c + 0.1 for c in closes]
-    lows = opens
     df = pd.DataFrame({
-        "open": opens,
+        "open": [c - 0.5 for c in closes],
         "close": closes,
-        "high": highs,
-        "low": lows,
+        "high": [c + 0.5 for c in closes],
+        "low": [c - 0.5 for c in closes],
         "volume": [1000.0] * n,
     })
     return df
 
 
-def _make_sell_df(n: int = 40) -> pd.DataFrame:
+def _make_sell_df(n: int = 45) -> pd.DataFrame:
     """
-    SELL 조건:
-    - body < 0 (음봉)
-    - body_strength > 0.5
-    - roc5 < roc5_ma AND roc5 < 0
-    앞 35개: 완만한 하락(roc5 작음)
-    마지막 5개: 급락하여 roc5[idx=38] << roc5_ma[idx=38]
+    SELL 조건: BB 확장 + close < bb_lower
+    - 처음 35개: flat at 100.0
+    - 마지막 10개: 매우 급락 → BB 확장 + 하단 이탈
     """
-    closes = [100.0 - i * 0.05 for i in range(35)]
-    base = closes[-1]
-    for i in range(1, 6):
-        closes.append(base - i * 10.0)
+    closes = [100.0] * 35
+    for i in range(n - 35):
+        closes.append(100.0 - (i + 1) * 30.0)
 
-    opens = [c + 0.8 for c in closes]   # 음봉
-    highs = [o + 0.1 for o in opens]
-    lows = opens
     df = pd.DataFrame({
-        "open": opens,
+        "open": [c + 0.5 for c in closes],
         "close": closes,
-        "high": highs,
-        "low": lows,
+        "high": [c + 0.5 for c in closes],
+        "low": [c - 0.5 for c in closes],
         "volume": [1000.0] * n,
     })
     return df
 
 
-class TestPriceActionMomentumStrategy:
+class TestVolatilityBreakoutStrategy:
 
     def setup_method(self):
-        self.strategy = PriceActionMomentumStrategy()
+        self.strategy = VolatilityBreakoutStrategy()
 
     # 1. 전략 이름
     def test_name(self):
-        assert self.strategy.name == "price_action_momentum"
+        assert self.strategy.name == "volatility_breakout"
 
     # 2. 데이터 부족 → HOLD
     def test_insufficient_data(self):
@@ -119,7 +99,7 @@ class TestPriceActionMomentumStrategy:
     def test_strategy_field(self):
         df = _make_base_df(n=30)
         sig = self.strategy.generate(df)
-        assert sig.strategy == "price_action_momentum"
+        assert sig.strategy == "volatility_breakout"
 
     # 6. action 유효값
     def test_action_valid_values(self):
@@ -133,7 +113,7 @@ class TestPriceActionMomentumStrategy:
         sig = self.strategy.generate(df)
         assert sig.confidence in (Confidence.HIGH, Confidence.MEDIUM, Confidence.LOW)
 
-    # 8. entry_price는 float
+    # 8. entry_price는 float (NaN 아님)
     def test_entry_price_is_float(self):
         df = _make_base_df(n=30)
         sig = self.strategy.generate(df)
@@ -178,11 +158,11 @@ class TestPriceActionMomentumStrategy:
         sig = self.strategy.generate(df)
         assert sig.action == Action.HOLD
 
-    # 15. flat → HOLD (body = 0, 신호 없음)
+    # 15. flat → HOLD (변동성 없음)
     def test_flat_data_holds(self):
         df = _make_base_df(n=30)
         sig = self.strategy.generate(df)
-        # body == 0이면 BUY/SELL 조건 모두 불만족
+        # 완전 flat이면 bb_std=0, bb_width=0, expanding=False
         assert sig.action == Action.HOLD
 
     # 16. BUY entry_price = 마지막 완성 캔들 close
@@ -201,14 +181,14 @@ class TestPriceActionMomentumStrategy:
             idx = len(df) - 2
             assert sig.entry_price == pytest.approx(float(df["close"].iloc[idx]))
 
-    # 18. confidence HIGH or MEDIUM on buy
+    # 18. BUY confidence HIGH or MEDIUM
     def test_buy_confidence_high_or_medium(self):
         df = _make_buy_df()
         sig = self.strategy.generate(df)
         if sig.action == Action.BUY:
             assert sig.confidence in (Confidence.HIGH, Confidence.MEDIUM)
 
-    # 19. confidence HIGH or MEDIUM on sell
+    # 19. SELL confidence HIGH or MEDIUM
     def test_sell_confidence_high_or_medium(self):
         df = _make_sell_df()
         sig = self.strategy.generate(df)
