@@ -278,6 +278,8 @@ from src.strategy.cci_divergence import CCIDivergenceStrategy
 from src.strategy.dynamic_pivot_channel import DynamicPivotChannelStrategy
 from src.strategy.hybrid_trend_rev import HybridTrendReversionStrategy
 from src.strategy.multi_factor import MultiFactorScoreStrategy
+from src.strategy.stoch_momentum import StochasticMomentumStrategy
+from src.strategy.volume_roc import VolumeROCStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -528,6 +530,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "dynamic_pivot_channel": DynamicPivotChannelStrategy,
     "hybrid_trend_rev": HybridTrendReversionStrategy,
     "multi_factor": MultiFactorScoreStrategy,
+    "stoch_momentum": StochasticMomentumStrategy,
+    "volume_roc": VolumeROCStrategy,
 }
 
 
