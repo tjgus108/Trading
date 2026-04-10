@@ -348,6 +348,9 @@ from src.strategy.price_cycle_detector import PriceCycleDetectorStrategy
 from src.strategy.momentum_quality import MomentumQualityStrategy
 from src.strategy.normalized_price_osc import NormalizedPriceOscStrategy
 from src.strategy.ema_envelope import EMAEnvelopeStrategy
+from src.strategy.volatility_breakout_v2 import VolatilityBreakoutV2Strategy
+from src.strategy.velocity_entry import VelocityEntryStrategy
+from src.strategy.range_bias import RangeBiasStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -666,8 +669,11 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_quality": MomentumQualityStrategy,
     "normalized_price_osc": NormalizedPriceOscStrategy,
     "ema_envelope": EMAEnvelopeStrategy,
+    "volatility_breakout_v2": VolatilityBreakoutV2Strategy,
     "cumulative_delta": CumulativeDeltaStrategy,
     "spread_analysis": SpreadAnalysisStrategy,
+    "velocity_entry": VelocityEntryStrategy,
+    "range_bias": RangeBiasStrategy,
 }
 
 
