@@ -284,6 +284,8 @@ from src.strategy.smc_strategy import SmartMoneyConceptStrategy
 from src.strategy.positional_scaling import PositionalScalingStrategy
 from src.strategy.relative_strength import RelativeStrengthStrategy
 from src.strategy.momentum_breadth import MomentumBreadthStrategy
+from src.strategy.price_squeeze import PriceSqueezeStrategy
+from src.strategy.inverse_fisher_rsi import InverseFisherRSIStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -540,6 +542,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "positional_scaling": PositionalScalingStrategy,
     "relative_strength": RelativeStrengthStrategy,
     "momentum_breadth": MomentumBreadthStrategy,
+    "price_squeeze": PriceSqueezeStrategy,
+    "inverse_fisher_rsi": InverseFisherRSIStrategy,
 }
 
 
