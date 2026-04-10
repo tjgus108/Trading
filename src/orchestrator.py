@@ -414,6 +414,8 @@ from src.strategy.candle_body_filter import CandleBodyFilterStrategy
 from src.strategy.ema_fan import EMAFanStrategy
 from src.strategy.entropy_momentum import EntropyMomentumStrategy
 from src.strategy.fractal_dimension import FractalDimensionStrategy
+from src.strategy.tail_risk_filter import TailRiskFilterStrategy
+from src.strategy.price_path_efficiency import PricePathEfficiencyStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -800,6 +802,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "fractal_dimension": FractalDimensionStrategy,
     "wick_analysis": WickAnalysisStrategy,
     "price_flow_index": PriceFlowIndexStrategy,
+    "tail_risk_filter": TailRiskFilterStrategy,
+    "price_path_efficiency": PricePathEfficiencyStrategy,
 }
 
 
