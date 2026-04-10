@@ -437,6 +437,8 @@ from src.strategy.impulse_system import ImpulseSystemStrategy
 from src.strategy.colored_candles import ColoredCandlesStrategy
 from src.strategy.heikin_ashi_trend import HeikinAshiTrendStrategy
 from src.strategy.volume_weighted_rsi_v2 import VolumeWeightedRSIV2Strategy
+from src.strategy.trend_break_confirm import TrendBreakConfirmStrategy
+from src.strategy.momentum_mean_rev import MomentumMeanRevStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -844,6 +846,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_momentum_score": TrendMomentumScoreStrategy,
     "impulse_system": ImpulseSystemStrategy,
     "colored_candles": ColoredCandlesStrategy,
+    "heikin_ashi_trend": HeikinAshiTrendStrategy,
+    "volume_weighted_rsi_v2": VolumeWeightedRSIV2Strategy,
+    "trend_break_confirm": TrendBreakConfirmStrategy,
+    "momentum_mean_rev": MomentumMeanRevStrategy,
 }
 
 
