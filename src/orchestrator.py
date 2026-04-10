@@ -314,6 +314,8 @@ from src.strategy.trendline_break import TrendlineBreakStrategy
 from src.strategy.sr_flip import SRFlipStrategy
 from src.strategy.volume_weighted_rsi import VolumeWeightedRSIStrategy as VolumeWeightedRSINewStrategy
 from src.strategy.adaptive_momentum import AdaptiveMomentumStrategy
+from src.strategy.pivot_point_rev import PivotPointRevStrategy
+from src.strategy.heiken_ashi_trend import HeikenAshiTrendStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -598,6 +600,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "breakout_confirm_v2": BreakoutConfirmV2Strategy,
     "trendline_break": TrendlineBreakStrategy,
     "sr_flip": SRFlipStrategy,
+    "volume_weighted_rsi": VolumeWeightedRSINewStrategy,
+    "adaptive_momentum": AdaptiveMomentumStrategy,
+    "pivot_point_rev": PivotPointRevStrategy,
+    "heiken_ashi_trend": HeikenAshiTrendStrategy,
 }
 
 
