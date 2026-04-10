@@ -301,6 +301,10 @@ from src.strategy.mean_rev_zscore import MeanRevZScoreStrategy
 from src.strategy.momentum_persistence import MomentumPersistenceStrategy
 from src.strategy.fractal_break import FractalBreakStrategy
 from src.strategy.market_structure_break import MarketStructureBreakStrategy
+from src.strategy.price_action_quality import PriceActionQualityStrategy
+from src.strategy.regime_filter import RegimeFilterStrategy
+from src.strategy.candle_pattern_score import CandlePatternScoreStrategy
+from src.strategy.multi_tf_trend import MultiTFTrendStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -574,6 +578,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_persistence": MomentumPersistenceStrategy,
     "fractal_break": FractalBreakStrategy,
     "market_structure_break": MarketStructureBreakStrategy,
+    "price_action_quality": PriceActionQualityStrategy,
+    "regime_filter": RegimeFilterStrategy,
 }
 
 
