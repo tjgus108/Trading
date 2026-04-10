@@ -1,9 +1,9 @@
 """
-DEMA Cross 전략: DEMA(5)가 DEMA(20)을 상향 돌파 시 BUY, 하향 돌파 시 SELL.
+DEMACrossStrategy: DEMA(fast=10)가 DEMA(slow=25)를 크로스할 때 신호 생성.
 
 DEMA(n) = 2 * EMA(close, n) - EMA(EMA(close, n), n)
 일반 EMA보다 노이즈가 적고 반응이 빠름.
-최소 25행 필요.
+최소 35행 필요.
 """
 
 import pandas as pd
@@ -20,31 +20,48 @@ def _dema(series: pd.Series, period: int) -> pd.Series:
 class DEMACrossStrategy(BaseStrategy):
     name = "dema_cross"
 
+    def __init__(self, fast: int = 10, slow: int = 25) -> None:
+        self.fast = fast
+        self.slow = slow
+
     def generate(self, df: pd.DataFrame) -> Signal:
-        if len(df) < 25:
+        if df is None or len(df) < 35:
+            close_val = float(df["close"].iloc[-1]) if df is not None and len(df) > 0 else 0.0
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.MEDIUM,
                 strategy=self.name,
-                entry_price=float(df["close"].iloc[-1]),
-                reasoning="데이터 부족: 최소 25행 필요.",
+                entry_price=close_val,
+                reasoning="Insufficient data: minimum 35 rows required.",
                 invalidation="",
             )
 
         idx = len(df) - 2
-        dema5 = _dema(df["close"], 5)
-        dema20 = _dema(df["close"], 20)
+        dema_fast = _dema(df["close"], self.fast)
+        dema_slow = _dema(df["close"], self.slow)
 
-        d5_now = float(dema5.iloc[idx])
-        d5_prev = float(dema5.iloc[idx - 1])
-        d20_now = float(dema20.iloc[idx])
-        d20_prev = float(dema20.iloc[idx - 1])
+        df_now = float(dema_fast.iloc[idx])
+        df_prev = float(dema_fast.iloc[idx - 1])
+        ds_now = float(dema_slow.iloc[idx])
+        ds_prev = float(dema_slow.iloc[idx - 1])
 
-        cross_up = d5_prev <= d20_prev and d5_now > d20_now
-        cross_down = d5_prev >= d20_prev and d5_now < d20_now
+        if any(v != v for v in [df_now, df_prev, ds_now, ds_prev]):  # NaN check
+            entry = float(self._last(df)["close"])
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.MEDIUM,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning="NaN in DEMA values.",
+                invalidation="",
+            )
 
-        dist_pct = abs(d5_now - d20_now) / max(abs(d20_now), 1e-10)
-        conf = Confidence.HIGH if dist_pct > 0.005 else Confidence.MEDIUM
+        cross_up = df_prev < ds_prev and df_now > ds_now
+        cross_down = df_prev > ds_prev and df_now < ds_now
+
+        close_price = float(df["close"].iloc[idx])
+        dist_pct = abs(df_now - ds_now) / max(abs(close_price), 1e-10)
+        conf = Confidence.HIGH if dist_pct > 0.01 else Confidence.MEDIUM
 
         entry = float(self._last(df)["close"])
 
@@ -55,12 +72,12 @@ class DEMACrossStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"DEMA5 ({d5_now:.4f}) crossed above DEMA20 ({d20_now:.4f}). "
-                    f"이격률={dist_pct*100:.3f}%."
+                    f"DEMA_fast ({df_now:.4f}) crossed above DEMA_slow ({ds_now:.4f}). "
+                    f"dist={dist_pct*100:.3f}%."
                 ),
-                invalidation=f"DEMA5가 DEMA20 ({d20_now:.4f}) 아래로 이탈 시",
-                bull_case=f"DEMA5={d5_now:.4f} > DEMA20={d20_now:.4f}, 상향 크로스",
-                bear_case=f"이전 DEMA5={d5_prev:.4f} ≤ DEMA20={d20_prev:.4f}",
+                invalidation=f"DEMA_fast가 DEMA_slow ({ds_now:.4f}) 아래로 이탈 시",
+                bull_case=f"DEMA_fast={df_now:.4f} > DEMA_slow={ds_now:.4f}, 상향 크로스",
+                bear_case=f"이전 DEMA_fast={df_prev:.4f} < DEMA_slow={ds_prev:.4f}",
             )
 
         if cross_down:
@@ -70,12 +87,12 @@ class DEMACrossStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"DEMA5 ({d5_now:.4f}) crossed below DEMA20 ({d20_now:.4f}). "
-                    f"이격률={dist_pct*100:.3f}%."
+                    f"DEMA_fast ({df_now:.4f}) crossed below DEMA_slow ({ds_now:.4f}). "
+                    f"dist={dist_pct*100:.3f}%."
                 ),
-                invalidation=f"DEMA5가 DEMA20 ({d20_now:.4f}) 위로 회복 시",
-                bull_case=f"이전 DEMA5={d5_prev:.4f} ≥ DEMA20={d20_prev:.4f}",
-                bear_case=f"DEMA5={d5_now:.4f} < DEMA20={d20_now:.4f}, 하향 크로스",
+                invalidation=f"DEMA_fast가 DEMA_slow ({ds_now:.4f}) 위로 회복 시",
+                bull_case=f"이전 DEMA_fast={df_prev:.4f} > DEMA_slow={ds_prev:.4f}",
+                bear_case=f"DEMA_fast={df_now:.4f} < DEMA_slow={ds_now:.4f}, 하향 크로스",
             )
 
         return Signal(
@@ -84,10 +101,10 @@ class DEMACrossStrategy(BaseStrategy):
             strategy=self.name,
             entry_price=entry,
             reasoning=(
-                f"DEMA 크로스 없음. DEMA5={d5_now:.4f}, DEMA20={d20_now:.4f}, "
-                f"이격률={dist_pct*100:.3f}%."
+                f"DEMA 크로스 없음. DEMA_fast={df_now:.4f}, DEMA_slow={ds_now:.4f}, "
+                f"dist={dist_pct*100:.3f}%."
             ),
             invalidation="",
-            bull_case=f"DEMA5={d5_now:.4f}, DEMA20={d20_now:.4f}",
-            bear_case=f"DEMA5={d5_now:.4f}, DEMA20={d20_now:.4f}",
+            bull_case=f"DEMA_fast={df_now:.4f}, DEMA_slow={ds_now:.4f}",
+            bear_case=f"DEMA_fast={df_now:.4f}, DEMA_slow={ds_now:.4f}",
         )

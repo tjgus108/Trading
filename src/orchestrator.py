@@ -76,6 +76,7 @@ from src.strategy.vortex import VortexStrategy
 from src.strategy.dpo import DPOStrategy
 from src.strategy.stc import STCStrategy
 from src.strategy.dema_cross import DEMACrossStrategy
+from src.strategy.trend_slope_filter import TrendSlopeFilterStrategy
 from src.strategy.tema_cross import TEMACrossStrategy
 from src.strategy.heikin_ashi import HeikinAshiStrategy
 from src.strategy.coppock import CoppockStrategy
@@ -343,6 +344,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "dpo": DPOStrategy,
     "stc": STCStrategy,
     "dema_cross": DEMACrossStrategy,
+    "trend_slope_filter": TrendSlopeFilterStrategy,
     "tema_cross": TEMACrossStrategy,
     "heikin_ashi": HeikinAshiStrategy,
     "coppock": CoppockStrategy,
