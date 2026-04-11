@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 99 — 2026-04-11T23:09:47.951816Z
+🔄 CYCLE 100 — 2026-04-11T23:25:11.623892Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 97 COMPLETED — B + D + SIM + F** (2026-04-12 15:00 UTC)
-  **[B] Risk:** Kelly fraction=0.5 (Half-Kelly) 기본값 확인. test_kelly_sizer_default_fraction_is_half_kelly 추가 (max_fraction=0.50으로 clip 회피하여 비율 검증).
-  **[D] ML:** LLMAnalyst mock 모드 검증 (수정 없음).
-  **[SIM] Auto-improve:** positional_scaling ATR 기반 동적 풀백 범위. 고정 ±1~2% → (ATR/EMA20)*0.3. 14 tests 유지.
-  **[F] Research:** 2026 커뮤니티 핫 토픽. AI 감성 분석 통합, XAI 투명성, 규제 자동화, 인프라 견고성.
-
-**[!] 감지된 이슈:**
-  - FAIL 기록 존재
+**Cycle 99 COMPLETED — E + A + SIM + F** (2026-04-12 23:10 UTC)
+  **[E] Execution:** tests/test_notifier.py +1 XSS javascript:/onerror= 벡터 차단.
+  **[A] Quality:** tests/test_walk_forward.py +1 WF 윈도우 최소 경계 검증.
+  **[SIM] Auto-improve:** frama 2차 개선. ATR 필터 + Adaptive RSI (gap>=1% 완화, 약한 신호 엄격). **-3.77% → +1.02% 흑자 전환!** (+4.79%p, Sharpe -0.69→0.38). 17 tests 유지.
+  **[F] Research:** FRAMA noise filter + FRAMA-RSI hybrid. 131일 파라미터 최적.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

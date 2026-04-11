@@ -358,3 +358,41 @@ def test_render_html_cumulative_pnl_displayed():
     assert "Cumulative P&amp;L" in html
     assert "-345.67" in html
     assert 'color:red' in html
+
+
+def test_render_html_cycle100_milestone():
+    """cycle_count >= 100 이면 CYCLE 100 MILESTONE 금색 배지가 표시된다."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 100,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 1000.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 100 MILESTONE" in html
+    assert "#ffd700" in html
+    assert "CYCLE 90 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle100_below_100():
+    """cycle_count < 100 이면 CYCLE 100 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 99,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 100 MILESTONE" not in html
+    assert "CYCLE 90 MILESTONE" in html

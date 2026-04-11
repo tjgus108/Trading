@@ -75,6 +75,34 @@ class DataHealthCheck:
         return summary
 
 
+    def to_dict(self) -> Dict[str, Any]:
+        """상태 정보를 딕셔너리로 변환."""
+        return {
+            "live_count": self.live_count,
+            "fallback_count": self.fallback_count,
+            "disconnected_count": self.disconnected_count,
+            "total_feeds": self.total_feeds,
+            "primary_feed": self.primary_feed,
+            "is_healthy": self.is_healthy(),
+            "anomalies": self.anomalies,
+            "feeds": {
+                name: {
+                    "status": report.status.value,
+                    "is_available": report.is_available,
+                    "latency_ms": report.latency_ms,
+                    "last_update": report.last_update,
+                    "error_msg": report.error_msg,
+                    "metadata": report.metadata,
+                }
+                for name, report in self.feeds.items()
+            },
+        }
+
+    def to_json(self) -> str:
+        """상태 정보를 JSON 문자열로 변환."""
+        import json
+        return json.dumps(self.to_dict(), indent=2)
+
 class DataFeedsHealthCheck:
     """
     Data feeds 상태 수집 및 종합.

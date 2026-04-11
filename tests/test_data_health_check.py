@@ -274,3 +274,109 @@ class TestDataFeedsHealthCheck:
         assert result.is_healthy() is False
         assert result.disconnected_count == 1
         assert "all_feeds_disconnected" in result.anomalies
+
+
+class TestDataHealthCheckExport:
+    """DataHealthCheck JSON export 기능."""
+
+    def test_to_dict_basic(self):
+        """to_dict() 기본 변환."""
+        reports = {
+            "feed1": FeedHealthReport("feed1", FeedStatus.LIVE, True, latency_ms=5.0),
+        }
+        health = DataHealthCheck(
+            feeds=reports,
+            live_count=1,
+            fallback_count=0,
+            disconnected_count=0,
+            total_feeds=1,
+            primary_feed="feed1",
+        )
+        
+        data = health.to_dict()
+        
+        assert data["live_count"] == 1
+        assert data["fallback_count"] == 0
+        assert data["disconnected_count"] == 0
+        assert data["total_feeds"] == 1
+        assert data["primary_feed"] == "feed1"
+        assert data["is_healthy"] is True
+        assert "feed1" in data["feeds"]
+
+    def test_to_dict_with_anomalies(self):
+        """to_dict() with anomalies."""
+        reports = {
+            "feed1": FeedHealthReport("feed1", FeedStatus.DISCONNECTED, False),
+        }
+        health = DataHealthCheck(
+            feeds=reports,
+            live_count=0,
+            fallback_count=0,
+            disconnected_count=1,
+            total_feeds=1,
+            anomalies=["all_feeds_disconnected"],
+        )
+        
+        data = health.to_dict()
+        
+        assert data["is_healthy"] is False
+        assert data["anomalies"] == ["all_feeds_disconnected"]
+
+    def test_to_dict_feed_details(self):
+        """to_dict() includes feed details."""
+        report = FeedHealthReport(
+            "test_feed",
+            FeedStatus.LIVE,
+            True,
+            latency_ms=10.5,
+            last_update="2024-01-01T10:00:00Z",
+            error_msg=None,
+            metadata={"cache_size": 100},
+        )
+        health = DataHealthCheck(feeds={"test_feed": report}, live_count=1, total_feeds=1)
+        
+        data = health.to_dict()
+        feed_data = data["feeds"]["test_feed"]
+        
+        assert feed_data["status"] == "LIVE"
+        assert feed_data["is_available"] is True
+        assert feed_data["latency_ms"] == 10.5
+        assert feed_data["last_update"] == "2024-01-01T10:00:00Z"
+        assert feed_data["metadata"]["cache_size"] == 100
+
+    def test_to_json_valid_json(self):
+        """to_json() produces valid JSON."""
+        import json
+        
+        reports = {
+            "feed1": FeedHealthReport("feed1", FeedStatus.LIVE, True),
+            "feed2": FeedHealthReport("feed2", FeedStatus.FALLBACK, True),
+        }
+        health = DataHealthCheck(
+            feeds=reports,
+            live_count=1,
+            fallback_count=1,
+            total_feeds=2,
+            primary_feed="feed1",
+        )
+        
+        json_str = health.to_json()
+        
+        # Should parse without error
+        parsed = json.loads(json_str)
+        assert parsed["live_count"] == 1
+        assert parsed["fallback_count"] == 1
+        assert parsed["total_feeds"] == 2
+
+    def test_to_json_formatting(self):
+        """to_json() is properly formatted (indented)."""
+        reports = {
+            "feed1": FeedHealthReport("feed1", FeedStatus.LIVE, True),
+        }
+        health = DataHealthCheck(feeds=reports, live_count=1, total_feeds=1)
+        
+        json_str = health.to_json()
+        
+        # Indented JSON should have newlines and spaces
+        assert "\n" in json_str
+        assert "  " in json_str  # 2-space indent
