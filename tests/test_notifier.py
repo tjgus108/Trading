@@ -115,7 +115,7 @@ class TestMessageFormat:
         result = _make_pipeline_result(signal=_make_signal())
         msg = _format_pipeline(result)
         assert "BUY" in msg
-        assert "65000.00" in msg
+        assert "65,000.00" in msg
         assert "HIGH" in msg
 
     def test_pipeline_with_risk_approved(self):
@@ -237,3 +237,23 @@ class TestSendBehavior:
         with patch.object(notifier, "_send") as mock_send:
             notifier.notify_pipeline(result)
             mock_send.assert_called_once()
+
+    def test_error_message_html_bold(self):
+        """notify_error wraps [ERROR] in HTML bold tags."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error("disk full")
+        assert "<b>[ERROR]</b>" in captured[0]
+        assert "disk full" in captured[0]
+
+    def test_startup_separator_and_html_bold(self):
+        """notify_startup includes separator line and HTML bold for mode."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_startup("rsi_cross", "SOL/USDT", dry_run=True)
+        msg = captured[0]
+        assert "---" in msg
+        assert "<b>[STARTUP]</b>" in msg
+        assert "<b>DRY RUN</b>" in msg

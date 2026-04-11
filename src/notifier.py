@@ -58,7 +58,7 @@ class TelegramNotifier:
         """Send a plain error alert."""
         if not self._enabled:
             return
-        text = f"[ERROR] {message}"
+        text = f"<b>[ERROR]</b> {message}"
         self._send(text)
 
     def notify_startup(self, strategy: str, symbol: str, dry_run: bool) -> None:
@@ -67,10 +67,11 @@ class TelegramNotifier:
             return
         mode = "DRY RUN" if dry_run else "LIVE"
         text = (
-            f"[STARTUP] Trading bot started\n"
-            f"Strategy: {strategy}\n"
-            f"Symbol:   {symbol}\n"
-            f"Mode:     {mode}"
+            f"<b>[STARTUP]</b> Trading bot started\n"
+            f"---\n"
+            f"Strategy : {strategy}\n"
+            f"Symbol   : {symbol}\n"
+            f"Mode     : <b>{mode}</b>"
         )
         self._send(text)
 
@@ -104,42 +105,42 @@ class TelegramNotifier:
 def _format_pipeline(result: PipelineResult) -> str:
     """Build a concise, emoji-free plain-text summary of a PipelineResult."""
     lines = [
-        f"[PIPELINE] {result.timestamp}",
-        f"Symbol:   {result.symbol}",
-        f"Step:     {result.pipeline_step}",
-        f"Status:   {result.status}",
+        f"<b>[PIPELINE]</b> {result.timestamp}",
+        f"Symbol : {result.symbol}",
+        f"Step   : {result.pipeline_step}",
+        f"Status : <b>{result.status}</b>",
     ]
 
     if result.signal:
         sig = result.signal
         lines.append(
-            f"Signal:   {sig.action.value} @ {sig.entry_price:.2f}"
+            f"Signal : {sig.action.value} @ {sig.entry_price:,.2f}"
             f"  ({sig.confidence.value})"
         )
 
     if result.risk:
         risk = result.risk
-        risk_line = f"Risk:     {risk.status.value}"
+        risk_line = f"Risk   : {risk.status.value}"
         if risk.reason:
             risk_line += f" — {risk.reason}"
         lines.append(risk_line)
         if risk.position_size is not None:
             lines.append(
                 f"  size={risk.position_size:.4f}"
-                f"  SL={risk.stop_loss}"
-                f"  TP={risk.take_profit}"
+                f"  SL={risk.stop_loss:,.2f}"
+                f"  TP={risk.take_profit:,.2f}"
             )
 
     if result.execution:
         exec_status = result.execution.get("status", "UNKNOWN")
-        lines.append(f"Exec:     {exec_status}")
+        lines.append(f"Exec   : {exec_status}")
         if result.execution.get("order_id"):
             lines.append(f"  order_id={result.execution['order_id']}")
 
     if result.notes:
-        lines.append(f"Notes:    {' | '.join(result.notes)}")
+        lines.append(f"Notes  : {' | '.join(result.notes)}")
 
     if result.error:
-        lines.append(f"Error:    {result.error}")
+        lines.append(f"Error  : {result.error}")
 
     return "\n".join(lines)

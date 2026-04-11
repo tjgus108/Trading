@@ -45,7 +45,8 @@
 - ✅ Cycle 37 완료 (B+D+F: Risk 통합 테스트 + LLM research_insights + ccxt best)
 - ✅ Cycle 38 완료 (E+A+F: env overrides + MC 회귀 + Kimchi Premium)
 - ✅ Cycle 39 완료 (C+B+F: VPIN 극단 + Risk 시나리오 + 스테이블코인 디페깅)
-- ⏳ **Cycle 40 대기** 🎯 (D+E+F)
+- ✅ **Cycle 40 완료** 🎯 (D+E+F: adaptive_selector + Notifier HTML + 2026 전망)
+- ⏳ **Cycle 41 대기** (A+C+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -54,7 +55,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,034개** |
+| ✅ 통과 테스트 | **6,038개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

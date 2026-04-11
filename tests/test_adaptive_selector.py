@@ -155,6 +155,25 @@ def test_consistency_summary_keys():
     assert all(0.0 <= v <= 1.0 for v in result.values())
 
 
+def test_select_single_strategy():
+    """단일 전략일 때 select()가 항상 해당 전략을 반환."""
+    strats = {"solo": _make_strategy("solo")}
+    sel = AdaptiveStrategySelector(strats, window=10)
+    result = sel.select()
+    assert result.name == "solo"
+
+
+def test_select_empty_history_all_negative_sharpe():
+    """모든 Sharpe가 음수(데이터 부족)이면 균등 선택 — select() 에러 없음."""
+    sel = _make_selector()
+    # 4개만 기록 (MIN_SAMPLES 미달) → sharpe=0 → total=0 → 균등 선택
+    sel.record_pnl("ema_cross", -5.0)
+    sel.record_pnl("rsi_div", -5.0)
+    result = sel.select()
+    assert result is not None
+    assert result.name in ["ema_cross", "rsi_div", "funding"]
+
+
 def test_window_cap():
     """window=5 초과 기록 시 오래된 데이터 버림."""
     strats = {"a": _make_strategy("a")}

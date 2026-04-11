@@ -1,33 +1,27 @@
 ======================================================================
-🔄 CYCLE 39 — 2026-04-11T08:51:19.911895Z
+🔄 CYCLE 40 — 2026-04-11T08:54:14.096747Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 38 COMPLETED — E + A + F** (2026-04-11 14:45 UTC)
-  **[E] Execution:** src/config.py _apply_env_overrides() 추가. EXCHANGE_NAME/SANDBOX, TRADING_SYMBOL/TIMEFRAME/DRY_RUN, RISK_PER_TRADE 등 환경 변수 override. API 키는 env 전용 명시. +2 tests.
-  **[A] Quality:** tests/test_monte_carlo.py +3 회귀 테스트 (Cycle 36 빈 배열 버그 수정 검증). empty/zero_target_len/many_nans.
-  **[F] Research:** Kimchi Premium 2024-2025. 2~5%→2025년 말 -0.18% 디스카운트 고착화. 직접 차익 불가 (외환법 + VAPUA). 프리미엄 -2% 이하 시 DCA 집중 전략 백테스트 187% vs 64%. 센티먼트 지표로만 활용 권장.
-  **Tests:** 6030 passed (+5 from Cycle 37).
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
-  - FAIL 기록 존재
-  - ERROR 기록 존재
-  - pending 항목 존재
+**Cycle 39 COMPLETED — C + B + F** (2026-04-11 15:05 UTC)
+  **[C] Data:** tests/test_order_flow.py +2 VPIN 극단 경계. 매수 99%/매도 99% 시 VPIN [0.8~1.0] 유지 검증.
+  **[B] Risk:** tests/test_risk_manager.py +2 통합 시나리오. DD 4.9%+아시아 REDUCED+노출 29.4% 한계 직전 → 포지션 50% 축소 APPROVED. Kelly 20%+기존 노출 20% → exposure BLOCKED.
+  **[F] Research:** 스테이블코인 디페깅. USDT SVB 시 $1 위 상승(안전자산), USDC $0.87, Ethena USDe 2025.10 $0.65. 디페깅→DeFi 연쇄 청산. USDT 기반 페어 우선 + 실시간 디페깅 감지 권장.
+  **Tests:** 6034 passed (+4 from Cycle 38).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
