@@ -225,3 +225,33 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=+0.00 news=NONE
 Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 01:22 UTC] Cycle 1 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 01:30 UTC] Cycle 1 COMPLETED — A + C + F
+**[A] Quality:** tests/test_phase_a_strategies.py + tests/test_volatility_breakout_v2.py의 pandas ChainedAssignmentWarning 수정 (.iloc → .loc 변경). 5739 passed, ChainedAssignmentWarning 완전 제거.
+**[C] Data:** src/data/websocket_feed.py:109-111 stop() race condition 가드 추가 (_loop is not None). DataFeed TTL 캐시 검토 완료 — 이슈 없음.
+**[F] Research:** .claude-state/RESEARCH_LOG.md 생성. 2024-2025 신규 케이스 7건 추가 (실패 4 + 성공 3). 핵심 인사이트:
+  1. 봇이 변동성을 증폭 (Oct 2025 $19B 청산 캐스케이드)
+  2. Sharpe만 본 전략은 위험 (SuperTrend AI 95% 수익에도 Sharpe 0.558)
+  3. 6개월 내 73% 봇 실패 — 과최적화 + 레짐 무대응 + 리스크 부재
+**Next Cycle:** 2 (B+D+F — 리스크+ML+리서치)
+
+## [2026-04-11 01:24 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 01:25 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order

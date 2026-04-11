@@ -33,7 +33,7 @@ def _make_buy_df(n: int = 25) -> pd.DataFrame:
     })
     # ATR ~= 4, prev_close ~= 100, upper = 100 + 0.5*4 = 102
     # HIGH: (close - upper)/atr > 0.3 → close > 102 + 0.3*4 = 103.2
-    df["close"].iloc[-2] = 110.0  # well above upper
+    df.loc[df.index[-2], "close"] = 110.0  # well above upper
     return df
 
 
@@ -48,7 +48,7 @@ def _make_sell_df(n: int = 25) -> pd.DataFrame:
         "volume": np.ones(n) * 1000.0,
     })
     # lower = 100 - 0.5*4 = 98
-    df["close"].iloc[-2] = 90.0  # well below lower
+    df.loc[df.index[-2], "close"] = 90.0  # well below lower
     return df
 
 
@@ -149,7 +149,7 @@ def test_buy_medium_confidence():
     })
     # ATR ~4, upper ~102, HIGH threshold = 0.3*4=1.2, so >103.2 → HIGH
     # MEDIUM: 102 < close <= 103.2
-    df["close"].iloc[-2] = 102.5  # ratio = 0.5/4 = 0.125 < 0.3 → MEDIUM
+    df.loc[df.index[-2], "close"] = 102.5  # ratio = 0.5/4 = 0.125 < 0.3 → MEDIUM
     sig = strategy.generate(df)
     if sig.action == Action.BUY:
         assert sig.confidence == Confidence.MEDIUM

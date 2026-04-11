@@ -174,7 +174,7 @@ class TestResidualMeanReversionStrategy:
         alt_df = _make_df(120, start_price=2000.0, seed=1)
         btc_df = _make_df(120, start_price=50000.0, seed=2)
         # alt 마지막 10개 캔들을 급등 패턴으로
-        alt_df["close"].iloc[-15:] = alt_df["close"].iloc[-15] * np.linspace(1.0, 1.3, 15)
+        alt_df.loc[alt_df.index[-15:], "close"] = alt_df["close"].iloc[-15] * np.linspace(1.0, 1.3, 15)
 
         strategy = ResidualMeanReversionStrategy(window=20)
         strategy.set_btc_data(btc_df)
@@ -241,7 +241,7 @@ class TestPairTradingStrategy:
         btc_df = _make_df(120, start_price=50000.0, seed=20)
         eth_df = _make_df(120, start_price=3000.0, seed=21)
         # BTC 최근 30개 캔들 급등 (ETH는 그대로)
-        btc_df["close"].iloc[-30:] = btc_df["close"].iloc[-30] * np.linspace(1.0, 1.5, 30)
+        btc_df.loc[btc_df.index[-30:], "close"] = btc_df["close"].iloc[-30] * np.linspace(1.0, 1.5, 30)
 
         strategy = PairTradingStrategy(spread_window=60, beta_window=80)
         strategy.set_eth_data(eth_df)
@@ -253,7 +253,7 @@ class TestPairTradingStrategy:
         btc_df = _make_df(120, start_price=50000.0, seed=30)
         eth_df = _make_df(120, start_price=3000.0, seed=31)
         # BTC 최근 30개 캔들 급락
-        btc_df["close"].iloc[-30:] = btc_df["close"].iloc[-30] * np.linspace(1.0, 0.6, 30)
+        btc_df.loc[btc_df.index[-30:], "close"] = btc_df["close"].iloc[-30] * np.linspace(1.0, 0.6, 30)
 
         strategy = PairTradingStrategy(spread_window=60, beta_window=80)
         strategy.set_eth_data(eth_df)

@@ -1,6 +1,17 @@
 # 🤖 트레이딩 봇 진행 상황
 
-## 📅 최근 업데이트: 2026-04-10
+## 📅 최근 업데이트: 2026-04-11
+
+---
+
+## 🎯 자동화 상태
+
+**5시간 주기 로테이션 활성화** ([MASTER_PLAN.md](.claude-state/MASTER_PLAN.md))
+- ✅ Cycle 1 완료 (A+C+F: 품질+데이터+리서치)
+- ⏳ **Cycle 2 대기** (B+D+F: 리스크+ML+리서치)
+- Cycle 3: E+A+F (실행+품질+리서치)
+- Cycle 4: C+B+F (데이터+리스크+리서치)
+- Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
 
@@ -8,10 +19,29 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,600개+** |
-| ❌ 실패 테스트 | **0개** |
-| ⏭️ 스킵 | 20개 |
-| 🎯 전략 파일 수 | **387개** |
+| ✅ 통과 테스트 | **5,739개** |
+| ❌ 실패 테스트 | 0 ✅ |
+| ⏭️ 스킵 | 25 |
+| 🎯 전략 등록 | **355개** (42개 정리) |
+| 🏆 PASS 전략 | **23개** (Sharpe ≥ 1.0, PF ≥ 1.5, Trades ≥ 15) |
+| 🔗 다양성 전략 | **21개** (\|corr\| < 0.7) |
+| 🧪 Research 사례 | 7건 추가 (2024-2025 신규) |
+
+---
+
+## 📝 Cycle 1 결과
+
+**[A] Quality Assurance** ✅
+- pandas Copy-on-Write 경고 해결 (.iloc → .loc)
+- 수정: `tests/test_phase_a_strategies.py`, `tests/test_volatility_breakout_v2.py`
+
+**[C] Data & Infrastructure** ✅
+- `src/data/websocket_feed.py` stop() race condition 가드 추가
+- DataFeed TTL 캐시 검토 — 이슈 없음
+
+**[F] Research** ✅
+- `.claude-state/RESEARCH_LOG.md` 작성 (실패 4 + 성공 3 케이스)
+- 핵심 인사이트: 봇이 변동성 증폭 / Sharpe 단독은 위험 / 73% 6개월 내 실패
 
 ---
 
