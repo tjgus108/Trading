@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 54 — 2026-04-11T09:42:58.444198Z
+🔄 CYCLE 55 — 2026-04-11T09:46:50.617655Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 53 COMPLETED — E + A + F** (2026-04-11 20:15 UTC)
-  **[E] Execution:** src/exchange/connector.py create_order max_retries=2. NetworkError/RequestTimeout 시 1초 대기 재시도. +2 tests.
-  **[A] Quality:** tests/test_pipeline_specialist.py +3 통합 테스트. Specialist→TWAP 전체 흐름, Specialist 충돌 alpha block, Kelly+VolTargeting 순차 조정.
-  **[F] Research:** ATR 배수 최적값. 손절 1.5x + 익절 3.0x (R:R 1:2) 장기 유리. 단타 1.5-2.0x, 포지션 2.5-3.5x. 3x ATR 손절이 고정 대비 15% 향상.
-  **Tests:** 6113 passed (+5 from Cycle 52).
+**Cycle 54 COMPLETED — C + B + F** (2026-04-11 20:40 UTC)
+  **[C] Data:** src/data/feed.py rate limit 감지 추가. _is_rate_limit_error() + _backoff_with_rate_limit() (4/6/8초). 다른 transient는 기존 짧은 backoff. +6 tests.
+  **[B] Risk CRITICAL:** src/risk/portfolio_optimizer.py _apply_constraints() NaN/inf 버그 수정. np.isfinite 체크 + clip(w,0)/sum 강제 정규화. 이전에는 NaN weights 그대로 반환됨. +2 tests.
+  **[F] Research:** ETF flows as signal. 2025 $46.7B 유입, 누적 $56.9B. ETF 월간 플로우 > LTH 공급 > 규제 > Fed 순 우선. 월별 보조 필터로 추가 권장.
+  **Tests:** 6121 passed (+8 from Cycle 53).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

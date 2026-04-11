@@ -28,8 +28,8 @@ def config_file(tmp_path):
         risk:
           max_drawdown: 0.20
           max_daily_loss: 0.05
-          stop_loss: 1.5
-          take_profit: 3.0
+          stop_loss_atr_multiplier: 1.5
+          take_profit_atr_multiplier: 3.0
           risk_per_trade: 0.01
         logging:
           level: INFO
@@ -96,8 +96,8 @@ def test_unknown_strategy_raises(tmp_path):
         risk:
           max_drawdown: 0.20
           max_daily_loss: 0.05
-          stop_loss: 1.5
-          take_profit: 3.0
+          stop_loss_atr_multiplier: 1.5
+          take_profit_atr_multiplier: 3.0
           risk_per_trade: 0.01
         logging:
           level: INFO

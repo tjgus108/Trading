@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from src.backtest.engine import BacktestEngine
+from src.backtest.walk_forward import WalkForwardValidator
 from src.strategy.ema_cross import EmaCrossStrategy
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 
@@ -90,17 +91,46 @@ def test_backtest_report_to_markdown():
 def test_backtest_report_markdown_vs_summary():
     """to_markdown()는 to_summary()보다 콤팩트해야 함."""
     from src.backtest.report import BacktestReport
-    
+
     trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}]
     report = BacktestReport.from_trades(trades)
-    
+
     markdown = report.to_markdown()
     summary = report.summary()
-    
+
     # markdown은 테이블 형식 (줄 수 적음), summary는 텍스트 형식
     markdown_lines = len(markdown.split('\n'))
     summary_lines = len(summary.split('\n'))
-    
+
     assert markdown_lines < summary_lines
     assert markdown.count('|') >= 16  # 최소 header + separators + 8 rows
+
+
+# ---------------------------------------------------------------------------
+# WalkForwardValidator 경계 조건 테스트
+# ---------------------------------------------------------------------------
+
+def test_walk_forward_validator_raises_on_insufficient_data():
+    """데이터가 train+test보다 짧으면 ValueError가 발생해야 한다."""
+    validator = WalkForwardValidator(train_window=200, test_window=50, step_size=50)
+    df = _make_trending_df(n=100)  # 100 < 200+50
+    with pytest.raises(ValueError, match="데이터 부족"):
+        validator.validate(df, EmaCrossStrategy())
+
+
+def test_walk_forward_validator_exact_minimum_data():
+    """train+test 정확히 최소 크기 데이터로 윈도우 1개가 생성되어야 한다."""
+    train, test = 200, 50
+    validator = WalkForwardValidator(train_window=train, test_window=test, step_size=test)
+    df = _make_trending_df(n=train + test)  # 정확히 최솟값
+    result = validator.validate(df, EmaCrossStrategy())
+    assert result.windows == 1
+    assert 0.0 <= result.consistency_score <= 1.0
+    assert len(result.results) == 1
+    # 첫 윈도우 메타데이터 검증
+    w = result.results[0]
+    assert w["train_start"] == 0
+    assert w["train_end"] == train - 1
+    assert w["test_start"] == train
+    assert w["test_end"] == train + test - 1
 
