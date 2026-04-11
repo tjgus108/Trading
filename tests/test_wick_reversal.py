@@ -221,3 +221,91 @@ def test_min_rows_boundary():
     df = _make_df(n=strategy.MIN_ROWS)
     sig = strategy.generate(df)
     assert isinstance(sig, Signal)
+
+
+# ── 16. Hammer + trend_up=True (추세 필터 검증) ──────────────────────────
+def test_hammer_with_trend_up_true():
+    """
+    Hammer + 최근 고점 근처 → trend_up=True → BUY
+    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
+    마지막 봉(idx=28): high는 자동 설정되어 있음
+    """
+    df = _make_df(n=30, pattern="hammer", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
+    idx_last = len(df) - 2  # 28
+    
+    # 14기간 이전(15~28): high=100.0으로 일정하게
+    for i in range(15, idx_last + 1):
+        df.at[i, "high"] = 100.0
+    
+    # 마지막 봉(28): high=100.0 (= high_14*0.99 이상)
+    # high_14 = 100.0, trend_up = 100.0 >= 100*0.99 = True
+    
+    sig = strategy.generate(df)
+    assert sig.action == Action.BUY
+    assert "trend_up=True" in sig.reasoning
+
+
+# ── 17. Hammer + trend_up=False (추세 필터 검증) ─────────────────────────
+def test_hammer_with_trend_up_false():
+    """
+    Hammer + 최근 고점에서 멀림 → trend_up=False → HOLD
+    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
+    마지막 봉(idx=28): high를 high_14*0.99 미만으로 설정
+    """
+    df = _make_df(n=30, pattern="hammer", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
+    idx_last = len(df) - 2  # 28
+    
+    # 14기간 이전(15~28): high=105.0으로 높게
+    for i in range(15, idx_last + 1):
+        df.at[i, "high"] = 105.0
+    
+    # 마지막 봉(28): high=103.0 (< high_14*0.99 = 103.95)
+    df.at[idx_last, "high"] = 103.0
+    
+    sig = strategy.generate(df)
+    assert sig.action == Action.HOLD
+    assert "trend_up=False" in sig.reasoning
+
+
+# ── 18. Shooting Star + trend_down=True (추세 필터 검증) ──────────────────
+def test_shooting_star_with_trend_down_true():
+    """
+    Shooting Star + 최근 저점 근처 → trend_down=True → SELL
+    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
+    마지막 봉(idx=28): low는 자동 설정되어 있음
+    """
+    df = _make_df(n=30, pattern="shooting_star", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
+    idx_last = len(df) - 2  # 28
+    
+    # 14기간 이전(15~28): low=100.0으로 일정하게
+    for i in range(15, idx_last + 1):
+        df.at[i, "low"] = 100.0
+    
+    # 마지막 봉(28): low=100.0 (= low_14*1.01 이하)
+    # low_14 = 100.0, trend_down = 100.0 <= 100*1.01 = True
+    
+    sig = strategy.generate(df)
+    assert sig.action == Action.SELL
+    assert "trend_down=True" in sig.reasoning
+
+
+# ── 19. Shooting Star + trend_down=False (추세 필터 검증) ─────────────────
+def test_shooting_star_with_trend_down_false():
+    """
+    Shooting Star + 최근 저점에서 멀림 → trend_down=False → HOLD
+    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
+    마지막 봉(idx=28): low를 low_14*1.01 초과로 설정
+    """
+    df = _make_df(n=30, pattern="shooting_star", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
+    idx_last = len(df) - 2  # 28
+    
+    # 14기간 이전(15~28): low=95.0으로 낮게
+    for i in range(15, idx_last + 1):
+        df.at[i, "low"] = 95.0
+    
+    # 마지막 봉(28): low=96.5 (> low_14*1.01 = 95.95)
+    df.at[idx_last, "low"] = 96.5
+    
+    sig = strategy.generate(df)
+    assert sig.action == Action.HOLD
+    assert "trend_down=False" in sig.reasoning

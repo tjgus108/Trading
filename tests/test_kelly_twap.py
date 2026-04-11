@@ -419,3 +419,62 @@ class TestTWAPPartialAndTimeout:
 
         assert result.timeout_occurred is False
         assert result.slices_executed == 3
+
+
+# ---------------------------------------------------------------------------
+# TWAP 슬라이스 합계 검증 테스트
+# ---------------------------------------------------------------------------
+
+class TestTWAPSliceSum:
+
+    def test_slice_sum_equals_total_qty_no_partial(self):
+        """부분 체결 없을 때 슬라이스 합계 == total_qty."""
+        import unittest.mock as mock
+
+        executor = TWAPExecutor(n_slices=5, interval_seconds=0, dry_run=True)
+        total_qty = 10.0
+        slice_qty = total_qty / executor.n_slices  # 2.0
+
+        # fill_ratio를 항상 1.0으로 고정 (부분 체결 없음)
+        with mock.patch("numpy.random.random", return_value=1.0), \
+             mock.patch("numpy.random.uniform", return_value=0.0):
+            result = executor.execute(
+                connector=None,
+                symbol="BTC/USDT",
+                side="buy",
+                total_qty=total_qty,
+                price_limit=50_000.0,
+            )
+
+        assert result.slices_executed == 5
+        assert abs(result.filled_qty - total_qty) < 1e-9, (
+            f"filled_qty {result.filled_qty} != total_qty {total_qty}"
+        )
+
+    def test_slice_sum_equals_total_qty_various_sizes(self):
+        """다양한 total_qty와 n_slices 조합에서 슬라이스 합계 == total_qty."""
+        import unittest.mock as mock
+
+        cases = [
+            (3, 9.0),
+            (7, 1.0),
+            (4, 0.123456),
+        ]
+        for n_slices, total_qty in cases:
+            executor = TWAPExecutor(n_slices=n_slices, interval_seconds=0, dry_run=True)
+
+            with mock.patch("numpy.random.random", return_value=1.0), \
+                 mock.patch("numpy.random.uniform", return_value=0.0):
+                result = executor.execute(
+                    connector=None,
+                    symbol="ETH/USDT",
+                    side="sell",
+                    total_qty=total_qty,
+                    price_limit=2000.0,
+                )
+
+            assert result.slices_executed == n_slices
+            assert abs(result.filled_qty - total_qty) < 1e-9, (
+                f"n_slices={n_slices}, total_qty={total_qty}: "
+                f"filled_qty={result.filled_qty}"
+            )

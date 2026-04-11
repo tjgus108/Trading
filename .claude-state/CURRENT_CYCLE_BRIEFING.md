@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 82 — 2026-04-11T15:43:38.161411Z
+🔄 CYCLE 83 — 2026-04-11T15:54:59.659753Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 81 COMPLETED — A + C + F** (2026-04-12 06:30 UTC)
-  **[A] Quality:** src/backtest/report.py from_json() 클래스메서드 추가. to_json↔from_json 대칭 구현, inf/nan 복원. +3 tests.
-  **[C] Data:** tests/test_feed_boundary.py +2 TTL 경계 (ttl=0 비활성, 매우 큰 값).
-  **[F] Research:** USDT Risk. S&P 2025 최저 등급 하향, BTC 준비금 5.6%. GENIUS Act 거래소 상장폐지 가능성. USDC/FDUSD 폴백 페어 권장.
-  **Tests:** 6239 passed (+5 from Cycle 80).
+**Cycle 82 COMPLETED — B + D + SIM + F (신규 SIM 카테고리!)** (2026-04-12 06:55 UTC)
+  **[B] Risk:** tests/test_portfolio_optimizer.py +2 VaR/CVaR 경계 (T=2 최소, 극단 loss tail).
+  **[D] ML:** tests/test_llm_analyst.py +3 _parse_response 경계 (특수문자, 빈 문자열, 마크다운).
+  **[SIM] 신규 카테고리 첫 실행:** Paper simulation 실행 → wick_reversal 개선.
+    - 문제: 합성 데이터에서 -14.17% 손실, Sharpe -3.08, 80 거래 과다
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

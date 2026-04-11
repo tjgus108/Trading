@@ -57,7 +57,12 @@
     * 거래 빈도 제어 (80개→20개 거래, 75% 감소)
     * 개선 후 합성 데이터 테스트: 4.07% 수익, 20 거래, SR 1.62, MDD 4.6%
   - 모든 wick_reversal 관련 테스트 16개 통과
+- Cycle 83 (Research): Engulfing / Frama 실전 유효성 조사
+  - FRAMA는 동적 지지/저항 역할, Engulfing은 반등 확인 신호로 조합 사용
+  - 단독 시 Engulfing 50~70% 정확도 → Cycle 82에서 engulfing_zone(-12.74%), frama(-7.89%) 손실
+  - 개선 방향: RSI(과매수/과매도) + Volume(패턴 신뢰도) 이중 필터 추가
 
 ## 남은 작업
 - TWAP per-slice 타임아웃(dry_run=False 경로) 추가 커버리지 고려
 - 거래소 커넥터 통합 테스트 (mock connector 기반)
+- engulfing_zone / frama 전략 RSI+Volume 필터 개선 검토
