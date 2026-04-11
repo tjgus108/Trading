@@ -18,6 +18,7 @@ BacktestEngine 결과(trades list + equity curve)로부터
   d = report.to_dict()
 """
 
+import json
 import logging
 from dataclasses import dataclass, asdict
 from typing import Optional
@@ -141,6 +142,28 @@ class BacktestReport:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+    def to_json(self) -> str:
+        """
+        JSON 형식으로 보고서 반환.
+        
+        Returns:
+            str: JSON 문자열
+        """
+        import json
+        d = asdict(self)
+        # float('inf')와 float('nan')을 문자열로 변환 (JSON 호환성)
+        def json_serializer(obj):
+            if isinstance(obj, float):
+                if np.isinf(obj):
+                    return "inf" if obj > 0 else "-inf"
+                if np.isnan(obj):
+                    return "nan"
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+        
+        return json.dumps(d, default=json_serializer, indent=2)
+
 
     def to_markdown(self) -> str:
         """

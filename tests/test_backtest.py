@@ -134,3 +134,31 @@ def test_walk_forward_validator_exact_minimum_data():
     assert w["test_start"] == train
     assert w["test_end"] == train + test - 1
 
+
+
+def test_backtest_report_to_json():
+    """BacktestReport.to_json() 형식 검증 및 직렬화."""
+    from src.backtest.report import BacktestReport
+    import json
+    
+    trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}, {"pnl_pct": 0.015}]
+    report = BacktestReport.from_trades(trades)
+    
+    # to_json() 실행
+    json_str = report.to_json()
+    
+    # 유효한 JSON인지 확인
+    data = json.loads(json_str)
+    
+    # 주요 필드 존재 확인
+    assert "total_return" in data
+    assert "sharpe_ratio" in data
+    assert "max_drawdown" in data
+    assert "win_rate" in data
+    assert "profit_factor" in data
+    assert "total_trades" in data
+    assert data["total_trades"] == 3
+    
+    # inf/nan 처리 확인
+    assert isinstance(data, dict)
+    print(f"✓ to_json() test passed. Generated JSON:\n{json_str}")

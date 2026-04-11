@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 65 — 2026-04-11T10:29:22.542949Z
+🔄 CYCLE 66 — 2026-04-11T10:32:37.713398Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 64 COMPLETED — C + B + F** (2026-04-12 00:40 UTC)
-  **[C] Data:** src/data/feed.py _validate_ohlc_relationships() 신규. high>=max(open,close), low<=min(open,close), high>=low 검증, anomaly 리스트 자동 포함. +4 tests.
-  **[B] Risk:** Kelly Sizer avg_loss=0 버그 없음 확인. avg_win 분모 사용, DD 제약 건너뛰기 로직 정상. +2 경계 테스트.
-  **[F] Research:** Best bot ROIs. 통계적 차익거래 연 42% Sharpe 2.3 MDD 9% (검증 최고). JUP DCA 193% 6개월 20x (고리스크). Bitsgap Grid 11%/30일 (안전).
-  **Tests:** 6166 passed (+6 from Cycle 63).
+**Cycle 65 COMPLETED — D + E + F** (2026-04-12 01:00 UTC)
+  **[D] ML:** tests/test_phase_b_context.py TestCompositeScoreEdge +2. 극단 bullish → +3.0, 극단 bearish → -3.0 clamp 검증.
+  **[E] Execution:** tests/test_scheduler.py +2 비정상 interval (0, -1m, 999999h, 빈, 0m) ValueError 검증.
+  **[F] Research:** AI agent trading 논문 2025. Trading-R1 (arXiv 2509.11420) LLM+RL 3단계 커리큘럼, Agent Trading Arena LLM 수치 추론 취약성 발견, TradingAgents 멀티에이전트 debate. 현 SpecialistEnsemble 구조와 일치.
+  **Tests:** 6174 passed (+8 from Cycle 64).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
