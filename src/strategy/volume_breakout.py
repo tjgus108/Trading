@@ -1,9 +1,9 @@
 """
-Volume Breakout 전략:
-- BUY: volume spike(>2x 평균) AND 양봉(close>open) AND close > ema20
-- SELL: volume spike(>2x 평균) AND 음봉(close<open) AND close < ema20
-- HOLD: 그 외
-- confidence: HIGH(volume > 3x 평균), MEDIUM(volume > 2x 평균)
+Volume Breakout 전략 (개선):
+- 스파이크 기준 2.0x → 1.8x 완화 (거래 빈도 증가)
+- BUY: volume spike(>1.8x 평균) AND 양봉(close>open) AND close > ema20
+- SELL: volume spike(>1.8x 평균) AND 음봉(close<open) AND close < ema20
+- confidence: HIGH(volume > 2.5x 평균), MEDIUM(volume > 1.8x 평균)
 - 최소 데이터: 25행
 """
 
@@ -13,8 +13,8 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _MIN_ROWS = 25
 _VOL_LOOKBACK = 20
-_SPIKE_MULT = 2.0
-_HIGH_CONF_MULT = 3.0
+_SPIKE_MULT = 1.8  # 2.0 → 1.8 (거래 증가)
+_HIGH_CONF_MULT = 2.5  # 3.0 → 2.5
 
 
 class VolumeBreakoutStrategy(BaseStrategy):

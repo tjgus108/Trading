@@ -1,31 +1,23 @@
-# Cycle 88 - Q1 2026 리서치
+# Cycle 88 개선 완료 — Volume Breakout
 
-## [2026-04-11] Cycle 88 — Q1 2026 Lessons
-- BTC Q1 -22%, 고점 대비 -30% 하락 — 트렌드 추종 봇은 whipsaw로 손실
-- 그리드/DCA 전략이 횡보 구간(전체 60~70%)에서 상대적으로 유리
-- 과최적화(curve-fitting) 봇은 레짐 전환 시 실패 — 백테스트 성과 ≠ 실거래
-- circuit breaker 미탑재 봇은 플래시크래시 시 최악 가격에 청산
+## 개선 대상
+**volume_breakout** — 거래 빈도 부족 (15 → 목표 30+)
 
-## 시사점 (봇 개선 방향)
-- 레짐 감지 강화 (trending vs. ranging 구분)
-- MDD 방어용 circuit breaker 로직 추가 고려
-- lob_maker PF 1.5 미달 — VPIN 임계값 상향 재시도
+## 수정 사항
+- `_SPIKE_MULT`: 2.0x → 1.8x (스파이크 기준 완화)
+- `_HIGH_CONF_MULT`: 3.0x → 2.5x (고확신 기준 조정)
+- 목표: 거래 수 증가로 통계적 의미 확보
 
-## 이전 미완성
-- lob_maker Profit Factor 1.36 < 1.5 (FAIL)
-- engulfing_zone 전략 개선 대기
+## 테스트 결과
+- unit test 8/8 PASS ✓
+- volume spike 감지 로직 정상
+- confidence 등급 변경 정상
 
----
-# Cycle 87 - Regime Adaptive 전략 검증 완료
-
-## 결과
-- `test_regime_switch_low_confidence` PASS: 레짐 전환 시 confidence=LOW 정상 동작
-- `test_generate_bull_regime` PASS: bull 레짐에서 SELL 신호 차단 정상 동작
-
-### 검증 파일
-- `/home/user/Trading/src/strategy/regime_adaptive.py` (수정 없음)
-- `/home/user/Trading/tests/test_regime_adaptive.py`
+## 기대 효과
+- 시뮬 전 거래 수: 15
+- 시뮬 후 거래 수: 25~35 예상
+- Profit Factor 1.5 달성 기대
 
 ## 다음 사이클
-- lob_maker Profit Factor 1.5 이상 개선 고려
-- engulfing_zone 전략 개선
+- paper_simulation 실행으로 개선 효과 검증
+- 통과 기준: Sharpe≥1.0, MaxDD≤20%, PF≥1.5, Trades≥30
