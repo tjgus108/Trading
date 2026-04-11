@@ -2,7 +2,7 @@
 G2. GEX Signal + CME Basis Spread 전략 테스트 (12개 이상).
 """
 
-import numpy as np
+import unittest.mock as mock
 import pandas as pd
 import pytest
 
@@ -192,29 +192,31 @@ def test_cme_confidence_low():
 
 
 # ---------------------------------------------------------------------------
-# 9. GEXFeed — 재시도 및 fallback 테스트 (Cycle 6 패턴)
+# 9. GEXFeed — 재시도 및 fallback 테스트 (Cycle 6 패턴) — mock 최적화
 # ---------------------------------------------------------------------------
 
 def test_gex_fallback_after_failure():
     """GEX API 실패 후 fallback(이전 성공) 데이터 반환."""
     feed = GEXFeed()
-    # fallback 데이터를 직접 설정 (API 성공했던 것처럼)
     feed._last_successful = {"net_gex": 1.5e9, "positive": True, "score": 1.5}
     
-    # API 실패 상황 시뮬레이션 (fallback 사용)
-    result = feed.get_gex("BTC")
-    assert result["net_gex"] == 1.5e9  # fallback에서 반환된 값
-    assert result["positive"] is True
+    # mock으로 API 호출 제거 (빠른 실행)
+    with mock.patch.object(feed, '_fetch_gex_with_retry', return_value=None):
+        result = feed.get_gex("BTC")
+        assert result["net_gex"] == 1.5e9
+        assert result["positive"] is True
 
 
 def test_gex_neutral_without_fallback():
     """GEX API 실패 + fallback 없음 → 중립 데이터 반환."""
     feed = GEXFeed()
-    # fallback이 없고 API 실패 시뮬레이션
     assert feed._last_successful is None
-    result = feed.get_gex("INVALID_SYMBOL")
-    assert result["net_gex"] == 0.0
-    assert result["score"] == 0.0
+    
+    # mock으로 API 호출 제거 (빠른 실행)
+    with mock.patch.object(feed, '_fetch_gex_with_retry', return_value=None):
+        result = feed.get_gex("INVALID_SYMBOL")
+        assert result["net_gex"] == 0.0
+        assert result["score"] == 0.0
 
 
 def test_gex_max_retries_parameter():
@@ -224,28 +226,30 @@ def test_gex_max_retries_parameter():
 
 
 # ---------------------------------------------------------------------------
-# 10. CMEBasisFeed — 재시도 및 fallback 테스트 (Cycle 6 패턴)
+# 10. CMEBasisFeed — 재시도 및 fallback 테스트 (Cycle 6 패턴) — mock 최적화
 # ---------------------------------------------------------------------------
 
 def test_cme_fallback_after_failure():
     """CME Basis API 실패 후 fallback(이전 성공) 데이터 반환."""
     feed = CMEBasisFeed()
-    # fallback 데이터를 직접 설정 (API 성공했던 것처럼)
     feed._last_successful = {"basis_pct": 0.82, "basis_annual": 10.0, "score": 0.0}
     
-    # API 실패 상황 시뮬레이션 (fallback 사용)
-    result = feed.get_basis("BTCUSDT")
-    assert abs(result["basis_annual"] - 10.0) < 1e-6  # fallback에서 반환된 값
+    # mock으로 API 호출 제거 (빠른 실행)
+    with mock.patch.object(feed, '_fetch_basis_with_retry', return_value=None):
+        result = feed.get_basis("BTCUSDT")
+        assert abs(result["basis_annual"] - 10.0) < 1e-6
 
 
 def test_cme_neutral_without_fallback():
     """CME Basis API 실패 + fallback 없음 → 중립 데이터 반환."""
     feed = CMEBasisFeed()
-    # fallback이 없고 API 실패 시뮬레이션
     assert feed._last_successful is None
-    result = feed.get_basis("INVALID_SYMBOL")
-    assert result["basis_pct"] == 0.0
-    assert result["basis_annual"] == 0.0
+    
+    # mock으로 API 호출 제거 (빠른 실행)
+    with mock.patch.object(feed, '_fetch_basis_with_retry', return_value=None):
+        result = feed.get_basis("INVALID_SYMBOL")
+        assert result["basis_pct"] == 0.0
+        assert result["basis_annual"] == 0.0
 
 
 def test_cme_max_retries_parameter():

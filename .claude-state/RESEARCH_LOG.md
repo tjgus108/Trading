@@ -534,3 +534,21 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Claude Opus 4 Trading Strategy — Medium](https://medium.com/@austin-starks/i-let-claude-opus-4-create-a-trading-strategy-it-destroyed-the-market-c200bf1a19a4)
 - [LLM Trading Bots Comparison — FlowHunt](https://www.flowhunt.io/blog/llm-trading-bots-comparison/)
 - [LLM API Pricing 2025 — IntuitionLabs](https://intuitionlabs.ai/articles/llm-api-pricing-comparison-2025)
+
+## [2026-04-11] Cycle 26 — Regulatory Landscape
+
+### 주요 규제 동향
+- EU MiCA(Markets in Crypto-Assets) 2025년 1월 전면 시행. 기존 MiFID와의 해석 충돌 문제로 각국 적용 편차 존재.
+- 한국: 2024년 7월 「가상자산 이용자 보호법」 시행. 시세조종·미공개정보 이용 등 불공정거래 행위 형사처벌 대상. "시장조성" 행위의 법적 정의 미비로 자동매매 봇 운영이 그레이존에 해당.
+- 미국: SEC는 알고리즘 트레이딩 자체를 금지하지 않으나 시세조종 금지법·기록보관·공시 의무는 동일 적용. 2025-06 자동화 투자자문 가이드라인 발표.
+- 한국 2단계 규제(디지털자산기본법): 2026년 1월 입법 예고 예정. 스테이블코인·해외 사업자 포함 통합 프레임워크.
+
+### 개인 봇 운영자 주의점
+- 자기 자금만 운용하는 개인은 별도 라이선스 불필요(한국·미국·EU 공통). 단, 타인 자금 운용·유료 신호 서비스는 투자자문업 등록 필요(미국 CTA/RIA, 한국 투자일임업).
+- 한국 가상자산 이용자 보호법상 "시장조성" 정의 불명확 → 마켓메이킹 전략 운용 시 법적 위험 존재. 허수주문(Spoofing)·세탁거래(Wash Trading)는 명시적 위반.
+- 거래소 ToS 위반(봇 금지 조항)도 계정 정지·자산 동결로 이어질 수 있어 별도 확인 필수.
+
+### 참고
+- [2025 Crypto Regulatory Round-Up — Chainalysis](https://www.chainalysis.com/blog/2025-crypto-regulatory-round-up/)
+- [South Korea Crypto Regulations — CoinTelegraph](https://cointelegraph.com/learn/articles/crypto-regulations-in-south-korea)
+- [AI Crypto Trading Bots Legal Guide — internetlawyer-blog.com](https://www.internetlawyer-blog.com/ai-crypto-trading-bots-navigating-state-federal-and-international-laws/)
