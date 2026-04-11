@@ -3074,3 +3074,59 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 08:57 UTC] Cycle 41 Dispatched — A + C + F
 Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:01 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 15:45 UTC] Cycle 41 COMPLETED — A + C + F
+**[A] Quality:** BacktestReport 17개 메트릭 필드 검증 (from_trades, from_backtest_result, _empty 모두). 모든 메트릭 일관되게 초기화됨, 누락 없음. 기존 12 tests 통과.
+**[C] Data:** tests/test_feed_parallel.py +2 cache_stats + fetch_multiple 통합 검증. 연속 호출 누적 정확, 부분 캐시 히트 통계 정확.
+**[F] Research:** 대시보드 베스트 프랙티스. 3계층 구조: 수익성(PF/Sharpe) + 리스크(MDD/마진) + 운영(에러/알림). 모듈형 패널 + 전략별 성과 분리 표시.
+**Tests:** 6045 passed (+7 from Cycle 40).
+**Next Cycle:** 42 (B+D+F)

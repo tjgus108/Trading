@@ -297,3 +297,69 @@ class TestSignalCorrelationTracker:
         for _ in range(20):
             tracker.record("a", Action.BUY)
         assert len(tracker._signals["a"]) <= 5
+
+
+    def test_all_metrics_initialized_from_trades(self):
+        """from_trades()에서 모든 메트릭이 초기화되는지 검증."""
+        trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}, {"pnl_pct": 0.02}]
+        report = BacktestReport.from_trades(trades)
+        
+        # BacktestReport dataclass의 모든 필드 확인
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"
+
+    def test_all_metrics_initialized_from_backtest_result(self):
+        """from_backtest_result()에서 모든 메트릭이 초기화되는지 검증."""
+        from src.backtest.engine import BacktestResult
+        br = BacktestResult(
+            strategy="test",
+            total_trades=30,
+            win_rate=0.6,
+            profit_factor=1.5,
+            sharpe_ratio=1.2,
+            max_drawdown=0.15,
+            total_return=0.3,
+            passed=True,
+            fail_reasons=[],
+        )
+        report = BacktestReport.from_backtest_result(br)
+        
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"
+
+    def test_all_metrics_initialized_empty(self):
+        """_empty()에서 모든 메트릭이 초기화되는지 검증."""
+        report = BacktestReport._empty(252 * 24)
+        
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"

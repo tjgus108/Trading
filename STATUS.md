@@ -46,7 +46,8 @@
 - ✅ Cycle 38 완료 (E+A+F: env overrides + MC 회귀 + Kimchi Premium)
 - ✅ Cycle 39 완료 (C+B+F: VPIN 극단 + Risk 시나리오 + 스테이블코인 디페깅)
 - ✅ **Cycle 40 완료** 🎯 (D+E+F: adaptive_selector + Notifier HTML + 2026 전망)
-- ⏳ **Cycle 41 대기** (A+C+F)
+- ✅ Cycle 41 완료 (A+C+F: Report 메트릭 검증 + cache+multi 통합 + 대시보드 리서치)
+- ⏳ **Cycle 42 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -55,7 +56,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,038개** |
+| ✅ 통과 테스트 | **6,045개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
