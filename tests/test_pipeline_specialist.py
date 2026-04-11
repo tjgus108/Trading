@@ -174,3 +174,96 @@ def test_specialist_ensemble_low_confidence_no_block():
     result = pipeline.run()
     assert result.signal is not None
     assert result.signal.action != Action.HOLD
+
+
+def test_pipeline_risk_blocked():
+    """Risk Manager가 신호를 BLOCKED하면 execution 단계까지 진행하지 않는다."""
+    pipeline = _make_pipeline()
+    
+    from src.risk.manager import RiskResult, RiskStatus
+    # risk_manager를 BLOCKED 반환하도록 설정
+    pipeline.risk_manager.evaluate.return_value = RiskResult(
+        status=RiskStatus.BLOCKED,
+        position_size=0.0,
+        stop_loss=0.0,
+        take_profit=0.0,
+        reason="Daily loss limit exceeded",
+        risk_amount=0.0,
+        portfolio_exposure=0.0,
+    )
+    
+    result = pipeline.run()
+    assert result.status == "BLOCKED"
+    assert result.pipeline_step == "risk"
+    assert any("Daily loss limit exceeded" in n for n in result.notes)
+    # execution이 없어야 함
+    assert result.execution is None
+
+
+def test_pipeline_execution_fails():
+    """Execution 단계에서 예외 발생 시 ERROR 상태로 반환."""
+    pipeline = _make_pipeline(dry_run=False)
+    
+    # execution이 실패하도록 connector 설정
+    pipeline.connector.create_order.side_effect = Exception("Connection timeout")
+    
+    result = pipeline.run()
+    assert result.status == "ERROR"
+    assert result.pipeline_step == "execution"
+    assert "Connection timeout" in result.error
+
+
+def test_pipeline_ensemble_conflict_llm():
+    """MultiLLMEnsemble이 conflicts_with()를 반환하면 HOLD 전환."""
+    pipeline = _make_pipeline()
+    
+    mock_ensemble = MagicMock()
+    mock_ensemble.conflicts_with.return_value = True
+    mock_ensemble.summary.return_value = "Strong SELL consensus"
+    pipeline.ensemble = mock_ensemble
+    
+    result = pipeline.run()
+    assert result.signal is not None
+    assert result.signal.action == Action.HOLD
+    assert "[ENSEMBLE_CONFLICT]" in result.signal.reasoning
+    assert result.pipeline_step == "alpha"
+    assert any("ENSEMBLE conflict → HOLD" in n for n in result.notes)
+
+
+def test_pipeline_kelly_sizing():
+    """Kelly Sizer가 충분한 거래 이력(>=10)이 있을 때 position_size 조정."""
+    from src.risk.kelly_sizer import KellySizer
+    
+    pipeline = _make_pipeline()
+    
+    # trade_history 10개 이상으로 설정
+    pipeline._trade_history = [
+        {"pnl": 100, "entry": 50000, "exit": 50100},
+    ] * 10
+    
+    mock_kelly = MagicMock(spec=KellySizer)
+    # from_trade_history를 통해 Kelly size 계산
+    pipeline.kelly_sizer = MagicMock()
+    
+    # Mock KellySizer.from_trade_history
+    with patch('src.pipeline.runner.KellySizer.from_trade_history') as mock_from_history:
+        mock_from_history.return_value = 0.02  # 새로운 kelly size
+        result = pipeline.run()
+        assert result.status == "OK"
+        assert any("Kelly size" in n for n in result.notes)
+
+
+def test_pipeline_vol_targeting():
+    """VolTargeting이 position_size를 조정한다."""
+    from src.risk.vol_targeting import VolTargeting
+    
+    pipeline = _make_pipeline()
+    
+    mock_vol_targeting = MagicMock(spec=VolTargeting)
+    mock_vol_targeting.adjust.return_value = 0.015  # 조정된 size
+    pipeline.vol_targeting = mock_vol_targeting
+    
+    result = pipeline.run()
+    assert result.status == "OK"
+    assert any("VolTarget size" in n for n in result.notes)
+    mock_vol_targeting.adjust.assert_called_once()

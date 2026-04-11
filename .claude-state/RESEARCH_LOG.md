@@ -363,3 +363,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Nova Trading Platform Breach — Cyber Defense Magazine](https://www.cyberdefensemagazine.com/nova-trading-platform-security-breach-half-a-million-dollars-drained-in-manual-attack/)
 - [XRP AMM Bot Exploit — MEXC Blog](https://blog.mexc.com/news/mystery-trader-nets-280k-outsmarting-quant-bots/)
 - [Bot Failures 2025 — Crypto Reporter](https://www.crypto-reporter.com/press-releases/most-crypto-trading-bots-promised-easy-money-the-market-killed-them-here-is-what-the-survivors-built-instead-123004/)
+
+## [2026-04-11] Cycle 16 — Production Deployment
+
+### 배포 전략
+- **Canary 배포**: 전체 자본의 1~5%로 신전략 먼저 live 실행. 라우터/서비스 메시가 소량 트래픽(~5%)만 신버전으로 전달. 슬리피지·체결가 차이 측정 후 점진 확대.
+- **Blue-Green 환경**: 구버전(Blue) 유지 상태에서 신버전(Green) 병렬 배포. 문제 발생 시 즉시 Blue로 트래픽 전환 → 롤백 시간 최소화.
+- **Runbook 사전 작성**: 롤백 명령어, 알림 채널, 메트릭 대시보드 위치를 문서화. 스테이징 환경에서 매 스프린트 롤백 시뮬레이션 실시.
+
+### Kill Switch 설계
+- **Feature Flag 기반**: 개별 전략 또는 기능을 즉시 비활성화. 전체 재배포 없이 단일 전략만 off — 수술적 대응 가능.
+- **자동 트리거 Circuit Breaker**: 일일 MDD 3%, 주간 7% 초과 또는 API 오류율 급증 시 모든 포지션 진입 즉시 중단. Telegram/Discord 실시간 알림 연동.
+- **포지션 한도 하드코딩**: 포트폴리오당 최대 노출 10%, 저유동성 자산 주문 크기 시장 깊이의 0.1% 이하를 코드 레벨에서 강제.
+
+### 참고
+- [Canary Release vs Kill Switch — Unleash](https://www.getunleash.io/blog/canary-release-vs-kill-switch)
+- [Trading System Kill Switch — NYIF](https://www.nyif.com/articles/trading-system-kill-switch-panacea-or-pandoras-box)
+- [Algo Trading Risk Management — LuxAlgo](https://www.luxalgo.com/blog/risk-management-strategies-for-algo-trading/)

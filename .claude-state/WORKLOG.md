@@ -919,3 +919,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** H2 2025 신규 실패 사례. Nova 키 위임 취약 ($500k), XRP AMM 봇 예측 가능 행동 착취 ($280k). 공통점: 봇 로직이 경직되어 역이용. **적용**: API Key 출금권한 제거 + 주문 파라미터 동적 지터.
 **Tests:** 5874 passed (+12 from Cycle 14).
 **Next Cycle:** 16 (A+C+F — 4회차)
+
+## [2026-04-11 03:20 UTC] Cycle 16 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:22 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:22:51Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 07:00 UTC] Cycle 16 COMPLETED — A + C + F
+**[A] Quality:** tests/test_pipeline_specialist.py +5 테스트. pipeline/runner.py 커버리지 보강: risk block 경로, execution 실패, ensemble conflict→HOLD, Kelly sizing, vol-targeting.
+**[C] Data:** tests/test_order_flow.py +3 VPIN 경계 테스트. 거대 거래량 급증, 혼합 거래량 크기, 0 거래량 봉 처리.
+**[F] Research:** 프로덕션 배포 전략. Canary 배포(1~5% 자본), Kill Switch (Feature Flag 기반), Blue-Green 롤백, MDD 3%/주간 7% Circuit Breaker 표준.
+**Tests:** 5882 passed (+8 from Cycle 15).
+**Next Cycle:** 17 (B+D+F)
