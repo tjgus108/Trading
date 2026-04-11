@@ -243,3 +243,34 @@ def test_optimizer_no_param_grid():
     result = opt.run(df)
     assert not result.is_stable
     assert "파라미터 그리드" in result.fail_reasons[0]
+
+
+# 테스트 14: WalkForwardOptimizer 윈도우 경계 조건 (정확히 최소 요구)
+def test_optimizer_window_boundary_exact_minimum():
+    """
+    윈도우 분할에서 IS >= 100, OOS >= 30 최소 요구.
+    n_windows=1, is_ratio=0.6인 경우:
+      - window_size = n // (n_windows + 1) = 260 // 2 = 130
+      - oos_size = 130 * (1 - 0.6) = 52
+      - is_size = 130 - 52 = 78 < 100 이므로 윈도우 버려짐
+    n_windows=2라도 분할을 통해 정확히 필요한 크기만 사용할 수 있는지 검증.
+    """
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.funding_rate import FundingRateStrategy
+    
+    def factory(params: dict):
+        return FundingRateStrategy(**params)
+    
+    # 260봉: window_size=130, is=78, oos=52 → IS부족 (78<100)
+    opt = WalkForwardOptimizer(
+        strategy_name="funding_rate",
+        strategy_factory=factory,
+        param_grid={"long_threshold": [0.0003], "short_threshold": [-0.0001]},
+        n_windows=1,
+    )
+    df = make_df(260)
+    result = opt.run(df)
+    # 윈도우가 최소값 미충족으로 버려지므로 유효 윈도우 없음
+    assert len(result.windows) == 0
+    assert not result.is_stable
+

@@ -8019,3 +8019,6 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: none
 ImplShortfall: -5.00bps
+
+## [2026-04-11 23:09 UTC] Cycle 99 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -288,3 +288,16 @@ class TestHTMLEscape:
         # Raw tags should not appear
         assert "<img src=x>" not in msg
         assert "<b>error</b>" not in msg
+
+    def test_html_escape_javascript_and_event_handler(self):
+        """notify_error escapes javascript: URI and onerror= event handler vectors."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        payload = '<a href="javascript:alert(1)" onerror=alert(2)>click</a>'
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error(payload)
+        msg = captured[0]
+        assert "javascript:" not in msg or "&lt;a" in msg
+        assert "<a href=" not in msg
+        assert "&lt;a href=&quot;javascript:alert(1)&quot;" in msg
+        assert "onerror=alert(2)" not in msg or "&lt;a" in msg
