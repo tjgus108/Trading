@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 61 — 2026-04-11T10:19:21.337345Z
+🔄 CYCLE 62 — 2026-04-11T10:21:45.698809Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 59 COMPLETED — C + B + F** (2026-04-11 22:45 UTC)
-  **[C] Data:** src/data/feed.py 빈 DataFrame ValueError 가드. test_feed_boundary.py 신규 +2 tests.
-  **[B] Risk:** src/risk/vol_targeting.py target_vol <= 0 ValueError. +3 경계 (작은/큰/음수 target_vol).
-  **[F] Research:** Pairs Trading 크립토. Cointegration(ADF/Johansen)이 correlation보다 안정. Copula+cointegration 결합이 우수. BTC/ETH 유동성 1순위. z-score ±2 진입 / ±0.5 청산 표준.
-  **Tests:** 6140 passed (+5 from Cycle 58).
+**Cycle 61 COMPLETED — A + C + F** (2026-04-11 23:35 UTC)
+  **[A] Quality:** tests/test_backtest_engine.py +2 slippage cost. 누적 정확성, 포지션 크기 비례성 검증.
+  **[C] Data:** tests/test_mock_connector_validation.py 신규 +8. 반환 구조, OHLC 관계, timestamp 정렬, limit 경계, timeframe 전체.
+  **[F] Research:** 한국 규제 2026. 가상자산이용자보호법(2024.07) 이용자 자산 분리 + 불공정거래 금지. 2단계 기본법 추진 중 (법인 허용 확대, 원화 스테이블). 자동매매 봇 직접 규제는 없으나 시세조종 간주 리스크 존재.
+  **Tests:** 6156 passed (+10 from Cycle 60).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

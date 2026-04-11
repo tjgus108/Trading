@@ -130,3 +130,29 @@ def test_monthly_takes_priority_over_daily():
     m.set_monthly_start(10000)
     status = m.update(8000)    # 모두 초과
     assert status.alert_level == AlertLevel.FORCE_LIQUIDATE
+
+
+def test_daily_weekly_simultaneous_weekly_wins():
+    """일일+주간 동시 초과 시 주간(HALT)이 우선."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    # 월간 기준 미설정 → monthly_dd=0
+    status = m.update(9200)    # 일일 8% > 3%, 주간 8% > 7%
+    assert status.halted is True
+    assert status.alert_level == AlertLevel.HALT
+    assert "주간" in status.reason
+    assert status.daily_drawdown_pct > m.daily_limit
+    assert status.weekly_drawdown_pct > m.weekly_limit
+
+
+def test_force_liquidate_not_cleared_by_reset_daily():
+    """FORCE_LIQUIDATE 상태에서 reset_daily() 호출해도 해제 안 됨."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_monthly_start(10000)
+    m.set_daily_start(10000)
+    m.update(8400)             # 월간 16% → FORCE_LIQUIDATE
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+    m.reset_daily(8400)        # 일일 리셋 시도
+    assert m.is_halted() is True
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
