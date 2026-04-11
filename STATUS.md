@@ -77,7 +77,8 @@
 - ✅ Cycle 69 완료 (C+B+F: liquidation format + position_sizer config + MEV Defense)
 - ✅ **Cycle 70 완료** 🎯 (D+E+F: correlation edge + Dashboard 70 배지 + 2025 영향력 아티클)
 - ✅ Cycle 71 완료 (A+C+F: fee tracking + WS buffer + Tx 최적화)
-- ⏳ **Cycle 72 대기** (B+D+F)
+- ✅ Cycle 72 완료 (B+D+F: Risk 복합 + HMM fallback + Bayesian opt)
+- ⏳ **Cycle 73 대기** (E+A+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -86,7 +87,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,195개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,202개** (0 warnings ✨) |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

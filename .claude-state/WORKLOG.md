@@ -6079,3 +6079,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Tx 비용 최적화. 배치+calldata 압축, 동적 base fee, Flashbots private pool, L2(Arbitrum/Base) 90% 절감.
 **Tests:** 6195 passed (+7 from Cycle 70).
 **Next Cycle:** 72 (B+D+F)
+
+## [2026-04-11 11:18 UTC] Cycle 72 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:19 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 03:20 UTC] Cycle 72 COMPLETED — B + D + F
+**[B] Risk:** tests/test_risk_manager.py +2 복합 시나리오. 멀티포지션+드로다운+jitter APPROVED, 드로다운 한계 전환 검증.
+**[D] ML:** tests/test_hmm_fallback.py 신규 +5. hmmlearn 미설치 시 graceful fallback (Bollinger Band 기반) 확인.
+**[F] Research:** Bayesian 최적화. TPE/Optuna 75% pair 승리, 예산 13-17%로 90% 최적치. Walk-forward 필수. Optuna 도입으로 파라미터 자동 튜닝 가능.
+**Tests:** 6202 passed (+7 from Cycle 71).
+**Next Cycle:** 73 (E+A+F)

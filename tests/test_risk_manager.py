@@ -602,3 +602,131 @@ def test_max_position_size_above_one_raises():
 def test_max_total_exposure_zero_raises():
     with pytest.raises(ValueError, match="max_total_exposure"):
         RiskManager(max_total_exposure=0.0)
+
+
+# ── Multi-Position + Drawdown + Jitter Complex Scenarios ─────────────────────
+
+def test_multi_position_drawdown_jitter_approved():
+    """복합: 멀티 포지션(노출 20%) + 드로다운 4% + jitter=0.03 → APPROVED, 포지션 jitter 범위 내."""
+    import random as _random
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    cb._peak_balance = 10000
+    # current_balance 9600 → drawdown 4.0% < 5% 한도
+
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.03,
+        session_filter=False,
+        max_total_exposure=0.30,
+    )
+
+    # 기존 포지션 2개: 총 노출 20%
+    open_positions = [
+        {"size": 0.02, "price": 9600},   # 192 / 9600 = 2.0%  (wrong — use entry_price scale)
+        {"size": 0.02, "price": 48000},  # 960 / 9600 = 10.0%
+        {"size": 0.02, "price": 48000},  # 960 / 9600 = 10.0%  → gross 20%
+    ]
+    # (0.02*9600 + 0.02*48000 + 0.02*48000) = 192+960+960 = 2112 / 9600 ≈ 22% < 30%
+
+    # 기준값(jitter=0) 계산
+    rm_base = RiskManager(
+        risk_per_trade=0.01, atr_multiplier_sl=1.5, atr_multiplier_tp=3.0,
+        max_position_size=0.10, jitter_pct=0.0, max_total_exposure=0.30,
+    )
+    base_result = rm_base.evaluate(
+        action="BUY", entry_price=48000, atr=480, account_balance=9600,
+        open_positions=open_positions,
+    )
+    base_size = base_result.position_size
+
+    _random.seed(None)
+    for _ in range(20):
+        result = rm.evaluate(
+            action="BUY",
+            entry_price=48000,
+            atr=480,
+            account_balance=9600,
+            last_candle_pct_change=0.02,
+            open_positions=open_positions,
+        )
+        assert result.status == RiskStatus.APPROVED
+        assert result.position_size >= base_size * 0.97 - 1e-9
+        assert result.position_size <= base_size * 1.03 + 1e-9
+        assert result.stop_loss < 48000
+        assert result.take_profit > 48000
+
+
+def test_multi_position_drawdown_near_limit_then_breached():
+    """복합: 멀티 포지션 + 드로다운이 한계 직전(APPROVED) → 한계 도달(BLOCKED) 전환."""
+    from datetime import timezone
+
+    cb_ok = _make_cb_from_config()
+    cb_ok._peak_balance = 10000
+    rm_ok = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb_ok,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    # 기존 포지션 2개: 총 노출 18% (한도 30% 미만)
+    open_positions = [
+        {"size": 0.018, "price": 50000},  # 900 / 9510 ≈ 9.46%
+        {"size": 0.018, "price": 50000},  # 900 / 9510 ≈ 9.46%  → 합 ~18.9%
+    ]
+    df = _make_df_with_vol(0.45)
+
+    # London session (평일 14:00 UTC) → ACTIVE, 축소 없음
+    ts = datetime(2026, 4, 14, 14, 0, 0, tzinfo=timezone.utc)
+
+    # 경우 1: 드로다운 4.9% (9510/10000) → 한도 5% 미만 → APPROVED
+    result_ok = rm_ok.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9510,
+        last_candle_pct_change=0.03,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+    assert result_ok.status == RiskStatus.APPROVED
+    assert result_ok.position_size > 0
+
+    # 경우 2: 드로다운 5.0% 정확히 도달 → BLOCKED
+    cb_breach = _make_cb_from_config()
+    cb_breach._peak_balance = 10000
+    rm_breach = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb_breach,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+    result_breach = rm_breach.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9500,           # drawdown = 5.0% ≥ 5% → BLOCKED
+        last_candle_pct_change=0.03,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+    assert result_breach.status == RiskStatus.BLOCKED
+    assert "Circuit breaker" in result_breach.reason
+    assert "drawdown" in result_breach.reason
+    assert result_breach.position_size is None

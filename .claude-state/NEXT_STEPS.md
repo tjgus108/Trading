@@ -1,3 +1,25 @@
+# Cycle 72 - Category D: ML & Signals
+## Status: COMPLETE
+
+### HMM Regime Detector Fallback
+- `src/ml/hmm_model.py`: fallback 이미 구현됨 (hmmlearn ImportError → Bollinger Band fallback)
+- 테스트 `/home/user/Trading/tests/test_hmm_fallback.py` 신규 작성, 5개 모두 PASS
+  1. hmmlearn 미설치 시 `_use_fallback=True` 설정
+  2. fallback predict()가 BULL/BEAR 반환
+  3. fallback sequence 길이 = df 길이
+  4. 데이터 < 20행 → 전부 BULL
+  5. fallback 모드 fit() 에러 없음
+
+---
+# Cycle 72 - Category F: Research
+## Status: COMPLETE
+
+## [2026-04-11] Cycle 72 — Bayesian Optimization
+- TPE (Tree-structured Parzen Estimator, Optuna) 기반 Bayesian 최적화가 2025 비교 연구에서 75% strategy-asset pair 승리, 예산의 13~17%만으로 최적치 90% 도달
+- Walk-forward validation 필수 — 브루트포스 대비 효율적이나 out-of-sample 검증 없으면 오버피팅
+- AutoQuant 프레임워크: Bayesian + 2단계 double screening → 결정론적 artifact 추출
+
+---
 # Cycle 71 - Category C: Data & Infrastructure
 ## Status: COMPLETE
 

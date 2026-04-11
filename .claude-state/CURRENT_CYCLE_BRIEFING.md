@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 71 — 2026-04-11T11:15:17.642334Z
+🔄 CYCLE 72 — 2026-04-11T11:18:03.988110Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 69 COMPLETED — C + B + F** (2026-04-12 02:20 UTC)
-  **[C] Data:** tests/test_liquidation_cascade.py +2 형식 검증. get_recent() list[dict] 필수 필드, compute_pressure() 필드 범위 [-3,+3].
-  **[B] Risk:** tests/test_risk.py +2 config 의존성. kelly_fraction=risk_per_trade 매핑, max_fraction=max_position_size 매핑 확인.
-  **[F] Research:** MEV Defense. Flashbots Protect 2.1M 계정 $43B 보호 98.5% 성공률. 이더리움 80% 보호 RPC. TEE 2025 핵심. slippage+분할+private RPC 표준.
-  **Tests:** 6184 passed (+4 from Cycle 68).
+**Cycle 71 COMPLETED — A + C + F** (2026-04-12 03:00 UTC)
+  **[A] Quality:** tests/test_backtest_engine.py +2 fee tracking. BUY+SELL 사이클 수수료 2배 누적 정확성 검증.
+  **[C] Data:** tests/test_websocket_buffer.py 신규 +5. deque(maxlen=1000) 자동 제거, 5000개 캔들 메모리 안전.
+  **[F] Research:** Tx 비용 최적화. 배치+calldata 압축, 동적 base fee, Flashbots private pool, L2(Arbitrum/Base) 90% 절감.
+  **Tests:** 6195 passed (+7 from Cycle 70).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
