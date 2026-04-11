@@ -67,10 +67,12 @@ class DataFeed:
                     )
                     time.sleep(0.5 * attempt)  # exponential backoff
         
-        # 모든 시도 실패
+        # 모든 시도 실패 — 상세 컨텍스트 포함
+        error_type = type(last_error).__name__
         logger.error(
-            "Fetch failed for %s %s after %d attempts: %s",
-            symbol, timeframe, self._max_retries, str(last_error)
+            "Fetch exhausted: symbol=%s, timeframe=%s, limit=%d, max_retries=%d, "
+            "error_type=%s, message=%s",
+            symbol, timeframe, limit, self._max_retries, error_type, str(last_error)
         )
         raise last_error
 

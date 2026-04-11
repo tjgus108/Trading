@@ -192,14 +192,52 @@ class TestFeedParallel:
                 feed.fetch("ETH/USDT", "4h", limit=100)
             
             assert str(exc_info.value) == "Persistent API error"
+            # Error 로그 확인 — 개선된 포맷 확인
+            error_calls = mock_logger.error.call_args_list
+            assert len(error_calls) >= 1
+            error_call_args = error_calls[0][0]
+            # 새 포맷: symbol, timeframe, limit, max_retries, error_type, message
+            assert error_call_args[1] == "ETH/USDT"  # symbol
+            assert error_call_args[2] == "4h"  # timeframe
+            assert error_call_args[3] == 100  # limit
+            assert error_call_args[4] == 2  # max_retries
+
+    def test_fetch_error_log_includes_context(self):
+        """Fetch 실패 시 에러 로그에 symbol, timeframe, limit, max_retries, error_type 포함."""
+        connector = MagicMock()
+        error = ValueError("Invalid data format")
+        connector.fetch_ohlcv.side_effect = error
+
+        feed = DataFeed(connector, max_retries=3)
+        
+        with patch("src.data.feed.logger") as mock_logger:
+            with pytest.raises(ValueError):
+                feed.fetch("BTC/USDT", "1h", limit=500)
+            
             # Error 로그 확인
             error_calls = mock_logger.error.call_args_list
             assert len(error_calls) >= 1
-            # call('format', 'ETH/USDT', '4h', 2, error_msg)
-            error_call_args = error_calls[0][0]
-            assert "ETH/USDT" in error_call_args[1]
-            assert "4h" in error_call_args[2]
-            assert error_call_args[3] == 2  # max_retries
+            
+            error_call = error_calls[0]
+            # 호출의 format string은 [0][0][0], 인자들은 [0][0][1:]
+            call_args = error_call[0]  # (format_string, arg1, arg2, ...)
+            
+            # 포맷 문자열 확인
+            format_str = call_args[0]
+            assert "symbol=%s" in format_str
+            assert "timeframe=%s" in format_str
+            assert "limit=%d" in format_str
+            assert "max_retries=%d" in format_str
+            assert "error_type=%s" in format_str
+            assert "message=%s" in format_str
+            
+            # 인자 확인
+            assert call_args[1] == "BTC/USDT"  # symbol
+            assert call_args[2] == "1h"  # timeframe
+            assert call_args[3] == 500  # limit
+            assert call_args[4] == 3  # max_retries
+            assert call_args[5] == "ValueError"  # error_type
+            assert "Invalid data format" in call_args[6]  # message
 
 
 if __name__ == "__main__":
