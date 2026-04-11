@@ -5,13 +5,14 @@ backtest-agent가 이 모듈을 사용한다.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 from src.strategy.base import Action, BaseStrategy
+from src.backtest.report import deflated_sharpe_ratio
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class BacktestResult:
     fail_reasons: list[str]
     total_fees: float = 0.0
     total_slippage_cost: float = 0.0
+    deflated_sharpe_ratio: float = 0.0  # DSR (과최적화 보정)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -55,6 +57,7 @@ class BacktestResult:
             f"  win_rate: {self.win_rate:.1%}",
             f"  profit_factor: {self.profit_factor:.2f}",
             f"  sharpe_ratio: {self.sharpe_ratio:.2f}",
+            f"  deflated_sharpe_ratio: {self.deflated_sharpe_ratio:.2f}",
             f"  max_drawdown: {self.max_drawdown:.1%}",
             f"  total_return: {self.total_return:.1%}",
             f"  total_fees: {self.total_fees:.4f}",
@@ -78,6 +81,7 @@ class BacktestEngine:
         slippage_pct: Optional[float] = None,  # 0.05% 슬리피지
         timeframe: str = "1h",
         funding_cost_per_candle: float = 0.0,
+        dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -90,6 +94,7 @@ class BacktestEngine:
         self.slippage_pct = self.slippage  # 별칭
         self.timeframe = timeframe
         self.funding_cost_per_candle = funding_cost_per_candle
+        self.dsr_threshold = dsr_threshold
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -263,6 +268,16 @@ class BacktestEngine:
 
         total_return = (eq[-1] - self.initial_balance) / self.initial_balance
 
+        # DSR 계산 (과최적화 보정)
+        pnls = np.array(trades)
+        dsr = deflated_sharpe_ratio(pnls, sharpe, ann_factor)
+        if dsr < self.dsr_threshold:
+            logger.warning(
+                "DSR %.3f < threshold %.3f for strategy '%s': "
+                "Sharpe may be overfitted.",
+                dsr, self.dsr_threshold, name,
+            )
+
         fail_reasons = []
         if sharpe < MIN_SHARPE:
             fail_reasons.append(f"sharpe {sharpe:.2f} < {MIN_SHARPE}")
@@ -285,4 +300,5 @@ class BacktestEngine:
             fail_reasons=fail_reasons,
             total_fees=round(total_fees, 6),
             total_slippage_cost=round(total_slippage_cost, 6),
+            deflated_sharpe_ratio=round(dsr, 3),
         )

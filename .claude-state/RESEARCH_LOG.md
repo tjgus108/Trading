@@ -500,3 +500,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Is AI Bot Trading Profitable in 2025? Real Results Revealed](https://agentiveaiq.com/blog/is-ai-bot-trading-profitable-the-2025-reality-check)
 - [78 Algorithmic Trading Statistics Every Trader Should Know in 2025](https://medium.com/@algorithmictradingstrategies/78-algorithmic-trading-statistics-every-trader-should-know-in-2025-c7e03c36ee44)
 - [AI Trading Bots - 2025 Performance Benchmarks Revealed](https://redhub.ai/ai-trading-bots-2025/)
+
+## [2026-04-11] Cycle 24 — Session/Holiday Patterns
+
+### 세션별 패턴
+- EU-US 오버랩(12:00–16:00 UTC)이 하루 중 가장 높은 변동성·거래량 구간. 미국 세션이 전체 중 긍정 수익 집중도 가장 높음.
+- 아시아 세션(도쿄)은 상대적으로 낮은 변동성·높은 안정성. 유럽·미국 주식 시장 개장 시간과 겹칠수록 BTC 변동성도 증가.
+- 주말은 유동성 감소 + 낮은 거래량이지만, 뉴스/내러티브 주도 스파이크 후 월요일 mean-revert 패턴이 자주 관찰됨.
+- 크리스마스·연말 같은 휴일에는 기관 참여 감소로 유동성 극도 취약 — 저유동성 급등/급락이 복귀 시 빠르게 되돌림.
+
+### 봇 적용
+- 세션 필터: 아시아 단독 세션(00:00–08:00 UTC)은 브레이크아웃 전략 신뢰도 낮음 → 이 구간 신규 진입 신호 스킵 또는 confidence 하향 조정 검토.
+- 주말/휴일 필터: 금·토·일(UTC) 또는 주요 공휴일 기간에는 포지션 사이즈 축소, 또는 HOLD 강제 유지로 유동성 리스크 회피.
+
+### 참고
+- [Bitcoin's Weekend Effect — ResearchGate](https://www.researchgate.net/publication/396418897_Bitcoin's_Weekend_Effect_Returns_Volatility_and_Volume_2014-2024)
+- [Trading Between Hours: Volatility Dispersion Across Multiple Regions — Amberdata](https://blog.amberdata.io/trading-between-hours-volatility-dispersion-across-multiple-regions)
+- [Time-of-day periodicities of trading volume and volatility in Bitcoin — ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S1544612319301904)

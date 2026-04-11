@@ -328,3 +328,37 @@ def test_recovery_factor_reflects_profit_to_drawdown_ratio():
             f"Recovery factor mismatch: got {report.recovery_factor:.6f}, "
             f"expected {expected_recovery:.6f}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 신규 6: DSR 통합 테스트
+# ---------------------------------------------------------------------------
+
+def test_dsr_field_present_in_result():
+    """BacktestResult에 deflated_sharpe_ratio 필드가 있어야 한다."""
+    engine = BacktestEngine()
+    df = make_df(n=300, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert hasattr(result, "deflated_sharpe_ratio")
+    assert isinstance(result.deflated_sharpe_ratio, float)
+
+
+def test_dsr_in_summary_output():
+    """summary() 출력에 deflated_sharpe_ratio 줄이 포함되어야 한다."""
+    engine = BacktestEngine()
+    df = make_df(n=300, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    summary = result.summary()
+    assert "deflated_sharpe_ratio" in summary
+
+
+def test_dsr_threshold_warning_logged(caplog):
+    """dsr_threshold=999 이면 경고 로그가 발생해야 한다."""
+    import logging
+    engine = BacktestEngine(dsr_threshold=999.0)
+    df = make_df(n=300, close_trend=0.002)
+    with caplog.at_level(logging.WARNING, logger="src.backtest.engine"):
+        result = engine.run(AlwaysBuyStrategy(), df)
+    assert any("DSR" in r.message for r in caplog.records), (
+        "dsr_threshold 초과 시 WARNING 로그가 발생해야 함"
+    )
