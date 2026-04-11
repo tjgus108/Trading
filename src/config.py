@@ -1,6 +1,22 @@
 """
 Config 로더: config.yaml → dataclass.
 환경변수(.env)와 YAML 설정을 통합한다.
+
+환경 변수 override 목록 (YAML보다 우선):
+  TRADING_SYMBOL          → trading.symbol
+  TRADING_TIMEFRAME       → trading.timeframe
+  TRADING_DRY_RUN         → dry_run  (true/false)
+  EXCHANGE_NAME           → exchange.name
+  EXCHANGE_SANDBOX        → exchange.sandbox (true/false)
+  RISK_PER_TRADE          → risk.risk_per_trade (float)
+  RISK_MAX_DRAWDOWN       → risk.max_drawdown (float)
+  RISK_MAX_DAILY_LOSS     → risk.max_daily_loss (float)
+  TELEGRAM_BOT_TOKEN      → telegram.bot_token
+  TELEGRAM_CHAT_ID        → telegram.chat_id
+
+API 키는 반드시 환경 변수로만 관리할 것 (config.yaml에 절대 기입 금지):
+  EXCHANGE_API_KEY
+  EXCHANGE_API_SECRET
 """
 
 import os
@@ -60,6 +76,60 @@ class AppConfig:
     strategy: str = "donchian_breakout"  # "ema_cross" | "donchian_breakout"
     dry_run: bool = True
     telegram: Optional[TelegramConfig] = None
+
+
+def _env_bool(key: str, default: bool) -> bool:
+    """환경 변수를 bool로 변환. 'true'/'1' → True, 'false'/'0' → False."""
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    return val.strip().lower() in ("true", "1", "yes")
+
+
+def _env_float(key: str, default: float) -> float:
+    """환경 변수를 float으로 변환. 파싱 실패 시 default 반환."""
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        warnings.warn(
+            f"환경 변수 {key}='{val}'을 float으로 변환할 수 없어 기본값 {default}를 사용합니다.",
+            UserWarning,
+            stacklevel=4,
+        )
+        return default
+
+
+def _apply_env_overrides(cfg: AppConfig) -> AppConfig:
+    """환경 변수로 config 값을 override한다. 환경 변수가 없으면 YAML 값 유지."""
+    # exchange
+    cfg.exchange.name = os.environ.get("EXCHANGE_NAME", cfg.exchange.name)
+    cfg.exchange.sandbox = _env_bool("EXCHANGE_SANDBOX", cfg.exchange.sandbox)
+
+    # trading
+    cfg.trading.symbol = os.environ.get("TRADING_SYMBOL", cfg.trading.symbol)
+    cfg.trading.timeframe = os.environ.get("TRADING_TIMEFRAME", cfg.trading.timeframe)
+
+    # risk
+    cfg.risk.risk_per_trade = _env_float("RISK_PER_TRADE", cfg.risk.risk_per_trade)
+    cfg.risk.max_drawdown = _env_float("RISK_MAX_DRAWDOWN", cfg.risk.max_drawdown)
+    cfg.risk.max_daily_loss = _env_float("RISK_MAX_DAILY_LOSS", cfg.risk.max_daily_loss)
+
+    # top-level
+    cfg.dry_run = _env_bool("TRADING_DRY_RUN", cfg.dry_run)
+
+    # telegram (override bot_token / chat_id if env vars present)
+    if cfg.telegram is not None:
+        cfg.telegram.bot_token = os.environ.get(
+            "TELEGRAM_BOT_TOKEN", cfg.telegram.bot_token
+        )
+        cfg.telegram.chat_id = os.environ.get(
+            "TELEGRAM_CHAT_ID", cfg.telegram.chat_id
+        )
+
+    return cfg
 
 
 def _validate_config(cfg: AppConfig) -> None:
@@ -144,5 +214,6 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
         telegram=telegram_cfg,
     )
 
+    _apply_env_overrides(cfg)
     _validate_config(cfg)
     return cfg

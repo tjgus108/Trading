@@ -2893,3 +2893,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** ccxt 베스트 프랙티스. enableRateLimit=True 필수, sync 멀티스레드 비안전 → async(ccxt.pro), 계층형 예외 처리, exchange 인스턴스 재사용 필수.
 **Tests:** 6025 passed (+5 from Cycle 36).
 **Next Cycle:** 38 (E+A+F)
+
+## [2026-04-11 08:48 UTC] Cycle 38 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:50 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 14:45 UTC] Cycle 38 COMPLETED — E + A + F
+**[E] Execution:** src/config.py _apply_env_overrides() 추가. EXCHANGE_NAME/SANDBOX, TRADING_SYMBOL/TIMEFRAME/DRY_RUN, RISK_PER_TRADE 등 환경 변수 override. API 키는 env 전용 명시. +2 tests.
+**[A] Quality:** tests/test_monte_carlo.py +3 회귀 테스트 (Cycle 36 빈 배열 버그 수정 검증). empty/zero_target_len/many_nans.
+**[F] Research:** Kimchi Premium 2024-2025. 2~5%→2025년 말 -0.18% 디스카운트 고착화. 직접 차익 불가 (외환법 + VAPUA). 프리미엄 -2% 이하 시 DCA 집중 전략 백테스트 187% vs 64%. 센티먼트 지표로만 활용 권장.
+**Tests:** 6030 passed (+5 from Cycle 37).
+**Next Cycle:** 39 (C+B+F)

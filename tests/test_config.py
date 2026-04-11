@@ -148,3 +148,25 @@ def test_max_position_size_above_05_warns(tmp_path):
     with pytest.warns(UserWarning, match="max_position_size"):
         cfg = load_config(str(p))
     assert cfg.trading.max_position_size == 0.8
+
+
+# ── 환경 변수 override 테스트 ─────────────────────────────────────────────────
+
+def test_env_overrides_exchange_and_symbol(config_file, monkeypatch):
+    """EXCHANGE_NAME, TRADING_SYMBOL 환경 변수가 YAML 값을 덮어씌운다."""
+    monkeypatch.setenv("EXCHANGE_NAME", "okx")
+    monkeypatch.setenv("TRADING_SYMBOL", "ETH/USDT")
+    cfg = load_config(config_file)
+    assert cfg.exchange.name == "okx"
+    assert cfg.trading.symbol == "ETH/USDT"
+
+
+def test_env_overrides_risk_and_dry_run(config_file, monkeypatch):
+    """RISK_PER_TRADE, RISK_MAX_DRAWDOWN, TRADING_DRY_RUN 환경 변수 override."""
+    monkeypatch.setenv("RISK_PER_TRADE", "0.02")
+    monkeypatch.setenv("RISK_MAX_DRAWDOWN", "0.10")
+    monkeypatch.setenv("TRADING_DRY_RUN", "false")
+    cfg = load_config(config_file)
+    assert cfg.risk.risk_per_trade == 0.02
+    assert cfg.risk.max_drawdown == 0.10
+    assert cfg.dry_run is False

@@ -136,3 +136,43 @@ def test_monte_carlo_annualization_param():
     # 둘 다 결과를 반환해야 함
     assert len(result_daily.sharpes) == 50
     assert len(result_hourly.sharpes) == 50
+
+
+# ---------------------------------------------------------------------------
+# Cycle 38: Empty Array Bug Fix Regression Tests (Cycle 36 수정 검증)
+# ---------------------------------------------------------------------------
+
+def test_monte_carlo_block_bootstrap_empty_array():
+    """_block_bootstrap이 빈 배열을 안전하게 처리."""
+    mc = MonteCarlo(n_simulations=1, block_size=20)
+    
+    # 직접 호출: 빈 배열
+    result = mc._block_bootstrap(np.array([], dtype=float), target_len=100)
+    assert isinstance(result, np.ndarray)
+    assert len(result) == 0
+
+
+def test_monte_carlo_block_bootstrap_zero_target_len():
+    """_block_bootstrap이 target_len=0을 안전하게 처리."""
+    mc = MonteCarlo(n_simulations=1, block_size=20)
+    r = np.array([0.001, 0.002, 0.003], dtype=float)
+    
+    # target_len이 0이면 빈 배열 반환
+    result = mc._block_bootstrap(r, target_len=0)
+    assert isinstance(result, np.ndarray)
+    assert len(result) == 0
+
+
+def test_monte_carlo_run_with_many_nans_resulting_empty():
+    """대부분 NaN인 Series: dropna() 후 빈 배열, 안전하게 처리."""
+    # 거의 모든 값이 NaN
+    data = [np.nan] * 95 + [0.001, 0.002, 0.003, 0.004, 0.005]  # 5개 유효값
+    returns = pd.Series(data)
+    
+    mc = MonteCarlo(n_simulations=30, block_size=10, seed=42)
+    result = mc.run(returns)
+    
+    # 예외 없이 완료, 결과는 유효함
+    assert len(result.final_returns) == 30
+    assert len(result.sharpes) == 30
+    assert len(result.max_drawdowns) == 30

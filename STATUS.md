@@ -43,7 +43,8 @@
 - ✅ Cycle 35 완료 (D+E+F: MultiSignal tie + dispatcher 로그 확장 + TradingView webhook)
 - ✅ Cycle 36 완료 (A+C+F: Monte Carlo 경계 + 에러 분류 + 선물 vs 현물 리서치)
 - ✅ Cycle 37 완료 (B+D+F: Risk 통합 테스트 + LLM research_insights + ccxt best)
-- ⏳ **Cycle 38 대기** (E+A+F)
+- ✅ Cycle 38 완료 (E+A+F: env overrides + MC 회귀 + Kimchi Premium)
+- ⏳ **Cycle 39 대기** (C+B+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -52,7 +53,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,025개** |
+| ✅ 통과 테스트 | **6,030개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

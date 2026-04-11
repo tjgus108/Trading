@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 37 — 2026-04-11T08:45:30.356966Z
+🔄 CYCLE 38 — 2026-04-11T08:48:39.712147Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 36 COMPLETED — A + C + F** (2026-04-11 14:05 UTC)
-  **[A] Quality:** tests/test_monte_carlo.py 신규 (+10 경계 조건). Monte Carlo 빈 데이터/단일 거래/NaN/음수/seed 재현성/0 변동성/annualization 검증. src/backtest/monte_carlo.py에 빈 배열 처리 버그 수정.
-  **[C] Data:** src/data/feed.py 에러 분류 (transient vs fatal). NetworkError/Timeout/RateLimit → 재시도, BadSymbol/Auth → 즉시 raise. +2 tests.
-  **[F] Research:** 선물 vs 현물 봇. 선물은 레버리지(5~10x) 수익 확대 가능하나 청산/펀딩비 리스크. 현물은 청산 없고 그리드 적합. 성과 차이는 봇 유형보다 전략/레짐 적합성에 의존.
-  **Tests:** 6020 passed (+12 from Cycle 35).
+**Cycle 37 COMPLETED — B + D + F** (2026-04-11 14:25 UTC)
+  **[B] Risk:** tests/test_risk_manager.py +2 통합 테스트. jitter+session_filter+open_positions+adaptive ATR 동시 활성화 APPROVED 검증, daily_loss+total_exposure 경계 시 서킷 브레이커 우선 BLOCKED 검증.
+  **[D] ML:** src/alpha/llm_analyst.py analyze_signal에 research_insights 파라미터 추가 (프롬프트 주입). _parse_response() 마크다운 정규화 + 최대 3문장. +3 tests.
+  **[F] Research:** ccxt 베스트 프랙티스. enableRateLimit=True 필수, sync 멀티스레드 비안전 → async(ccxt.pro), 계층형 예외 처리, exchange 인스턴스 재사용 필수.
+  **Tests:** 6025 passed (+5 from Cycle 36).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
