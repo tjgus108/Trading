@@ -1,18 +1,16 @@
-# Cycle 32 - Category B: Risk Management 문서화
+# Cycle 33 - Execution 모듈 README
 
 ## 이번 작업 내용
-`src/risk/README.md` 신규 작성 (코드 변경 없음).
+`src/exchange/README.md` 신규 작성 (79줄, 코드 변경 없음).
 
 ### 생성 파일
-**src/risk/README.md** (135줄)
-- DrawdownMonitor 3층 서킷브레이커 (일일/주간/월간) 설명
-- CircuitBreaker 다층 차단 조건 및 size_multiplier 표 정리
-- KellySizer Risk-Constrained Half-Kelly 공식 정리
-- RiskManager evaluate() 처리 순서, config.yaml 매핑 표
-- VolTargeting 공식 및 사용법
-- PortfolioOptimizer 3가지 방법론 정리
-- RiskResult 출력 구조
+**src/exchange/README.md**
+- ExchangeConnector: ccxt 기반 실거래소 연결, API 권한 체크, wait_for_fill
+- PaperTrader: 슬리피지/부분체결/타임아웃 시뮬레이션 모의거래 엔진
+- PaperConnector: PaperTrader를 ExchangeConnector 인터페이스로 래핑
+- MockExchangeConnector: API 키 없이 demo 모드 전체 파이프라인 테스트
+- TWAPExecutor: n_slices 분할 주문, Almgren-Chriss 슬리피지 추정
 
 ## 다음 단계
-- RiskManager와 DrawdownMonitor/CircuitBreaker(circuit_breaker.py) 통합 연결 검토
-- VolTargeting을 RiskManager.evaluate()에 연동하는 옵션 추가 고려
+- RiskManager와 ExchangeConnector 연동 흐름 검토 (signal → risk → execute)
+- PaperConnector.fetch_ticker() NotImplementedError 개선 고려 (mock price 반환)
