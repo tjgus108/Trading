@@ -109,6 +109,7 @@ class RiskManager:
         circuit_breaker: Optional[CircuitBreaker] = None,
         jitter_pct: float = 0.0,  # ±jitter_pct 랜덤 노이즈 (0~0.05)
         session_filter: bool = False,  # True 시 세션별 포지션 축소 활성화
+        max_total_exposure: float = 0.30,  # 다중 포지션 총 노출 한도 (계좌 대비 30%)
     ):
         self.risk_per_trade = risk_per_trade
         self.atr_multiplier_sl = atr_multiplier_sl
@@ -117,6 +118,7 @@ class RiskManager:
         self.circuit_breaker = circuit_breaker
         self.jitter_pct = max(0.0, min(jitter_pct, 0.05))  # 상한 5%
         self.session_filter = session_filter
+        self.max_total_exposure = max_total_exposure
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
@@ -162,6 +164,20 @@ class RiskManager:
         )
         return mult
 
+    def check_total_exposure(
+        self,
+        open_positions: list,  # list of {"size": float, "price": float}
+        account_balance: float,
+    ) -> Optional[str]:
+        """기존 포지션들의 총 노출이 max_total_exposure 초과 시 사유 반환, 정상이면 None."""
+        total = sum(p["size"] * p["price"] for p in open_positions)
+        ratio = total / account_balance if account_balance > 0 else 0.0
+        if ratio >= self.max_total_exposure:
+            return (
+                f"total_exposure {ratio:.2%} >= limit {self.max_total_exposure:.2%}"
+            )
+        return None
+
     def reset_daily(self) -> None:
         """자정 리셋: 일일 손실 초기화."""
         if self.circuit_breaker:
@@ -176,6 +192,7 @@ class RiskManager:
         last_candle_pct_change: float = 0.0,
         candle_df: Optional[pd.DataFrame] = None,  # adaptive multiplier용
         timestamp: Union[datetime, None] = None,  # 세션 필터용 UTC 시각
+        open_positions: Optional[list] = None,  # 다중 포지션 total exposure 체크용
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -196,6 +213,21 @@ class RiskManager:
                 return RiskResult(
                     status=RiskStatus.BLOCKED,
                     reason=f"Circuit breaker: {block_reason}",
+                    position_size=None,
+                    stop_loss=None,
+                    take_profit=None,
+                    risk_amount=None,
+                    portfolio_exposure=None,
+                )
+
+        # 다중 포지션 total exposure 체크
+        if open_positions:
+            exposure_reason = self.check_total_exposure(open_positions, account_balance)
+            if exposure_reason:
+                logger.warning("Total exposure limit breached: %s", exposure_reason)
+                return RiskResult(
+                    status=RiskStatus.BLOCKED,
+                    reason=f"Total exposure limit: {exposure_reason}",
                     position_size=None,
                     stop_loss=None,
                     take_profit=None,

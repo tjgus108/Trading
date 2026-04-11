@@ -587,3 +587,22 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [AMMs: Toward More Profitable Liquidity Provisioning](https://arxiv.org/html/2501.07828v1)
 - [Bots fleece DeFi LPs for $500m/year — DL News](https://www.dlnews.com/articles/defi/new-cow-swap-amm-will-stop-mev-bots-and-save-users-millions/)
 - [CoW DAO MEV-Capturing AMM](https://cow.fi/learn/cow-dao-launches-the-first-mev-capturing-amm)
+
+## [2026-04-11] Cycle 29 — Successful Bot Patterns
+
+### 성공 공통 요소
+- Profit Factor 2.0+ 유지, Sharpe 1.5+, MDD 15-20% 이내 — 살아남는 봇의 최소 기준이 아닌 운영 목표로 설정
+- 단순 전략 우선: 복잡한 ML 모델보다 규칙 기반 단순 전략이 라이브에서 더 안정적. 과적합 위험 낮음
+- 멀티 데이터 통합: 기술 지표 단독이 아닌 센티멘트·거시 신호 병합 시 적응력 향상
+- 52%의 자동화 계좌가 3개월 내 실패 — 생존 봇은 포지션 크기 알고리즘 + 일일 손실 한도 + 상관관계 모니터링 3종 세트 보유
+- 30일·90일 롤링 일관성으로 성과 측정 (백테스트 최고 수익률 기준 금지)
+
+### 운영 습관
+- 1쌍 1타임프레임으로 시작 → 실제 자본 5% 이하 파일럿 → 다변화 순서 준수
+- 봇 오버라이드 금지: 수동 개입 시 평균 68% 자본 손실. 전략 신뢰 또는 전략 교체 둘 중 하나만
+- 지속적 모니터링 + 보안 패치: "set and forget" 방치 계좌 73%가 6개월 내 실패
+
+### 참고
+- [Why AI Trading Bots Fail — Amplework](https://www.amplework.com/blog/ai-trading-bots-failures-how-to-build-profitable-bot/)
+- [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [AI Bot Trading Profitable 2025? — AgentiveAIQ](https://agentiveaiq.com/blog/is-ai-bot-trading-profitable-the-2025-reality-check)

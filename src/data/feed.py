@@ -5,6 +5,7 @@ data-agent가 이 모듈을 사용한다.
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -45,6 +46,57 @@ class DataFeed:
         summary = self._fetch_fresh(symbol, timeframe, limit)
         self._cache[key] = (summary, now)
         return summary
+
+
+    def fetch_multiple(
+        self,
+        symbols: list[str],
+        timeframe: str,
+        limit: int = 500,
+        max_workers: int = None,
+    ) -> dict[str, DataSummary]:
+        """
+        여러 심볼을 병렬로 fetch.
+        
+        Args:
+            symbols: 심볼 리스트 (예: ["BTC/USDT", "ETH/USDT"])
+            timeframe: 타임프레임 (예: "1h")
+            limit: 캔들 개수
+            max_workers: 스레드 풀 크기 (기본: min(32, 심볼 수 + 4))
+        
+        Returns:
+            {symbol: DataSummary} 딕셔너리
+        
+        Notes:
+            - 기본 fetch()와 동일한 캐싱 로직 적용
+            - 오류 발생 시 해당 심볼은 건너뛰고 나머지 진행
+        """
+        if max_workers is None:
+            max_workers = min(len(symbols) + 4, 32)
+        
+        results = {}
+        failed = {}
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 작업 제출
+            futures = {
+                executor.submit(self.fetch, symbol, timeframe, limit): symbol
+                for symbol in symbols
+            }
+            
+            # 완료된 작업 수집
+            for future in as_completed(futures):
+                symbol = futures[future]
+                try:
+                    results[symbol] = future.result()
+                except Exception as e:
+                    failed[symbol] = str(e)
+                    logger.warning("fetch_multiple: %s 실패 — %s", symbol, e)
+        
+        if failed:
+            logger.info("fetch_multiple 완료: %d 성공, %d 실패", len(results), len(failed))
+        
+        return results
 
     def invalidate_cache(self, symbol=None, timeframe=None):
         """특정 심볼/타임프레임 또는 전체 캐시 무효화."""

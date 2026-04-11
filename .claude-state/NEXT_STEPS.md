@@ -1,22 +1,27 @@
-# Cycle 28 - Config Validation 강화 완료
+# Cycle 29 - Data & Infrastructure: DataFeed 병렬 fetch 확장
 
 ## 이번 작업 내용
-`load_config()` 호출 시 위험 파라미터 자동 검증 추가.
+`src/data/feed.py`에 `fetch_multiple()` 메서드 추가로 여러 심볼 동시 fetch 지원.
 
-**수정:**
-1. `src/config.py`
-   - L7: `import warnings` 추가
-   - L67-84: `_validate_config()` 함수 신규 추가
-     - `risk_per_trade > 0.1` → `ValueError`
-     - `risk_per_trade > 0.05` → `UserWarning`
-     - `max_position_size > 0.5` → `UserWarning`
-   - L131: `_validate_config(cfg)` 호출
+### 수정 파일
+1. **src/data/feed.py** (L7-99)
+   - L8: `from concurrent.futures import ThreadPoolExecutor, as_completed` import 추가
+   - L51-99: `fetch_multiple()` 메서드 신규 추가
+     - ThreadPoolExecutor로 병렬 fetch
+     - 기존 fetch() 캐싱 로직 동일 적용
+     - 부분 실패 처리: 일부 심볼 오류 시 다른 심볼 계속 처리
+     - max_workers 자동 조절 (min(len(symbols)+4, 32))
 
-2. `tests/test_config.py`
-   - L82-134: 검증 테스트 3개 추가
+2. **tests/test_feed_parallel.py** (신규)
+   - 7개 테스트 추가
+   - 기본 병렬 fetch, 캐싱, 부분 실패, 지표 포함 검증
+
+### 검증사항
+- `websocket_feed.py` L73: 이미 `deque(maxlen=MAX_CANDLES)` 무한 버퍼 방지 됨
+- 하위 호환성: 기존 `fetch()` 동작 100% 유지
 
 ## 테스트 결과
-6/6 passed (test_config.py)
+7/7 passed (test_feed_parallel.py)
 
 ## 다음 단계
-- Cycle 29: connector retry 로직 검증 또는 새 전략 작업
+- Cycle 30: strategy 강화 또는 risk 최적화

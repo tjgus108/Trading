@@ -2359,3 +2359,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** AMM/DEX 상호작용. MEV 봇이 LP로부터 연 $500M+ 추출(LVR). Uniswap v3 LP 50%가 단순 보유 대비 손실. CeFi 봇이 DEX 가격 신호 소스로 쓸 때 차익거래 지연 주의.
 **Tests:** 5982 passed (+3 from Cycle 27).
 **Next Cycle:** 29 (C+B+F)
+
+## [2026-04-11 04:20 UTC] Cycle 29 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:22 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 11:45 UTC] Cycle 29 COMPLETED — C + B + F
+**[C] Data:** src/data/feed.py에 fetch_multiple() 메서드 추가. ThreadPoolExecutor 기반 병렬 fetch, 캐싱 적용, 부분 실패 처리, 자동 스레드 풀 조절. +7 tests (test_feed_parallel.py).
+**[B] Risk:** src/risk/manager.py에 max_total_exposure 파라미터 (기본 0.30) + check_total_exposure() + open_positions 인자. 총 노출 30% 초과 시 BLOCKED. +2 tests.
+**[F] Research:** 성공 봇 공통점. 단순 전략 + 포지션 크기/일일 손실/상관 모니터링 3종. MDD 15-20% 목표. 실패 원인: 수동 오버라이드 68% 손실, set-and-forget 73% 6개월 내 실패. 롤링 일관성 평가 필수.
+**Tests:** 5991 passed (+9 from Cycle 28).
+**Next Cycle:** 30 (D+E+F)

@@ -67,3 +67,28 @@ def test_risk_amount_equals_one_percent(risk_manager):
     result = risk_manager.evaluate("BUY", entry_price=50000, atr=1000, account_balance=10000)
     assert result.status == RiskStatus.APPROVED
     assert abs(result.risk_amount - 100.0) < 0.01  # 1% of 10000
+
+
+def test_total_exposure_blocked():
+    """기존 포지션이 총 노출 한도(30%)를 초과하면 BLOCKED."""
+    rm = RiskManager(max_total_exposure=0.30)
+    # 계좌 10000, 기존 포지션: 3500 USD (35%) → 초과
+    open_pos = [{"size": 0.07, "price": 50000}]  # 0.07 * 50000 = 3500
+    result = rm.evaluate(
+        "BUY", entry_price=50000, atr=1000, account_balance=10000,
+        open_positions=open_pos,
+    )
+    assert result.status == RiskStatus.BLOCKED
+    assert "total_exposure" in result.reason
+
+
+def test_total_exposure_approved_under_limit():
+    """기존 포지션이 총 노출 한도 미만이면 APPROVED."""
+    rm = RiskManager(max_total_exposure=0.30)
+    # 계좌 10000, 기존 포지션: 2000 USD (20%) → 통과
+    open_pos = [{"size": 0.04, "price": 50000}]  # 0.04 * 50000 = 2000
+    result = rm.evaluate(
+        "BUY", entry_price=50000, atr=1000, account_balance=10000,
+        open_positions=open_pos,
+    )
+    assert result.status == RiskStatus.APPROVED
