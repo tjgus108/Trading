@@ -96,3 +96,12 @@
 - [Kelly Criterion in Algo-Trading — ALGOGENE](https://algogene.com/community/post/175)
 - [Risk-Constrained Kelly Criterion — QuantInsti](https://blog.quantinsti.com/risk-constrained-kelly-criterion/)
 - [Fractional Kelly & Uncertainty — Matthew Downey](https://matthewdowney.github.io/uncertainty-kelly-criterion-optimal-bet-size.html)
+
+
+## [2026-04-11] Cycle 3 — Execution Research (SKIPPED)
+
+F 에이전트가 WebSearch 타임아웃(30분+)으로 실행 완료하지 못함.
+Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
+- 거래소별 실측 슬리피지 (Binance, OKX, Bybit)
+- Paper → Live 전환 함정 체크리스트
+- TWAP/VWAP 최신 개선 기법 (2024-2025)
