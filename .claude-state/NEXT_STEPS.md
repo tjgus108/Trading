@@ -366,6 +366,44 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 
 ---
 
+## Cycle 6 - Category A: Quality Assurance ✅ COMPLETED
+
+**Task:** Fix numpy warnings in strategy code (19 warnings → 0)
+
+**Files Modified:**
+1. `/home/user/Trading/src/strategy/sine_wave.py` (lines 33-35)
+   - **Issue:** `RuntimeWarning: invalid value encountered in divide`
+   - **Root Cause:** `np.where(std20 > 0, ...)` 조건이 NaN 체크를 하지 않아 NaN/0 나눗셈 발생
+   - **Fix:** 수동 마스킹으로 NaN 값 사전 필터링
+   ```python
+   # Before: zscore = np.where(std20 > 0, (close_arr - sma20) / std20, 0.0)
+   # After:
+   zscore = np.zeros(n)
+   mask = (~np.isnan(std20)) & (std20 > 0)
+   zscore[mask] = (close_arr[mask] - sma20[mask]) / std20[mask]
+   ```
+
+2. `/home/user/Trading/src/strategy/trend_persistence.py` (lines 35-40)
+   - **Issue:** `RuntimeWarning: Degrees of freedom <= 0 for slice` (12개 경고)
+   - **Root Cause:** `autocorr(lag=1)`이 샘플 수 < 2일 때 호출되어 자유도 부족
+   - **Fix:** `min_periods` 체크 강화 (2 → 3)
+   ```python
+   # Before: lambda x: pd.Series(x).autocorr(lag=1) if len(x) >= 2 else 0.0
+   # After:  lambda x: pd.Series(x).autocorr(lag=1) if len(x) >= 3 else 0.0
+   ```
+
+**Test Results:**
+- test_sine_wave.py: 18 passed, 0 warnings ✅
+- test_trend_persistence.py: 14 passed, 0 warnings ✅
+- Full test suite: 5817 passed, 25 skipped, **0 warnings** ✅ (19 → 0)
+
+**경고 제거 요약:**
+- **12개 warnings (SineWaveStrategy):** NaN 마스킹으로 제거
+- **7개 warnings (TrendPersistenceStrategy):** autocorr 자유도 체크 강화로 제거
+- **전체 19개 경고 완전 제거**
+
+---
+
 ## Next: 추가 작업 후보 (Cycle 6~)
 - NewsMonitor 에러 처리 강화 (CryptoPanic API 타임아웃)
 - OnchainFetcher 재시도 로직 추가 (현재 한 번만 시도)

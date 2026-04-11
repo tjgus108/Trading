@@ -497,3 +497,37 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=+0.00 news=NONE
 Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:25:23Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:25 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:25:53Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:26 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:26:33Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:28 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:28:15Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 03:30 UTC] Cycle 6 COMPLETED — A + C + F
+**[A] Quality:** src/strategy/sine_wave.py + src/strategy/trend_persistence.py에서 numpy RuntimeWarning 19개 완전 제거. NaN 마스킹 + 자유도 체크 강화.
+**[C] Data:** src/data/news.py NewsMonitor 견고성 강화 (max_retries + exponential backoff + fallback). +9 테스트. src/data/sentiment.py도 유사하게 개선됨.
+**[F] Research:** 레짐 감지 함정 리서치 (HMM lag, 크립토 Markov 가정 붕괴). RESEARCH_LOG.md에 추가.
+**Tests:** 5817 passed, 25 skipped, 0 warnings ✨ (+19 from Cycle 5)
+**Next Cycle:** 7 (B+D+F — 리스크+ML+리서치 두번째 순회)
