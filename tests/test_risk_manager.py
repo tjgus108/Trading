@@ -570,3 +570,35 @@ def test_mixed_direction_positions_total_exposure_is_gross_not_net():
         open_positions=open_positions_small,
     )
     assert result_small.status == RiskStatus.APPROVED
+
+
+# ── __init__ 입력 파라미터 범위 검증 ─────────────────────────────────────────
+
+def test_risk_per_trade_above_one_raises():
+    with pytest.raises(ValueError, match="risk_per_trade"):
+        RiskManager(risk_per_trade=1.01)
+
+
+def test_risk_per_trade_zero_raises():
+    with pytest.raises(ValueError, match="risk_per_trade"):
+        RiskManager(risk_per_trade=0.0)
+
+
+def test_risk_per_trade_boundary_exactly_one_ok():
+    rm = RiskManager(risk_per_trade=1.0)
+    assert rm.risk_per_trade == 1.0
+
+
+def test_atr_multiplier_sl_zero_raises():
+    with pytest.raises(ValueError, match="atr_multiplier_sl"):
+        RiskManager(atr_multiplier_sl=0.0)
+
+
+def test_max_position_size_above_one_raises():
+    with pytest.raises(ValueError, match="max_position_size"):
+        RiskManager(max_position_size=1.1)
+
+
+def test_max_total_exposure_zero_raises():
+    with pytest.raises(ValueError, match="max_total_exposure"):
+        RiskManager(max_total_exposure=0.0)

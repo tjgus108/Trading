@@ -111,6 +111,16 @@ class RiskManager:
         session_filter: bool = False,  # True 시 세션별 포지션 축소 활성화
         max_total_exposure: float = 0.30,  # 다중 포지션 총 노출 한도 (계좌 대비 30%)
     ):
+        if not (0 < risk_per_trade <= 1.0):
+            raise ValueError(f"risk_per_trade must be in (0, 1.0], got {risk_per_trade}")
+        if atr_multiplier_sl <= 0:
+            raise ValueError(f"atr_multiplier_sl must be > 0, got {atr_multiplier_sl}")
+        if atr_multiplier_tp <= 0:
+            raise ValueError(f"atr_multiplier_tp must be > 0, got {atr_multiplier_tp}")
+        if not (0 < max_position_size <= 1.0):
+            raise ValueError(f"max_position_size must be in (0, 1.0], got {max_position_size}")
+        if not (0 < max_total_exposure <= 1.0):
+            raise ValueError(f"max_total_exposure must be in (0, 1.0], got {max_total_exposure}")
         self.risk_per_trade = risk_per_trade
         self.atr_multiplier_sl = atr_multiplier_sl
         self.atr_multiplier_tp = atr_multiplier_tp

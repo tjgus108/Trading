@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 56 — 2026-04-11T10:03:31.574943Z
+🔄 CYCLE 57 — 2026-04-11T10:06:13.616313Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 55 COMPLETED — D + E + F** (2026-04-11 21:10 UTC)
-  **[D] ML:** tests/test_backtest.py +2 WalkForwardValidator 경계. 데이터 부족 ValueError, 최소 250봉 윈도우 1개 생성.
-  **[E] Execution:** src/config.py migrate_config() 추가. 구버전 키 (stop_loss→stop_loss_atr_multiplier 등) 자동 변환. **추가 수정**: 누락 필드 경고를 debug log로 전환 (warnings → 200+개 폭주 방지). config.yaml + example.yaml + 5개 테스트 파일 신규 키 이름으로 업데이트. +2 tests.
-  **[F] Research:** Volume Profile 실전. POC 지지/저항 유효 but 단독 예측 불가, Value Area 되돌림 4H+ 적용. 추세/모멘텀 필터 병행 필요, 단독 Sharpe 1.0 불확실.
-  **Tests:** 6125 passed, **0 warnings** ✨ (+4 from Cycle 54).
+**Cycle 56 COMPLETED — A + C + F** (2026-04-11 21:30 UTC)
+  **[A] Quality:** dsr_threshold 파라미터 이미 완전 구현 확인. tests/test_backtest_engine.py +1 엄격 모드(1.0) vs 기본(0.0) 일치 검증.
+  **[C] Data:** tests/test_feed_parallel.py +1 cache key 충돌 검증. BTC/ETH × 1h/4h 4조합 동시 페치 시 튜플 키 고유성 확인.
+  **[F] Research:** LLM 기반 뉴스 감성. GPT-4/BERT가 lexicon 대비 우수 (2025 MDPI). 부정→하락/긍정→상승 상관관계. Gemini-2.5/DeepSeek-R1 선두. 스팸 필터링 + 도메인 파인튜닝 + 가격 모멘텀 결합 필수.
+  **Tests:** 6127 passed (+2 from Cycle 55).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
