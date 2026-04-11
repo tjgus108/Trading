@@ -1,30 +1,31 @@
 ======================================================================
-🔄 CYCLE 43 — 2026-04-11T09:05:36.886701Z
+🔄 CYCLE 44 — 2026-04-11T09:07:51.285880Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 42 COMPLETED — B + D + F** (2026-04-11 16:05 UTC)
-  **[B] Risk:** tests/test_portfolio_optimizer.py +3 경계. zero correlation 3방법 합=1, 전체 NaN fallback, 단일 데이터 fallback. 버그 없음 확인.
-  **[D] ML:** tests/test_phase_c_ml.py +2 일관성 테스트. 모든 피처 동일 길이/인덱스, X/y 정렬. features.py shift(1) 일관 적용, label 분리 확인.
-  **[F] Research:** 봇 보안 침해 2025. AIXBT 55 ETH (세션 토큰), Polymarket GitHub 악성코드, Nova $500K (수동 내부). 주요 벡터: API 키 노출, 세션 토큰 탈취, 오픈소스 봇 악성코드.
-  **Tests:** 6050 passed (+5 from Cycle 41).
+**Cycle 43 COMPLETED — E + A + F** (2026-04-11 16:25 UTC)
+  **[E] Execution:** tests/test_paper_trader.py +3 경계. 0 balance BUY 거부, 수수료>이익 음수 P&L, 잔액=주문비용 정확 성공.
+  **[A] Quality:** scripts/audit_summary.py 신규. QUALITY_AUDIT.csv에서 요약 통계 출력 (PASS/FAIL, Top 5, avg Sharpe/WR/MDD).
+  **[F] Research:** LSTM vs Transformer 2025. LSTM 가격 변동 예측 안정적(장기), Transformer 절대가 소폭 우세 + 학습 빠름. 전략 주기 1h+ → LSTM, 스캘핑 → Transformer.
+  **Tests:** 6053 passed (+3 from Cycle 42).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
+  - FAIL 기록 존재
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

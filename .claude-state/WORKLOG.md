@@ -3248,3 +3248,111 @@ ImplShortfall: -5.00bps
 **[F] Research:** LSTM vs Transformer 2025. LSTM 가격 변동 예측 안정적(장기), Transformer 절대가 소폭 우세 + 학습 빠름. 전략 주기 1h+ → LSTM, 스캘핑 → Transformer.
 **Tests:** 6053 passed (+3 from Cycle 42).
 **Next Cycle:** 44 (C+B+F)
+
+## [2026-04-11 09:07 UTC] Cycle 44 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:09 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 09:10 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 16:50 UTC] Cycle 44 COMPLETED — C + B + F
+**[C] Data:** tests/test_sentiment.py 신규 (+11 tests). F&G 일관성, ConnectionError/잘못된 JSON, 펀딩비 타임아웃/필드 누락, OI 다중 API, 전체 실패 fallback.
+**[B] Risk:** tests/test_vol_targeting.py +3. target > realized → max 2.0 클리핑, target < realized → target/rv 정확, std=0 → divide-by-zero 방어.
+**[F] Research:** Volume Profile 실전. POC+Value Area 지지/저항, VWAP 밴드 mean-reversion, Anchored VWAP 데이트레이딩. 정량 성과 데이터 희소 — 단독보다 RSI+볼륨 조합이 신뢰도 향상.
+**Tests:** 6067 passed (+14 from Cycle 43). 1개 flaky 발생 후 재실행 시 통과.
+**Next Cycle:** 45 (D+E+F)

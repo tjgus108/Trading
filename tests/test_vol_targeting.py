@@ -81,3 +81,44 @@ def test_adjust_no_double_call(monkeypatch):
     monkeypatch.setattr(vt, "realized_vol", counting_rv)
     vt.adjust(base_size=0.01, df=df)
     assert call_count["n"] == 1, f"realized_vol() called {call_count['n']} times, expected 1"
+
+
+# ── 추가 시나리오: target_vol vs realized_vol 비교 ─────────────────────────────
+
+def test_target_vol_greater_than_realized_clips_to_max():
+    """realized_vol < target_vol → scalar > 1, max_scalar(2.0)에 클리핑."""
+    vt = VolTargeting(target_vol=0.20, annualization=1, max_scalar=2.0, min_scalar=0.1)
+    rng = np.random.default_rng(7)
+    log_rets = rng.normal(0, 0.10, 24)  # rv ≈ 0.10 < target 0.20
+    closes = 100 * np.exp(np.concatenate([[0], np.cumsum(log_rets)]))
+    df = pd.DataFrame({"close": closes})
+    rv = vt.realized_vol(df)
+    s = vt.scalar(df)
+    assert rv < vt.target_vol, f"rv({rv:.4f}) should be < target(0.20)"
+    assert s == pytest.approx(2.0), "scalar must be clipped to max_scalar when rv << target"
+
+
+def test_target_vol_less_than_realized_no_clip():
+    """realized_vol > target_vol → scalar < 1, min_scalar 클리핑 없는 범위."""
+    vt = VolTargeting(target_vol=0.20, annualization=1, max_scalar=2.0, min_scalar=0.1)
+    rng = np.random.default_rng(7)
+    log_rets = rng.normal(0, 0.40, 24)  # rv ≈ 0.40 > target 0.20
+    closes = 100 * np.exp(np.concatenate([[0], np.cumsum(log_rets)]))
+    df = pd.DataFrame({"close": closes})
+    rv = vt.realized_vol(df)
+    s = vt.scalar(df)
+    assert rv > vt.target_vol, f"rv({rv:.4f}) should be > target(0.20)"
+    expected = vt.target_vol / rv
+    assert s == pytest.approx(expected, rel=1e-6), "scalar = target/rv without clipping"
+    assert 0.1 < s < 1.0
+
+
+def test_numerical_stability_identical_prices():
+    """모든 가격이 동일(변동 없음) → log_return=0, std=0 → rv=0 → scalar=1.0(fallback)."""
+    vt = VolTargeting(target_vol=0.20, annualization=252 * 24)
+    df = pd.DataFrame({"close": [100.0] * 25})
+    rv = vt.realized_vol(df)
+    s = vt.scalar(df)
+    # std=0 → rv=0 → _scalar_from_rv returns 1.0
+    assert rv == pytest.approx(0.0)
+    assert s == pytest.approx(1.0), "zero rv must return scalar=1.0 (no divide-by-zero)"
