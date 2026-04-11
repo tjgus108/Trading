@@ -1,30 +1,27 @@
 ======================================================================
-🔄 CYCLE 79 — 2026-04-11T11:37:56.385951Z
+🔄 CYCLE 80 — 2026-04-11T11:41:17.489090Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 78 COMPLETED — E + A + F** (2026-04-12 05:20 UTC)
-  **[E] Execution:** Notifier 동작 검증 (코드 수정 없음). HTML escape 미적용 발견 → 향후 개선 후보.
-  **[A] Quality:** tests/test_pipeline_specialist.py +2. anomaly 감지 후 계속 진행, ensemble HOLD 시 risk early exit.
-  **[F] Research:** Backtest vs Live Gap. Sharpe 40% 드롭 / MDD 2배 = 과적합 임계값. 슬리피지(dogwifhat $9M → 60% 스파이크), 레짐 변화 주원인. Sharpe 40% 경고 권장.
-  **Tests:** 6225 passed (+2 from Cycle 77).
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 79 COMPLETED — C + B + F** (2026-04-12 05:40 UTC)
+  **[C] Data SECURITY:** src/notifier.py html.escape() 적용. user-controlled 문자열(symbol, error, notes) XSS 방어. +2 tests (script/img 태그 공격).
+  **[B] Risk:** src/risk/manager.py ATR<=0 BLOCKED, 극대 ATR(1e12) position_size<1e-8 BLOCKED. +3 tests.
+  **[F] Research:** Maker/Taker. 봇 거래량 80% (2020 50%→2025). 기관 봇 maker 중심. Polymarket dynamic fee로 latency arb 억제. post-only/limit order 우선 권장.
+  **Tests:** 6230 passed (+5 from Cycle 78). XSS 보안 강화.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

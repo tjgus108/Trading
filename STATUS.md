@@ -85,7 +85,8 @@
 - ✅ Cycle 77 완료 (B+D+F: DD reset + Heston-LSTM 경계 + Stoch Vol)
 - ✅ Cycle 78 완료 (E+A+F: Notifier 검증 + pipeline +2 + Backtest gap)
 - ✅ Cycle 79 완료 (C+B+F: **Notifier XSS 방어** + Risk ATR 경계 + Maker/Taker)
-- ⏳ **Cycle 80 대기** 🎯 (D+E+F)
+- ✅ **Cycle 80 완료** 🎯 (D+E+F: adaptive_selector + Dashboard 80 배지 + Best Resources)
+- ⏳ **Cycle 81 대기** (A+C+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -94,7 +95,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,230개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,234개** (0 warnings ✨) 🎯 |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

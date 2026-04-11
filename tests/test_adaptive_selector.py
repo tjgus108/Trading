@@ -187,3 +187,43 @@ def test_window_cap():
     # window=5이므로 최신 5개(양수)만 남아야 → Sharpe > 0
     sh = sel.sharpe("a")
     assert sh > 0, f"최신 양수 데이터만 남아야 하는데 Sharpe={sh}"
+
+
+# ── 가중치 변동성 검증 ────────────────────────────────────────────────────
+
+def test_weight_shifts_with_changing_sharpe():
+    """PnL 패턴이 바뀌면 rolling Sharpe(가중치)가 실제로 변한다."""
+    sel = _make_selector()
+    # 초기: ema_cross 양호
+    for p in [10, 12, 9, 11, 10, 13, 8, 11, 10, 12]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div: 혼합
+    for p in [1, -2, 3, -1, 2, -3, 1, -2, 2, -1]:
+        sel.record_pnl("rsi_div", p)
+    sh_ema_before = sel.sharpe("ema_cross")
+    sh_rsi_before = sel.sharpe("rsi_div")
+    assert sh_ema_before > sh_rsi_before, "ema_cross Sharpe > rsi_div Sharpe"
+
+    # 이후: rsi_div 성과 역전(양수 몰림)
+    for p in [20, 22, 21, 25, 19, 23, 20, 22, 21, 24]:
+        sel.record_pnl("rsi_div", p)
+    sh_rsi_after = sel.sharpe("rsi_div")
+    assert sh_rsi_after > sh_rsi_before, "새 데이터 반영 후 rsi_div Sharpe 상승"
+
+
+def test_select_weight_proportional_after_reversal():
+    """가중치 역전 후 select() 선택 빈도가 바뀐다."""
+    sel = _make_selector()
+    # ema_cross 초기 우세
+    for p in [10, 12, 11, 13, 10, 12, 11, 13, 10, 12]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div 최신 10개 = 더 높은 Sharpe로 역전
+    for p in [50, 55, 52, 58, 51, 53, 57, 54, 56, 55]:
+        sel.record_pnl("rsi_div", p)
+
+    counts = {"ema_cross": 0, "rsi_div": 0, "funding": 0}
+    for _ in range(200):
+        counts[sel.select().name] += 1
+    assert counts["rsi_div"] > counts["ema_cross"], (
+        f"rsi_div(high Sharpe) 선택 빈도가 더 높아야 함: {counts}"
+    )

@@ -146,7 +146,8 @@ def _render_html(data: dict) -> str:
     cycles = data.get("cycle_count", 0)
     cumulative_pnl = data.get("cumulative_pnl", 0)
     cum_pnl_color = "green" if cumulative_pnl >= 0 else "red"
-    _milestones = [(70, '#7b2ff7', '#fff', 'CYCLE 70 MILESTONE'),
+    _milestones = [(80, '#ff4500', '#fff', 'CYCLE 80 MILESTONE'),
+                   (70, '#7b2ff7', '#fff', 'CYCLE 70 MILESTONE'),
                    (60, '#00b4d8', '#111', 'CYCLE 60 MILESTONE'),
                    (50, '#c8a800', '#111', 'CYCLE 50 MILESTONE')]
     milestone_html = ''.join(

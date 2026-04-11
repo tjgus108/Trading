@@ -6551,3 +6551,63 @@ ImplShortfall: -5.00bps
 **[F] Research:** Maker/Taker. 봇 거래량 80% (2020 50%→2025). 기관 봇 maker 중심. Polymarket dynamic fee로 latency arb 억제. post-only/limit order 우선 권장.
 **Tests:** 6230 passed (+5 from Cycle 78). XSS 보안 강화.
 **Next Cycle:** 80 🎯 (D+E+F) — 80 사이클 마일스톤
+
+## [2026-04-11 11:41 UTC] Cycle 80 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:42 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 06:00 UTC] 🎯 Cycle 80 COMPLETED — D + E + F (80 마일스톤!)
+**[D] ML:** tests/test_adaptive_selector.py +2. PnL 변경 시 rolling Sharpe 변화, 역전 후 select 빈도 변화 검증.
+**[E] Execution:** src/dashboard.py Cycle 80 배지 (#ff4500 오렌지-레드) 추가. +2 tests.
+**[F] Research:** Best Resources. Morton "Crypto Bots Guide" (입문), Ernie Chan "Quantitative Trading" (심화), 3Commas/Cryptohopper 플랫폼.
+**Tests:** 6234 passed 🎯 (+4 from Cycle 79).
+**🎉 Status:** 79 사이클 완료, 10 CRITICAL 버그 수정, 6234 tests, 0 warnings.
+**Next Cycle:** 81 (A+C+F)

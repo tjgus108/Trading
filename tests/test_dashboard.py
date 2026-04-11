@@ -262,3 +262,42 @@ def test_render_html_no_cycle70_below_70():
     html = _render_html(data)
     assert "CYCLE 70 MILESTONE" not in html
     assert "CYCLE 60 MILESTONE" in html
+
+
+def test_render_html_cycle80_milestone():
+    """cycle_count >= 80 이면 CYCLE 80, 70, 60, 50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 80,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 800.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 80 MILESTONE" in html
+    assert "#ff4500" in html
+    assert "CYCLE 70 MILESTONE" in html
+    assert "CYCLE 60 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle80_below_80():
+    """cycle_count < 80 이면 CYCLE 80 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 79,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 80 MILESTONE" not in html
+    assert "CYCLE 70 MILESTONE" in html
