@@ -106,7 +106,10 @@ class BinanceWebSocketFeed:
     def stop(self) -> None:
         """WebSocket 수신 중지."""
         self._stop_event.set()
-        if self._loop and not self._loop.is_closed():
+        # Guard against race condition: if stop() is called before _run_loop()
+        # assigns self._loop, _loop will be None. The _stop_event.set() above
+        # ensures clean exit via _stop_event.is_set() check in _connect_with_retry.
+        if self._loop is not None and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread:
             self._thread.join(timeout=5)
