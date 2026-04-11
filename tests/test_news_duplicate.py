@@ -53,6 +53,16 @@ class TestNewsDuplicate:
         event2 = monitor.mock(level="HIGH", event_text="btc hack")
         assert monitor._is_duplicate(event2.title_hash)
 
+    def test_duplicate_detection_mixed_case_and_whitespace(self):
+        """대소문자 + 공백 차이 무관하게 중복 감지."""
+        monitor = NewsMonitor(duplicate_window_hours=24)
+        
+        event1 = monitor.mock(level="HIGH", event_text="  BTC  HACK  ")
+        monitor._seen_hashes[event1.title_hash] = time.time()
+        
+        event2 = monitor.mock(level="HIGH", event_text="btc hack")
+        assert monitor._is_duplicate(event2.title_hash), "Should detect duplicate with case and whitespace differences"
+
     def test_no_duplicate_different_headlines(self):
         """다른 헤드라인 → 중복 없음."""
         monitor = NewsMonitor(duplicate_window_hours=24)

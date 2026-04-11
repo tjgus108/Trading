@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 95 — 2026-04-11T18:35:35.017170Z
+🔄 CYCLE 96 — 2026-04-11T18:48:38.703305Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 94 COMPLETED — C + B + SIM + F (double SIM)** (2026-04-12 13:20 UTC)
-  **[C] Data:** tests/test_onchain_consistency.py +2 TTL 캐시 검증.
-  **[B] Risk:** tests/test_notifier.py 심각도별 알림 검증 (수정 없음).
-  **[SIM] Auto-improve 2개 동시 완료!**
-    1. **value_area** Sharpe 0.90 → **1.30 PASS 달성!** EMA 추세+볼륨+VA breach 1.5σ+고확신 조건.
+**Cycle 95 COMPLETED — D + E + SIM + F** (2026-04-12 13:50 UTC)
+  **[D] ML:** tests/test_adaptive_selector.py +1 저 Sharpe → 선택 빈도 감소 검증.
+  **[E] Execution:** tests/test_kelly_twap.py +2 Kelly+TWAP 파이프라인 통합 시나리오.
+  **[SIM] Auto-improve:** relative_volume RVOL 임계값 2.0 → 1.5 완화 + VWAP OR 조건. **+0.74% → +7.87%** (Sharpe 0.32 → 1.86). 테스트 1개 업데이트 (rvol 1.67 기존 HOLD → BUY 허용).
+  **[F] Research:** Walk-forward 파라미터. IS/OOS 70-80/20-30 표준, 67/33 권장 (OOS Sharpe 1.89). 창 크기: 단기 2y/6m, 장기 5y/1y.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

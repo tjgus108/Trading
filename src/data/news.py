@@ -46,8 +46,9 @@ MEDIUM_KEYWORDS = [
 
 
 def _get_title_hash(title: str) -> str:
-    """제목의 hash 값 반환. 중복 감지용."""
-    return hashlib.md5(title.lower().strip().encode()).hexdigest()
+    """제목의 hash 값 반환. 중복 감지용. 공백 정규화."""
+    normalized = re.sub(r'\s+', ' ', title.lower().strip())
+    return hashlib.md5(normalized.encode()).hexdigest()
 
 
 @dataclass

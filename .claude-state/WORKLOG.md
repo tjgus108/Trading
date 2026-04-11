@@ -7775,3 +7775,6 @@ ImplShortfall: -5.00bps
 **Tests:** 6300 passed (+3 from Cycle 94).
 **SIM 누적 13개:** +relative_volume
 **Next Cycle:** 96 (A+C+SIM+F)
+
+## [2026-04-11 18:48 UTC] Cycle 96 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
