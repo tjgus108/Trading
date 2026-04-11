@@ -67,6 +67,20 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
     df["macd_signal"] = df["macd"].ewm(span=9).mean()
     df["volume_sma20"] = df["volume"].rolling(20).mean()
     df["return_5"] = df["close"].pct_change(5)
+    
+    # 추가 지표 (몇몇 전략에서 필요)
+    df["ema20"] = df["close"].ewm(span=20).mean()
+    df["donchian_high"] = df["high"].rolling(20).max()
+    df["donchian_low"] = df["low"].rolling(20).min()
+    
+    # VWAP 계산: (누적 전형 가격 * 거래량) / 누적 거래량
+    typical_price = (df["high"] + df["low"] + df["close"]) / 3
+    cum_vol = df["volume"].cumsum()
+    cum_tp_vol = (typical_price * df["volume"]).cumsum()
+    df["vwap"] = cum_tp_vol / cum_vol.replace(0, np.nan)
+    
+    # VWAP 20 period rolling (근사)
+    df["vwap20"] = (typical_price * df["volume"]).rolling(20).sum() / df["volume"].rolling(20).sum()
 
     return df
 

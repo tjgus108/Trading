@@ -5,6 +5,7 @@ wick_reversal,WickReversalStrategy,wick_reversal,6.506,0.543,2.033,0.035,35,0.16
 crossover_confluence,CrossoverConfluenceStrategy,crossover_confluence,6.462,0.833,7.374,0.011,6,0.0683,False,39.01,19.5,['trades 6 < 15']
 elder_impulse,ElderImpulseStrategy,elder_impulse,6.29,0.625,2.699,0.035,16,0.1088,True,106.68,53.34,[]
 ema_dynamic_support,EMADynamicSupportStrategy,ema_dynamic_support,5.946,0.636,3.184,0.012,11,0.0921,False,86.18,43.09,['trades 11 < 15']
+volume_breakout,VolumeBreakoutStrategy,volume_breakout,5.911,0.6,2.664,0.022,15,0.1013,True,97.5,48.75,[]
 price_range_breakout,PriceRangeBreakoutStrategy,price_range_breakout,5.89,0.8,6.975,0.011,5,0.0621,False,35.96,17.98,['trades 5 < 15']
 momentum_quality,MomentumQualityStrategy,momentum_quality,5.535,0.518,1.917,0.032,27,0.1246,True,196.62,98.31,[]
 engulfing_zone,BullishEngulfingZoneStrategy,engulfing_zone,5.501,0.6,2.495,0.033,15,0.0918,True,105.78,52.89,[]
@@ -14,35 +15,28 @@ price_action_momentum,PriceActionMomentumStrategy,price_action_momentum,5.239,0.
 bb_bandwidth,BBBandwidthStrategy,bb_bandwidth,5.149,0.571,2.362,0.022,14,0.0843,False,104.78,52.39,['trades 14 < 15']
 order_flow_imbalance_v2,OrderFlowImbalanceV2Strategy,order_flow_imbalance_v2,5.003,0.516,1.772,0.043,31,0.1158,True,205.66,102.83,[]
 htf_ema,HigherTimeframeEMAStrategy,htf_ema,4.913,0.52,1.851,0.032,25,0.103,True,168.23,84.11,[]
-price_pattern_recog,PricePatternRecogStrategy,price_pattern_recog,4.813,1.0,291225995075.83,0.0,2,0.0284,False,13.71,6.85,['trades 2 < 15']
-pre_breakout,PreBreakoutStrategy,pre_breakout,4.765,0.75,5.479,0.012,4,0.0459,False,36.41,18.2,['trades 4 < 15']
 linear_channel_rev,LinearChannelReversionStrategy,linear_channel_rev,4.622,0.5,1.853,0.053,24,0.0928,True,153.59,76.8,[]
 vol_spread_analysis,VolSpreadAnalysisStrategy,vol_spread_analysis,4.59,0.571,2.129,0.033,14,0.0732,False,98.21,49.1,['trades 14 < 15']
 volume_spread_analysis_v2,VolumeSpreadAnalysisV2Strategy,volume_spread_analysis_v2,4.566,0.571,2.164,0.033,14,0.0716,False,100.53,50.27,['trades 14 < 15']
 price_cluster,PriceClusterStrategy,price_cluster,4.507,0.533,2.058,0.022,15,0.073,True,96.06,48.03,[]
 frama,FRAMAStrategy,frama,4.372,0.514,1.616,0.046,35,0.105,True,234.03,117.02,[]
 narrow_range,NarrowRangeStrategy,narrow_range,4.31,0.5,1.611,0.043,34,0.1011,True,226.35,113.18,[]
-nr7,NR7Strategy,nr7,4.31,0.5,1.611,0.043,34,0.1011,True,226.35,113.18,[]
 trend_break_confirm,TrendBreakConfirmStrategy,trend_break_confirm,4.215,0.538,2.073,0.032,13,0.0647,False,86.13,43.07,['trades 13 < 15']
 lob_strategy,LOBOFIStrategy,lob_maker,4.093,0.562,1.93,0.023,16,0.0636,True,109.45,54.72,[]
 ema_stack,EMAStackStrategy,ema_stack,4.026,0.452,1.487,0.045,42,0.1032,False,298.46,149.23,['profit_factor 1.49 < 1.5']
 dema_cross,DEMACrossStrategy,dema_cross,3.805,0.5,1.696,0.032,20,0.0699,True,129.2,64.6,[]
-zero_lag_ema,ZeroLagEMAStrategy,zero_lag_ema,3.805,0.5,1.696,0.032,20,0.0699,True,129.2,64.6,[]
 relative_volume,RelativeVolumeStrategy,relative_volume,3.762,0.5,1.757,0.033,18,0.0654,True,118.39,59.2,[]
 bb_keltner_squeeze,BBKeltnerSqueezeStrategy,bb_keltner_squeeze,3.747,0.571,2.455,0.022,7,0.0437,False,50.57,25.28,['trades 7 < 15']
 positional_scaling,PositionalScalingStrategy,positional_scaling,3.724,0.5,1.737,0.033,18,0.0647,True,123.39,61.7,[]
 trend_momentum_blend,TrendMomentumBlendStrategy,trend_momentum_blend,3.634,0.447,1.404,0.045,47,0.0991,False,337.32,168.66,['profit_factor 1.40 < 1.5']
 multi_tf_trend,MultiTFTrendStrategy,multi_tf_trend,3.621,0.444,1.465,0.038,36,0.0858,False,253.99,126.99,['profit_factor 1.46 < 1.5']
-ultimate_oscillator,UltimateOscillatorStrategy,ultimate_oscillator,3.62,1.0,195654971065.163,0.0,1,0.0193,False,5.99,3.0,['trades 1 < 15']
-consolidation_breakout,ConsolidationBreakoutStrategy,consolidation_breakout,3.598,1.0,193450735127.146,0.0,1,0.0189,False,8.53,4.27,['trades 1 < 15']
-consecutive_candles,ConsecutiveCandlesStrategy,consecutive_candles,3.575,1.0,191738541783.491,0.001,1,0.0186,False,10.82,5.41,['trades 1 < 15']
+ema_cross,EmaCrossStrategy,ema_cross,3.587,1.0,192618634442.158,0.001,1,0.0188,False,9.64,4.82,['trades 1 < 15']
 trend_follow_filter,TrendFollowFilterStrategy,trend_follow_filter,3.551,0.441,1.483,0.064,34,0.0822,False,240.88,120.44,['profit_factor 1.48 < 1.5']
 guppy,GuppyStrategy,guppy,3.53,0.442,1.369,0.057,52,0.0997,False,361.49,180.75,['profit_factor 1.37 < 1.5']
 trend_slope_filter,TrendSlopeFilterStrategy,trend_slope_filter,3.529,0.442,1.409,0.042,43,0.0913,False,305.16,152.58,['profit_factor 1.41 < 1.5']
 pmo_strategy,PriceMomentumOscillator,pmo_strategy,3.51,0.583,1.948,0.022,12,0.0473,False,74.39,37.2,['trades 12 < 15']
 acceleration_band,AccelerationBandStrategy,acceleration_band,3.452,0.481,1.511,0.052,27,0.0708,True,184.7,92.35,[]
 body_momentum,BodyMomentumStrategy,body_momentum,3.426,0.571,2.214,0.022,7,0.0374,False,42.88,21.44,['trades 7 < 15']
-three_bar_reversal,ThreeBarReversalStrategy,three_bar_reversal,3.392,0.667,3.669,0.011,3,0.0272,False,22.31,11.15,['trades 3 < 15']
 volatility_cluster,VolatilityClusterStrategy,volatility_cluster,3.372,0.5,1.697,0.043,16,0.0546,True,104.43,52.21,[]
 trima,TRIMAStrategy,trima,3.203,0.545,1.851,0.022,11,0.0416,False,66.31,33.16,['trades 11 < 15']
 adaptive_threshold,AdaptiveThresholdStrategy,adaptive_threshold,3.17,0.452,1.379,0.063,42,0.0801,False,287.59,143.79,['profit_factor 1.38 < 1.5']
@@ -71,11 +65,9 @@ cci_breakout,CCIBreakoutStrategy,cci_breakout,2.16,0.421,1.268,0.069,38,0.0499,F
 seasonal_cycle,SeasonalCycleStrategy,seasonal_cycle,2.129,0.467,1.428,0.022,15,0.0314,False,103.87,51.94,['profit_factor 1.43 < 1.5']
 divergence_confirmation,DivergenceConfirmationStrategy,divergence_confirmation,2.076,0.448,1.308,0.043,29,0.0399,False,191.74,95.87,['profit_factor 1.31 < 1.5']
 balance_of_power,BalanceOfPowerStrategy,balance_of_power,2.01,0.444,1.308,0.058,27,0.0387,False,182.11,91.06,['profit_factor 1.31 < 1.5']
-trend_filtered_mean_rev,TrendFilteredMeanRevStrategy,trend_filtered_mean_rev,1.955,0.5,1.838,0.011,4,0.0163,False,26.81,13.41,['trades 4 < 15']
 adaptive_trend,AdaptiveTrendStrategy,adaptive_trend,1.927,0.409,1.224,0.074,44,0.0465,False,300.3,150.15,['profit_factor 1.22 < 1.5']
 trend_momentum_score,TrendMomentumScoreStrategy,trend_momentum_score,1.92,0.396,1.209,0.073,53,0.0498,False,360.88,180.44,['profit_factor 1.21 < 1.5']
 volatility_expansion,VolatilityExpansionStrategy,volatility_expansion,1.917,0.5,1.535,0.022,8,0.02,False,54.56,27.28,['trades 8 < 15']
-volume_surge,VolumeSurgeStrategy,volume_surge,1.917,0.5,1.826,0.011,4,0.0159,False,30.01,15.01,['trades 4 < 15']
 ema_envelope,EMAEnvelopeStrategy,ema_envelope,1.911,0.48,1.299,0.05,25,0.0334,False,161.44,80.72,['profit_factor 1.30 < 1.5']
 adaptive_rsi_thresh,AdaptiveRSIThresholdStrategy,adaptive_rsi_thresh,1.907,0.429,1.39,0.022,14,0.0279,False,98.04,49.02,"['profit_factor 1.39 < 1.5', 'trades 14 < 15']"
 trend_consistency,TrendConsistencyStrategy,trend_consistency,1.907,0.405,1.232,0.051,42,0.0447,False,290.94,145.47,['profit_factor 1.23 < 1.5']
@@ -92,15 +84,12 @@ acc_dist,AccDistStrategy,acc_dist,1.695,0.391,1.196,0.082,46,0.0412,False,318.5,
 coppock_enhanced,CoppockEnhancedStrategy,coppock_enhanced,1.681,0.429,1.343,0.043,14,0.0221,False,87.61,43.81,"['profit_factor 1.34 < 1.5', 'trades 14 < 15']"
 vol_adj_momentum,VolAdjMomentumStrategy,vol_adj_momentum,1.662,0.382,1.181,0.093,55,0.0431,False,372.78,186.39,['profit_factor 1.18 < 1.5']
 fractal_break,FractalBreakStrategy,fractal_break,1.659,0.412,1.182,0.055,51,0.0419,False,355.0,177.5,['profit_factor 1.18 < 1.5']
-volume_climax,VolumeClimaxStrategy,volume_climax,1.654,0.5,2.1,0.01,2,0.0095,False,12.23,6.11,['trades 2 < 15']
 tema_strategy,TEMAStrategy,tema_strategy,1.628,0.435,1.257,0.033,23,0.0284,False,149.57,74.79,['profit_factor 1.26 < 1.5']
 lr_channel,LRChannelStrategy,lr_channel,1.623,0.462,1.352,0.035,13,0.0218,False,80.74,40.37,"['profit_factor 1.35 < 1.5', 'trades 13 < 15']"
-trend_channel,TrendChannelStrategy,trend_channel,1.623,0.462,1.352,0.035,13,0.0218,False,80.74,40.37,"['profit_factor 1.35 < 1.5', 'trades 13 < 15']"
 gartley_pattern,SimplifiedGartleyStrategy,gartley_pattern,1.599,0.444,1.303,0.084,18,0.0252,False,110.82,55.41,['profit_factor 1.30 < 1.5']
 dpo,DPOStrategy,dpo,1.595,0.404,1.182,0.083,47,0.038,False,312.23,156.12,['profit_factor 1.18 < 1.5']
 composite_momentum,CompositeMomentumStrategy,composite_momentum,1.594,0.405,1.195,0.063,42,0.036,False,293.98,146.99,['profit_factor 1.20 < 1.5']
 velocity_entry,VelocityEntryStrategy,velocity_entry,1.558,0.386,1.168,0.066,57,0.0407,False,387.09,193.54,['profit_factor 1.17 < 1.5']
-triple_screen,TripleScreenStrategy,triple_screen,1.547,0.5,1.612,0.022,4,0.0118,False,29.39,14.69,['trades 4 < 15']
 carry_strategy,CarryStrategy,carry_strategy,1.499,0.4,1.194,0.045,35,0.0313,False,233.0,116.5,['profit_factor 1.19 < 1.5']
 zlema_cross,ZLEMACrossStrategy,zlema_cross,1.47,0.452,1.204,0.048,31,0.0301,False,211.08,105.54,['profit_factor 1.20 < 1.5']
 smi,SMIStrategy,smi,1.453,0.429,1.191,0.073,35,0.0301,False,247.02,123.51,['profit_factor 1.19 < 1.5']
@@ -127,7 +116,6 @@ zlmacd,ZeroLagMACDStrategy,zlmacd,1.016,0.435,1.168,0.053,23,0.0162,False,148.46
 gaussian_channel,GaussianChannelStrategy,gaussian_channel,1.014,0.412,1.187,0.043,17,0.0149,False,110.22,55.11,['profit_factor 1.19 < 1.5']
 cyber_cycle,CyberCycleStrategy,cyber_cycle,1.013,0.389,1.143,0.063,36,0.02,False,240.82,120.41,['profit_factor 1.14 < 1.5']
 apo,APOStrategy,apo,0.955,0.4,1.218,0.063,10,0.0111,False,65.64,32.82,"['sharpe 0.96 < 1.0', 'profit_factor 1.22 < 1.5', 'trades 10 < 15']"
-night_star,NightStarStrategy,night_star,0.92,0.5,1.358,0.022,4,0.0062,False,27.25,13.62,"['sharpe 0.92 < 1.0', 'profit_factor 1.36 < 1.5', 'trades 4 < 15']"
 heikin_ashi,HeikinAshiStrategy,heikin_ashi,0.917,0.408,1.119,0.058,49,0.0198,False,323.53,161.77,"['sharpe 0.92 < 1.0', 'profit_factor 1.12 < 1.5']"
 atr_channel,ATRChannelStrategy,atr_channel,0.902,0.394,1.136,0.056,33,0.0168,False,232.03,116.01,"['sharpe 0.90 < 1.0', 'profit_factor 1.14 < 1.5']"
 consolidation_break,ConsolidationBreakStrategy,consolidation_break,0.889,0.429,1.26,0.033,7,0.0085,False,49.65,24.82,"['sharpe 0.89 < 1.0', 'profit_factor 1.26 < 1.5', 'trades 7 < 15']"
@@ -173,40 +161,24 @@ spread_momentum,SpreadMomentumStrategy,spread_momentum,0.099,0.372,1.045,0.053,4
 ppo,PPOStrategy,ppo,0.09,0.364,1.048,0.063,11,0.0,False,72.51,36.26,"['sharpe 0.09 < 1.0', 'profit_factor 1.05 < 1.5', 'trades 11 < 15']"
 pivot_point_rev,PivotPointRevStrategy,pivot_point_rev,0.083,0.393,1.047,0.045,28,-0.001,False,176.98,88.49,"['sharpe 0.08 < 1.0', 'profit_factor 1.05 < 1.5']"
 kijun_bounce,KijunBounceStrategy,kijun_bounce,0.022,0.364,1.039,0.032,11,-0.0008,False,70.36,35.18,"['sharpe 0.02 < 1.0', 'profit_factor 1.04 < 1.5', 'trades 11 < 15']"
-cloud_cover,CloudCoverStrategy,cloud_cover,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 doji_pattern,DojiPatternStrategy,doji_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-dynamic_pivot_channel,DynamicPivotChannelStrategy,dynamic_pivot_channel,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-exhaustion_bar,ExhaustionBarStrategy,exhaustion_bar,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-flag_pennant,FlagPennantStrategy,flag_pennant,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+donchian_breakout,DonchianBreakoutStrategy,donchian_breakout,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 gex_strategy,GEXStrategy,gex_signal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 harami,HaramiStrategy,harami,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-harmonic_pattern,HarmonicPatternStrategy,harmonic_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 heston_lstm_strategy,HestonLSTMStrategy,heston_lstm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-high_low_reversal,HighLowReversalStrategy,high_low_reversal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-klinger,KlingerStrategy,klinger,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 lstm_strategy,MLLSTMStrategy,ml_lstm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 market_maker_sig,MarketMakerStrategy,market_maker_sig,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 marubozu,MarubozuStrategy,marubozu,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-mass_index,MassIndexStrategy,mass_index,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 ml_strategy,MLRFStrategy,ml_rf,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 morning_evening_star,MorningEveningStarStrategy,morning_evening_star,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-order_block,OrderBlockStrategy,order_block,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-pa_confirm,PriceActionConfirmStrategy,pa_confirm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-pivot_band,PivotBandStrategy,pivot_band,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-price_action_quality,PriceActionQualityStrategy,price_action_quality,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-psychological_line,PsychologicalLineStrategy,psychological_line,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 smc_strategy,SmartMoneyConceptStrategy,smc_strategy,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-squeeze_momentum,SqueezeMomentumStrategy,squeeze_momentum,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 supertrend,SuperTrendStrategy,supertrend,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 three_candles,ThreeCandlesStrategy,three_candles,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 three_soldiers_crows,ThreeSoldiersAndCrowsStrategy,three_soldiers_crows,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-trend_exhaustion_signal,TrendExhaustionSignalStrategy,trend_exhaustion_signal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-trend_quality,TrendQualityStrategy,trend_quality,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-volatility_regime,VolatilityRegimeStrategy,volatility_regime,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 vortex,VortexStrategy,vortex,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
-wedge_pattern,WedgePatternStrategy,wedge_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
 vwap_band,VWAPBandStrategy,vwap_band,-0.075,0.357,1.026,0.032,14,-0.0025,False,99.61,49.81,"['sharpe -0.08 < 1.0', 'profit_factor 1.03 < 1.5', 'trades 14 < 15']"
 trend_persistence,TrendPersistenceStrategy,trend_persistence,-0.095,0.382,1.03,0.064,55,-0.0078,False,367.5,183.75,"['sharpe -0.09 < 1.0', 'profit_factor 1.03 < 1.5']"
+vpt_confirm,VolumePriceTrendConfirmStrategy,vpt_confirm,-0.104,0.372,1.026,0.084,51,-0.0079,False,328.81,164.41,"['sharpe -0.10 < 1.0', 'profit_factor 1.03 < 1.5']"
 price_impact,PriceImpactStrategy,price_impact,-0.126,0.372,1.024,0.092,43,-0.0073,False,287.45,143.72,"['sharpe -0.13 < 1.0', 'profit_factor 1.02 < 1.5']"
 oscillator_band,OscillatorBandStrategy,oscillator_band,-0.135,0.37,1.019,0.061,27,-0.0053,False,172.84,86.42,"['sharpe -0.13 < 1.0', 'profit_factor 1.02 < 1.5']"
 macd_slope,MACDSlopeStrategy,macd_slope,-0.143,0.381,1.025,0.073,42,-0.0077,False,292.77,146.39,"['sharpe -0.14 < 1.0', 'profit_factor 1.02 < 1.5']"
@@ -283,7 +255,6 @@ r_squared,RSquaredStrategy,r_squared,-1.761,0.31,0.86,0.075,29,-0.0374,False,194
 price_velocity,PriceVelocityStrategy,price_velocity,-1.768,0.345,0.903,0.081,55,-0.0531,False,348.36,174.18,"['sharpe -1.77 < 1.0', 'profit_factor 0.90 < 1.5']"
 price_cycle_detector,PriceCycleDetectorStrategy,price_cycle_detector,-1.783,0.34,0.9,0.11,53,-0.0519,False,339.82,169.91,"['sharpe -1.78 < 1.0', 'profit_factor 0.90 < 1.5']"
 breakout_confirm_v2,BreakoutConfirmV2Strategy,breakout_confirm_v2,-1.788,0.333,0.773,0.043,12,-0.0229,False,79.64,39.82,"['sharpe -1.79 < 1.0', 'profit_factor 0.77 < 1.5', 'trades 12 < 15']"
-range_bound,RangeBoundStrategy,range_bound,-1.862,0.25,0.611,0.032,4,-0.0138,False,28.51,14.26,"['sharpe -1.86 < 1.0', 'profit_factor 0.61 < 1.5', 'trades 4 < 15']"
 adx_regime,ADXRegimeStrategy,adx_regime,-1.906,0.325,0.873,0.091,40,-0.0458,False,257.37,128.69,"['sharpe -1.91 < 1.0', 'profit_factor 0.87 < 1.5']"
 exhaustion_reversal,ExhaustionReversalStrategy,exhaustion_reversal,-1.918,0.286,0.69,0.043,7,-0.0187,False,46.4,23.2,"['sharpe -1.92 < 1.0', 'profit_factor 0.69 < 1.5', 'trades 7 < 15']"
 trix,TRIXStrategy,trix,-2.013,0.2,0.593,0.032,5,-0.0148,False,29.01,14.5,"['sharpe -2.01 < 1.0', 'profit_factor 0.59 < 1.5', 'trades 5 < 15']"
@@ -292,7 +263,6 @@ adaptive_momentum,AdaptiveMomentumStrategy,adaptive_momentum,-2.019,0.347,0.882,
 rsi_band,RSIBandStrategy,rsi_band,-2.025,0.316,0.858,0.068,38,-0.0491,False,247.13,123.56,"['sharpe -2.03 < 1.0', 'profit_factor 0.86 < 1.5']"
 median_price,MedianPriceStrategy,median_price,-2.057,0.348,0.868,0.094,46,-0.055,False,293.27,146.64,"['sharpe -2.06 < 1.0', 'profit_factor 0.87 < 1.5']"
 linear_regression,LinearRegressionStrategy,linear_regression,-2.208,0.3,0.785,0.059,20,-0.0381,False,133.74,66.87,"['sharpe -2.21 < 1.0', 'profit_factor 0.78 < 1.5']"
-trend_reversal,TrendReversalPatternStrategy,trend_reversal,-2.238,0.5,0.566,0.022,4,-0.0106,False,27.07,13.54,"['sharpe -2.24 < 1.0', 'profit_factor 0.57 < 1.5', 'trades 4 < 15']"
 adaptive_cycle,AdaptiveCycleStrategy,adaptive_cycle,-2.267,0.333,0.833,0.089,36,-0.0526,False,233.97,116.99,"['sharpe -2.27 < 1.0', 'profit_factor 0.83 < 1.5']"
 donchian_midline,DonchianMidlineStrategy,donchian_midline,-2.286,0.348,0.791,0.057,23,-0.0398,False,148.23,74.12,"['sharpe -2.29 < 1.0', 'profit_factor 0.79 < 1.5']"
 connors_rsi,ConnorsRSIStrategy,connors_rsi,-2.365,0.25,0.682,0.066,12,-0.0294,False,69.99,35.0,"['sharpe -2.36 < 1.0', 'profit_factor 0.68 < 1.5', 'trades 12 < 15']"
@@ -335,9 +305,6 @@ momentum_accel,MomentumAccelerationStrategy,momentum_accel,-3.593,0.308,0.781,0.
 elder_force,ElderForceIndexStrategy,elder_force,-3.594,0.3,0.742,0.129,40,-0.0819,False,246.91,123.45,"['sharpe -3.59 < 1.0', 'profit_factor 0.74 < 1.5']"
 disparity_index,DisparityIndexStrategy,disparity_index,-3.649,0.25,0.609,0.071,16,-0.053,False,101.23,50.62,"['sharpe -3.65 < 1.0', 'profit_factor 0.61 < 1.5']"
 stochastic,StochasticStrategy,stochastic,-3.721,0.269,0.68,0.104,26,-0.0694,False,160.55,80.27,"['sharpe -3.72 < 1.0', 'profit_factor 0.68 < 1.5']"
-parabolic_move,ParabolicMoveStrategy,parabolic_move,-3.79,0.0,0.0,0.011,1,-0.0108,False,6.59,3.3,"['sharpe -3.79 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
-key_reversal,KeyReversalStrategy,key_reversal,-3.794,0.0,0.0,0.011,1,-0.0109,False,6.78,3.39,"['sharpe -3.79 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
-dual_thrust,DualThrustStrategy,dual_thrust,-3.802,0.0,0.0,0.011,1,-0.0109,False,7.09,3.54,"['sharpe -3.80 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
 candle_pattern_score,CandlePatternScoreStrategy,candle_pattern_score,-3.814,0.0,0.0,0.011,1,-0.011,False,7.83,3.91,"['sharpe -3.81 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
 star_pattern,StarPatternStrategy,star_pattern,-3.817,0.0,0.0,0.011,1,-0.011,False,8.01,4.01,"['sharpe -3.82 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
 breakout_pullback,BreakoutPullbackStrategy,breakout_pullback,-3.989,0.231,0.545,0.07,13,-0.0511,False,88.48,44.24,"['sharpe -3.99 < 1.0', 'profit_factor 0.54 < 1.5', 'trades 13 < 15']"
@@ -358,11 +325,8 @@ roc_divergence,ROCDivergenceStrategy,roc_divergence,-5.086,0.21,0.521,0.092,19,-
 gap_momentum,GapMomentumStrategy,gap_momentum,-5.108,0.294,0.624,0.143,34,-0.1007,False,212.9,106.45,"['sharpe -5.11 < 1.0', 'profit_factor 0.62 < 1.5']"
 bb_squeeze,BbSqueezeStrategy,bb_squeeze,-5.149,0.2,0.475,0.067,15,-0.0669,False,104.74,52.37,"['sharpe -5.15 < 1.0', 'profit_factor 0.48 < 1.5']"
 coppock,CoppockStrategy,coppock,-5.35,0.295,0.657,0.15,44,-0.1215,False,278.8,139.4,"['sharpe -5.35 < 1.0', 'profit_factor 0.66 < 1.5']"
-vol_mean_rev,VolatilityMeanReversionStrategy,vol_mean_rev,-5.363,0.0,0.0,0.021,2,-0.0215,False,12.78,6.39,"['sharpe -5.36 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
 momentum_div,MomentumDivergenceStrategy,momentum_div,-5.366,0.312,0.657,0.134,48,-0.1263,False,307.95,153.98,"['sharpe -5.37 < 1.0', 'profit_factor 0.66 < 1.5']"
 candle_pattern,CandlePatternStrategy,candle_pattern,-5.37,0.0,0.0,0.021,2,-0.0215,False,13.23,6.61,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
-engulfing,EngulfingStrategy,engulfing,-5.37,0.0,0.0,0.021,2,-0.0215,False,13.23,6.61,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
-rsi_ob_os,RSIOBOSStrategy,rsi_ob_os,-5.374,0.0,0.0,0.02,2,-0.0204,False,13.94,6.97,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
 demarker,DeMarkerStrategy,demarker,-5.433,0.273,0.528,0.097,22,-0.0835,False,138.72,69.36,"['sharpe -5.43 < 1.0', 'profit_factor 0.53 < 1.5']"
 roc,ROCStrategy,roc,-5.439,0.281,0.6,0.125,32,-0.104,False,207.44,103.72,"['sharpe -5.44 < 1.0', 'profit_factor 0.60 < 1.5']"
 divergence_score,DivergenceScoreStrategy,divergence_score,-5.599,0.277,0.644,0.143,47,-0.1304,False,281.33,140.67,"['sharpe -5.60 < 1.0', 'profit_factor 0.64 < 1.5']"
@@ -372,8 +336,7 @@ cme_basis_strategy,CMEBasisStrategy,cme_basis,-5.927,0.276,0.644,0.208,58,-0.155
 multi_timeframe_momentum,MultiTimeframeMomentumStrategy,multi_timeframe_momentum,-5.969,0.275,0.604,0.128,40,-0.1275,False,252.55,126.28,"['sharpe -5.97 < 1.0', 'profit_factor 0.60 < 1.5']"
 cup_handle,CupHandleStrategy,cup_handle,-6.003,0.125,0.265,0.054,8,-0.0543,False,46.9,23.45,"['sharpe -6.00 < 1.0', 'profit_factor 0.27 < 1.5', 'trades 8 < 15']"
 bull_bear_power,BullBearPowerStrategy,bull_bear_power,-6.31,0.2,0.454,0.103,20,-0.0963,False,125.19,62.59,"['sharpe -6.31 < 1.0', 'profit_factor 0.45 < 1.5']"
-elder_ray,ElderRayStrategy,elder_ray,-6.31,0.2,0.454,0.103,20,-0.0963,False,125.19,62.59,"['sharpe -6.31 < 1.0', 'profit_factor 0.45 < 1.5']"
-stoch_divergence,StochDivergenceStrategy,stoch_divergence,-6.597,0.0,0.0,0.032,3,-0.0323,False,21.32,10.66,"['sharpe -6.60 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 3 < 15']"
+vwap_reversion,VWAPReversionStrategy,vwap_reversion,-6.551,0.242,0.533,0.157,33,-0.1265,False,221.41,110.7,"['sharpe -6.55 < 1.0', 'profit_factor 0.53 < 1.5']"
 williams_r,WilliamsRStrategy,williams_r,-6.699,0.222,0.535,0.149,36,-0.1344,False,224.92,112.46,"['sharpe -6.70 < 1.0', 'profit_factor 0.53 < 1.5']"
 opening_range_breakout,OpeningRangeBreakoutStrategy,opening_range_breakout,-7.465,0.236,0.582,0.181,55,-0.1809,False,334.87,167.44,"['sharpe -7.47 < 1.0', 'profit_factor 0.58 < 1.5']"
 volume_oscillator_v2,VolumeOscillatorV2Strategy,volume_oscillator_v2,-7.579,0.237,0.496,0.177,38,-0.1509,False,232.09,116.04,"['sharpe -7.58 < 1.0', 'profit_factor 0.50 < 1.5']"
