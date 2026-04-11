@@ -357,3 +357,31 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL
 **[F] Research:** WebSearch 타임아웃(30분+)으로 미완료. Cycle 4에서 Execution 주제 포함 필수.
 **Tests:** 5766 passed, 25 skipped.
 **Next Cycle:** 4 (C+B+F — 데이터+리스크+리서치 강화)
+
+## [2026-04-11 02:12 UTC] Cycle 4 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:14 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:15 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:45 UTC] Cycle 4 COMPLETED — C + B + F
+**[C] Data:** src/data/order_flow.py VPIN OFI 버그 수정 (close==open 봉을 NEUTRAL로 처리). +8 경계 조건 테스트 추가.
+**[B] Risk:** src/risk/circuit_breaker.py ATR surge 감지 추가 (current_atr >= baseline * multiplier 시 size 50% 축소). +4 테스트.
+**[F] Research:** November 2025 $2B 추가 청산 이벤트 확인. Binance/OKX 슬리피지 공개 실측치 부재 → 공개 소스로 TWAP 필수성 재확인.
+**Tests:** 5778 passed (+12 from Cycle 3).
+**Next Cycle:** 5 (D+E+F — ML+실행+리서치)

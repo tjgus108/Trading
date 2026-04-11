@@ -100,3 +100,63 @@ def test_reset_all_clears_everything():
     assert cb.is_triggered is False
     result = cb.check(current_balance=9800.0, peak_balance=10000.0, daily_start_balance=10000.0)
     assert result["triggered"] is False
+
+
+# ── 변동성 급등 (ATR surge) ────────────────────────────────
+def test_atr_surge_returns_half_size_multiplier():
+    """ATR이 기준의 2배 이상 → triggered=False, size_multiplier=0.5, volatility_surge=True"""
+    cb = CircuitBreaker(atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.04,   # 4% — 기준 2%의 2배
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is False
+    assert result["volatility_surge"] is True
+    assert result["size_multiplier"] == 0.5
+    assert "ATR 급등" in result["reason"]
+
+
+def test_atr_below_surge_threshold_no_effect():
+    """ATR이 기준의 1.9배 → 급등 아님, 정상 통과"""
+    cb = CircuitBreaker(atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.038,   # 1.9배 < 2.0
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is False
+    assert result["volatility_surge"] is False
+    assert result["size_multiplier"] == 1.0
+
+
+def test_atr_surge_does_not_override_drawdown_trigger():
+    """낙폭 조건 먼저 트리거되면 ATR surge는 무관 — triggered=True, size_multiplier=0.0"""
+    cb = CircuitBreaker(daily_drawdown_limit=0.05, atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=9400.0,   # -6% daily
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.10,
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "일일" in result["reason"]
+
+
+def test_atr_surge_without_atr_args_no_effect():
+    """current_atr/baseline_atr 미전달 시 ATR 체크 스킵"""
+    cb = CircuitBreaker(atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is False
+    assert result["volatility_surge"] is False
+    assert result["size_multiplier"] == 1.0

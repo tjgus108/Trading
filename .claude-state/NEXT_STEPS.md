@@ -211,3 +211,66 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 - 5 strategies required technical indicators not included in make_synthetic_data()
 - All fixes were in the synthetic data generation function (CSV not touched)
 
+
+---
+
+## Cycle 4 - Category B: Risk Management ✅ COMPLETED
+
+**Task:** CircuitBreaker ATR 변동성 급등 감지 추가
+
+**Files Modified:**
+1. `/home/user/Trading/src/risk/circuit_breaker.py` (전체 재작성, 93 → 121 lines)
+   - `atr_surge_multiplier` 파라미터 추가 (기본값 2.0)
+   - `check()` 시그니처 확장: `current_atr`, `baseline_atr` optional 파라미터 추가
+   - 반환 dict에 `volatility_surge: bool`, `size_multiplier: float` 필드 추가
+   - ATR surge 로직: `current_atr >= baseline_atr × multiplier` → `size_multiplier=0.5`, `triggered=False`
+   - 낙폭 조건 트리거 시 `size_multiplier=0.0` (완전 차단)
+   - `_make_result()` 헬퍼 메서드로 반환 일관성 확보
+
+2. `/home/user/Trading/tests/test_circuit_breaker.py` (lines 106-149 추가, 4개 신규 테스트)
+   - `test_atr_surge_returns_half_size_multiplier`: ATR 2배 이상 → size_multiplier=0.5
+   - `test_atr_below_surge_threshold_no_effect`: ATR 1.9배 → 정상 통과
+   - `test_atr_surge_does_not_override_drawdown_trigger`: 낙폭 우선, triggered=True
+   - `test_atr_surge_without_atr_args_no_effect`: 파라미터 미전달 → 스킵
+
+**Test Results:**
+- test_circuit_breaker.py: 14 passed ✅ (기존 10 + 신규 4)
+
+**설계 결정:**
+- ATR surge 단독으로 triggered=True 유발 안 함 → 포지션 축소 신호이지 완전 차단 아님
+- 낙폭 조건이 더 심각하면 drawdown 조건이 ATR surge를 덮음
+- `size_multiplier` 필드로 호출자가 포지션 크기를 조정할 수 있게 함
+
+---
+
+## Cycle 4 - Category C: Data & Infrastructure ✅ COMPLETED
+
+**Task:** OrderFlow/VPIN 정확도 검증
+
+**Bug Found & Fixed:**
+- `/home/user/Trading/src/data/order_flow.py` (lines 138-141)
+  - **Issue:** `close == open` 케이스가 SELL로 잘못 분류됨 (close > open 만 체크)
+  - **Fix:** NEUTRAL 봉(close==open) 추가 처리
+    - `buy_frac[df["close"] > df["open"]] = 1.0` (BUY)
+    - `buy_frac[df["close"] == df["open"]] = 0.5` (NEUTRAL)
+    - Default `buy_frac = 0.0` (SELL)
+  - **Impact:** VPIN 계산 정확도 향상 (neutral candles 올바른 처리)
+
+**Tests Added:**
+- `/home/user/Trading/tests/test_order_flow.py` (lines 145-203)
+  - `TestVPINCalculator` 클래스 추가 (8개 테스트)
+  - `test_vpin_all_neutral_candles`: neutral 봉 처리 검증
+  - `test_vpin_perfect_buy_pressure`: 100% BUY 압력 (VPIN=1.0)
+  - `test_vpin_perfect_sell_pressure`: 100% SELL 압력 (VPIN=1.0)
+  - `test_vpin_balanced_buy_sell`: 균형잡힌 거래량 (VPIN=1.0)
+  - `test_vpin_bounded_zero_to_one`: 범위 검증 [0,1]
+  - `test_vpin_get_latest`: 최종값 반환 검증
+  - `test_vpin_get_latest_insufficient_data`: 데이터 부족 시 0.5 반환
+  - `test_vpin_get_latest_nan`: NaN 처리 검증
+
+**Test Results:**
+- test_order_flow.py: 26 passed ✅ (18 기존 + 8 신규)
+- Full test suite: 5778 passed, 25 skipped ✅
+- No regressions
+
+**Summary:** VPIN 계산의 중립 봉 분류 오류를 수정. OFI 정확도 향상으로 order flow imbalance 신호 신뢰성 증대.

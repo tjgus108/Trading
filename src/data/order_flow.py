@@ -135,7 +135,11 @@ class VPINCalculator:
         df: OHLCV DataFrame (close, open, volume 컬럼 필요)
         returns: VPIN 시리즈 (0~1), 길이 = len(df)
         """
-        buy_frac = (df["close"] > df["open"]).astype(float)
+        # close > open: BUY (1.0), close == open: NEUTRAL (0.5), close < open: SELL (0.0)
+        buy_frac = pd.Series(0.0, index=df.index)
+        buy_frac[df["close"] > df["open"]] = 1.0
+        buy_frac[df["close"] == df["open"]] = 0.5
+        
         buy_vol = df["volume"] * buy_frac
         sell_vol = df["volume"] * (1 - buy_frac)
         imbalance = (buy_vol - sell_vol).abs()
@@ -143,6 +147,7 @@ class VPINCalculator:
         vpin = (imbalance.rolling(self.n_buckets).sum() /
                 total_vol.rolling(self.n_buckets).sum().replace(0, 1))
         return vpin.clip(0, 1)
+
 
     def get_latest(self, df: pd.DataFrame) -> float:
         """마지막 VPIN 값 반환. 데이터 부족 시 0.5"""

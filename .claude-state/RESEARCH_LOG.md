@@ -105,3 +105,26 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - 거래소별 실측 슬리피지 (Binance, OKX, Bybit)
 - Paper → Live 전환 함정 체크리스트
 - TWAP/VWAP 최신 개선 기법 (2024-2025)
+
+
+## [2026-04-11] Cycle 4 — Brief Research
+
+### 2025 스트레스 이벤트
+
+- October 10, 2025 (10/10): $19B 청산, 60초 내 $3.21B 소멸. 트럼프 관세 발표 + 기술적 매도가 겹친 매크로 충격이 트리거.
+- November 21, 2025: $2B 24시간 청산. ETF 자금 유출이 유동성을 빼앗으며 지지선 붕괴 → 자동 청산 연쇄. October보다 규모 작지만 동일한 메카니즘.
+- 2025년 연간 총 ~$150B 청산. 대부분 정상 흡수됐으나 October/November 두 구간에서 인프라 한계 노출.
+- 공통 특징: 중형~소형 알트코인에서 롱 레버리지 집중 → 유동성 얕은 구간에서 청산 증폭.
+
+### 실측 슬리피지 (Binance/OKX)
+
+- Binance 선물: 일일 $40B+ 거래량으로 업계 최대 유동성. BTC/ETH 대형 페어 기준 정상 시장에서 슬리피지 ~1~5 bps 수준(추정). 대형 기관 주문에도 스프레드 타이트.
+- OKX: Binance 대비 유동성 낮으나 봇 생태계 우수. 슬리피지는 정상 시장에서 Binance와 유사하나 중소형 페어에서 확대.
+- 정량 수치 한계: 2025년 실측 bps 데이터는 공개 출처에서 확인 불가. 거래소들이 TWAP/알고 주문을 권장하는 것이 간접 증거 — 시장가 주문 슬리피지가 무시 못할 수준임을 시사.
+- 실무 권고: 시장가 주문 대신 Limit/TWAP 사용, 포지션 크기를 호가창 깊이의 0.1% 이하로 제한(Cycle 1 교훈 재확인).
+
+### 참고
+
+- [October 2025 Crash — Amberdata](https://blog.amberdata.io/how-3.21b-vanished-in-60-seconds-october-2025-crypto-crash-explained-through-7-charts)
+- [November 2025 Wipeout — Yahoo Finance](https://finance.yahoo.com/news/crypto-market-wipeout-2b-24-160816131.html)
+- [Binance vs OKX Liquidity — Bitcompare](https://bitcompare.net/post/binance-vs-okx)
