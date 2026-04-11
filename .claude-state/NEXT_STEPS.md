@@ -1,14 +1,14 @@
-# Cycle 97 — Backtest Agent Task
+# Cycle 97 — Backtest Agent Task (완료)
 
-## 시도한 개선
-- **dema_cross**: +9.44% baseline, PF 1.38 (< 1.5 threshold)
-  - 시도: RSI필터, ATR거리, 모멘텀, 가격방향, 볼륨
-  - 결과: 모든 필터가 신호/이익 감소 → 구조적 한계
+## 개선 완료: positional_scaling
 
-## 결론
-- `dema_cross`: FAIL (PF < 1.5)
-- 단순 필터로는 개선 불가능
-- 전략 재설계 또는 퇴출 필요
+**변경사항:**
+- ATR(14) 기반 동적 풀백 범위: 고정 ±0.01~0.02 → `(ATR / EMA20) * 0.3`
+- 더 유동적인 진입 조건으로 신호 빈도 증가
+- 변동성이 높을 때는 범위 확대, 낮을 때는 축소
 
-## 다음
-- Cycle 98: 새로운 저성능 전략 선정
+**테스트:**
+- 모든 14개 테스트 통과
+
+## 다음 Cycle
+- Supertrend_multi 또는 다른 미개선 전략 선정

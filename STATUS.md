@@ -101,8 +101,9 @@
 - ✅ **Cycle 93 완료** (E+A+**SIM**+F: run_once non-fatal + Sharpe/Sortino + **volatility_cluster**)
 - ✅ **Cycle 94 완료** (C+B+**SIM**+F: **value_area Sharpe 1.30 PASS** + **price_action_momentum Sharpe 1.33**)
 - ✅ **Cycle 95 완료** (D+E+**SIM**+F: adaptive weight + Kelly+TWAP + **relative_volume +0.74%→+7.87%**)
-- ✅ Cycle 96 완료 (A+C+F: 13 SIM 회귀 + news dup + Kelly-Lite, SIM dema_cross 구조적 한계)
-- ⏳ **Cycle 97 대기** (B+D+SIM+F)
+- ✅ Cycle 96 완료 (A+C+F: 13 SIM 회귀 + news dup + Kelly-Lite, dema_cross 구조적 한계)
+- ✅ **Cycle 97 완료** (B+D+**SIM**+F: Half-Kelly 검증 + LLM mock + **positional_scaling ATR 동적**)
+- ⏳ **Cycle 98 대기** (E+A+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -111,7 +112,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,301개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,302개** (0 warnings ✨) |
 | 🎯 SIM 누적 개선 13개 | ...+**relative_volume** (Sharpe 0.32→1.86) |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
