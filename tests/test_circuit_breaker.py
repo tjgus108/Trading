@@ -102,6 +102,40 @@ def test_reset_all_clears_everything():
     assert result["triggered"] is False
 
 
+
+def test_reset_all_clears_consecutive_losses_and_cooldown():
+    """reset_all() 후 _consecutive_losses와 _cooldown_remaining이 0으로 초기화."""
+    cb = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=2)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    assert cb.consecutive_losses == 3
+    assert cb.cooldown_remaining == 2
+    cb.reset_all()
+    assert cb.consecutive_losses == 0
+    assert cb.cooldown_remaining == 0
+    assert cb.is_triggered is False
+
+
+def test_reset_all_allows_check_after_flash_crash_trigger():
+    """플래시 크래시로 _triggered=True 된 뒤 reset_all() 하면 다음 check() 정상 통과."""
+    cb = CircuitBreaker(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=50000.0,
+        candle_close=44000.0,
+    )
+    assert result["triggered"] is True
+    cb.reset_all()
+    result2 = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result2["triggered"] is False
+    assert result2["size_multiplier"] == 1.0
+
 # ── 변동성 급등 (ATR surge) ────────────────────────────────
 def test_atr_surge_returns_half_size_multiplier():
     """ATR이 기준의 2배 이상 → triggered=False, size_multiplier=0.5, volatility_surge=True"""

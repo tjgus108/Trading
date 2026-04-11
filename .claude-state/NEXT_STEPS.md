@@ -1,3 +1,13 @@
+# Cycle 74 - Category F: Research
+## Status: COMPLETE
+
+## [2026-04-11] Cycle 74 — ETF Option Bots
+- BITO(선물 ETF)·IBIT(현물 ETF) 옵션 체인 모두 활성화, 유동성 확보로 봇 전략 적용 가능
+- 주요 봇 전략: covered call(IBIT 보유 + 월물 OTM call 매도), 또는 delta-neutral strangle on BITO 주변 BTC 변동성 spike
+- BITO는 0.95% 보수·roll 비용 있어 단기 옵션 매도(프리미엄 수집) 위주, IBIT은 spot-tracking으로 방향성 옵션 매수 유리
+- 2025 트렌드: IV rank 기반 premium-selling 봇(IV 높을 때 매도 진입, GEX flip 레벨 결합)
+
+---
 # Cycle 73 - Category F: Research
 ## Status: COMPLETE
 

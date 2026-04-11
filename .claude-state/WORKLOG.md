@@ -6197,3 +6197,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 크립토 옵션 GEX. Positive GEX → 가격 pin mean-revert, Negative GEX → 추세 가속. 기존 gex_strategy.py 이미 구현됨.
 **Tests:** 6207 passed (+5 from Cycle 72). 9번째 CRITICAL 버그 수정.
 **Next Cycle:** 74 (C+B+F)
+
+## [2026-04-11 11:23 UTC] Cycle 74 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:25 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 04:00 UTC] Cycle 74 COMPLETED — C + B + F
+**[C] Data:** tests/test_onchain_consistency.py 신규 +3. mock 일관성, score 재계산, [-3,+3] 경계 검증.
+**[B] Risk:** tests/test_circuit_breaker.py +2 reset_all. 연속 손실+쿨다운 초기화, 플래시 크래시 트리거 후 재개 확인.
+**[F] Research:** ETF Option Bots. BITO(선물) + IBIT(현물) 옵션 체인 활성화. IV rank 기반 strangle 매도, GEX flip 결합 타이밍 정밀도 향상.
+**Tests:** 6212 passed (+5 from Cycle 73).
+**Next Cycle:** 75 (D+E+F)
