@@ -24,7 +24,8 @@
 - ✅ Cycle 15 완료 (D+E+F: LLMAnalyst 견고성 + Impl Shortfall 추적 + H2 2025 실패)
 - ✅ Cycle 16 완료 (A+C+F: pipeline 커버리지 + VPIN 경계 + 배포 전략 리서치)
 - ✅ Cycle 17 완료 (B+D+F: Order jitter + Ensemble 병렬화 + 레짐 감지 신기법)
-- ⏳ **Cycle 18 대기** (E+A+F)
+- ✅ Cycle 18 완료 (E+A+F: API Key 권한 체크 + walk_forward 경계 + API 보안 리서치)
+- ⏳ **Cycle 19 대기** (C+B+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -33,7 +34,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,888개** |
+| ✅ 통과 테스트 | **5,898개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

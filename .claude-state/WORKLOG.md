@@ -1040,3 +1040,59 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 03:27 UTC] Cycle 18 Dispatched — E + A + F
 Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:30 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:30:49Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 07:40 UTC] Cycle 18 COMPLETED — E + A + F
+**[E] Execution (via Risk):** connector.check_api_permissions() 검증. 출금 권한 활성화 시 CRITICAL 로그. tests/test_api_key_permissions.py + tests/test_connector.py 테스트 추가 (+10).
+**[A] Quality:** tests/test_walk_forward.py +3 경계 조건 테스트. validator_minimum_data, optimizer_insufficient_data, optimizer_no_param_grid.
+**[F] Research:** 2024-2025 API 보안. Bybit $1.5B, DMM $320M, WazirX $235M 모두 키 탈취. **교훈**: 출금 권한 API 키 절대 금지, Trade 권한만, IP 화이트리스트 필수.
+**Tests:** 5898 passed (+10 from Cycle 17).
+**Next Cycle:** 19 (C+B+F)
