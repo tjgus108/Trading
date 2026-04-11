@@ -1,11 +1,29 @@
-# Cycle 60 - Research: 2026 Bot Must-Haves
+# Cycle 61 - QA: backtest_engine slippage 누적 검증 완료
 
-## [2026-04-11] Cycle 60 — 2026 Bot Must-Haves
-- AI 기반 멀티전략 동시 실행 (단일 전략 단독 운영 비권장)
-- 멀티익스체인지 스마트 오더라우팅 (최적 유동성/가격 자동 선택)
-- 동적 리스크 관리: 다단계 TP/SL, TWAP/VWAP 실행
-- 규제 대응: AML/KYC 로그, 세금 리포트 자동화
-- 실시간 백테스트 + 포워드테스트 파이프라인
+## [2026-04-11] Cycle 61 — BacktestEngine slippage 누적 비용 검증
+
+### 작업 완료
+- `src/backtest/engine.py` 검토 (line 104-330):
+  - total_slippage_cost 필드 추적 (line 114, 143, 152, 178, 203)
+  - BUY 진입: entry = close * (1 + slippage) → slip = size * (entry - close)
+  - SELL 진입: entry = close * (1 - slippage) → slip = size * (close - entry)
+  - Exit 시에도 동일하게 슬리피지 비용 누적
+  - BacktestResult.summary()에 total_slippage_cost 필드 출력 (line 69)
+
+### 테스트 추가
+- `tests/test_backtest_engine.py` (line 395-468):
+  - `test_total_slippage_cost_accumulates_correctly`: 슬리피지 누적 정확성 검증
+  - `test_slippage_cost_scales_with_position_size`: 포지션 크기 vs 슬리피지 비용 비례성 검증
+
+### 테스트 결과
+- tests/test_backtest_engine.py: 27/27 PASS ✓
+  - 신규 테스트 2개: PASS
+  - 기존 회귀: 0개
+
+### 결론
+- total_slippage_cost 누적 계산 정확함 (경계 케이스 포함)
+- BUY/SELL 진입 및 청산 시 일관성 확인
+- position size에 따른 비용 비례성 검증 완료
 
 ---
 

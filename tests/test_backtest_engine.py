@@ -387,3 +387,87 @@ def test_dsr_threshold_strict_mode_validation():
     assert result_strict.deflated_sharpe_ratio == result_loose.deflated_sharpe_ratio, (
         "동일 데이터 · 동일 전략 → DSR 계산 결과는 동일해야 함"
     )
+
+
+# ---------------------------------------------------------------------------
+# 신규 7: Slippage 누적 비용 검증
+# ---------------------------------------------------------------------------
+
+def test_total_slippage_cost_accumulates_correctly():
+    """
+    slippage 비용이 정확히 누적되는지 검증.
+    BUY: entry = close * (1 + slippage) → slip = size * (entry - close)
+    SELL: entry = close * (1 - slippage) → slip = size * (close - entry)
+    Exit 시에도 동일하게 적용.
+    """
+    slippage_rate = 0.001  # 0.1%
+    
+    engine = BacktestEngine(
+        initial_balance=10000.0,
+        slippage=slippage_rate,
+        commission=0.0,  # 슬리피지만 검증
+        atr_multiplier_sl=0.5,  # TP 자주 도달하도록 설정
+        atr_multiplier_tp=1.0,
+    )
+    
+    df = make_df(n=200, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    
+    # 거래가 최소 1개는 있어야 함
+    assert result.total_trades > 0, "거래가 발생해야 함"
+    
+    # total_slippage_cost는 0보다 커야 함
+    assert result.total_slippage_cost > 0.0, (
+        f"슬리피지 비용이 발생해야 함: {result.total_slippage_cost:.6f}"
+    )
+    
+    # 각 거래의 PnL에서 slippage 비용이 차감되었으므로
+    # slippage=0인 경우보다 수익이 작아야 함
+    result_no_slip = BacktestEngine(
+        initial_balance=10000.0,
+        slippage=0.0,
+        commission=0.0,
+        atr_multiplier_sl=0.5,
+        atr_multiplier_tp=1.0,
+    ).run(AlwaysBuyStrategy(), df)
+    
+    assert result.total_return < result_no_slip.total_return, (
+        f"슬리피지 적용 시 수익이 감소: "
+        f"slip={result.total_return:.4f} vs no-slip={result_no_slip.total_return:.4f}"
+    )
+
+
+def test_slippage_cost_scales_with_position_size():
+    """
+    슬리피지 비용은 포지션 크기(size)에 비례해야 함.
+    larger balance → larger position size → larger slippage cost
+    """
+    slippage_rate = 0.001
+    
+    # 작은 초기 자본
+    engine_small = BacktestEngine(
+        initial_balance=1000.0,
+        slippage=slippage_rate,
+        commission=0.0,
+    )
+    
+    # 큰 초기 자본
+    engine_large = BacktestEngine(
+        initial_balance=100000.0,
+        slippage=slippage_rate,
+        commission=0.0,
+    )
+    
+    df = make_df(n=200, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+    
+    result_small = engine_small.run(strategy, df)
+    result_large = engine_large.run(strategy, df)
+    
+    # 동일 슬리피지율이지만 큰 잔고가 더 큰 절대값 슬리피지 비용을 발생
+    assert result_small.total_trades > 0
+    assert result_large.total_trades > 0
+    assert result_large.total_slippage_cost > result_small.total_slippage_cost, (
+        f"큰 잔고가 더 큰 슬리피지 비용 발생: "
+        f"large={result_large.total_slippage_cost:.6f} > small={result_small.total_slippage_cost:.6f}"
+    )

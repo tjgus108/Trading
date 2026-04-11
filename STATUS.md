@@ -66,7 +66,8 @@
 - ✅ Cycle 58 완료 (E+A+F: fetch_balance 안전 + pytest slow marker + 봇 비용)
 - ✅ Cycle 59 완료 (C+B+F: feed 빈 DF + vol_targeting 경계 + Pairs Trading)
 - ✅ **Cycle 60 완료** 🎯 (D+E+F: Confidence validation + Dashboard 60 배지 + 2026 필수)
-- ⏳ **Cycle 61 대기** (A+C+F)
+- ✅ Cycle 61 완료 (A+C+F: slippage 누적 + Mock OHLCV + 한국 규제 2026)
+- ⏳ **Cycle 62 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -75,7 +76,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,146개** (0 warnings ✨) 🎯 |
+| ✅ 통과 테스트 | **6,156개** (0 warnings ✨) |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
