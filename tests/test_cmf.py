@@ -10,7 +10,7 @@ from src.strategy.cmf import CMFStrategy
 _PERIOD = 20
 
 
-def _make_df(n=50, cmf_target=None, close_above_ema=True):
+def _make_df(n=50, cmf_target=None, close_above_ema=True, trend="bullish"):
     """
     cmf_target: None이면 기본 중립 데이터.
                 'high_buy'  → CMF > 0.15
@@ -18,9 +18,19 @@ def _make_df(n=50, cmf_target=None, close_above_ema=True):
                 'high_sell' → CMF < -0.15
                 'med_sell'  → -0.15 <= CMF < -0.05
     close_above_ema: True → close > ema50, False → close < ema50
+    trend: 'bullish' → ema20 > ema50, 'bearish' → ema20 < ema50, 'neutral' → ema20 ≈ ema50
     """
     base_close = 110.0 if close_above_ema else 90.0
     ema50 = 100.0
+    
+    # 추세 반영
+    if trend == "bullish":
+        ema20 = 102.0  # ema50 > ema20 인데, 우리는 ema20 > ema50 원함 → swap
+        ema20 = 105.0  # ema20 > ema50
+    elif trend == "bearish":
+        ema20 = 95.0   # ema20 < ema50
+    else:  # neutral
+        ema20 = 100.0
 
     if cmf_target in ("high_buy", "med_buy"):
         # MFM 양수: close 가 high 에 근접해야 함
@@ -31,16 +41,7 @@ def _make_df(n=50, cmf_target=None, close_above_ema=True):
         highs = closes + 0.1       # close ≈ high → MFM ≈ +1
         lows = closes - 2.0
         if cmf_target == "med_buy":
-            # CMF = (2*close - high - low) / (high - low)
-            # close=110, high=111.5, low=108.5 → (220-111.5-108.5)/(111.5-108.5) = 0/3 = 0 → too low
-            # 원하는 MFM: 0.05~0.15 → close 위치 조절
-            # highs=111, lows=108 → range=3, mfm=(220-111-108)/3=1/3=0.33 still high
-            # highs=115, lows=108 → range=7, num=220-115-108=-3 → negative
-            # 직접 MFM 범위 설정: highs=111, lows=109 → range=2, num=220-111-109=0 → neutral
-            # close=110, high=110.5, low=108 → range=2.5, num=220-110.5-108=1.5, mfm=0.6
-            # 원하는 0.1 수준: close=110, high=120, low=100 → range=20, num=220-120-100=0
-            # close=110.5, high=120, low=100 → num=221-120-100=1, mfm=1/20=0.05 경계
-            # close=111, high=120, low=100 → num=222-120-100=2, mfm=2/20=0.1 ← 이걸 사용
+            # close=110, high=120, low=100 → range=20, num=220-120-100=0
             closes = np.full(n, base_close + 1.0)
             highs = closes + 9.0    # close=111, high=120
             lows = closes - 11.0    # low=100, range=20, MFM=(222-120-100)/20=2/20=0.10
@@ -67,6 +68,7 @@ def _make_df(n=50, cmf_target=None, close_above_ema=True):
         "high": highs,
         "low": lows,
         "volume": np.ones(n) * 1000.0,
+        "ema20": np.full(n, ema20),
         "ema50": np.full(n, ema50),
         "atr14": np.ones(n) * 0.5,
     })
@@ -93,18 +95,18 @@ def test_strategy_name():
     assert strategy.name == "cmf"
 
 
-# ── 2. BUY 신호 (CMF>0.05, close>ema50) ──────────────────────────────────
+# ── 2. BUY 신호 (CMF>0.05, close>ema50, ema20>ema50, 볼륨 양호) ──────────
 def test_buy_signal():
-    df = _make_df(cmf_target="high_buy", close_above_ema=True)
+    df = _make_df(cmf_target="high_buy", close_above_ema=True, trend="bullish")
     cmf = _cmf_value(df)
     assert cmf > 0.05, f"CMF should be > 0.05, got {cmf}"
     sig = strategy.generate(df)
     assert sig.action == Action.BUY
 
 
-# ── 3. SELL 신호 (CMF<-0.05, close<ema50) ────────────────────────────────
+# ── 3. SELL 신호 (CMF<-0.05, close<ema50, ema20<ema50, 볼륨 양호) ────────
 def test_sell_signal():
-    df = _make_df(cmf_target="high_sell", close_above_ema=False)
+    df = _make_df(cmf_target="high_sell", close_above_ema=False, trend="bearish")
     cmf = _cmf_value(df)
     assert cmf < -0.05, f"CMF should be < -0.05, got {cmf}"
     sig = strategy.generate(df)
@@ -113,7 +115,7 @@ def test_sell_signal():
 
 # ── 4. BUY HIGH confidence (CMF > 0.15) ──────────────────────────────────
 def test_buy_high_confidence():
-    df = _make_df(cmf_target="high_buy", close_above_ema=True)
+    df = _make_df(cmf_target="high_buy", close_above_ema=True, trend="bullish")
     cmf = _cmf_value(df)
     assert cmf > 0.15, f"CMF should be > 0.15, got {cmf}"
     sig = strategy.generate(df)
@@ -123,7 +125,7 @@ def test_buy_high_confidence():
 
 # ── 5. BUY MEDIUM confidence (0.05 < CMF <= 0.15) ────────────────────────
 def test_buy_medium_confidence():
-    df = _make_df(cmf_target="med_buy", close_above_ema=True)
+    df = _make_df(cmf_target="med_buy", close_above_ema=True, trend="bullish")
     cmf = _cmf_value(df)
     assert 0.05 < cmf <= 0.15, f"CMF should be in (0.05, 0.15], got {cmf}"
     sig = strategy.generate(df)
@@ -133,7 +135,7 @@ def test_buy_medium_confidence():
 
 # ── 6. SELL HIGH confidence (CMF < -0.15) ────────────────────────────────
 def test_sell_high_confidence():
-    df = _make_df(cmf_target="high_sell", close_above_ema=False)
+    df = _make_df(cmf_target="high_sell", close_above_ema=False, trend="bearish")
     cmf = _cmf_value(df)
     assert cmf < -0.15, f"CMF should be < -0.15, got {cmf}"
     sig = strategy.generate(df)
@@ -143,7 +145,7 @@ def test_sell_high_confidence():
 
 # ── 7. SELL MEDIUM confidence (-0.15 <= CMF < -0.05) ─────────────────────
 def test_sell_medium_confidence():
-    df = _make_df(cmf_target="med_sell", close_above_ema=False)
+    df = _make_df(cmf_target="med_sell", close_above_ema=False, trend="bearish")
     cmf = _cmf_value(df)
     assert -0.15 <= cmf < -0.05, f"CMF should be in [-0.15, -0.05), got {cmf}"
     sig = strategy.generate(df)
@@ -151,14 +153,11 @@ def test_sell_medium_confidence():
     assert sig.confidence == Confidence.MEDIUM
 
 
-# ── 8. CMF>0.05이지만 close < ema50 → HOLD ───────────────────────────────
-def test_buy_cmf_but_below_ema_hold():
-    df = _make_df(cmf_target="high_buy", close_above_ema=False)
+# ── 8. CMF>0.05이지만 추세 역행 (ema20<ema50) → HOLD ──────────────────
+def test_buy_cmf_but_no_trend_hold():
+    df = _make_df(cmf_target="high_buy", close_above_ema=True, trend="bearish")
     cmf = _cmf_value(df)
     assert cmf > 0.05, f"CMF should be > 0.05, got {cmf}"
-    close = float(df["close"].iloc[-2])
-    ema50 = float(df["ema50"].iloc[-2])
-    assert close < ema50
     sig = strategy.generate(df)
     assert sig.action == Action.HOLD
 
@@ -187,7 +186,7 @@ def test_signal_fields():
 
 # ── 11. BUY reasoning에 "CMF" 포함 ───────────────────────────────────────
 def test_buy_reasoning_contains_cmf():
-    df = _make_df(cmf_target="high_buy", close_above_ema=True)
+    df = _make_df(cmf_target="high_buy", close_above_ema=True, trend="bullish")
     sig = strategy.generate(df)
     assert sig.action == Action.BUY
     assert "CMF" in sig.reasoning
@@ -195,7 +194,7 @@ def test_buy_reasoning_contains_cmf():
 
 # ── 12. SELL reasoning에 "CMF" 포함 ──────────────────────────────────────
 def test_sell_reasoning_contains_cmf():
-    df = _make_df(cmf_target="high_sell", close_above_ema=False)
+    df = _make_df(cmf_target="high_sell", close_above_ema=False, trend="bearish")
     sig = strategy.generate(df)
     assert sig.action == Action.SELL
     assert "CMF" in sig.reasoning
@@ -209,8 +208,7 @@ def test_none_data():
 
 # ── 14. HOLD 신호 (중립 데이터) ──────────────────────────────────────────
 def test_hold_neutral():
-    df = _make_df(n=50)  # 중립: close 중간, ema50과 비슷
-    # close=110, ema50=100 이면 BUY 조건 체크되는데 CMF가 0이면 HOLD
+    df = _make_df(n=50, trend="neutral")
     sig = strategy.generate(df)
     # 중립 데이터에서 CMF=0 → HOLD
     assert sig.action == Action.HOLD

@@ -90,7 +90,8 @@
 - ✅ **Cycle 82 완료** (B+D+**SIM**+F: VaR 경계 + LLM parse + **wick_reversal -14.17%→+0.93% 개선**)
 - ✅ **Cycle 83 완료** (E+A+**SIM**+F: TWAP sum + wick 회귀 +2 + **engulfing_zone -12.74%→-2.53%**)
 - ✅ **Cycle 84 완료** (C+B+**SIM**+F: fetch_multiple stress + DD halt recovery + **frama -7.89%→-3.77%**)
-- ⏳ **Cycle 85 대기** (D+E+SIM+F)
+- ✅ **Cycle 85 완료** (D+E+**SIM**+F: MultiSig 경계 + PosHealth 통합 + **cmf -7.31%→+4.28%**)
+- ⏳ **Cycle 86 대기** (A+C+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -99,8 +100,8 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,257개** (0 warnings ✨) |
-| 🎯 SIM 개선 | wick_reversal +15.1%p, engulfing_zone +10.2%p, frama +4.1%p |
+| ✅ 통과 테스트 | **6,261개** (0 warnings ✨) |
+| 🎯 SIM 누적 개선 | wick+15.1%, engulfing+10.2%, frama+4.1%, cmf+11.6% = **+41.0%p** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

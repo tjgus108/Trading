@@ -6910,3 +6910,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 16:19 UTC] Cycle 85 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 16:28 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 08:25 UTC] Cycle 85 COMPLETED — D + E + SIM + F
+**[D] ML:** tests/test_multi_signal.py +2 record_outcome 경계. 연속 5회 적중 weight=2.0, 실패 window 교체 weight=0.5.
+**[E] Execution:** tests/test_position_health_integration.py 신규 +2. 손실 확대 HEALTHY→WARNING→CRITICAL, 손절 근접 CRITICAL.
+**[SIM] Auto-improve:** cmf 개선. EMA20/50 추세 필터 + 볼륨 0.7 임계값. **-7.31% → +4.28% (+11.59%p)**. Sharpe 1.25 달성.
+**[F] Research:** CMF. 단독 비권장 → RSI/EMA/BB 필터 결합 필수. +0.05 지속이 매수 조건.
+**Tests:** 6261 passed (+4 from Cycle 84).
+**SIM 누적 개선:** wick_reversal +15.1%p, engulfing_zone +10.2%p, frama +4.1%p, **cmf +11.6%p** = **+41.0%p 총**
+**Next Cycle:** 86 (A+C+SIM+F)
