@@ -8,6 +8,11 @@ F3. DEX 가격 피드.
 
 캐시: 60초
 
+재시도: exponential backoff (Cycle 6 패턴) + fallback
+  - 최대 2회 재시도
+  - 실패 시 마지막 성공 가격 반환
+  - fallback도 없으면 0.0 반환
+
 인터페이스:
   DEXPriceFeed:
     get_price(symbol: str = "BTC") -> float  # USD 기준
@@ -26,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
 CACHE_TTL = 60
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_SECONDS = [1, 2]  # exponential backoff
 
 SYMBOL_MAP = {
     "BTC": "bitcoin",
@@ -38,21 +45,41 @@ ARB_THRESHOLD_PCT = 0.3
 
 
 class DEXPriceFeed:
-    def __init__(self):
+    def __init__(self, max_retries: int = _MAX_RETRIES):
         self._cache: dict[str, tuple[float, float]] = {}  # symbol → (price, timestamp)
+        self._last_successful: dict[str, float] = {}  # symbol → last_price (fallback)
+        self.max_retries = max_retries
 
     def get_price(self, symbol: str = "BTC") -> float:
-        """DEX/CoinGecko 가격. 실패 시 0.0"""
+        """
+        DEX/CoinGecko 가격 조회.
+        - 캐시 유효 시 캐시값 반환
+        - API 호출 (재시도 포함)
+        - 실패 시: fallback → 0.0
+        """
         now = time.time()
         if symbol in self._cache:
             price, ts = self._cache[symbol]
             if now - ts < CACHE_TTL:
                 return price
 
-        price = self._fetch_coingecko(symbol)
+        price = self._fetch_coingecko_with_retry(symbol)
         if price > 0.0:
             self._cache[symbol] = (price, now)
-        return price
+            self._last_successful[symbol] = price
+            return price
+
+        # 재시도 후 실패 → fallback 사용
+        if symbol in self._last_successful:
+            logger.warning(
+                "DEXPriceFeed.get_price failed after retries, using fallback for '%s'",
+                symbol
+            )
+            return self._last_successful[symbol]
+
+        # fallback도 없으면 0.0
+        logger.warning("DEXPriceFeed.get_price failed and no fallback available for '%s'", symbol)
+        return 0.0
 
     def get_spread(self, cex_price: float, symbol: str = "BTC") -> dict:
         """
@@ -94,14 +121,59 @@ class DEXPriceFeed:
         """테스트/데모용 mock"""
         feed = cls()
         feed._cache[symbol] = (price, time.time())
+        feed._last_successful[symbol] = price
         return feed
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
+    def _fetch_coingecko_with_retry(self, symbol: str) -> float:
+        """
+        CoinGecko API 재시도 (exponential backoff).
+        실패 시 0.0 반환.
+        """
+        coin_id = SYMBOL_MAP.get(symbol)
+        if coin_id is None:
+            logger.warning("DEXPriceFeed: unknown symbol '%s'", symbol)
+            return 0.0
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = requests.get(
+                    COINGECKO_URL,
+                    params={"ids": coin_id, "vs_currencies": "usd"},
+                    timeout=5,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                price = float(data[coin_id]["usd"])
+                logger.debug("DEXPriceFeed: %s=%s (CoinGecko, attempt %d)", symbol, price, attempt + 1)
+                return price
+            except Exception as e:
+                if attempt < self.max_retries:
+                    wait = _RETRY_BACKOFF_SECONDS[attempt]
+                    logger.warning(
+                        "DEXPriceFeed: CoinGecko attempt %d/%d failed for '%s': %s. Retry in %ds...",
+                        attempt + 1,
+                        self.max_retries + 1,
+                        symbol,
+                        str(e),
+                        wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.warning(
+                        "DEXPriceFeed: CoinGecko failed after %d retries for '%s': %s",
+                        self.max_retries + 1,
+                        symbol,
+                        str(e),
+                    )
+
+        return 0.0
+
     def _fetch_coingecko(self, symbol: str) -> float:
-        """CoinGecko API로 가격 조회. 실패 시 0.0"""
+        """CoinGecko API로 가격 조회. 재시도 로직 없음 (하위호환)."""
         coin_id = SYMBOL_MAP.get(symbol)
         if coin_id is None:
             logger.warning("DEXPriceFeed: unknown symbol '%s'", symbol)

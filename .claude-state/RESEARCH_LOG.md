@@ -450,3 +450,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [All You Need to Know About Leveraged Tokens in 2025 — 3Commas](https://3commas.io/blog/leveraged-tokens)
 - [4 Pitfalls of Trading Leveraged Tokens — Binance Blog](https://www.binance.com/en/blog/all/4-pitfalls-of-trading-leveraged-tokens-and-how-to-avoid-them-421499824684900885)
 - [3x Leveraged ETFs Guide — Bitget Academy](https://www.bitget.com/academy/3x-leveraged-etfs)
+
+## [2026-04-11] Cycle 21 — Infrastructure Best Practices
+
+### 지연 최적화
+- 거래소 서버와 같은 데이터센터(Equinix NY4/LD4 등)에 VPS 배치 시 RTT 0.3~1ms 달성 가능. 물리적 거리가 지연의 핵심.
+- 10~20ms 지연만으로도 스캘핑/브레이크아웃 전략 수익의 30~50% 잠식. 표준 NIC(20~50µs) 대비 kernel-bypass NIC(1~5µs) 고려.
+- 암호화폐는 Binance/OKX 서버가 주로 AWS Tokyo/Singapore 기반 → 해당 리전 VPS 선택이 우선.
+
+### Failover & 모니터링
+- **systemd**: `Restart=always` + `RestartSec=5s` 설정으로 크래시 시 자동 재기동. 가장 경량 옵션.
+- **Docker**: 컨테이너 격리로 환경 일관성 보장. `--restart=unless-stopped` 플래그로 failover. Freqtrade/Hummingbot 모두 공식 Docker 이미지 제공.
+- **다중 인스턴스**: Primary/Standby 구성 + 헬스체크 엔드포인트로 active failover. 단일 장애점 제거 필수.
+
+### 참고
+- [Low Latency Trading Infrastructure — QuantVPS](https://www.quantvps.com/blog/low-latency-trading)
+- [Algo Trading VPS Optimization 2025 — TradingFXVPS](https://tradingfxvps.com/api-trading-vps-optimization-2025-websocket-rest-for-algo-strategies/)
+- [Crypto Trading Bot Best Practices 2024 — Alwin.io](https://www.alwin.io/best-practices-for-optimizing-your-crypto-trading-bot-in-2024)
