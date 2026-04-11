@@ -14,6 +14,10 @@
   - Sharpe 40% 이상 하락 or MDD 2배 이상 → 과적합 신호
   - 주요 원인: 슬리피지(얇은 호가창), 레짐 변화, 전략 경쟁 심화
   - 실용: 3단계 파이프라인 (백테스트 → walk-forward → 라이브 페이퍼)
+- Cycle 79 (Category C): Notifier HTML escape 추가
+  - src/notifier.py: html.escape() 적용 (symbol, error, notes, timestamp 등)
+  - TestHTMLEscape 클래스 추가: XSS 공격 방어 검증 (2 테스트)
+  - 전체 25 테스트 통과
 
 ## 남은 작업
 - TWAP per-slice 타임아웃(dry_run=False 경로) 추가 커버리지 고려

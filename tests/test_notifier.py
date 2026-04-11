@@ -257,3 +257,34 @@ class TestSendBehavior:
         assert "---" in msg
         assert "<b>[STARTUP]</b>" in msg
         assert "<b>DRY RUN</b>" in msg
+
+
+class TestHTMLEscape:
+    """Test HTML escaping of user-controlled strings in notifier."""
+
+    def test_html_escape_in_error_message(self):
+        """notify_error escapes HTML special characters in user input."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error("<script>alert('xss')</script>")
+        msg = captured[0]
+        # Should contain escaped HTML, not raw tags
+        assert "&lt;script&gt;" in msg
+        assert "<script>" not in msg
+
+    def test_html_escape_in_pipeline_result(self):
+        """_format_pipeline escapes HTML special characters in result fields."""
+        result = _make_pipeline_result(
+            symbol="<img src=x>",
+            error="<b>error</b> & more",
+            notes=["dry_run=True <test>"]
+        )
+        msg = _format_pipeline(result)
+        # Should contain escaped versions
+        assert "&lt;img src=x&gt;" in msg
+        assert "&lt;b&gt;" in msg
+        assert "&amp;" in msg
+        # Raw tags should not appear
+        assert "<img src=x>" not in msg
+        assert "<b>error</b>" not in msg

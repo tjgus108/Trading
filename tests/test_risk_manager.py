@@ -730,3 +730,33 @@ def test_multi_position_drawdown_near_limit_then_breached():
     assert "Circuit breaker" in result_breach.reason
     assert "drawdown" in result_breach.reason
     assert result_breach.position_size is None
+
+
+# ── ATR boundary tests ────────────────────────────────────────────────────────
+
+def test_atr_zero_blocked():
+    """ATR=0 → ZeroDivisionError 없이 BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=0, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "ATR" in result.reason
+
+
+def test_atr_negative_blocked():
+    """음수 ATR → BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=-100, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "ATR" in result.reason
+
+
+def test_atr_extremely_large_blocked():
+    """ATR이 매우 커서 position_size가 0이 되는 경우 → BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5, max_position_size=0.10)
+    # sl_distance = 1e12 * 1.5 → position_size ≈ 0
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=1e12, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "zero" in result.reason.lower() or "ATR" in result.reason

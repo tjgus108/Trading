@@ -6492,3 +6492,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Backtest vs Live Gap. Sharpe 40% 드롭 / MDD 2배 = 과적합 임계값. 슬리피지(dogwifhat $9M → 60% 스파이크), 레짐 변화 주원인. Sharpe 40% 경고 권장.
 **Tests:** 6225 passed (+2 from Cycle 77).
 **Next Cycle:** 79 (C+B+F)
+
+## [2026-04-11 11:37 UTC] Cycle 79 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:40 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 05:40 UTC] Cycle 79 COMPLETED — C + B + F
+**[C] Data SECURITY:** src/notifier.py html.escape() 적용. user-controlled 문자열(symbol, error, notes) XSS 방어. +2 tests (script/img 태그 공격).
+**[B] Risk:** src/risk/manager.py ATR<=0 BLOCKED, 극대 ATR(1e12) position_size<1e-8 BLOCKED. +3 tests.
+**[F] Research:** Maker/Taker. 봇 거래량 80% (2020 50%→2025). 기관 봇 maker 중심. Polymarket dynamic fee로 latency arb 억제. post-only/limit order 우선 권장.
+**Tests:** 6230 passed (+5 from Cycle 78). XSS 보안 강화.
+**Next Cycle:** 80 🎯 (D+E+F) — 80 사이클 마일스톤

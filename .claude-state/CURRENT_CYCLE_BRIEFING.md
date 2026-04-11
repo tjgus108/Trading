@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 78 — 2026-04-11T11:35:24.790850Z
+🔄 CYCLE 79 — 2026-04-11T11:37:56.385951Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 77 COMPLETED — B + D + F** (2026-04-12 05:00 UTC)
-  **[B] Risk:** tests/test_drawdown_monitor.py +2. set_daily/weekly_start 후 새 기준 추적 정상.
-  **[D] ML:** tests/test_heston_lstm.py +4 경계. 소량 데이터, 고/저 변동성, 데이터 부족 처리 모두 정상.
-  **[F] Research:** Stoch Vol 모델. Heston+LSTM hybrid Sharpe 2.1 (BTC 2024). GARCH 단독 예측력 제한적, ML 보정 조합 권장.
-  **Tests:** 6223 passed (+2 from Cycle 76).
+**Cycle 78 COMPLETED — E + A + F** (2026-04-12 05:20 UTC)
+  **[E] Execution:** Notifier 동작 검증 (코드 수정 없음). HTML escape 미적용 발견 → 향후 개선 후보.
+  **[A] Quality:** tests/test_pipeline_specialist.py +2. anomaly 감지 후 계속 진행, ensemble HOLD 시 risk early exit.
+  **[F] Research:** Backtest vs Live Gap. Sharpe 40% 드롭 / MDD 2배 = 과적합 임계값. 슬리피지(dogwifhat $9M → 60% 스파이크), 레짐 변화 주원인. Sharpe 40% 경고 권장.
+  **Tests:** 6225 passed (+2 from Cycle 77).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

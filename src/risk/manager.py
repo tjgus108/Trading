@@ -245,6 +245,19 @@ class RiskManager:
                     portfolio_exposure=None,
                 )
 
+        # ATR 경계 검증: 0 이하면 SL 계산 불가
+        if atr <= 0:
+            logger.warning("Invalid ATR value: %.6f — BLOCKED", atr)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"Invalid ATR: {atr} (must be > 0)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
+
         # 포지션 사이징 (candle_df 있으면 adaptive multiplier, 없으면 config 값 사용)
         if candle_df is not None:
             sl_mult = self.adaptive_stop_multiplier(candle_df)
@@ -257,6 +270,19 @@ class RiskManager:
         # 최대 포지션 한도 클램프
         max_size = (account_balance * self.max_position_size) / entry_price
         position_size = min(position_size, max_size)
+
+        # ATR이 매우 커서 포지션 사이즈가 사실상 0인 경우 BLOCK (< 1e-8 단위)
+        if position_size < 1e-8:
+            logger.warning("position_size <= 0 after sizing (ATR too large?): atr=%.6f — BLOCKED", atr)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"position_size is zero after sizing (ATR={atr} may be abnormally large)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
 
         # 주문 지터: 봇의 예측 가능한 패턴 노출 방지 (AMM 착취 대응)
         if self.jitter_pct > 0.0:
