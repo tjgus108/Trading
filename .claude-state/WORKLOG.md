@@ -1783,3 +1783,108 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 03:59 UTC] Cycle 25 Dispatched — D + E + F
 Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:06 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 04:07 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 10:15 UTC] Cycle 25 COMPLETED — D + E + F
+**[D] ML:** src/strategy/base.py에 is_active_session() + SessionType enum 추가. EU-US overlap (12:00-16:00 UTC, Mon-Fri) → ACTIVE, 그 외/주말 → REDUCED. Cycle 24 리서치 반영. +10 tests.
+**[E] Execution (via Risk) CRITICAL:** src/orchestrator.py UnboundLocalError 버그 수정. drawdown try 블록 내 지역 `from src.pipeline.runner import PipelineResult`가 Python 컴파일러에게 해당 함수 전체에서 로컬 변수로 오인식시켜 health check 블록에서 NameError 발생 → except로 삼켜져 pipeline 계속 실행됨. 지역 import 제거. +health_check 통합 테스트.
+**[F] Research:** AI 에이전트 트레이딩. 백테스트 SPY 2배 수익 케이스 존재하나 실전 공개 데이터 부족. API 비용 봇 100개 기준 월 $2,400. 모델 혼용으로 절감 가능.
+**Tests:** 5975 passed (+12 from Cycle 24).
+**Next Cycle:** 26 (A+C+F)

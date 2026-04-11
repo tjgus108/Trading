@@ -865,7 +865,6 @@ class BotOrchestrator:
             balance = self._pipeline._fetch_balance_usd()
             dd_status = self._drawdown_monitor.update(balance)
             if dd_status.halted:
-                from src.pipeline.runner import PipelineResult
                 from datetime import datetime, timezone
                 ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
                 if dd_status.alert_level == AlertLevel.FORCE_LIQUIDATE:
@@ -901,7 +900,7 @@ class BotOrchestrator:
                 return PipelineResult(
                     timestamp=_ts, symbol=self.cfg.trading.symbol,
                     pipeline_step="health_check", status="BLOCKED",
-                    notes=["DataFeeds all_disconnected"],
+                    notes=["all_feeds_disconnected"],
                 )
             if "operating_in_degraded_mode" in _hc.anomalies:
                 logger.warning("DataFeeds degraded_mode: %s", _hc)
