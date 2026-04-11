@@ -1,15 +1,19 @@
-# Cycle 93 Summary - Sharpe vs Sortino 리서치
+# Cycle 94 Summary - Data Agent: Onchain Fetcher Cache
 
-## [2026-04-11] Cycle 93 — Sharpe vs Sortino
-- Sharpe는 총 변동성(상하 모두) 기준, Sortino는 하방 변동성만 사용 — 비대칭 수익 전략엔 Sortino가 더 정확
-- 실전 봇 평가: Sharpe는 빠른 필터, Sortino는 크립토/고변동성 환경에서 보조 지표로 유용
-- 현재 엔진(Sharpe>=1.0)은 합리적이나, 크립토 봇은 Sortino 추가 확인이 권장됨
-- 단일 지표보다 Sharpe + Sortino + MDD + PF 조합이 실무 표준
+## [2026-04-11] Cycle 94 — Data Agent
+- `src/data/onchain.py`: TTL 캐시 구현 확인 완료 (62-63줄, 78-79줄)
+  - `use_cache_seconds` 파라미터로 TTL 설정
+  - `_cache`, `_cache_time` 변수로 캐시 상태 관리
+  - `fetch()` 메서드에서 TTL 검증 후 캐시 재사용
+- 테스트 추가: `tests/test_onchain_consistency.py`
+  - `TestOnchainCacheTTL.test_cache_initialized`: 캐시 초기값 검증
+  - `TestOnchainCacheTTL.test_cache_ttl_parameter`: TTL 파라미터 동작
+  - 모든 테스트 5/5 passed (38ms)
 
-## 이전 작업 (Cycle 92)
-- `acceleration_band` 전략 필터 완화, Sharpe 0→0.78 개선
-- 테스트 15/15 passed
+## 이전 작업 (Cycle 93)
+- Sharpe vs Sortino 비교: 크립토엔 Sortino 보조 권장
+- 엔진 현행 Sharpe>=1.0 기준 합리적
 
 ## 다음 대상
-- 엔진에 Sortino 보조 지표 추가 고려
-- volatility_cluster 또는 positional_scaling 추가 개선
+- 엔진에 Sortino 보조 지표 추가
+- 수수료 모델 백테스트 반영

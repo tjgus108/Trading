@@ -7553,3 +7553,6 @@ ImplShortfall: -5.00bps
 **Tests:** 6295 passed (+2 from Cycle 92).
 **SIM 누적 10개:** +volatility_cluster
 **Next Cycle:** 94 (C+B+SIM+F)
+
+## [2026-04-11 18:23 UTC] Cycle 94 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

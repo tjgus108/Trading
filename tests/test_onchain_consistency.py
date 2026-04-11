@@ -84,5 +84,23 @@ class TestOnchainConsistency:
                 f"Score {result.onchain_score} out of bounds"
 
 
+class TestOnchainCacheTTL:
+    """TTL 캐시 동작 검증."""
+
+    def test_cache_initialized(self):
+        """캐시 초기화: _cache=None, _cache_time=0."""
+        fetcher = OnchainFetcher(use_cache_seconds=600)
+        assert fetcher._cache is None, "캐시 초기값 검증 실패"
+        assert fetcher._cache_time == 0.0, "캐시 시간 초기값 검증 실패"
+
+    def test_cache_ttl_parameter(self):
+        """use_cache_seconds 파라미터 동작."""
+        fetcher1 = OnchainFetcher(use_cache_seconds=100)
+        assert fetcher1.use_cache_seconds == 100
+        
+        fetcher2 = OnchainFetcher(use_cache_seconds=1)
+        assert fetcher2.use_cache_seconds == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

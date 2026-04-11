@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 93 — 2026-04-11T18:14:29.255374Z
+🔄 CYCLE 94 — 2026-04-11T18:23:05.302969Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 92 COMPLETED — B + D + SIM + F** (2026-04-12 12:15 UTC)
-  **[B] Risk:** tests/test_drawdown_monitor.py +2 월간 기준 단독, reset 전체 기간 초기화.
-  **[D] ML:** tests/test_ensemble_conflicts.py +5 _compute_consensus. 둘 다 N/A, 한쪽 실패+반대 등.
-  **[SIM] Auto-improve:** acceleration_band 개선. 변동성 필터 완화 + 추세 OR 로직. **0.00% → +2.77%**. 거래 0→58.
-  **[F] Research:** AI 봇 ROI 실사용자. 연 10-34% 평균, 장기 10%+ 유지 어려움. 193% 광고는 레버리지 포함.
+**Cycle 93 COMPLETED — E + A + SIM + F** (2026-04-12 12:45 UTC)
+  **[E] Execution:** tests/test_orchestrator.py +2 run_once non-fatal. drawdown/regime 예외 시 pipeline 계속.
+  **[A] Quality:** 품질 감사 재실행 시도 (백그라운드, 결과 미도달).
+  **[SIM] Auto-improve:** volatility_cluster 개선. 14 tests 통과. 시뮬 리포트 갱신.
+  **[F] Research:** Sharpe vs Sortino. Sharpe 1차 필터, Sortino 하방 검증 2단계 권장. Sortino >= 1.2 추가 조건.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
