@@ -419,3 +419,73 @@ def test_full_pipeline_kelly_sizer_and_vol_targeting_together():
     # Vol targeting이 호출되었는지 확인
     assert any("VolTarget size" in n for n in result.notes)
     mock_vol.adjust.assert_called_once()
+
+
+
+def test_pipeline_data_anomaly_detection():
+    """
+    Data anomaly 감지 시 notes에 기록되는지 검증.
+    파이프라인은 계속 진행하지만 anomaly가 로깅됨.
+    """
+    pipeline = _make_pipeline()
+    
+    df = _make_df()
+    data_summary = MagicMock()
+    data_summary.df = df
+    data_summary.missing = 2  # 5 이상이 아니므로 경고만
+    data_summary.anomalies = ["price_gap > 5%", "volume_spike 10x"]
+    data_summary.candles = len(df)
+    pipeline.data_feed.fetch.return_value = data_summary
+    
+    result = pipeline.run()
+    
+    # 파이프라인은 OK이지만 notes에 anomalies가 기록됨
+    assert result.status == "OK"
+    assert result.pipeline_step in ("execution", "risk")
+    assert any("ANOMALIES" in n for n in result.notes)
+
+
+def test_pipeline_sequential_failures_ensemble_then_risk():
+    """
+    SpecialistEnsemble이 HOLD 전환 후 risk manager 호출 안 됨을 검증.
+    dry_run=True에서도 정상 상태 반환.
+    """
+    pipeline = _make_pipeline(dry_run=True)
+    
+    # Ensemble이 강한 반대로 HOLD 전환
+    mock_ensemble = MagicMock()
+    mock_ensemble.analyze.return_value = SpecialistVote(
+        agent_name="strong_opposing_vote",
+        action="SELL",
+        confidence=0.95,
+        reasoning="System-wide bearish signals detected",
+    )
+    pipeline.specialist_ensemble = mock_ensemble
+    
+    # Risk manager 호출 카운트
+    risk_call_count = 0
+    original_evaluate = pipeline.risk_manager.evaluate
+    
+    def track_risk_calls(*args, **kwargs):
+        nonlocal risk_call_count
+        risk_call_count += 1
+        from src.risk.manager import RiskResult, RiskStatus
+        return RiskResult(
+            status=RiskStatus.APPROVED,
+            position_size=0.01,
+            stop_loss=49500.0,
+            take_profit=51000.0,
+            reason="",
+            risk_amount=100.0,
+            portfolio_exposure=0.01,
+        )
+    
+    pipeline.risk_manager.evaluate.side_effect = track_risk_calls
+    
+    result = pipeline.run()
+    
+    # HOLD로 전환되고 risk manager는 호출 안 됨
+    assert result.signal.action == Action.HOLD
+    assert result.pipeline_step == "alpha"
+    assert result.status == "OK"
+    assert risk_call_count == 0

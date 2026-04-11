@@ -6433,3 +6433,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Stoch Vol 모델. Heston+LSTM hybrid Sharpe 2.1 (BTC 2024). GARCH 단독 예측력 제한적, ML 보정 조합 권장.
 **Tests:** 6223 passed (+2 from Cycle 76).
 **Next Cycle:** 78 (E+A+F)
+
+## [2026-04-11 11:35 UTC] Cycle 78 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:36 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 05:20 UTC] Cycle 78 COMPLETED — E + A + F
+**[E] Execution:** Notifier 동작 검증 (코드 수정 없음). HTML escape 미적용 발견 → 향후 개선 후보.
+**[A] Quality:** tests/test_pipeline_specialist.py +2. anomaly 감지 후 계속 진행, ensemble HOLD 시 risk early exit.
+**[F] Research:** Backtest vs Live Gap. Sharpe 40% 드롭 / MDD 2배 = 과적합 임계값. 슬리피지(dogwifhat $9M → 60% 스파이크), 레짐 변화 주원인. Sharpe 40% 경고 권장.
+**Tests:** 6225 passed (+2 from Cycle 77).
+**Next Cycle:** 79 (C+B+F)

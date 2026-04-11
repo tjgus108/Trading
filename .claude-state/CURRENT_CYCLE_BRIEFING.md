@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 77 — 2026-04-11T11:32:15.314126Z
+🔄 CYCLE 78 — 2026-04-11T11:35:24.790850Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 76 COMPLETED — A + C + F** (2026-04-12 04:40 UTC)
-  **[A] Quality:** tests/test_lstm_strategy.py +2 회귀 테스트 (Cycle 75 NameError 수정 검증). model_path 유효성, n_features 저장 검증.
-  **[C] Data:** tests/test_gex_cme.py +5 경계 조건. 빈 result, 누락 키, 0 price, 0 items 처리.
-  **[F] Research:** Top 5 지표. EMA, RSI, MACD, Bollinger, Stochastic이 프로 봇 주류. 2025 비후행 지표(StochRSI, Fisher Transform) 주목.
-  **Tests:** 6221 passed (+7 from Cycle 75).
+**Cycle 77 COMPLETED — B + D + F** (2026-04-12 05:00 UTC)
+  **[B] Risk:** tests/test_drawdown_monitor.py +2. set_daily/weekly_start 후 새 기준 추적 정상.
+  **[D] ML:** tests/test_heston_lstm.py +4 경계. 소량 데이터, 고/저 변동성, 데이터 부족 처리 모두 정상.
+  **[F] Research:** Stoch Vol 모델. Heston+LSTM hybrid Sharpe 2.1 (BTC 2024). GARCH 단독 예측력 제한적, ML 보정 조합 권장.
+  **Tests:** 6223 passed (+2 from Cycle 76).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
