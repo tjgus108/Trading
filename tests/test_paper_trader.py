@@ -356,3 +356,39 @@ def test_fee_impact_on_balance_and_pnl():
     # PnL = (120-100)*1000 - 120 = 20000 - 120 = 19,880
     expected_pnl = (120 - 100) * 1000.0 - 120.0
     assert abs(sell_result["pnl"] - expected_pnl) < 0.1
+
+
+# ── 경계 조건 테스트 (Cycle 43) ──────────────────────────────
+
+def test_zero_balance_buy_rejected():
+    """잔액 0인 계좌에서 BUY는 rejected"""
+    pt = PaperTrader(initial_balance=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+    assert pt.account.balance == 0.0
+
+
+def test_fee_exceeds_profit_net_loss():
+    """수수료가 명목 이익을 초과할 때 P&L이 음수"""
+    # price_gain = 0.01/unit, qty=1, fee_rate=0.05 → fee=0.0505 > gain=0.01
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.05,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1.00, quantity=1.0,
+                      strategy="s", confidence="H")
+    result = pt.execute_signal("BTC/USDT", "SELL", price=1.01, quantity=1.0,
+                               strategy="s", confidence="H")
+    # nominal_gain=0.01, sell_fee=1.01*0.05=0.0505 → pnl < 0
+    assert result["pnl"] < 0.0
+
+
+def test_exact_balance_buy_succeeds():
+    """잔액이 주문 비용과 정확히 같을 때 BUY 성공"""
+    # cost = price * qty * (1 + fee_rate) = 1000 * 1 * 1.001 = 1001.0
+    pt = PaperTrader(initial_balance=1001.0, fee_rate=0.001,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    assert abs(pt.account.balance) < 1e-6  # 잔액 거의 0

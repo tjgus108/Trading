@@ -3189,3 +3189,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 봇 보안 침해 2025. AIXBT 55 ETH (세션 토큰), Polymarket GitHub 악성코드, Nova $500K (수동 내부). 주요 벡터: API 키 노출, 세션 토큰 탈취, 오픈소스 봇 악성코드.
 **Tests:** 6050 passed (+5 from Cycle 41).
 **Next Cycle:** 43 (E+A+F)
+
+## [2026-04-11 09:05 UTC] Cycle 43 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:06 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 16:25 UTC] Cycle 43 COMPLETED — E + A + F
+**[E] Execution:** tests/test_paper_trader.py +3 경계. 0 balance BUY 거부, 수수료>이익 음수 P&L, 잔액=주문비용 정확 성공.
+**[A] Quality:** scripts/audit_summary.py 신규. QUALITY_AUDIT.csv에서 요약 통계 출력 (PASS/FAIL, Top 5, avg Sharpe/WR/MDD).
+**[F] Research:** LSTM vs Transformer 2025. LSTM 가격 변동 예측 안정적(장기), Transformer 절대가 소폭 우세 + 학습 빠름. 전략 주기 1h+ → LSTM, 스캘핑 → Transformer.
+**Tests:** 6053 passed (+3 from Cycle 42).
+**Next Cycle:** 44 (C+B+F)
