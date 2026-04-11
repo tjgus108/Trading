@@ -1096,3 +1096,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 2024-2025 API 보안. Bybit $1.5B, DMM $320M, WazirX $235M 모두 키 탈취. **교훈**: 출금 권한 API 키 절대 금지, Trade 권한만, IP 화이트리스트 필수.
 **Tests:** 5898 passed (+10 from Cycle 17).
 **Next Cycle:** 19 (C+B+F)
+
+## [2026-04-11 03:31 UTC] Cycle 19 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:33 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:33:58Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 08:00 UTC] Cycle 19 COMPLETED — C + B + F
+**[C] Data:** src/data/options_feed.py GEX/CME Feed에 재시도+fallback 패턴 (Cycle 6 스타일). max_retries, exponential backoff, _last_successful 캐시, 중립값 폴백. +6 tests (test_gex_cme.py).
+**[B] Risk CRITICAL:** src/risk/circuit_breaker.py flash_crash 감지 추가. config.yaml에 flash_crash_pct: 0.10이 정의되어 있었으나 코드에 구현 전무했음. candle_open/close 전달 시 abs(close-open)/open >= flash_crash_pct이면 즉시 triggered=True, size=0. +4 tests.
+**[F] Research:** 펀딩비 아비트라지 실전. 2024 연 14%, 2025 연 19% 수익이나 참가자 증가로 40%만 수수료 후 수익. 우리 funding_rate 전략에 중립/약세 필터 + 펀딩 급변 서킷브레이커 필요.
+**Tests:** 5908 passed (+10 from Cycle 18).
+**Next Cycle:** 20 (D+E+F)

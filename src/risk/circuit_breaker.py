@@ -4,6 +4,7 @@ Circuit Breaker: 다층 자동 거래 중단.
 - 변동성 급등: 현재 ATR이 기준 ATR의 atr_surge_multiplier 배 이상이면 트리거
   (포지션 full-block이 아닌 50% 축소 신호를 반환)
 - 상관관계 급증: 전략 간 상관계수 ≥ corr_threshold → size_multiplier=0.7 축소
+- 플래시 크래시 감지: 단일 캔들 가격 변동 ≥ flash_crash_pct → 즉시 완전 차단
 """
 import logging
 from typing import Optional
@@ -20,12 +21,14 @@ class CircuitBreaker:
         total_drawdown_limit: float = 0.15,   # -15% 전체 낙폭
         atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
         corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소
+        flash_crash_pct: float = 0.10,        # 단일 캔들 10% 이상 변동 → 즉시 차단
         correlation_tracker: Optional[SignalCorrelationTracker] = None,
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
         self.total_drawdown_limit = total_drawdown_limit
         self.atr_surge_multiplier = atr_surge_multiplier
         self.corr_threshold = corr_threshold
+        self.flash_crash_pct = flash_crash_pct
         self._correlation_tracker = correlation_tracker
         self._triggered: bool = False
         self._reason: str = ""
@@ -58,6 +61,8 @@ class CircuitBreaker:
         daily_start_balance: float,
         current_atr: Optional[float] = None,
         baseline_atr: Optional[float] = None,
+        candle_open: Optional[float] = None,
+        candle_close: Optional[float] = None,
     ) -> dict:
         """
         반환:
@@ -70,9 +75,22 @@ class CircuitBreaker:
 
         ATR surge와 correlation throttle이 동시 발생하면 더 보수적인 값(0.5) 사용.
         낙폭 조건은 항상 우선 — triggered=True, size_multiplier=0.0.
+        플래시 크래시(candle_open/candle_close 제공 시)는 낙폭보다 먼저 체크.
         """
         if daily_start_balance <= 0 or peak_balance <= 0:
             return self._make_result(False, "", 0.0)
+
+        # ── 플래시 크래시 체크 (최우선) ──────────────────────────────────────
+        if candle_open is not None and candle_close is not None and candle_open > 0:
+            candle_chg = abs(candle_close - candle_open) / candle_open
+            if candle_chg >= self.flash_crash_pct:
+                self._triggered = True
+                self._reason = (
+                    f"플래시 크래시 감지: 캔들 변동 {candle_chg:.2%} ≥ 한계 {self.flash_crash_pct:.2%} "
+                    f"(open={candle_open}, close={candle_close})"
+                )
+                logger.warning("CircuitBreaker TRIGGERED: %s", self._reason)
+                return self._make_result(True, self._reason, 0.0, size_multiplier=0.0)
 
         daily_dd = (daily_start_balance - current_balance) / daily_start_balance
         total_dd = (peak_balance - current_balance) / peak_balance

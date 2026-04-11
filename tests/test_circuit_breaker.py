@@ -231,3 +231,57 @@ def test_corr_throttle_and_atr_surge_uses_lower_multiplier():
     assert result["volatility_surge"] is True
     assert result["correlation_throttle"] is True
     assert result["size_multiplier"] == 0.5
+
+
+# ── 플래시 크래시 감지 ──────────────────────────────────────
+def test_flash_crash_down_triggers():
+    """단일 캔들 10% 이상 하락 → triggered=True, size_multiplier=0.0"""
+    cb = CircuitBreaker(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=50000.0,
+        candle_close=44000.0,  # -12%
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "플래시 크래시" in result["reason"]
+
+
+def test_flash_crash_up_triggers():
+    """단일 캔들 10% 이상 상승도 플래시 크래시로 감지 (abs 사용)"""
+    cb = CircuitBreaker(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=50000.0,
+        candle_close=56000.0,  # +12%
+    )
+    assert result["triggered"] is True
+    assert "플래시 크래시" in result["reason"]
+
+
+def test_flash_crash_below_threshold_no_trigger():
+    """캔들 변동 9% → 한계 미만, 정상 통과"""
+    cb = CircuitBreaker(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=50000.0,
+        candle_close=45500.0,  # -9%
+    )
+    assert result["triggered"] is False
+
+
+def test_flash_crash_omitted_no_effect():
+    """candle_open/candle_close 미전달 시 플래시 크래시 체크 스킵"""
+    cb = CircuitBreaker(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is False

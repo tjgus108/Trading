@@ -1,59 +1,33 @@
-# Next Steps
+# Cycle 19 - 진행 상황
 
-## Cycle 18 - API Key Permission 검증 ✅ COMPLETED (2차 확인)
+## 완료: Category C - Options Feed 견고성 개선 (15분)
 
-**Task:** check_api_permissions() 단위 테스트 추가 (기존 구현 검증)
+### 작업 내용
+1. `src/data/options_feed.py` - GEXFeed/CMEBasisFeed 개선
+   - Cycle 6 패턴 적용: 재시도(exponential backoff 0.5/1/2s) + fallback
+   - max_retries 파라미터화 (기본값: 2회)
+   - _last_successful 캐시로 API 실패 시 이전 성공 데이터 사용
+   - fallback도 없으면 중립 데이터(score=0) 반환
+   - 파이프라인 블록 방지 (예외 전파 금지)
 
-**Confirmed:** `src/exchange/connector.py` lines 37-65 — 이미 구현 완료 상태
-- `connect()` 끝에서 자동 호출 (line 35)
-- 출금 권한 → CRITICAL 로그
-- 미지원 거래소 → WARNING + 빈 dict
+2. `tests/test_gex_cme.py` - 새 테스트 6개 추가 (총 22개)
+   - test_gex_fallback_after_failure: fallback 데이터 검증
+   - test_gex_neutral_without_fallback: fallback 없을 때 중립값
+   - test_gex_max_retries_parameter: max_retries 파라미터화 확인
+   - test_cme_fallback_after_failure: CME fallback 테스트
+   - test_cme_neutral_without_fallback: CME 중립값 테스트
+   - test_cme_max_retries_parameter: CME max_retries 확인
 
-**New Tests:** `tests/test_connector.py` — 3개 신규 작성
-1. `test_check_permissions_no_withdraw` — 정상 패스
-2. `test_check_permissions_withdraw_enabled` — CRITICAL 로그 확인
-3. `test_check_permissions_not_supported` — NotSupported 처리
+### 변경 사항
+- src/data/options_feed.py (라인 1-206) - 재시도/fallback 로직 추가
+- tests/test_gex_cme.py (라인 198-260) - 6개 테스트 추가
 
-**Test Results:** 3/3 passed ✅
+### 테스트 결과
+```
+22 passed in 7.16s
+- 기존 16개 테스트 모두 통과
+- 새 6개 테스트 모두 통과
+```
 
----
-
-## Cycle 18 - API Key Permission 검증 ✅ COMPLETED (1차)
-
-**Task:** startup 시 API Key 출금 권한 체크 기능 추가
-
-**Changes:**
-1. `src/exchange/connector.py` line 35 — `connect()` 끝에 `self.check_api_permissions()` 호출 추가
-2. `src/exchange/connector.py` lines 37-65 — `check_api_permissions()` 메서드 추가
-3. `tests/test_api_key_permissions.py` — 4개 테스트 신규 작성
-
-**Test Results:** 4/4 passed ✅
-
----
-
-## Cycle 18 - Category A: Quality Assurance ✅ COMPLETED
-
-**Changes:**
-1. `tests/test_walk_forward.py` lines 191-237 — 3개 테스트 추가
-**Total: 13/13 passed ✅**
-
----
-
-## Cycle 17 - Category B: Risk Management ✅ COMPLETED
-
-**Changes:**
-1. `src/risk/manager.py` lines 107, 114 — jitter_pct 파라미터 추가
-2. `src/risk/manager.py` lines 213-218 — jitter 적용 로직
-3. `tests/test_risk_manager.py` lines 210-247 — 4개 테스트 추가
-**Test Results:** 31/31 passed ✅
-
----
-
-## Next Opportunities (Future Cycles)
-
-### Security
-- check_api_permissions() 결과를 config 경고 파일로도 기록 (선택)
-- API Key rotation reminder (30일 주기) 추가
-
-### Walk-Forward Validation
-- Multi-window optimization tests (IS/OOS Sharpe ratio overfitting)
+## 다음 단계
+Cycle 19 Category C 완료. 다음 사이클/카테고리 대기.

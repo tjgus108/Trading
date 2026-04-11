@@ -416,3 +416,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Bybit Hack Analysis — Chainalysis](https://www.chainalysis.com/blog/bybit-exchange-hack-february-2025-crypto-security-dprk/)
 - [Coinbase API Security Best Practices](https://docs.cdp.coinbase.com/get-started/authentication/security-best-practices)
 - [Crypto Exchange Hacks Statistics — CoinLaw](https://coinlaw.io/crypto-exchange-hacks-and-security-statistics/)
+
+## [2026-04-11] Cycle 19 — Funding Rate Arbitrage Reality
+
+### 실전 수익률
+- 2024 연평균 수익률 약 14.39%, 2025년 19.26%로 반등 — 강세장 펀딩비 상승 효과
+- 강세장 구간 8시간 펀딩비 0.05~0.2%, 연환산 22~100%+ 가능; 횡보장은 0%에 수렴
+- 전체 기회 중 40%만 거래비용·스프레드 반전 후 양의 수익 — 신중한 진입 필수
+- 시장 참가자 증가로 아비트라지 풀이 커질수록 수익 축소 확인(ScienceDirect 연구)
+
+### 우리 봇 funding_rate 전략 재평가
+- 강세 사이클 의존도 높음 — 중립·약세장 진입 필터 없으면 수수료 손실 누적 위험
+- 펀딩비 급변 시 델타 헤지 슬리피지로 단기 포지션 붕괴 가능, 서킷브레이커 필수
+
+### 참고
+- [ScienceDirect — Risk and Return of Funding Rate Arbitrage (CEX/DEX)](https://www.sciencedirect.com/science/article/pii/S2096720925000818)
+- [Gate.io — Perpetual Contract Funding Rate Arbitrage 2025](https://www.gate.com/learn/articles/perpetual-contract-funding-rate-arbitrage/2166)
+- [Amberdata — Ultimate Guide to Funding Rate Arbitrage](https://blog.amberdata.io/the-ultimate-guide-to-funding-rate-arbitrage-amberdata)
