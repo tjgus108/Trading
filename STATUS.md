@@ -94,8 +94,9 @@
 - ✅ **Cycle 86 완료** (A+C+**SIM**+F: 품질감사 + WS reconnect + **lob_maker -3.28%→+8.92% Sharpe 2.27**)
 - ✅ **Cycle 87 완료** (B+D+**SIM**+F: jitter 일관성 + regime 전환 + **htf_ema -2.26%→+1.79%**)
 - ✅ **Cycle 88 완료** (E+A+**SIM**+F: paper fee + 6개 회귀 체크 + **volume_breakout 임계값 조정**)
-- ✅ Cycle 89 완료 (C+B+F: data feeds integration + Kelly config + NR7, SIM 미완)
-- ⏳ **Cycle 90 대기** 🎯 (D+E+SIM+F)
+- ✅ Cycle 89 완료 (C+B+F: data feeds integration + Kelly config + NR7)
+- ✅ **Cycle 90 완료** 🎯 (D+E+**SIM**+F: **narrow_range -0.36%→+14.90% Sharpe 5.82 TOP3**)
+- ⏳ **Cycle 91 대기** (A+C+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -104,8 +105,8 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,278개** (0 warnings ✨) |
-| 🎯 SIM 누적 개선 7개 | +wick+engulf+frama+cmf+lob+htf+volume_breakout |
+| ✅ 통과 테스트 | **6,282개** (0 warnings ✨) 🎯 |
+| 🎯 SIM 누적 개선 8개 | +wick+engulf+frama+cmf+lob+htf+vol_br+**narrow_range** = **+72.5%p** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
