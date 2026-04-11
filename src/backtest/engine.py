@@ -47,6 +47,11 @@ class BacktestResult:
     total_fees: float = 0.0
     total_slippage_cost: float = 0.0
     deflated_sharpe_ratio: float = 0.0  # DSR (과최적화 보정)
+    avg_win: float = 0.0  # 평균 수익 거래
+    avg_loss: float = 0.0  # 평균 손실 거래 (양수)
+    win_loss_ratio: float = 0.0  # avg_win / avg_loss
+    max_consecutive_losses: int = 0  # 최대 연속 손실
+    trades: list[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -288,6 +293,21 @@ class BacktestEngine:
         if len(trades) < MIN_TRADES:
             fail_reasons.append(f"trades {len(trades)} < {MIN_TRADES}")
 
+        # avg_win, avg_loss, win_loss_ratio 계산
+        avg_win_val = float(np.mean(wins)) if wins else 0.0
+        avg_loss_val = float(abs(np.mean(losses))) if losses else 0.0
+        win_loss_ratio_val = avg_win_val / avg_loss_val if avg_loss_val > 1e-9 else (0.0 if avg_win_val == 0.0 else float("inf"))
+        
+        # 최대 연속 손실 횟수
+        max_cons_loss = 0
+        cur_cons_loss = 0
+        for t in trades:
+            if t <= 0:
+                cur_cons_loss += 1
+                max_cons_loss = max(max_cons_loss, cur_cons_loss)
+            else:
+                cur_cons_loss = 0
+        
         return BacktestResult(
             strategy=name,
             total_trades=len(trades),
@@ -301,4 +321,9 @@ class BacktestEngine:
             total_fees=round(total_fees, 6),
             total_slippage_cost=round(total_slippage_cost, 6),
             deflated_sharpe_ratio=round(dsr, 3),
+            avg_win=round(avg_win_val, 6),
+            avg_loss=round(avg_loss_val, 6),
+            win_loss_ratio=round(win_loss_ratio_val, 3) if win_loss_ratio_val != float("inf") else float("inf"),
+            max_consecutive_losses=max_cons_loss,
+            trades=trades,  # 거래 PnL 리스트 저장
         )

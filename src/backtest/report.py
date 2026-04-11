@@ -246,6 +246,7 @@ class BacktestReport:
     def from_backtest_result(cls, result: "BacktestResult", annualization: int = 252 * 24) -> "BacktestReport":
         """
         BacktestEngine.run()이 반환한 BacktestResult를 BacktestReport로 변환.
+        BacktestResult에는 이미 avg_win, avg_loss 등의 메트릭이 계산되어 있음.
 
         Args:
             result: BacktestEngine.run() 반환값
@@ -254,11 +255,11 @@ class BacktestReport:
         recovery = result.total_return / result.max_drawdown if result.max_drawdown > 1e-9 else (float("inf") if result.total_return > 0 else 0.0)
         return cls(
             total_return=result.total_return,
-            ann_return=0.0,          # BacktestResult에 미포함 — 필요 시 from_trades() 사용
+            ann_return=0.0,          # 백테스트는 전체 기간 기반이므로 0
             ann_volatility=0.0,      # 동일
             sharpe_ratio=result.sharpe_ratio,
-            sortino_ratio=0.0,       # BacktestResult에 미포함 — 필요 시 from_trades() 사용
-            deflated_sharpe_ratio=0.0,  # BacktestResult에 미포함 — 필요 시 from_trades() 사용
+            sortino_ratio=0.0,       # trades 필요 — 필요 시 from_trades() 사용
+            deflated_sharpe_ratio=result.deflated_sharpe_ratio,
             calmar_ratio=(result.total_return / result.max_drawdown
                           if result.max_drawdown > 1e-9 else 0.0),
             recovery_factor=recovery,
@@ -266,10 +267,10 @@ class BacktestReport:
             total_trades=result.total_trades,
             win_rate=result.win_rate,
             profit_factor=result.profit_factor,
-            avg_win=0.0,
-            avg_loss=0.0,
-            win_loss_ratio=0.0,
-            max_consecutive_losses=0,
+            avg_win=result.avg_win,
+            avg_loss=result.avg_loss,
+            win_loss_ratio=result.win_loss_ratio,
+            max_consecutive_losses=result.max_consecutive_losses,
             annualization=annualization,
         )
 

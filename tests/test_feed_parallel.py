@@ -318,6 +318,59 @@ class TestFeedParallel:
 
 
 
+    def test_fetch_multiple_cache_stats_integration(self):
+        """fetch_multiple 사용 시 cache_stats가 정확히 기록되는지 검증."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 번째 fetch_multiple: 2개 심볼 → miss 2
+        symbols = ["BTC/USDT", "ETH/USDT"]
+        results1 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_first = feed.cache_stats()
+        assert stats_after_first['miss_count'] == 2, "첫 번째 호출: miss 2"
+        assert stats_after_first['hit_count'] == 0, "첫 번째 호출: hit 0"
+        assert stats_after_first['total'] == 2
+        assert stats_after_first['cached_keys'] == 2
+        
+        # 두 번째 fetch_multiple (같은 심볼): → hit 2
+        results2 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_second = feed.cache_stats()
+        assert stats_after_second['miss_count'] == 2, "두 번째 호출: miss는 여전히 2"
+        assert stats_after_second['hit_count'] == 2, "두 번째 호출: hit 2"
+        assert stats_after_second['total'] == 4
+        assert stats_after_second['cached_keys'] == 2
+        assert stats_after_second['hit_rate'] == 0.5
+
+    def test_fetch_multiple_partial_cache_hit(self):
+        """fetch_multiple에서 일부만 캐시 히트되는 경우."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 호출: BTC/USDT만 캐시
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        assert feed.cache_stats()['miss_count'] == 1
+        
+        # fetch_multiple: BTC(hit) + ETH(miss)
+        results = feed.fetch_multiple(["BTC/USDT", "ETH/USDT"], "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        assert stats['hit_count'] == 1, "BTC는 캐시 히트"
+        assert stats['miss_count'] == 2, "ETH는 새로운 미스"
+        assert stats['total'] == 3
+        assert stats['hit_rate'] == 1/3
+        assert len(results) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
@@ -325,6 +378,8 @@ if __name__ == "__main__":
 class TestErrorClassification:
     """에러 분류 (Transient vs Fatal) 테스트."""
 
+    def test_transient_network_error_retry(self):
+        """NetworkError는 transient → 재시도."""
     def test_transient_network_error_retry(self):
         """NetworkError는 transient → 재시도."""
         import ccxt
@@ -363,3 +418,55 @@ class TestErrorClassification:
         
         # 재시도하지 않음 (call_count = 1)
         assert connector.fetch_ohlcv.call_count == 1
+
+    def test_fetch_multiple_cache_stats_integration(self):
+        """fetch_multiple 사용 시 cache_stats가 정확히 기록되는지 검증."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 번째 fetch_multiple: 2개 심볼 → miss 2
+        symbols = ["BTC/USDT", "ETH/USDT"]
+        results1 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_first = feed.cache_stats()
+        assert stats_after_first['miss_count'] == 2, "첫 번째 호출: miss 2"
+        assert stats_after_first['hit_count'] == 0, "첫 번째 호출: hit 0"
+        assert stats_after_first['total'] == 2
+        assert stats_after_first['cached_keys'] == 2
+        
+        # 두 번째 fetch_multiple (같은 심볼): → hit 2
+        results2 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_second = feed.cache_stats()
+        assert stats_after_second['miss_count'] == 2, "두 번째 호출: miss는 여전히 2"
+        assert stats_after_second['hit_count'] == 2, "두 번째 호출: hit 2"
+        assert stats_after_second['total'] == 4
+        assert stats_after_second['cached_keys'] == 2
+        assert stats_after_second['hit_rate'] == 0.5
+
+    def test_fetch_multiple_partial_cache_hit(self):
+        """fetch_multiple에서 일부만 캐시 히트되는 경우."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 호출: BTC/USDT만 캐시
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        assert feed.cache_stats()['miss_count'] == 1
+        
+        # fetch_multiple: BTC(hit) + ETH(miss)
+        results = feed.fetch_multiple(["BTC/USDT", "ETH/USDT"], "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        assert stats['hit_count'] == 1, "BTC는 캐시 히트"
+        assert stats['miss_count'] == 2, "ETH는 새로운 미스"
+        assert stats['total'] == 3
+        assert stats['hit_rate'] == 1/3
+        assert len(results) == 2
