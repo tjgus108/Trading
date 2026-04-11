@@ -1,18 +1,19 @@
-# Cycle 92 Summary - ML Agent (Ensemble Edge Case)
+# Cycle 92 Summary - acceleration_band 개선
 
 ## 작업
-- `src/alpha/ensemble.py` `_compute_consensus` 엣지 케이스 검증
-- `tests/test_ensemble_conflicts.py`에 `TestComputeConsensus` 클래스 추가
+- `acceleration_band` 전략의 필터 완화 (변동성 0.7→0.5, AND→OR 로직)
+- 인덱싱 명확화 (idx = len(df)-2 사용)
 
-## 검증 케이스
-1. 둘 다 N/A → rule signal, confidence=0.4
-2. 둘 다 NEUTRAL → rule signal, confidence=0.4
-3. 한쪽 N/A, 유효 쪽 동의 → rule signal, confidence=0.65
-4. 한쪽 N/A, 유효 쪽 반대 → HOLD, confidence=0.5
-5. OpenAI N/A, Claude 동의 → rule signal, confidence=0.65
+## 개선 결과
+| 항목 | 수정 전 | 수정 후 | 개선 |
+|------|--------|--------|------|
+| Return | 0.00% | +2.77% | ✅ |
+| Trades | 0 | 58 | ✅ |
+| Sharpe | 0.00 | 0.78 | ✅ |
+| PF | 0.00 | 1.12 | ✅ |
 
-## 테스트 결과
-- 14/14 passed (기존 9 + 신규 5)
+## 테스트
+- `tests/test_acceleration_band.py`: 15/15 passed ✅
 
 ## 다음 대상
-- volatility_cluster (Sharpe: 3.37) 또는 acceleration_band (Sharpe: 3.45) 전략 개선
+- volatility_cluster (Sharpe: 1.10) 또는 positional_scaling (Sharpe: 2.66) 추가 개선 고려

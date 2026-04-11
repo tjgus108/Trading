@@ -1,11 +1,11 @@
 """
 AccelerationBandStrategy: Headley Acceleration Bands 돌파 전략.
-개선: 추세 필터 + 변동성 확인 + 신호 강화
+개선: 추세 필터 + 변동성 확인 + 신호 강화 (필터 완화)
 - upper = sma20 * (1 + 4 * sma20((high-low)/(high+low)))
 - lower = sma20 * (1 - 4 * sma20((high-low)/(high+low)))
-- BUY:  close crosses above upper + trend_up + vol_ok → HIGH
-- SELL: close crosses below lower + trend_down + vol_ok → HIGH
-- confidence: HIGH if (crossover + strong trend)
+- BUY:  close crosses above upper + (trend_up OR vol_ok) → MEDIUM+
+- SELL: close crosses below lower + (trend_down OR vol_ok) → MEDIUM+
+- confidence: HIGH if (crossover + trend + vol)
 - 최소 행: 25
 """
 
@@ -43,6 +43,7 @@ class AccelerationBandStrategy(BaseStrategy):
         upper = sma * (1 + 4 * hl_sma)
         lower = sma * (1 - 4 * hl_sma)
 
+        # 신호는 -2에서 발생, 현재는 -1
         idx = len(df) - 2
         close_now = float(df["close"].iloc[idx])
         close_prev = float(df["close"].iloc[idx - 1])
@@ -58,12 +59,12 @@ class AccelerationBandStrategy(BaseStrategy):
         trend_up = close_now >= high_14 * 0.98
         trend_down = close_now <= low_14 * 1.02
 
-        # 변동성 필터: 최근 10개 캔들의 평균 변동성
+        # 변동성 필터 완화: 최근 10개 캔들의 평균 변동성
         vol_lookback = min(10, len(df) - 1)
         recent_range = (df["high"].iloc[-vol_lookback - 1:-1].max() - 
                        df["low"].iloc[-vol_lookback - 1:-1].min())
         current_range = df["high"].iloc[idx] - df["low"].iloc[idx]
-        vol_ok = current_range > recent_range * 0.7  # 현재 범위가 평균의 70% 이상
+        vol_ok = current_range > recent_range * 0.5  # 이전 필터: 0.7 → 완화: 0.5
 
         # 밴드 폭 강도
         band_width = (upper_now - lower_now) / close_now if close_now > 0 else 0
@@ -74,12 +75,13 @@ class AccelerationBandStrategy(BaseStrategy):
             f"trend_up={trend_up} trend_down={trend_down} vol_ok={vol_ok} band_width={band_width:.4f}"
         )
 
-        # BUY: close crosses above upper + trend_up + vol_ok
-        if close_prev <= upper_prev and close_now > upper_now and trend_up and vol_ok:
-            # HIGH confidence if 강한 돌파 + 강한 밴드
+        # BUY: close crosses above upper + (trend_up OR vol_ok)
+        # 필터 완화: 추세 또는 변동성 중 하나만 필요
+        if close_prev <= upper_prev and close_now > upper_now and (trend_up or vol_ok):
+            # HIGH confidence if 강한 돌파 + 강한 밴드 + 추세
             confidence = (
                 Confidence.HIGH 
-                if (close_now > upper_now * _HIGH_CONF_MARGIN and strong_band)
+                if (close_now > upper_now * _HIGH_CONF_MARGIN and strong_band and trend_up)
                 else Confidence.MEDIUM
             )
             return Signal(
@@ -88,7 +90,7 @@ class AccelerationBandStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close_now,
                 reasoning=(
-                    f"Upper band breakout (trend+vol): close={close_now:.2f} > upper={upper_now:.2f}, "
+                    f"Upper band breakout (trend OR vol): close={close_now:.2f} > upper={upper_now:.2f}, "
                     f"trend_up={trend_up}, vol_ok={vol_ok}, band_width={band_width:.4f}"
                 ),
                 invalidation=f"close <= upper={upper_now:.2f}",
@@ -96,12 +98,13 @@ class AccelerationBandStrategy(BaseStrategy):
                 bear_case=context,
             )
 
-        # SELL: close crosses below lower + trend_down + vol_ok
-        if close_prev >= lower_prev and close_now < lower_now and trend_down and vol_ok:
-            # HIGH confidence if 강한 돌파 + 강한 밴드
+        # SELL: close crosses below lower + (trend_down OR vol_ok)
+        # 필터 완화: 추세 또는 변동성 중 하나만 필요
+        if close_prev >= lower_prev and close_now < lower_now and (trend_down or vol_ok):
+            # HIGH confidence if 강한 돌파 + 강한 밴드 + 추세
             confidence = (
                 Confidence.HIGH 
-                if (close_now < lower_now / _HIGH_CONF_MARGIN and strong_band)
+                if (close_now < lower_now / _HIGH_CONF_MARGIN and strong_band and trend_down)
                 else Confidence.MEDIUM
             )
             return Signal(
@@ -110,7 +113,7 @@ class AccelerationBandStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close_now,
                 reasoning=(
-                    f"Lower band breakout (trend+vol): close={close_now:.2f} < lower={lower_now:.2f}, "
+                    f"Lower band breakout (trend OR vol): close={close_now:.2f} < lower={lower_now:.2f}, "
                     f"trend_down={trend_down}, vol_ok={vol_ok}, band_width={band_width:.4f}"
                 ),
                 invalidation=f"close >= lower={lower_now:.2f}",
@@ -126,7 +129,7 @@ class AccelerationBandStrategy(BaseStrategy):
             reasoning=(
                 f"No crossover or filters failed: "
                 f"crossover={close_prev <= upper_prev and close_now > upper_now or close_prev >= lower_prev and close_now < lower_now}, "
-                f"trend_up={trend_up}, trend_down={trend_down}, vol_ok={vol_ok}"
+                f"trend_or_vol={(trend_up or trend_down or vol_ok)}"
             ),
             invalidation="",
             bull_case=context,
