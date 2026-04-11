@@ -157,3 +157,26 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [FinRL Ensemble 2023/2024 — arXiv](https://arxiv.org/html/2501.10709v1)
 - [Ensemble Deep RL for Trading — Springer](https://link.springer.com/chapter/10.1007/978-3-031-61037-0_9)
 - [Overfitting in Crypto Strategies — TrendRider](https://trendrider.net/blog/how-to-avoid-overfitting-crypto-trading)
+
+
+## [2026-04-11] Cycle 6 — Regime Detection Pitfalls
+
+### 레짐 감지 실전 함정
+
+- **전환 지연(Lag)**: HMM은 충분한 관측값이 쌓여야 레짐 전환을 확정 — 이미 절반이상 움직인 뒤에 신호가 나옴. 고빈도 크립토에서 치명적.
+- **상태 수 결정 문제**: 너무 많으면 노이즈를 레짐으로 학습(과적합), 너무 적으면 전환을 못 잡음. AIC/BIC 기준도 주관성 완전히 제거 불가.
+- **정규분포 가정 위반**: HMM 내부는 수익률이 정규 분포라고 가정하지만, 크래시(October 2025 등) 시 팻테일 발생 → 레짐 분류 오작동.
+- **Markov 가정 한계**: 미래 상태가 오직 현재 상태에만 의존한다고 가정 — 장기 기억(momentum) 구간이 많은 크립토에서 구조적으로 맞지 않음.
+- **OOS 성능 붕괴**: 훈련 기간에 없는 새 레짐(예: 기관 ETF 유입 이후 구조 변화)에서 모델이 기존 레짐으로 잘못 분류.
+
+### 크립토 특화 주의점
+
+- **레짐 지속 시간이 극단적으로 짧음**: 주식 시장 기준으로 설계된 HMM은 크립토의 며칠 단위 급등락을 하나의 안정적 레짐으로 처리하지 못함.
+- **외생 변수 선택 어려움**: 볼륨·온체인 지표 등이 크립토 레짐에 영향을 미치지만, 2024년 이후 기관 ETF 거래량이 지배하면서 기존 온체인 변수의 예측력이 약화.
+- **변동성 클러스터링 + 레짐 혼동**: GARCH 기반 변동성 클러스터링은 레짐 전환이 아닌 단순 ATR 스파이크를 레짐 변화로 오인하게 만들 수 있음 — 레짐 레이블 신뢰도 훼손.
+
+### 참고
+
+- [Regime Switching Forecasting for Cryptos — Springer Digital Finance](https://link.springer.com/article/10.1007/s42521-024-00123-2)
+- [HMM Market Regime Pitfalls — QuantifiedStrategies](https://www.quantifiedstrategies.com/hidden-markov-model-market-regimes-how-hmm-detects-market-regimes-in-trading-strategies/)
+- [Bitcoin HMM Analysis 2024-2026 — Preprints.org](https://www.preprints.org/manuscript/202603.0831)

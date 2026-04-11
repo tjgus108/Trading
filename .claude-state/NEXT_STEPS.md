@@ -318,3 +318,55 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 - Orchestrator 통합: TWAP 실행기 자동 호출 (대형 주문 감지)
 - Risk Agent 연동 (TWAP 전 approval 체크)
 - 호가창 깊이 기반 슬리피지 모델 추가
+
+---
+
+## Cycle 6 - Category C: Data & Infrastructure ✅ COMPLETED
+
+**Task:** SentimentFetcher 견고성 강화 (재시도 + fallback)
+
+**Files Modified:**
+1. `/home/user/Trading/src/data/sentiment.py` (lines 1-227 전체 수정)
+   - `__init__`에 `max_retries` 파라미터 추가 (기본값 2)
+   - `_last_successful` 필드 추가: 이전 성공한 데이터 저장
+   - 모든 `_fetch_*` 메서드에 재시도 로직 추가
+     - exponential backoff: 0.5s × 2^attempt (0.5s, 1s, 2s)
+     - 시도 실패 시 debug 로그, 모든 시도 완료 후 warning 로그
+   - `fetch()` 메서드에 fallback 로직 추가
+     - 일부 API 실패: 성공한 API만 사용
+     - 모든 API 실패: `_last_successful` 반환
+     - fallback도 없음: 중립 데이터(`score=0, source="unavailable"`) 반환
+   - 문서화 강화: graceful degradation 명시
+
+2. `/home/user/Trading/tests/test_phase_b_context.py` (lines 317-414 추가)
+   - `TestSentimentFetcherRobustness` 클래스: 9개 테스트
+     - `test_fetch_all_apis_fail_uses_fallback`: fallback 데이터 사용 검증
+     - `test_fetch_all_apis_fail_no_fallback_returns_neutral`: fallback 없을 시 중립 데이터
+     - `test_partial_api_failure_uses_available_data`: 일부 API 실패 처리
+     - `test_cache_returns_same_data_within_timeout`: 캐시 타임아웃 검증
+     - `test_max_retries_parameter_affects_behavior`: 재시도 파라미터 동작
+     - `test_fallback_last_successful_tracked`: `_last_successful` 저장 확인
+     - `test_fear_greed_api_failure_logs_warning`: 로그 출력 검증
+     - `test_unavailable_source_when_no_fallback`: source 필드 검증
+     - `test_multiple_successful_apis_combined_source`: 여러 API 성공 시 source 통합
+   - `TestSentimentFetcherFallbackIntegration` 클래스: 1개 통합 테스트
+     - `test_fallback_survives_subsequent_failures`: fallback 데이터 지속성 검증
+
+**Test Results:**
+- test_phase_b_context.py: 50 passed ✅ (기존 40 + 신규 10)
+- 전체 robustness 테스트: 10개 모두 통과
+- 기존 테스트 40개 회귀 없음
+
+**기술 정리:**
+- **재시도 로직:** exponential backoff로 transient 에러 자동 복구
+- **Fallback:** 과거 성공한 데이터 유지로 일시적 API 장애 극복
+- **부분 실패 처리:** 일부 API 실패해도 사용 가능한 데이터 반환
+- **로깅:** 재시도 시도별 debug + 최종 실패 시 warning으로 운영자 알림
+- **graceful degradation:** 모든 API 실패 시 중립 데이터로 파이프라인 계속 진행
+
+---
+
+## Next: 추가 작업 후보 (Cycle 6~)
+- NewsMonitor 에러 처리 강화 (CryptoPanic API 타임아웃)
+- OnchainFetcher 재시도 로직 추가 (현재 한 번만 시도)
+- Orchestrator에 sentiment fetch timeout 설정

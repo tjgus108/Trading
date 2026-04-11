@@ -4,7 +4,7 @@ B1. SentimentFetcher: Fear & Greed Index + 펀딩비/Open Interest 수집.
 데이터 소스:
   - Fear & Greed: alternative.me (무료, HTTPS GET)
   - 펀딩비/OI: ccxt (거래소 연결 있을 때) 또는 Binance REST API
-  - 연결 실패 시 score=0 반환 — 파이프라인 블록 절대 금지
+  - 연결 실패 시 graceful degradation: fallback 데이터 또는 중립 점수 반환
 
 sentiment-agent가 이 모듈을 사용한다.
 """
@@ -49,20 +49,31 @@ class SentimentData:
 
 class SentimentFetcher:
     """
-    감성 데이터 수집기.
+    감성 데이터 수집기 (재시도 + fallback 지원).
 
     fetch()로 최신 SentimentData 반환.
-    API 실패 시 score=0인 중립 데이터 반환 (예외 없음).
+    - API 성공 시: 실제 데이터 반환
+    - 일부 API 실패: 성공한 API 데이터 사용
+    - 모든 API 실패: fallback(이전 성공 데이터) 또는 중립 데이터 반환
+    
+    파이프라인 블록 절대 금지.
     """
 
-    def __init__(self, symbol: str = "BTCUSDT", use_cache_seconds: int = 300):
+    def __init__(self, symbol: str = "BTCUSDT", use_cache_seconds: int = 300, max_retries: int = 2):
         self.symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
         self.use_cache_seconds = use_cache_seconds
+        self.max_retries = max_retries  # 각 API별 최대 재시도 횟수
         self._cache: Optional[SentimentData] = None
         self._cache_time: float = 0.0
+        self._last_successful: Optional[SentimentData] = None  # 이전 성공한 데이터
 
     def fetch(self) -> SentimentData:
-        """최신 감성 데이터 반환. cache_seconds 내 재호출 시 캐시 반환."""
+        """최신 감성 데이터 반환. cache_seconds 내 재호출 시 캐시 반환.
+        
+        모든 API 실패 시:
+        1. 이전 성공한 데이터 반환 (fallback)
+        2. 그것도 없으면 중립 데이터 반환 (score=0)
+        """
         now = time.time()
         if self._cache and (now - self._cache_time) < self.use_cache_seconds:
             return self._cache
@@ -77,16 +88,35 @@ class SentimentFetcher:
             source_parts.append("alternative.me")
         if funding_rate is not None:
             source_parts.append("binance_futures")
-        source = ",".join(source_parts) if source_parts else "mock"
-
-        data = SentimentData(
-            fear_greed_index=fear_greed,
-            fear_greed_label=fg_label,
-            funding_rate=funding_rate,
-            open_interest=open_interest,
-            sentiment_score=score,
-            source=source,
-        )
+        
+        if source_parts:
+            # 최소 하나의 API 성공
+            source = ",".join(source_parts)
+            data = SentimentData(
+                fear_greed_index=fear_greed,
+                fear_greed_label=fg_label,
+                funding_rate=funding_rate,
+                open_interest=open_interest,
+                sentiment_score=score,
+                source=source,
+            )
+            self._last_successful = data  # 성공한 데이터 저장
+        else:
+            # 모든 API 실패 - fallback 사용
+            if self._last_successful:
+                logger.warning("All sentiment APIs failed, using fallback data from %s", self._last_successful.source)
+                data = self._last_successful
+            else:
+                logger.warning("All sentiment APIs failed, no fallback available. Returning neutral.")
+                data = SentimentData(
+                    fear_greed_index=None,
+                    fear_greed_label="N/A",
+                    funding_rate=None,
+                    open_interest=None,
+                    sentiment_score=0.0,
+                    source="unavailable",
+                )
+        
         self._cache = data
         self._cache_time = now
         logger.info(data.summary())
@@ -106,45 +136,60 @@ class SentimentFetcher:
         )
 
     # ------------------------------------------------------------------
-    # Internal fetchers (각각 독립 실패 처리)
+    # Internal fetchers (각각 독립 실패 처리 + 재시도)
     # ------------------------------------------------------------------
 
     def _fetch_fear_greed(self) -> tuple[Optional[int], str]:
-        try:
-            req = urllib.request.Request(
-                FEAR_GREED_URL,
-                headers={"User-Agent": "TradingBot/1.0"},
-            )
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            value = int(data["data"][0]["value"])
-            label = data["data"][0]["value_classification"]
-            return value, label
-        except Exception as e:
-            logger.debug("Fear&Greed fetch failed: %s", e)
-            return None, "N/A"
+        for attempt in range(self.max_retries + 1):
+            try:
+                req = urllib.request.Request(
+                    FEAR_GREED_URL,
+                    headers={"User-Agent": "TradingBot/1.0"},
+                )
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    data = json.loads(resp.read())
+                value = int(data["data"][0]["value"])
+                label = data["data"][0]["value_classification"]
+                return value, label
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.debug("Fear&Greed fetch attempt %d/%d failed: %s", attempt + 1, self.max_retries + 1, e)
+                    time.sleep(0.5 * (2 ** attempt))  # exponential backoff: 0.5s, 1s, 2s
+                else:
+                    logger.warning("Fear&Greed fetch failed after %d attempts: %s", self.max_retries + 1, e)
+        return None, "N/A"
 
     def _fetch_funding_rate(self) -> Optional[float]:
-        try:
-            url = BINANCE_FUNDING_URL.format(symbol=self.symbol)
-            req = urllib.request.Request(url, headers={"User-Agent": "TradingBot/1.0"})
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            return float(data.get("lastFundingRate", 0))
-        except Exception as e:
-            logger.debug("Funding rate fetch failed: %s", e)
-            return None
+        for attempt in range(self.max_retries + 1):
+            try:
+                url = BINANCE_FUNDING_URL.format(symbol=self.symbol)
+                req = urllib.request.Request(url, headers={"User-Agent": "TradingBot/1.0"})
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    data = json.loads(resp.read())
+                return float(data.get("lastFundingRate", 0))
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.debug("Funding rate fetch attempt %d/%d failed: %s", attempt + 1, self.max_retries + 1, e)
+                    time.sleep(0.5 * (2 ** attempt))
+                else:
+                    logger.warning("Funding rate fetch failed after %d attempts: %s", self.max_retries + 1, e)
+        return None
 
     def _fetch_open_interest(self) -> Optional[float]:
-        try:
-            url = BINANCE_OI_URL.format(symbol=self.symbol)
-            req = urllib.request.Request(url, headers={"User-Agent": "TradingBot/1.0"})
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            return float(data.get("openInterest", 0))
-        except Exception as e:
-            logger.debug("Open Interest fetch failed: %s", e)
-            return None
+        for attempt in range(self.max_retries + 1):
+            try:
+                url = BINANCE_OI_URL.format(symbol=self.symbol)
+                req = urllib.request.Request(url, headers={"User-Agent": "TradingBot/1.0"})
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    data = json.loads(resp.read())
+                return float(data.get("openInterest", 0))
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.debug("Open Interest fetch attempt %d/%d failed: %s", attempt + 1, self.max_retries + 1, e)
+                    time.sleep(0.5 * (2 ** attempt))
+                else:
+                    logger.warning("Open Interest fetch failed after %d attempts: %s", self.max_retries + 1, e)
+        return None
 
     def _compute_score(self, fg: Optional[int], fr: Optional[float]) -> float:
         """종합 감성 점수 [-3, +3]. 높을수록 강세."""
