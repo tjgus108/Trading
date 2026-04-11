@@ -192,3 +192,34 @@ def test_set_weekly_start_resets_tracking():
     status = m.update(9000)     # 9200 대비 ~2.2% — 주간 한계 미만
     assert status.halted is False
     assert abs(status.weekly_drawdown_pct - (9200 - 9000) / 9200) < 1e-6
+
+
+# ── 기간별 granularity 추가 테스트 ───────────────────────────
+
+def test_monthly_drawdown_pct_without_daily_weekly_start():
+    """월간 기준만 설정 시 daily/weekly_dd=0, monthly_dd만 계산."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_monthly_start(10000)
+    # daily_start, weekly_start 미설정
+    status = m.update(9000)   # 월간 10% 낙폭 — 한계 미만
+    assert status.daily_drawdown_pct == 0.0
+    assert status.weekly_drawdown_pct == 0.0
+    assert abs(status.monthly_drawdown_pct - 0.10) < 1e-6
+    assert status.halted is False
+
+
+def test_reset_clears_all_period_starts():
+    """reset() 호출 후 기간별 기준 잔고가 모두 초기화된다."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+    m.update(8000)   # 모든 기간 한계 초과 → FORCE_LIQUIDATE
+    assert m.is_halted()
+
+    m.reset()
+    status = m.update(9500)   # reset 후 기준 없으므로 기간별 dd=0
+    assert status.halted is False
+    assert status.daily_drawdown_pct == 0.0
+    assert status.weekly_drawdown_pct == 0.0
+    assert status.monthly_drawdown_pct == 0.0

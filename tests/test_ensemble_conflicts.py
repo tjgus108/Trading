@@ -1,8 +1,9 @@
 """
 EnsembleSignal.conflicts_with() 엣지 케이스 테스트.
+_compute_consensus: both-fail / one-fail edge cases.
 """
 import pytest
-from src.alpha.ensemble import EnsembleSignal
+from src.alpha.ensemble import EnsembleSignal, MultiLLMEnsemble
 
 
 def make_signal(consensus: str, confidence: float) -> EnsembleSignal:
@@ -73,3 +74,46 @@ class TestConflictsWith:
         sig = make_signal("NEUTRAL", 0.95)
         assert sig.conflicts_with("BUY") is False
         assert sig.conflicts_with("SELL") is False
+
+
+class TestComputeConsensus:
+    """_compute_consensus 직접 검증 (no API 호출)."""
+
+    def _ensemble(self):
+        """API 키 없이 인스턴스 생성 — neutral 모드."""
+        return MultiLLMEnsemble(use_openai=False)
+
+    def test_both_fail_returns_rule_with_low_confidence(self):
+        """Claude + OpenAI 둘 다 N/A → rule signal, confidence=0.4."""
+        e = self._ensemble()
+        consensus, conf = e._compute_consensus("BUY", "N/A", "N/A")
+        assert consensus == "BUY"
+        assert conf == 0.4
+
+    def test_both_neutral_returns_rule_with_low_confidence(self):
+        """NEUTRAL은 N/A와 동일 처리 → rule signal, confidence=0.4."""
+        e = self._ensemble()
+        consensus, conf = e._compute_consensus("SELL", "NEUTRAL", "NEUTRAL")
+        assert consensus == "SELL"
+        assert conf == 0.4
+
+    def test_one_fail_agrees_with_rule(self):
+        """한쪽 N/A, 나머지가 rule과 동의 → rule signal, confidence=0.65."""
+        e = self._ensemble()
+        consensus, conf = e._compute_consensus("BUY", "BUY", "N/A")
+        assert consensus == "BUY"
+        assert conf == 0.65
+
+    def test_one_fail_disagrees_with_rule(self):
+        """한쪽 N/A, 나머지가 반대 의견 → HOLD, confidence=0.5."""
+        e = self._ensemble()
+        consensus, conf = e._compute_consensus("BUY", "SELL", "N/A")
+        assert consensus == "HOLD"
+        assert conf == 0.5
+
+    def test_openai_fail_claude_agrees(self):
+        """OpenAI N/A, Claude가 rule 동의 → rule signal, confidence=0.65."""
+        e = self._ensemble()
+        consensus, conf = e._compute_consensus("SELL", "N/A", "SELL")
+        assert consensus == "SELL"
+        assert conf == 0.65

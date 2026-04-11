@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 91 — 2026-04-11T17:52:46.298804Z
+🔄 CYCLE 92 — 2026-04-11T18:04:04.130376Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 89 COMPLETED — C + B + F (SIM 미완)** (2026-04-12 10:35 UTC)
-  **[C] Data:** tests/test_data_feeds_integration.py 신규 +9. 4개 피드 동시 초기화, 혼합 상태, 병렬 fetch 시뮬.
-  **[B] Risk:** Kelly sizer config 매핑 검증. max_drawdown 정상, risk_per_trade는 max_fraction으로 명시 전달 필요 (정책 이슈 발견).
-  **[SIM] 미완:** 에이전트가 시뮬만 돌리고 실제 개선 못함. 다음 사이클에서 재시도.
-  **[F] Research:** NR7 효과성. 단독 CAGR 7.8%/승률 57% 보통. ATR 수축 + 볼륨 확인 + 돌파 방향 필터 조합 필수.
+**Cycle 91 COMPLETED — A + C + SIM + F** (2026-04-12 11:40 UTC)
+  **[A] Quality:** 8개 SIM 개선 전략 회귀 체크 — 7 pass, narrow_range 테스트 파일 없음 (별도 추가 필요).
+  **[C] Data:** tests/test_sentiment.py +2. 단일 소스 실패 시 graceful, 전체 실패 시 중립 반환.
+  **[SIM] No-op:** roc_ma_cross 3가지 개선 시도했으나 원본이 이미 최적화 (Sharpe 2.985 PASS). 추가 조정 시 오히려 저하.
+  **[F] Research:** Q2 2026. AI 모멘텀 + 리스크 관리 필수. 레짐 감지 + 전략 전환 구조.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
