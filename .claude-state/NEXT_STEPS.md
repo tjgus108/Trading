@@ -1,3 +1,18 @@
+# Cycle 87 - Regime Adaptive 전략 검증 완료
+
+## 결과
+- `test_regime_switch_low_confidence` PASS: 레짐 전환 시 confidence=LOW 정상 동작
+- `test_generate_bull_regime` PASS: bull 레짐에서 SELL 신호 차단 정상 동작
+
+### 검증 파일
+- `/home/user/Trading/src/strategy/regime_adaptive.py` (수정 없음)
+- `/home/user/Trading/tests/test_regime_adaptive.py`
+
+## 다음 사이클
+- lob_maker Profit Factor 1.5 이상 개선 고려
+- engulfing_zone 전략 개선
+
+---
 # Cycle 86 - lob_maker 개선 완료
 
 ## 결과

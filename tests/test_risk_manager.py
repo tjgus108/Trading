@@ -760,3 +760,42 @@ def test_atr_extremely_large_blocked():
     assert result.status == RiskStatus.BLOCKED
     assert result.position_size is None
     assert "zero" in result.reason.lower() or "ATR" in result.reason
+
+
+# ── Jitter seed consistency ───────────────────────────────────────────────────
+
+def test_jitter_same_seed_same_sequence():
+    """같은 seed로 반복 호출 시 동일한 position_size 시퀀스를 반환한다."""
+    import random as _random
+
+    rm = _make_rm(jitter_pct=0.05)
+
+    _random.seed(42)
+    run1 = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(5)
+    ]
+
+    _random.seed(42)
+    run2 = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(5)
+    ]
+
+    assert run1 == run2, f"seed=42 두 번 실행 결과가 다름: {run1} vs {run2}"
+
+
+def test_jitter_zero_no_variation_across_seeds():
+    """jitter_pct=0.0 이면 seed와 무관하게 항상 같은 position_size."""
+    import random as _random
+
+    rm = _make_rm(jitter_pct=0.0)
+
+    results = []
+    for seed in (0, 1, 99, 12345):
+        _random.seed(seed)
+        results.append(
+            rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        )
+
+    assert len(set(results)) == 1, f"jitter=0인데 seed마다 값이 다름: {results}"
