@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 47 — 2026-04-11T09:21:19.698738Z
+🔄 CYCLE 48 — 2026-04-11T09:24:21.302445Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 46 COMPLETED — A + C + F** (2026-04-11 17:35 UTC)
-  **[A] Quality:** dashboard.py stop()에 server_close() 추가로 socket 정리. pytest.ini ResourceWarning 필터. 경고 6 → 0.
-  **[C] Data:** tests/test_feed_parallel.py +2 TTL 경계 (59s 히트, 60s 만료 미스). Mock time 활용.
-  **[F] Research:** 세금 이슈. 미국 Form 1099-DA 2025 도입, 단기 10-37%. 한국 2027 연기, 연 250만원 초과 22% 분리과세. 고빈도 봇은 세금 소프트웨어 필수.
-  **Tests:** 6072 passed, **0 warnings** (+2 from Cycle 45).
+**Cycle 47 COMPLETED — B + D + F** (2026-04-11 17:55 UTC)
+  **[B] Risk:** tests/test_kelly_twap.py +2 경계. half_kelly > max_dd_constrained 시 제약 적용, 경계 동일값 시 변화 없음.
+  **[D] ML:** tests/test_ensemble_conflicts.py 신규 +9. conflicts_with() action=HOLD 시 None 안전 처리, confidence 경계 0.7 정확 동작.
+  **[F] Research:** 과적합 검증 신기법. CPCV(Combinatorial Purged CV)가 PBO/DSR 대비 OOS 우위. White's Reality Check는 열위. PBO+DSR 유지 + CPCV 보완 권장.
+  **Tests:** 6083 passed (+11 from Cycle 46).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

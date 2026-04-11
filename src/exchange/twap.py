@@ -31,6 +31,7 @@ class TWAPResult:
     dry_run: bool
     partial_fills: int = 0  # 부분 체결된 슬라이스 개수
     timeout_occurred: bool = False  # 타임아웃 여부
+    avg_execution_time: float = 0.0  # 슬라이스당 평균 실행 시간 (초)
 
 
 class TWAPExecutor:
@@ -84,9 +85,11 @@ class TWAPExecutor:
         filled_quantities: list[float] = []
         partial_fills = 0
         timeout_occurred = False
+        slice_times: list[float] = []
         start_time = time.time()
 
         for i in range(self.n_slices):
+            _slice_t0 = time.time()
             # 타임아웃 체크
             if self.timeout_per_slice is not None:
                 elapsed = time.time() - start_time
@@ -181,6 +184,7 @@ class TWAPExecutor:
                     timeout_occurred = True
                     break
 
+            slice_times.append(time.time() - _slice_t0)
             # 마지막 슬라이스 후에는 대기 없음
             if i < self.n_slices - 1 and not self.dry_run:
                 time.sleep(self.interval_seconds)
@@ -192,6 +196,8 @@ class TWAPExecutor:
         total_filled = sum(filled_quantities) if filled_quantities else 0.0
         slippage = self.estimate_slippage(total_filled, price_limit or avg_price)
 
+        avg_exec_time = float(np.mean(slice_times)) if slice_times else 0.0
+
         return TWAPResult(
             slices_executed=len(filled_prices),
             avg_price=avg_price,
@@ -201,6 +207,7 @@ class TWAPExecutor:
             dry_run=self.dry_run,
             partial_fills=partial_fills,
             timeout_occurred=timeout_occurred,
+            avg_execution_time=avg_exec_time,
         )
 
     def estimate_slippage(

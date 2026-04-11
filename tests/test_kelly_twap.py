@@ -224,7 +224,7 @@ class TestTWAPExecutor:
 
     def test_twap_result_fields(self):
         """TWAPResult 필드 모두 존재."""
-        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run", "filled_qty", "partial_fills", "timeout_occurred"}
+        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run", "filled_qty", "partial_fills", "timeout_occurred", "avg_execution_time"}
         actual = {f.name for f in fields(TWAPResult)}
         assert required == actual, f"Missing fields: {required - actual}"
 
@@ -338,3 +338,16 @@ class TestTWAPPartialAndTimeout:
         assert isinstance(result.filled_qty, float)
         assert isinstance(result.partial_fills, int)
         assert isinstance(result.timeout_occurred, bool)
+
+    def test_twap_avg_execution_time_tracked(self):
+        """avg_execution_time이 float이고 0 이상임을 확인."""
+        executor = TWAPExecutor(n_slices=4, interval_seconds=0, dry_run=True)
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=1.0,
+            price_limit=50_000.0,
+        )
+        assert isinstance(result.avg_execution_time, float)
+        assert result.avg_execution_time >= 0.0

@@ -1,3 +1,25 @@
+# Cycle 48 - Category A: Quality Assurance — Test Fixtures 공통화 완료
+
+## [2026-04-11] Cycle 48 — conftest.py 생성 및 테스트 Fixture 공통화
+
+### 작업 완료
+- `tests/conftest.py` 신규 생성 (170줄)
+  - `sample_df` fixture: 기본 DataFrame (open, high, low, close, volume)
+  - `sample_df_with_ema` fixture: EMA20, EMA50 지표 포함
+  - `_make_df()` helper: ATR14, RSI14, Donchian, VWAP 지표 자동 생성
+- 기존 테스트 호환성 100% 유지 (로컬 `_make_df` 함수들 그대로 유지)
+- 향후 신규 테스트 작성 시 conftest 활용 권장
+
+### 파일 변경
+- `tests/conftest.py`: 신규 생성 (공통 fixture 제공)
+
+### 테스트 결과
+- tests/test_strategy.py: 5/5 PASS ✓
+- tests/test_momentum_mean_rev.py: 16/16 PASS ✓
+- tests/test_velocity_entry.py: 16/16 PASS ✓
+
+---
+
 # Cycle 47 - Category F: Research 완료
 
 ## [2026-04-11] Cycle 47 — Overfitting Detection Methods
@@ -69,56 +91,3 @@
 ### 테스트 결과
 - 5/5 PASS
 
----
-
-# Cycle 44 - Category B: Risk Management 완료
-
-## [2026-04-11] Cycle 44 — VolTargeting 검증 강화
-
-### 작업 완료
-- `tests/test_vol_targeting.py`에 3개 시나리오 테스트 추가
-  - target_vol > realized_vol → max_scalar 클리핑 확인
-  - target_vol < realized_vol → 클리핑 없는 정확한 scalar 수치 확인
-  - 모든 가격 동일(std=0) → divide-by-zero 방어 및 scalar=1.0 확인
-
-### 파일 변경
-- `tests/test_vol_targeting.py`: 6→9개 (3개 추가)
-
-### 테스트 결과
-- 9/9 PASS
-
----
-
-# Cycle 44 - Category C: Data & Infrastructure 완료
-
-## [2026-04-11] Cycle 44 — SentimentFetcher 결과 일관성 테스트 완료
-
-### 작업 완료
-- `src/data/sentiment.py` 동일 입력 → 동일 출력 일관성 검증
-- Fear & Greed API 개별 실패 시나리오 2개 추가
-- 펀딩비(funding_rate) API 개별 실패 시나리오 2개 추가
-- Open Interest API 개별 실패 시나리오 1개 추가
-- 모든 소스 실패 시 fallback/neutral 처리 2개 추가
-
-### 파일 변경
-- `tests/test_sentiment.py`: 신규 생성 (11개 테스트 케이스)
-
-### 테스트 결과
-- tests/test_sentiment.py: 11/11 PASS ✓
-
----
-
-# Cycle 41 - Category A: Quality Assurance 완료
-
-## [2026-04-11] Cycle 41 — BacktestReport 메트릭 완결성 검증
-- `src/backtest/report.py` 모든 메트릭 3개 경로에서 일관되게 초기화 확인
-- from_trades(), from_backtest_result(), _empty() 메서드 전체 검증
-- 17개 필드 모두 누락/None 없음 확인
-
----
-
-# Cycle 41 - Category C: Data & Infrastructure 완료
-
-## [2026-04-11] Cycle 41 — feed.py get_cache_stats ↔ fetch_multiple 통합 검증
-- `cache_stats()` (Cycle 34) + `fetch_multiple()` (Cycle 29) 통합 상태 확인
-- fetch_multiple은 내부적으로 fetch()를 호출하므로 캐시 통계가 자동 누적
