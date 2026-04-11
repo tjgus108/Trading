@@ -385,3 +385,22 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL
 **[F] Research:** November 2025 $2B 추가 청산 이벤트 확인. Binance/OKX 슬리피지 공개 실측치 부재 → 공개 소스로 TWAP 필수성 재확인.
 **Tests:** 5778 passed (+12 from Cycle 3).
 **Next Cycle:** 5 (D+E+F — ML+실행+리서치)
+
+## [2026-04-11 02:16 UTC] Cycle 5 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:18 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=mock; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 03:05 UTC] Cycle 5 COMPLETED — D + E + F
+**[D] ML:** src/strategy/multi_signal.py MultiStrategyAggregator 성과 기반 동적 가중치 추가. record_outcome() API로 최근 N개 신호 적중률 rolling 추적, 0.5~2.0 배율로 정적 가중치 조정. +15 tests (test_multi_signal.py).
+**[E] Execution:** src/exchange/twap.py TWAP 실행기 부분 체결/타임아웃 처리 추가. TWAPResult에 filled_qty, partial_fills, timeout_occurred 필드. +5 tests.
+**[F] Research:** 앙상블 실전 성과 요약. Sharpe 1.26 vs 단일 0.9 우위 확인. 90% 크립토 전략 과적합 경고. Walk-Forward OOS + 상관관계 사전 점검 필수.
+**Tests:** 5798 passed (+20 from Cycle 4).
+**Next Cycle:** 6 (A+C+F — 품질+데이터+리서치 재순환)

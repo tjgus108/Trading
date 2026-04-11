@@ -128,3 +128,32 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [October 2025 Crash — Amberdata](https://blog.amberdata.io/how-3.21b-vanished-in-60-seconds-october-2025-crypto-crash-explained-through-7-charts)
 - [November 2025 Wipeout — Yahoo Finance](https://finance.yahoo.com/news/crypto-market-wipeout-2b-24-160816131.html)
 - [Binance vs OKX Liquidity — Bitcompare](https://bitcompare.net/post/binance-vs-okx)
+
+
+## [2026-04-11] Cycle 5 — Ensemble Strategies
+
+### 앙상블 실전 성과 (2024-2025)
+
+- ACM ICAIF FinRL 2023/2024 대회: 앙상블이 단일 에이전트보다 누적 수익·Sharpe 모두 우세. Sharpe 기중 앙상블 방식이 최고 성과.
+- PLS/FFN/GRBT 앙상블 평균 예측: Sharpe 1.20+ 달성, 단일 모델 대비 일관되게 우위.
+- 메타-러닝 앙상블(OGU/Fast Universalization): Sharpe 1.26 수준 — 자본을 고성능 포트폴리오에 동적 배분하는 방식이 핵심.
+- 2026년 1월 기준 6전략 앙상블 실사례: 주간 +1.3%, YTD +1.5%, MDD 0% — 낮은 드로다운이 단일 전략 대비 가장 두드러진 차이.
+
+### 앙상블 함정
+
+- **과적합 위험 증폭**: 90%의 크립토 전략이 과적합 상태. 앙상블은 구성 전략 수가 많을수록 백테스트 Sharpe가 좋아 보이지만 live에서 일제히 실패할 수 있음. Win rate 80%+, PF 4.0+ 신호면 과적합 의심.
+- **상관관계 붕괴**: 역사적 낮은 상관관계를 가정하고 조합한 전략들이 시장 스트레스 구간(예: October 2025)에서 동시에 같은 방향으로 손실 — "다양화 환상(diversification illusion)".
+- **훈련 비용과 적응 지연**: 앙상블 훈련 시간이 선형 증가, 변동성 큰 크립토 시장에서 빠른 레짐 변화에 재적응 어려움. 복잡성 대비 실익을 반드시 검증해야 함.
+- **샘플링 병목**: FinRL 앙상블은 다양한 에이전트 확보를 위해 대규모 시뮬레이션 환경 필요 — 소규모 팀/봇에서 현실적 구현 장벽.
+
+### 우리 봇 적용 인사이트
+
+- 현재 STRATEGY_REGISTRY에 등록된 전략들을 앙상블화할 때, Sharpe 가중 방식(각 전략의 최근 N일 Sharpe에 비례해 신호 가중)이 단순 다수결보다 우수.
+- Walk-forward validation 없이 앙상블 구성 전략 선택 금지 — 백테스트 Sharpe가 높아도 OOS 성과 확인 필수.
+- 스트레스 구간 상관관계 사전 검증: 정상 시장이 아닌 고변동성 구간(ATR spike)에서 전략 간 상관관계가 0.7 이상이면 앙상블 효과 없음으로 판단.
+
+### 참고
+
+- [FinRL Ensemble 2023/2024 — arXiv](https://arxiv.org/html/2501.10709v1)
+- [Ensemble Deep RL for Trading — Springer](https://link.springer.com/chapter/10.1007/978-3-031-61037-0_9)
+- [Overfitting in Crypto Strategies — TrendRider](https://trendrider.net/blog/how-to-avoid-overfitting-crypto-trading)

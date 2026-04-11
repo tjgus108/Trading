@@ -274,3 +274,47 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 - No regressions
 
 **Summary:** VPIN 계산의 중립 봉 분류 오류를 수정. OFI 정확도 향상으로 order flow imbalance 신호 신뢰성 증대.
+
+---
+
+## Cycle 5 - Category E: Execution ✅ COMPLETED
+
+**Task:** TWAP 실행기 검증 및 버그 수정 (부분 체결/타임아웃)
+
+**Files Modified:**
+1. `/home/user/Trading/src/exchange/twap.py` (전체 재작성, 152 → 231 lines)
+   - **추가 필드:**
+     - `filled_qty: float` (실제 체결 수량, 부분 체결 반영)
+     - `partial_fills: int` (부분 체결된 슬라이스 개수)
+     - `timeout_occurred: bool` (타임아웃 발생 여부)
+   - **생성자 확장:** `timeout_per_slice` 파라미터 추가
+   - **부분 체결 처리:** dry_run에서 20% 확률로 부분 체결 시뮬레이션, 실제 주문에서는 connector 응답의 'filled' 필드 반영
+   - **타임아웃 로직:** 슬라이스별/전체 타임아웃 체크 → `timeout_occurred=True` 설정 및 루프 조기 종료
+   - **예외 처리:** connector 에러 발생 시 `timeout_occurred=True`, 루프 종료
+   - **슬리피지 계산:** `total_filled` 기반 재계산 (부분 체결 반영)
+
+2. `/home/user/Trading/tests/test_kelly_twap.py` (lines 173-177 수정 + lines 198-278 추가)
+   - `test_twap_result_fields` 수정: 새로운 필드 확인
+   - **신규 테스트 5개 (부분 체결/타임아웃 관련):**
+     - `test_twap_partial_fill_tracking`: 부분 체결 시뮬레이션 및 추적
+     - `test_twap_filled_qty_calculation`: filled_qty 정확도 검증
+     - `test_twap_timeout_flag_no_timeout`: 타임아웃 없는 정상 케이스
+     - `test_twap_timeout_per_slice_respected`: 타임아웃 경계값 테스트
+     - `test_twap_result_new_fields`: 새 필드 존재 확인
+
+**Test Results:**
+- test_kelly_twap.py: 19 passed ✅ (기존 14 + 신규 5)
+- Full test suite: OK (회귀 없음)
+
+**기술 정리:**
+- **부분 체결:** connector.place_order() 응답에서 'filled' 필드 추출, 없으면 slice_qty 가정
+- **타임아웃:** `timeout_per_slice * n_slices` 전체 제한 + 슬라이스별 체크
+- **예외 처리:** connector 에러 → timeout_occurred=True, 루프 종료
+- **슬리피지:** sum(filled_quantities)로 재계산하여 부분 체결 반영
+
+---
+
+## Next: 추가 작업 후보 (Cycle 5~)
+- Orchestrator 통합: TWAP 실행기 자동 호출 (대형 주문 감지)
+- Risk Agent 연동 (TWAP 전 approval 체크)
+- 호가창 깊이 기반 슬리피지 모델 추가

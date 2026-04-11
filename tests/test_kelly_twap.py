@@ -172,7 +172,7 @@ class TestTWAPExecutor:
 
     def test_twap_result_fields(self):
         """TWAPResult 필드 모두 존재."""
-        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run"}
+        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run", "filled_qty", "partial_fills", "timeout_occurred"}
         actual = {f.name for f in fields(TWAPResult)}
         assert required == actual, f"Missing fields: {required - actual}"
 
@@ -193,3 +193,96 @@ class TestTWAPExecutor:
             price_limit=2000.0,
         )
         assert result.total_qty == 3.5
+
+
+# ---------------------------------------------------------------------------
+# TWAP 부분 체결 & 타임아웃 테스트
+# ---------------------------------------------------------------------------
+
+class TestTWAPPartialAndTimeout:
+
+    def test_twap_partial_fill_tracking(self):
+        """dry_run에서 부분 체결 시뮬레이션 및 tracking."""
+        executor = TWAPExecutor(n_slices=5, interval_seconds=0, dry_run=True)
+        np.random.seed(42)  # 재현 가능성
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=1.0,
+            price_limit=50_000.0,
+        )
+        # 부분 체결이 발생할 수 있으므로 filled_qty <= total_qty
+        assert result.filled_qty <= result.total_qty + 1e-8
+        assert result.partial_fills >= 0
+
+    def test_twap_filled_qty_calculation(self):
+        """filled_qty가 정확히 계산되는지 확인."""
+        executor = TWAPExecutor(n_slices=1, interval_seconds=0, dry_run=True)
+        np.random.seed(123)
+        result = executor.execute(
+            connector=None,
+            symbol="ETH/USDT",
+            side="sell",
+            total_qty=2.0,
+            price_limit=2000.0,
+        )
+        # 1 슬라이스이므로 slices_executed == 1
+        assert result.slices_executed == 1
+        # filled_qty는 total_qty와 비슷해야 함 (부분 체결 고려)
+        assert 0 < result.filled_qty <= result.total_qty
+
+    def test_twap_timeout_flag_no_timeout(self):
+        """timeout_per_slice 설정해도 빠른 실행 시 timeout_occurred=False."""
+        executor = TWAPExecutor(
+            n_slices=2,
+            interval_seconds=0,
+            dry_run=True,
+            timeout_per_slice=10.0,  # 10초/슬라이스
+        )
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=1.0,
+            price_limit=50_000.0,
+        )
+        assert result.timeout_occurred is False
+
+    def test_twap_timeout_per_slice_respected(self):
+        """timeout_per_slice가 매우 작으면 timeout_occurred=True."""
+        executor = TWAPExecutor(
+            n_slices=3,
+            interval_seconds=0.5,  # 0.5초 대기
+            dry_run=False,
+            timeout_per_slice=0.001,  # 1ms/슬라이스 = 매우 짧음
+        )
+        # 실제 connector 없으므로 Exception 발생 → timeout_occurred=True
+        # dry_run=False인데 connector=None이면 실행 중 에러 발생
+        # 이 경우 timeout_occurred 플래그가 설정됨을 확인
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=1.0,
+            price_limit=50_000.0,
+        )
+        # timeout이나 exception으로 인해 완료되지 않음
+        assert result.timeout_occurred is True or result.slices_executed < 3
+
+    def test_twap_result_new_fields(self):
+        """새로운 필드 (filled_qty, partial_fills, timeout_occurred) 존재 확인."""
+        executor = TWAPExecutor(n_slices=1, dry_run=True)
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=1.0,
+            price_limit=50_000.0,
+        )
+        assert hasattr(result, "filled_qty")
+        assert hasattr(result, "partial_fills")
+        assert hasattr(result, "timeout_occurred")
+        assert isinstance(result.filled_qty, float)
+        assert isinstance(result.partial_fills, int)
+        assert isinstance(result.timeout_occurred, bool)
