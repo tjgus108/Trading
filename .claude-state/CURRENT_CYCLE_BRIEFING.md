@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 70 — 2026-04-11T10:43:05.573932Z
+🔄 CYCLE 71 — 2026-04-11T11:15:17.642334Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
@@ -22,6 +22,9 @@
   **[B] Risk:** tests/test_risk.py +2 config 의존성. kelly_fraction=risk_per_trade 매핑, max_fraction=max_position_size 매핑 확인.
   **[F] Research:** MEV Defense. Flashbots Protect 2.1M 계정 $43B 보호 98.5% 성공률. 이더리움 80% 보호 RPC. TEE 2025 핵심. slippage+분할+private RPC 표준.
   **Tests:** 6184 passed (+4 from Cycle 68).
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

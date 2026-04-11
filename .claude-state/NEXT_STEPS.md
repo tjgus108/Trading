@@ -1,3 +1,21 @@
+# Cycle 71 - Category C: Data & Infrastructure
+## Status: COMPLETE
+
+### Websocket Buffer Overflow Prevention
+- Verified `/home/user/Trading/src/data/websocket_feed.py`
+- Buffer uses `deque(maxlen=MAX_CANDLES)` (1000) → auto-eviction when limit exceeded
+- Created comprehensive buffer tests at `/home/user/Trading/tests/test_websocket_buffer.py`:
+  1. `test_candle_buffer_maxlen_enforced` — MAX_CANDLES limit enforced, no overflow
+  2. `test_deque_auto_eviction` — validates deque behavior
+  3. `test_candle_count_respects_maxlen` — candle_count() ≤ 1000
+  4. `test_get_latest_df_memory_bounded` — 5000 candles added, buffer stays at 1000
+  5. `test_concurrent_append_respects_maxlen` — 2000 appends respect maxlen
+- All 5 tests PASSED ✓
+- No memory leak detected: buffer automatically evicts oldest candles
+
+Result: websocket_feed.py is production-safe for high-frequency candle ingestion.
+
+---
 # Cycle 70 - Category F: Research
 ## Status: COMPLETE
 
@@ -8,24 +26,3 @@
 - **Flashbots Protect docs** — 온체인 봇 MEV 방어 필수 참조 (Cycle 69에서 상세 확인)
 
 Key trend: ML/RL 실시간 최적화 + DeFi 통합 + Private mempool 방어
-
----
-# Cycle 70 - Category D: ML & Signals
-## Status: COMPLETE
-
-### What was done
-- Read `/home/user/Trading/src/analysis/strategy_correlation.py`
-- Created `/home/user/Trading/tests/test_strategy_correlation.py` with 2 edge case tests:
-  1. `test_empty_history_returns_none` — empty tracker returns None/[] on all query methods
-  2. `test_single_strategy_returns_none` — single strategy (need >=2) returns None
-- Both tests PASSED
-
----
-# Cycle 69 - Category F: Research
-## Status: COMPLETE
-
-### MEV Defense Research
-- Flashbots Protect: 2.1M 계정 보호, $43B DEX 거래량, private mempool로 샌드위치 차단
-- TEE 기반 프라이버시: 2025년 Flashbots 주력 방향
-- 이더리움 트랜잭션의 80%가 이미 보호 RPC 사용
-- 트레이더 전략: slippage 타이트하게, 대형 거래 분할, private mempool 활용
