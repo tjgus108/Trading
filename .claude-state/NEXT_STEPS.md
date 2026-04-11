@@ -1,10 +1,27 @@
-# Cycle 98 — Research (완료)
+# Cycle 98 — SIM 개선 미실행
 
-## [2026-04-11] Cycle 98 — Price Action vs Indicators
-- 2025~2026 실증 결과: 어느 쪽도 절대 우위 없음. 시장 국면(추세/횡보)에 따라 성패 갈림.
-- Price action(캔들 패턴, S/R)은 노이즈 감소·빠른 적응이 강점. 지표 기반은 조건 의존성 높아 횡보장에서 실패 빈도 증가.
-- 2026 기준 실제 작동하는 봇은 단순·규칙 기반 전략을 기계적으로 실행하는 쪽. 예측 시도보다 통계적 엣지 반복이 핵심.
-- 결론: 하이브리드(price action 진입 조건 + 지표 필터)가 최적. 현 전략 스택에 캔들 패턴 기반 전략 추가 검토 권장.
+## 상황
+- 시간 부족 (10분 제약)으로 신규 전략 개선 미실행
+- 현재 PASS 전략: 22개 (기존 13개 + 미개선)
+- FAIL 전략 중 근접 후보:
+  - **ema_stack**: profit_factor 1.49 < 1.5 (1) only)
+  - **trend_follow_filter**: profit_factor 1.48 < 1.5
+  - **guppy**: profit_factor 1.37 < 1.5
+  - **multi_tf_trend**: profit_factor 1.46 < 1.5
 
-## 다음 Cycle
-- Supertrend_multi 또는 캔들 패턴(engulfing/pin bar) 전략 구현 검토
+## 개선 시도 및 실패 원인
+1. **ema_stack ATR필터**: 신호 0개 생성
+2. **trend_follow_filter RSI필터**: 신호 0개 생성 (필터 과강)
+3. **ema_stack close조건제거**: Sharpe -0.57 악화, PF 1.15로 감소
+
+## Cycle 99 권장사항
+- **간단한 접근**: profit_factor만 목표 (close조건 제거 시도했으나 실패)
+  → 대신 거래빈도 + 수익성 동시 최적화 필요
+- **대안 전략**: 
+  - BB_bandwidth (14 trades, 1점 모자람) 확인
+  - 기존 개선 사례(narrow_range +14.90%) 참조: 파라미터 조정보다 필터 강화
+- **리스크**: 과최적화 회피 (DSR 감시)
+
+## Cycle 98 결론
+- Backtest 결과: 미개선 (0 신규)
+- 기존 13개 + 미개선 전략들 = 현황 유지
