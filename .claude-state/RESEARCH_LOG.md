@@ -380,3 +380,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Canary Release vs Kill Switch — Unleash](https://www.getunleash.io/blog/canary-release-vs-kill-switch)
 - [Trading System Kill Switch — NYIF](https://www.nyif.com/articles/trading-system-kill-switch-panacea-or-pandoras-box)
 - [Algo Trading Risk Management — LuxAlgo](https://www.luxalgo.com/blog/risk-management-strategies-for-algo-trading/)
+
+## [2026-04-11] Cycle 17 — Volatility Regime Detection (New Methods)
+
+### 신규 기법
+- **Soft Regime HAR**: HMM으로 레짐 확률 산출 후 HAR 모델 두 개(저변동/고변동)를 확률 가중치로 블렌딩 — 경계 구간 hard-switch 오류 제거
+- **Probabilistic-Attention Transformer**: 외부 추정 쇼크 확률을 attention weight에 직접 임베딩, VIX 급등 조기 감지에 효과적
+- **Ensemble-HMM Voting (Multi-Model)**: Random Forest·XGBoost·HMM을 앙상블 투표로 결합, 단일 모델 레짐 오분류 완화
+- **VMD + Cascaded LSTM-Attention**: Variational Mode Decomposition으로 주파수 성분 분리 후 LSTM-Attention 통과, VIX 비선형 급변 포착
+
+### 실전 한계
+- Transformer/Attention 계열은 훈련 데이터가 부족한 저유동성 코인에서 과적합 심각, 실전 배포 전 OOS 검증 필수
+- Soft-regime 블렌딩은 레짐 전환 지연(lag)이 여전히 존재 — 급격한 플래시 크래시엔 여전히 취약
+
+### 참고
+- [Soft Regime-Switching HAR (arxiv 2510.03236)](https://arxiv.org/html/2510.03236v1)
+- [Probabilistic-Attention Transformer for VIX (ScienceDirect)](https://www.sciencedirect.com/science/article/abs/pii/S0952197624003816)
+- [Ensemble-HMM Voting Framework (AIMS Press)](https://www.aimspress.com/article/id/69045d2fba35de34708adb5d)

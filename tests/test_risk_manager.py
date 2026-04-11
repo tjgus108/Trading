@@ -204,3 +204,50 @@ def test_evaluate_uses_adaptive_multiplier():
     # 저변동 → SL이 entry에 더 가까워야 함 (multiplier 1.2 < 1.5)
     assert result_adaptive.stop_loss > result_fixed.stop_loss
     assert result_adaptive.status == RiskStatus.APPROVED
+
+
+# ── Order Jitter ──────────────────────────────────────────────────────────────
+
+def test_jitter_varies_position_size():
+    """jitter_pct > 0 이면 동일 입력에서 position_size가 매 호출마다 달라진다."""
+    import random as _random
+    rm = _make_rm(jitter_pct=0.05)
+    sizes = set()
+    _random.seed(None)  # 시드 고정 해제
+    for _ in range(30):
+        result = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+        assert result.status == RiskStatus.APPROVED
+        sizes.add(result.position_size)
+    # 30번 중 최소 2개 이상 다른 값이 나와야 함
+    assert len(sizes) >= 2
+
+
+def test_jitter_within_bounds():
+    """jitter_pct=0.05 → position_size가 기준값 ±5% 범위 이내여야 한다."""
+    # jitter 없는 기준값 계산
+    rm_base = _make_rm(jitter_pct=0.0)
+    base_result = rm_base.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    base_size = base_result.position_size
+
+    rm_jitter = _make_rm(jitter_pct=0.05)
+    for _ in range(50):
+        result = rm_jitter.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+        assert result.status == RiskStatus.APPROVED
+        assert result.position_size <= base_size * 1.05 + 1e-9
+        assert result.position_size >= base_size * 0.95 - 1e-9
+
+
+def test_jitter_zero_is_deterministic():
+    """jitter_pct=0.0 (기본값) 이면 동일 입력에 항상 같은 position_size."""
+    rm = _make_rm(jitter_pct=0.0)
+    results = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(10)
+    ]
+    assert len(set(results)) == 1
+
+
+def test_jitter_pct_clamped_at_five_percent():
+    """jitter_pct > 0.05 전달 시 내부적으로 0.05로 클램프된다."""
+    rm = _make_rm(jitter_pct=0.99)
+    assert rm.jitter_pct == pytest.approx(0.05)

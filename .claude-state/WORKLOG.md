@@ -978,3 +978,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 프로덕션 배포 전략. Canary 배포(1~5% 자본), Kill Switch (Feature Flag 기반), Blue-Green 롤백, MDD 3%/주간 7% Circuit Breaker 표준.
 **Tests:** 5882 passed (+8 from Cycle 15).
 **Next Cycle:** 17 (B+D+F)
+
+## [2026-04-11 03:23 UTC] Cycle 17 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:26 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:26:18Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 07:20 UTC] Cycle 17 COMPLETED — B + D + F
+**[B] Risk:** src/risk/manager.py에 jitter_pct 파라미터 추가 (기본 0.0, 최대 5% 클램프). BUY/SELL 포지션 사이즈 확정 후 random.uniform ±N% 노이즈 적용. Cycle 15 리서치의 "XRP AMM 봇 착취" 대응. +4 tests.
+**[D] ML:** src/alpha/ensemble.py _ask_parallel() 추가. Claude + OpenAI를 ThreadPoolExecutor(max_workers=2)로 병렬 호출. 레이턴시 ~50% 단축 (max(t_claude, t_openai)). 10초 타임아웃. +2 tests.
+**[F] Research:** 변동성 체제 전환 감지 신기법. Soft Regime HAR (확률 가중 블렌딩), Ensemble-HMM Voting, Probabilistic-Attention Transformer. 저유동성 과적합 한계 여전.
+**Tests:** 5888 passed (+6 from Cycle 16).
+**Next Cycle:** 18 (E+A+F)

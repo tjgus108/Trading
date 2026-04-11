@@ -1,5 +1,37 @@
 # Next Steps
 
+## Cycle 17 - Category B: Risk Management ✅ COMPLETED
+
+**Task:** Order Jitter — 봇 예측 가능성 차단 (AMM 착취 대응)
+
+**Changes:**
+1. `src/risk/manager.py` line 9 — `import random` 추가
+2. `src/risk/manager.py` lines 107, 114 — `__init__`에 `jitter_pct: float = 0.0` 파라미터 추가 (상한 5% 클램프)
+3. `src/risk/manager.py` lines 213-218 — max_size 클램프 후 `random.uniform(-jitter_pct, jitter_pct)` 적용
+4. `tests/test_risk_manager.py` lines 210-247 — 4개 테스트 추가
+   - `test_jitter_varies_position_size`: 30회 호출 시 2개 이상 다른 값
+   - `test_jitter_within_bounds`: 50회 호출 모두 ±5% 범위 내
+   - `test_jitter_zero_is_deterministic`: jitter=0이면 항상 동일값
+   - `test_jitter_pct_clamped_at_five_percent`: 0.99 입력 → 0.05 클램프
+
+**Test Results:** 31/31 passed ✅
+
+---
+
+## Cycle 17 - Category D: ML & Signals ✅ COMPLETED
+
+**Task:** MultiLLMEnsemble 병렬 호출 (레이턴시 최적화)
+
+**Changes:**
+1. `src/alpha/ensemble.py` line 1 — `concurrent.futures.ThreadPoolExecutor` import 추가
+2. `src/alpha/ensemble.py` lines 148-162 — `_ask_parallel()` 메서드 추가 (Claude + OpenAI 병렬)
+3. `src/alpha/ensemble.py` line 127 — `analyze()` 내 순차 호출 → `_ask_parallel()` 단일 호출로 교체
+4. `tests/test_phase_d.py` — `test_ask_parallel_both_na_without_clients`, `test_ask_parallel_uses_stub` 2개 추가
+
+**Test Results:** 13/13 passed ✅
+
+---
+
 ## Cycle 16 - Category A: Quality Assurance ✅ COMPLETED
 
 **Task:** pipeline/runner.py 테스트 커버리지 보강

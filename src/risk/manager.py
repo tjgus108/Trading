@@ -6,6 +6,7 @@ LLM이 직접 수치를 계산하지 않고 이 코드가 처리한다.
 
 import logging
 import math
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -103,12 +104,14 @@ class RiskManager:
         atr_multiplier_tp: float = 3.0,    # 익절: ATR * 3.0
         max_position_size: float = 0.10,   # 계좌 대비 최대 10%
         circuit_breaker: Optional[CircuitBreaker] = None,
+        jitter_pct: float = 0.0,  # ±jitter_pct 랜덤 노이즈 (0~0.05)
     ):
         self.risk_per_trade = risk_per_trade
         self.atr_multiplier_sl = atr_multiplier_sl
         self.atr_multiplier_tp = atr_multiplier_tp
         self.max_position_size = max_position_size
         self.circuit_breaker = circuit_breaker
+        self.jitter_pct = max(0.0, min(jitter_pct, 0.05))  # 상한 5%
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
@@ -206,6 +209,13 @@ class RiskManager:
         # 최대 포지션 한도 클램프
         max_size = (account_balance * self.max_position_size) / entry_price
         position_size = min(position_size, max_size)
+
+        # 주문 지터: 봇의 예측 가능한 패턴 노출 방지 (AMM 착취 대응)
+        if self.jitter_pct > 0.0:
+            noise = random.uniform(-self.jitter_pct, self.jitter_pct)
+            position_size = position_size * (1.0 + noise)
+            position_size = min(position_size, max_size)  # 클램프 재적용
+            logger.debug("Order jitter applied: noise=%.4f%%", noise * 100)
 
         if action == "BUY":
             stop_loss = entry_price - sl_distance
