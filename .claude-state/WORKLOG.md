@@ -2713,3 +2713,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** Paper→Live 전환 기준. 4~8주 paper + 100+ 트레이드 + 상승/하락 레짐 각 1회. 전환 지표 Sharpe≥1.0, PF≥1.5, MDD≤20%. 자본 5~10%로 시작 후 증액.
 **Tests:** 6005 passed 🎉 (+7 from Cycle 33).
 **Next Cycle:** 35 (D+E+F)
+
+## [2026-04-11 08:36 UTC] Cycle 35 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md

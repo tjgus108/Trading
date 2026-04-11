@@ -180,3 +180,38 @@ def test_performance_summary_no_data():
     assert s["accuracy"] is None
     assert s["samples"] == 0
     assert s["perf_weight"] == 1.0
+
+
+# ── 동점 처리 경계 조건 ─────────────────────────────────────────────────────
+
+def test_tie_buy_sell_same_conf_returns_hold():
+    """BUY/SELL 동일 confidence 동점 → HOLD."""
+    agg = _make_agg(
+        ("a", Action.BUY, Confidence.MEDIUM),
+        ("b", Action.SELL, Confidence.MEDIUM),
+    )
+    sig = agg.generate(_df())
+    assert sig.action == Action.HOLD
+    assert "동점" in sig.reasoning
+
+
+def test_tie_with_hold_vote_still_hold():
+    """BUY/SELL 동점 + 추가 HOLD 투표 → 여전히 HOLD."""
+    agg = _make_agg(
+        ("a", Action.BUY, Confidence.HIGH),
+        ("b", Action.SELL, Confidence.HIGH),
+        ("c", Action.HOLD, Confidence.MEDIUM),
+    )
+    sig = agg.generate(_df())
+    assert sig.action == Action.HOLD
+
+
+def test_tie_confidence_low():
+    """동점 HOLD 신호의 confidence는 LOW여야 함."""
+    agg = _make_agg(
+        ("a", Action.BUY, Confidence.HIGH),
+        ("b", Action.SELL, Confidence.HIGH),
+    )
+    sig = agg.generate(_df())
+    assert sig.action == Action.HOLD
+    assert sig.confidence == Confidence.LOW
