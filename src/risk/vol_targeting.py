@@ -35,6 +35,8 @@ class VolTargeting:
         max_scalar: float = 2.0,        # 최대 스케일 배수 (레버리지 한계)
         min_scalar: float = 0.1,        # 최소 스케일 배수
     ) -> None:
+        if target_vol <= 0:
+            raise ValueError(f"target_vol must be positive, got {target_vol}")
         self.target_vol = target_vol
         self.window = window
         self.annualization = annualization

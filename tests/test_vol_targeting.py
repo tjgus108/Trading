@@ -122,3 +122,37 @@ def test_numerical_stability_identical_prices():
     # std=0 → rv=0 → _scalar_from_rv returns 1.0
     assert rv == pytest.approx(0.0)
     assert s == pytest.approx(1.0), "zero rv must return scalar=1.0 (no divide-by-zero)"
+
+
+# ── 추가 경계 조건: 극단적 target_vol ─────────────────────────────────────────
+
+def test_very_small_target_vol_clamps_to_min_scalar():
+    """target_vol이 매우 작으면 scalar가 min_scalar에 클리핑."""
+    vt = VolTargeting(target_vol=0.0001, annualization=1, max_scalar=2.0, min_scalar=0.1)
+    rng = np.random.default_rng(0)
+    # rv ≈ 0.20 (정상 변동성) >> target_vol 0.0001 → scalar 극소 → min_scalar
+    log_rets = rng.normal(0, 0.20, 24)
+    closes = 100 * np.exp(np.concatenate([[0], np.cumsum(log_rets)]))
+    df = pd.DataFrame({"close": closes})
+    s = vt.scalar(df)
+    assert s == pytest.approx(0.1), "very small target_vol must clamp to min_scalar"
+
+
+def test_very_large_target_vol_clamps_to_max_scalar():
+    """target_vol이 매우 크면 scalar가 max_scalar에 클리핑."""
+    vt = VolTargeting(target_vol=100.0, annualization=1, max_scalar=2.0, min_scalar=0.1)
+    rng = np.random.default_rng(0)
+    # rv ≈ 0.20 (정상 변동성) << target_vol 100.0 → scalar 극대 → max_scalar
+    log_rets = rng.normal(0, 0.20, 24)
+    closes = 100 * np.exp(np.concatenate([[0], np.cumsum(log_rets)]))
+    df = pd.DataFrame({"close": closes})
+    s = vt.scalar(df)
+    assert s == pytest.approx(2.0), "very large target_vol must clamp to max_scalar"
+
+
+def test_nonpositive_target_vol_raises():
+    """target_vol <= 0이면 ValueError."""
+    with pytest.raises(ValueError, match="target_vol must be positive"):
+        VolTargeting(target_vol=0.0)
+    with pytest.raises(ValueError, match="target_vol must be positive"):
+        VolTargeting(target_vol=-0.5)

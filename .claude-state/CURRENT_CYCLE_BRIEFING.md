@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 58 — 2026-04-11T10:09:00.305199Z
+🔄 CYCLE 59 — 2026-04-11T10:13:52.761606Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 57 COMPLETED — B + D + F** (2026-04-11 21:55 UTC)
-  **[B] Risk:** src/risk/manager.py __init__ 5개 파라미터 범위 검증 추가 (risk_per_trade, atr_multiplier_sl/tp, max_position_size, max_total_exposure). +6 경계 테스트.
-  **[D] ML:** multi_signal.py 가중치 정규화 검증. score/total ratio 방식이라 가중치 합이 달라도 비율 같으면 동일 결과 확인. 수정 없음.
-  **[F] Research:** Market Making 실전. 스프레드 수익 2024-2025 0.5% 미만 축소 (경쟁 심화). Hummingbot LOB 횡보장 연 15-40%. 인벤토리 리스크 핵심, 동적 스프레드 필수.
-  **Tests:** 6133 passed (+6 from Cycle 56).
+**Cycle 58 COMPLETED — E + A + F** (2026-04-11 22:20 UTC)
+  **[E] Execution:** src/exchange/connector.py fetch_balance None/예외 안전 처리. +2 tests.
+  **[A] Quality:** pytest.ini slow marker 추가. 상위 3개 느린 테스트(1.5s+)에 @slow 태그. pytest -m slow 또는 -m "not slow" 필터 가능.
+  **[F] Research:** 봇 running 비용. VPS $20-40/월 기본, $100-200 고성능. 거래소 API 무료. 3rd-party 플랫폼 +$25-240. 관리 기회비용 $150-600/월. 최소 $50-100/월.
+  **Tests:** 6135 passed (+2 from Cycle 57). 1 flaky (test_buy_insufficient_balance) 재실행 통과.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

@@ -239,6 +239,11 @@ class DataFeed:
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
         df = self._to_dataframe(raw)
+        
+        # 경계: 빈 DataFrame 처리
+        if df.empty:
+            raise ValueError(f"Empty OHLCV data for {symbol} {timeframe}")
+        
         missing = self._count_missing(df, timeframe)
         anomalies = self._detect_anomalies(df)
         df = self._add_indicators(df)
