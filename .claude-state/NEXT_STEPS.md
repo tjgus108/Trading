@@ -29,6 +29,24 @@
   - 책: C.W. Morton "Ultimate Beginner's Guide to Crypto Trading Bots", Ernie Chan "Quantitative Trading"
   - 플랫폼: 3Commas(DCA/그리드봇), Cryptohopper(전략 마켓플레이스)
   - 실용: 단순 DCA/그리드 봇부터 시작 → walk-forward 검증 후 고급 전략으로
+- Cycle 81 (Category C): DataFeed 캐시 TTL 경계
+  - tests/test_feed_boundary.py 추가: TestCacheTTLBoundaries 클래스
+  - test_cache_ttl_zero_disables_cache: ttl=0 경우 모든 요청 미스 확인 (connector.fetch_ohlcv.call_count=2)
+  - test_cache_ttl_very_large_value: ttl=999999999 경우 캐시 항상 유효 확인 (call_count=1)
+  - 전체 4 테스트 통과 (test_feed_boundary.py)
+- Cycle 81 (Category A): BacktestReport JSON 로드/저장 round-trip
+  - src/backtest/report.py: from_json() 클래스메서드 추가 (to_json()과 대칭)
+  - inf/nan 값 문자열 변환 및 역변환 처리 (JSON 직렬화 호환성)
+  - tests/test_backtest.py: 3개 테스트 추가
+    - test_backtest_report_json_round_trip: 전체 필드 검증
+    - test_backtest_report_json_special_values: inf/nan 복원 확인
+    - test_from_json_preserves_dict_equality: dict 동등성 검증
+  - 전체 12 테스트 통과 (test_backtest.py), 29 테스트 통과 (test_backtest_engine.py)
+- Cycle 82 (Research): 과적합 백테스트 전략 실전 수정 베스트 프랙티스
+  - Walk-Forward Optimization: WFE > 70% 기준, 파라미터 미변경으로 OOS 구간 테스트
+  - 파라미터 안정성: optima 주변 sweep으로 plateau(안정) vs cliff(과적합) 구분
+  - DSR(Deflated Sharpe Ratio) 사용 — 전략 수 및 선택 편향 보정
+  - 의심 신호: Sharpe > 3.0, PF >> 2.0, 수수료/슬리피지 추가 시 수익 소멸
 
 ## 남은 작업
 - TWAP per-slice 타임아웃(dry_run=False 경로) 추가 커버리지 고려

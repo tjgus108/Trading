@@ -1,27 +1,34 @@
 ======================================================================
-🔄 CYCLE 80 — 2026-04-11T11:41:17.489090Z
+🔄 CYCLE 82 — 2026-04-11T15:43:38.161411Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
+
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [D] ML & Signals
 - **Agent**: ml-agent
 - **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [SIM] Paper Simulation & Auto-improve
+- **Agent**: backtest-agent
+- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 79 COMPLETED — C + B + F** (2026-04-12 05:40 UTC)
-  **[C] Data SECURITY:** src/notifier.py html.escape() 적용. user-controlled 문자열(symbol, error, notes) XSS 방어. +2 tests (script/img 태그 공격).
-  **[B] Risk:** src/risk/manager.py ATR<=0 BLOCKED, 극대 ATR(1e12) position_size<1e-8 BLOCKED. +3 tests.
-  **[F] Research:** Maker/Taker. 봇 거래량 80% (2020 50%→2025). 기관 봇 maker 중심. Polymarket dynamic fee로 latency arb 억제. post-only/limit order 우선 권장.
-  **Tests:** 6230 passed (+5 from Cycle 78). XSS 보안 강화.
+**Cycle 81 COMPLETED — A + C + F** (2026-04-12 06:30 UTC)
+  **[A] Quality:** src/backtest/report.py from_json() 클래스메서드 추가. to_json↔from_json 대칭 구현, inf/nan 복원. +3 tests.
+  **[C] Data:** tests/test_feed_boundary.py +2 TTL 경계 (ttl=0 비활성, 매우 큰 값).
+  **[F] Research:** USDT Risk. S&P 2025 최저 등급 하향, BTC 준비금 5.6%. GENIUS Act 거래소 상장폐지 가능성. USDC/FDUSD 폴백 페어 권장.
+  **Tests:** 6239 passed (+5 from Cycle 80).
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

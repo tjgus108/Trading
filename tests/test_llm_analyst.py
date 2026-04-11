@@ -97,6 +97,31 @@ class TestAnalyzeSignal:
         result = analyst.analyze_signal("BTC/USDT", "BUY", "reason")
         assert result.count(".") <= 3
 
+    def test_parse_response_special_chars(self):
+        """특수문자 포함 긴 문장 — 파싱 후 비어있지 않고 3문장 이하."""
+        analyst = LLMAnalyst(enabled=False)
+        text = "Price surged 15%! RSI @ 72 is overbought? Watch $BTC carefully."
+        result = analyst._parse_response(text)
+        assert result != ""
+        # 문장 수 확인: 3개 이하 (!, ?, . 각 1개씩)
+        import re
+        sentences = re.split(r"(?<=[.!?])\s+", result)
+        assert len([s for s in sentences if s.strip()]) <= 3
+
+    def test_parse_response_empty_string(self):
+        """빈 문자열 입력 시 빈 문자열 반환."""
+        analyst = LLMAnalyst(enabled=False)
+        result = analyst._parse_response("")
+        assert result == ""
+
+    def test_parse_response_markdown_stripped(self):
+        """마크다운 헤더/불릿 제거 후 텍스트만 남음."""
+        analyst = LLMAnalyst(enabled=False)
+        text = "# Analysis\n- Risk is elevated. Funding rate is negative."
+        result = analyst._parse_response(text)
+        assert "#" not in result
+        assert result.startswith("-") is False
+
 
 # ---------------------------------------------------------------------------
 # classify_news_risk

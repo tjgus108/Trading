@@ -6611,3 +6611,66 @@ ImplShortfall: -5.00bps
 **Tests:** 6234 passed 🎯 (+4 from Cycle 79).
 **🎉 Status:** 79 사이클 완료, 10 CRITICAL 버그 수정, 6234 tests, 0 warnings.
 **Next Cycle:** 81 (A+C+F)
+
+## [2026-04-11 15:39 UTC] Cycle 81 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 15:42 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 06:30 UTC] Cycle 81 COMPLETED — A + C + F
+**[A] Quality:** src/backtest/report.py from_json() 클래스메서드 추가. to_json↔from_json 대칭 구현, inf/nan 복원. +3 tests.
+**[C] Data:** tests/test_feed_boundary.py +2 TTL 경계 (ttl=0 비활성, 매우 큰 값).
+**[F] Research:** USDT Risk. S&P 2025 최저 등급 하향, BTC 준비금 5.6%. GENIUS Act 거래소 상장폐지 가능성. USDC/FDUSD 폴백 페어 권장.
+**Tests:** 6239 passed (+5 from Cycle 80).
+**Sim:** Paper simulation 재실행 — 웹 샌드박스에서 Bybit API 차단으로 합성 데이터 사용.
+**Next:** Cycle 82 (B+D+F) with new SIM agent
+
+## [2026-04-11 15:43 UTC] Cycle 82 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

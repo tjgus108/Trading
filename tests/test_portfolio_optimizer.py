@@ -274,3 +274,42 @@ def test_inf_weights_to_apply_constraints_returns_equal_weight():
     assert not np.any(np.isinf(result))
     assert abs(result.sum() - 1.0) < 1e-9
     assert np.all(result >= 0.0)
+
+
+# ── VaR/CVaR 경계 시나리오 ────────────────────────────────────────────────────
+
+def test_var_cvar_minimum_data_boundary():
+    """T=2: cutoff_idx=max(1, int(2*0.05))=1 → CVaR==VaR (최솟값 하나만 평균).
+
+    경계 조건: 데이터 2개일 때 _compute_var_cvar가 올바른 값을 반환하는지 확인.
+    """
+    r = np.array([-0.05, 0.03])  # 손실 -5%, 수익 +3%
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    # sorted_r = [-0.05, 0.03], cutoff_idx=1
+    # VaR  = -(-0.05) = 0.05
+    # CVaR = -mean([-0.05]) = 0.05  (CVaR == VaR, 경계 허용)
+    assert abs(var - 0.05) < 1e-12, f"VaR expected 0.05, got {var}"
+    assert abs(cvar - 0.05) < 1e-12, f"CVaR expected 0.05, got {cvar}"
+    assert cvar >= var - 1e-12
+
+
+def test_var_cvar_extreme_loss_tail():
+    """극단 손실 꼬리: 하위 5% 구간에 손실이 집중돼 CVaR > VaR이어야 함.
+
+    100개 수익률 중 하위 5개(5%)가 -0.10 ~ -0.06 사이 큰 손실이고
+    나머지는 소폭 양수 → CVaR(하위 5개 평균) > VaR(5번째 퍼센타일).
+    """
+    # 하위 5개: 큰 손실 (-0.10, -0.09, -0.08, -0.07, -0.06)
+    losses = np.array([-0.10, -0.09, -0.08, -0.07, -0.06])
+    gains = np.full(95, 0.002)  # 나머지 95개는 소폭 수익
+    r = np.concatenate([losses, gains])
+
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+
+    # cutoff_idx = max(1, int(100 * 0.05)) = 5
+    # sorted_r[:5] = [-0.10, -0.09, -0.08, -0.07, -0.06]
+    # VaR  = -sorted_r[4]  = 0.06
+    # CVaR = -mean(sorted_r[:5]) = mean([0.10,0.09,0.08,0.07,0.06]) = 0.08
+    assert abs(var - 0.06) < 1e-12, f"VaR expected 0.06, got {var}"
+    assert abs(cvar - 0.08) < 1e-12, f"CVaR expected 0.08, got {cvar}"
+    assert cvar > var, f"CVaR {cvar} should be > VaR {var} for fat tail"

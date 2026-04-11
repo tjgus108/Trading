@@ -162,3 +162,101 @@ def test_backtest_report_to_json():
     # inf/nan 처리 확인
     assert isinstance(data, dict)
     print(f"✓ to_json() test passed. Generated JSON:\n{json_str}")
+
+
+def test_backtest_report_json_round_trip():
+    """to_json() → from_json() 라운드트립 검증."""
+    from src.backtest.report import BacktestReport
+    import json
+    
+    trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}, {"pnl_pct": 0.015}]
+    original = BacktestReport.from_trades(trades)
+    
+    # Serialize to JSON and back
+    json_str = original.to_json()
+    restored = BacktestReport.from_json(json_str)
+    
+    # Compare all fields
+    assert restored.total_return == original.total_return
+    assert restored.ann_return == original.ann_return
+    assert restored.ann_volatility == original.ann_volatility
+    assert restored.sharpe_ratio == original.sharpe_ratio
+    assert restored.sortino_ratio == original.sortino_ratio
+    assert restored.deflated_sharpe_ratio == original.deflated_sharpe_ratio
+    assert restored.calmar_ratio == original.calmar_ratio
+    assert restored.recovery_factor == original.recovery_factor
+    assert restored.max_drawdown == original.max_drawdown
+    assert restored.total_trades == original.total_trades
+    assert restored.win_rate == original.win_rate
+    assert restored.profit_factor == original.profit_factor
+    assert restored.avg_win == original.avg_win
+    assert restored.avg_loss == original.avg_loss
+    assert restored.win_loss_ratio == original.win_loss_ratio
+    assert restored.max_consecutive_losses == original.max_consecutive_losses
+    assert restored.annualization == original.annualization
+    print("✓ JSON round-trip test passed")
+
+
+def test_backtest_report_json_special_values():
+    """inf/nan 값 직렬화 및 복원 검증."""
+    from src.backtest.report import BacktestReport
+    
+    trades = [{"pnl_pct": 0.05}, {"pnl_pct": 0.05}]
+    report = BacktestReport.from_trades(trades)
+    
+    # profit_factor가 모두 양수면 inf가 될 수 있음
+    # (손실 거래가 없으면 total_loss=0)
+    json_str = report.to_json()
+    restored = BacktestReport.from_json(json_str)
+    
+    # inf/nan이 올바르게 복원되었는지 확인
+    if report.profit_factor == float("inf"):
+        assert restored.profit_factor == float("inf")
+    elif report.recovery_factor == float("inf"):
+        assert restored.recovery_factor == float("inf")
+    else:
+        # 일반 값들도 정확히 복원
+        assert abs(restored.profit_factor - report.profit_factor) < 1e-9
+    
+    print("✓ JSON special values test passed")
+
+
+def test_from_json_preserves_dict_equality():
+    """from_json() 복원 후 to_dict()가 원본과 동일해야 함."""
+    from src.backtest.report import BacktestReport
+    
+    trades = [
+        {"pnl_pct": 0.02},
+        {"pnl_pct": -0.01},
+        {"pnl_pct": 0.015},
+        {"pnl_pct": -0.005},
+        {"pnl_pct": 0.03},
+    ]
+    original = BacktestReport.from_trades(trades, annualization=6048)
+    
+    # Round trip
+    json_str = original.to_json()
+    restored = BacktestReport.from_json(json_str)
+    
+    # Dict comparison
+    original_dict = original.to_dict()
+    restored_dict = restored.to_dict()
+    
+    for key in original_dict:
+        orig_val = original_dict[key]
+        rest_val = restored_dict[key]
+        
+        # Handle float comparisons with NaN/inf
+        if isinstance(orig_val, float) and isinstance(rest_val, float):
+            import numpy as np
+            if np.isnan(orig_val) and np.isnan(rest_val):
+                continue
+            elif np.isinf(orig_val) and np.isinf(rest_val):
+                # Check sign match for inf
+                assert (orig_val > 0) == (rest_val > 0), f"inf sign mismatch for {key}"
+            else:
+                assert abs(orig_val - rest_val) < 1e-9, f"Mismatch for {key}: {orig_val} vs {rest_val}"
+        else:
+            assert orig_val == rest_val, f"Mismatch for {key}: {orig_val} vs {rest_val}"
+    
+    print("✓ Dict equality test passed")

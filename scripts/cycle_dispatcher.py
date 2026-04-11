@@ -30,13 +30,14 @@ WORKLOG = STATE_DIR / "WORKLOG.md"
 STATUS = ROOT / "STATUS.md"
 
 # 로테이션 테이블 (MASTER_PLAN.md와 일치해야 함)
+# SIM은 매 사이클 필수로 포함 (F 리서치처럼)
 ROTATION = [
     # (cycle_num, [categories])
-    (1, ["A", "C", "F"]),  # 품질 + 데이터 + 리서치
-    (2, ["B", "D", "F"]),  # 리스크 + ML + 리서치
-    (3, ["E", "A", "F"]),  # 실행 + 품질 + 리서치
-    (4, ["C", "B", "F"]),  # 데이터 + 리스크 + 리서치
-    (5, ["D", "E", "F"]),  # ML + 실행 + 리서치
+    (1, ["A", "C", "SIM", "F"]),  # 품질 + 데이터 + 시뮬 + 리서치
+    (2, ["B", "D", "SIM", "F"]),  # 리스크 + ML + 시뮬 + 리서치
+    (3, ["E", "A", "SIM", "F"]),  # 실행 + 품질 + 시뮬 + 리서치
+    (4, ["C", "B", "SIM", "F"]),  # 데이터 + 리스크 + 시뮬 + 리서치
+    (5, ["D", "E", "SIM", "F"]),  # ML + 실행 + 시뮬 + 리서치
 ]
 
 CATEGORY_INFO = {
@@ -69,6 +70,11 @@ CATEGORY_INFO = {
         "name": "Research",
         "agent": "strategy-researcher-agent",
         "focus": "트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)",
+    },
+    "SIM": {
+        "name": "Paper Simulation & Auto-improve",
+        "agent": "backtest-agent",
+        "focus": "scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용",
     },
 }
 

@@ -164,6 +164,35 @@ class BacktestReport:
         
         return json.dumps(d, default=json_serializer, indent=2)
 
+    @classmethod
+    def from_json(cls, json_str: str) -> "BacktestReport":
+        """
+        JSON 문자열로부터 BacktestReport 복원.
+        
+        Args:
+            json_str: to_json()으로 생성한 JSON 문자열
+        
+        Returns:
+            BacktestReport
+        
+        Raises:
+            ValueError: JSON 파싱 실패 또는 필드 누락 시
+        """
+        d = json.loads(json_str)
+        
+        # inf/nan 문자열을 float로 역변환
+        for key, val in d.items():
+            if isinstance(val, str):
+                if val == "inf":
+                    d[key] = float("inf")
+                elif val == "-inf":
+                    d[key] = float("-inf")
+                elif val == "nan":
+                    d[key] = float("nan")
+        
+        return cls(**d)
+
+
 
     def to_markdown(self) -> str:
         """
