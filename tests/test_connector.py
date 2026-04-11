@@ -92,3 +92,54 @@ def test_mock_sell_overdraft_clamps_to_zero():
     conn.create_order("BTC/USDT", "sell", 1.0)
     btc = conn._balance["total"]["BTC"]
     assert btc >= 0, f"BTC balance went negative: {btc}"
+
+
+# ── health_check 메서드 테스트 ─────────────────────────────────────────────
+
+def test_health_check_not_connected():
+    """미연결 상태 → health_check는 connected=False 반환."""
+    conn = ExchangeConnector(exchange_name="binance", sandbox=True)
+    # _exchange 미설정 상태
+    
+    result = conn.health_check()
+    
+    assert result["connected"] is False
+    assert result["exchange"] == "binance"
+    assert result["sandbox"] is True
+    assert result["markets_loaded"] is False
+    assert result["last_tick"] is None
+
+
+def test_health_check_connected():
+    """연결된 상태 + 시장 로드됨 → connected=True, markets_loaded=True."""
+    conn = _make_connector()
+    conn._exchange.symbols = ["BTC/USDT", "ETH/USDT"]  # 시장이 로드됨
+    
+    result = conn.health_check()
+    
+    assert result["connected"] is True
+    assert result["exchange"] == "binance"
+    assert result["sandbox"] is True
+    assert result["markets_loaded"] is True
+
+
+def test_health_check_no_symbols():
+    """연결 상태이나 시장 미로드 → markets_loaded=False."""
+    conn = _make_connector()
+    conn._exchange.symbols = []  # 시장 로드 안 됨
+    
+    result = conn.health_check()
+    
+    assert result["connected"] is True
+    assert result["markets_loaded"] is False
+
+
+def test_health_check_exception_handling():
+    """연결 상태에서 예외 발생 → 안전하게 처리하고 connected=False."""
+    conn = _make_connector()
+    conn._exchange.symbols = None  # symbols가 없으면 예외 발생
+    
+    result = conn.health_check()
+    
+    assert result["connected"] is False
+    assert result["exchange"] == "binance"

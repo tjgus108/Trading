@@ -64,6 +64,49 @@ class ExchangeConnector:
             )
         return info
 
+
+    def health_check(self) -> dict:
+        """연결 상태 및 거래소 상태 확인.
+        
+        반환값: {
+            "connected": bool,
+            "exchange": str,
+            "sandbox": bool,
+            "markets_loaded": bool,
+            "last_tick": dict or None
+        }
+        """
+        if self._exchange is None:
+            return {
+                "connected": False,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": False,
+                "last_tick": None,
+            }
+        
+        try:
+            # 시장 정보 확인 (간단한 ping)
+            markets_loaded = len(self._exchange.symbols) > 0 if hasattr(self._exchange, 'symbols') else False
+            
+            logger.debug("health_check: %s is healthy", self.exchange_name)
+            return {
+                "connected": True,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": markets_loaded,
+                "last_tick": None,
+            }
+        except Exception as e:
+            logger.warning("health_check failed: %s", str(e))
+            return {
+                "connected": False,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": False,
+                "last_tick": None,
+            }
+
     @property
     def exchange(self) -> ccxt.Exchange:
         if self._exchange is None:

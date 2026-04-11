@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 50 — 2026-04-11T09:30:08.692236Z
+🔄 CYCLE 51 — 2026-04-11T09:34:53.912507Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
@@ -22,6 +22,9 @@
   **[B] Risk:** tests/test_risk_manager.py +2 multi-position 경계. 동일 방향 누적 30% 경계, 반대 방향 gross 35% BLOCKED (net 5% 아님).
   **[F] Research:** Bybit 2025 사건. Feb 21 Lazarus $1.5B 해킹 (역대 최대). 멀티시그 강화, API 보안 오버홀. Aug 2025 기관 rate limit 도입, 일반 perp 400 req/s 유지. **우리 봇: API 키 2FA 필수**.
   **Tests:** 6093 passed (+9 from Cycle 48).
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

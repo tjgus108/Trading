@@ -104,24 +104,40 @@ class BacktestReport:
     annualization: int
 
     def summary(self) -> str:
-        return (
-            f"=== Backtest Report ===\n"
-            f"Total Return:    {self.total_return:+.2%}\n"
-            f"Ann. Return:     {self.ann_return:+.2%}\n"
-            f"Ann. Volatility: {self.ann_volatility:.2%}\n"
-            f"Sharpe Ratio:    {self.sharpe_ratio:.3f}\n"
-            f"Sortino Ratio:   {self.sortino_ratio:.3f}\n"
-            f"Max Drawdown:    {self.max_drawdown:.2%}\n"
-            f"Calmar Ratio:    {self.calmar_ratio:.3f}\n"
-            f"Recovery Factor: {self.recovery_factor:.3f}\n"
-            f"Win Rate:        {self.win_rate:.1%}\n"
-            f"Profit Factor:   {self.profit_factor:.2f}\n"
-            f"Avg Win:         {self.avg_win:+.4f}\n"
-            f"Avg Loss:        {self.avg_loss:.4f}\n"
-            f"Win/Loss Ratio:  {self.win_loss_ratio:.2f}\n"
-            f"Max Cons. Loss:  {self.max_consecutive_losses}\n"
-            f"Total Trades:    {self.total_trades}\n"
-        )
+        """
+        개선된 요약 출력: 섹션별 분류, 우측 정렬, 콤마 포맷.
+        """
+        def safe_format(val, fmt):
+            if isinstance(val, float) and (np.isinf(val) or np.isnan(val)):
+                return "N/A"
+            return fmt.format(val)
+        
+        lines = [
+            "=== Backtest Report ===",
+            "",
+            "PERFORMANCE:",
+            f"  Total Return:          {self.total_return:+.2%}",
+            f"  Ann. Return:           {self.ann_return:+.2%}",
+            f"  Ann. Volatility:       {self.ann_volatility:.2%}",
+            "",
+            "RISK-ADJUSTED METRICS:",
+            f"  Sharpe Ratio:          {self.sharpe_ratio:>7.3f}",
+            f"  Deflated Sharpe:       {self.deflated_sharpe_ratio:>7.3f}",
+            f"  Sortino Ratio:         {self.sortino_ratio:>7.3f}",
+            f"  Calmar Ratio:          {self.calmar_ratio:>7.3f}",
+            f"  Recovery Factor:       {safe_format(self.recovery_factor, '{:>7.2f}')}",
+            f"  Max Drawdown:          {self.max_drawdown:>7.2%}",
+            "",
+            "TRADE STATISTICS:",
+            f"  Total Trades:          {self.total_trades:>7,d}",
+            f"  Win Rate:              {self.win_rate:>7.1%}",
+            f"  Profit Factor:         {self.profit_factor:>7.2f}",
+            f"  Win/Loss Ratio:        {self.win_loss_ratio:>7.2f}",
+            f"  Avg Win:               {self.avg_win:>+7.4f}",
+            f"  Avg Loss:              {self.avg_loss:>7.4f}",
+            f"  Max Consecutive Loss:  {self.max_consecutive_losses:>6}",
+        ]
+        return "\n".join(lines)
 
     def to_dict(self) -> dict:
         return asdict(self)
