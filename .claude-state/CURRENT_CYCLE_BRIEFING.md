@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 88 — 2026-04-11T17:25:46.309863Z
+🔄 CYCLE 89 — 2026-04-11T17:33:08.320751Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 87 COMPLETED — B + D + SIM + F** (2026-04-12 09:35 UTC)
-  **[B] Risk:** tests/test_risk_manager.py +2 jitter seed 일관성, jitter=0 불변.
-  **[D] ML:** tests/test_regime_adaptive.py +2 레짐 전환 LOW confidence, bull 레짐 SELL 억제.
-  **[SIM] Auto-improve:** htf_ema 개선. Cross distance 필터 (range*0.3). **-2.26% → +1.79% (+4.05%p)**. 21 tests 유지.
-  **[F] Research:** 단순 전략 보강. ATR 변동성 필터 + HTF 트렌드 정렬 3단 조합이 주류.
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 88 COMPLETED — E + A + SIM + F** (2026-04-12 10:05 UTC)
+  **[E] Execution:** tests/test_paper_trader.py +2 fee tracking. BUY fee 단일 차감, SELL fee 누적 pnl.
+  **[A] Quality:** 6개 SIM 개선 전략 회귀 체크 — wick(19), engulf(15), frama(12), cmf(14), lob(7), htf(21) 모두 PASS.
+  **[SIM] Auto-improve:** volume_breakout 임계값 조정 (스파이크 2.0→1.8, 고확신 3.0→2.5). 거래수 증가 목표.
+  **[F] Research:** Q1 2026 레슨. BTC -22%, 트렌드 추종 whipsaw 손실. Grid/DCA 횡보 우위. circuit breaker 필수.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

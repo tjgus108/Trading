@@ -1,23 +1,35 @@
-# Cycle 88 개선 완료 — Volume Breakout
+# Cycle 89 완료 — Data Feeds Integration Smoke Test
 
-## 개선 대상
-**volume_breakout** — 거래 빈도 부족 (15 → 목표 30+)
+## 작업 내용
+**Data feeds integration smoke test** — sentiment, onchain, news, feed 통합 테스트
 
-## 수정 사항
-- `_SPIKE_MULT`: 2.0x → 1.8x (스파이크 기준 완화)
-- `_HIGH_CONF_MULT`: 3.0x → 2.5x (고확신 기준 조정)
-- 목표: 거래 수 증가로 통계적 의미 확보
+## 수정 파일
+- `/home/user/Trading/tests/test_data_feeds_integration.py` (신규)
 
 ## 테스트 결과
-- unit test 8/8 PASS ✓
-- volume spike 감지 로직 정상
-- confidence 등급 변경 정상
+```
+test_data_feeds_integration.py: 9/9 PASS ✓
+  - test_all_feeds_concurrent_initialization
+  - test_mixed_feed_states (LIVE + FALLBACK)
+  - test_feed_data_consistency
+  - test_feed_error_handling
+  - test_feed_primary_selection
+  - test_concurrent_feed_anomaly_detection
+  - test_feed_summary_report
+  - test_parallel_sentiment_and_onchain
+  - test_four_feeds_integration
 
-## 기대 효과
-- 시뮬 전 거래 수: 15
-- 시뮬 후 거래 수: 25~35 예상
-- Profit Factor 1.5 달성 기대
+test_data_health_check.py: 17/17 PASS ✓ (기존)
+```
+
+## 통합 테스트 범위
+1. **REST DataFeed (OHLCV)**: fetch, 캐싱
+2. **SentimentFetcher**: Fear & Greed, 펀딩비
+3. **OnchainFetcher**: 온체인 메트릭
+4. **NewsMonitor**: 리스크 이벤트
+5. **WebSocket adapter**: 연결, fallback 전환
+6. 이상 감지: all_disconnected, degraded_mode
 
 ## 다음 사이클
-- paper_simulation 실행으로 개선 효과 검증
-- 통과 기준: Sharpe≥1.0, MaxDD≤20%, PF≥1.5, Trades≥30
+- alpha-agent 통합 (data-agent ↔ alpha-agent 메시지 검증)
+- paper_simulation 실행으로 데이터 파이프라인 E2E 검증
