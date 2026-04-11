@@ -310,3 +310,23 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [AI Trading Bot Metrics — 3Commas](https://3commas.io/blog/ai-trading-bot-performance-analysis)
 - [Crypto Anomaly Detection (Deep Learning + Band Protocol) — Google Cloud](https://medium.com/google-cloud/technical-indicators-calculation-and-anomaly-detection-on-band-protocol-data-6dbf3b9b92c6)
 - [Funding Rate Guide — Bitunix](https://blog.bitunix.com/en/2024/07/15/understanding-crypto-funding-rate/)
+
+## [2026-04-11] Cycle 13 — Market Structure 2025
+
+### ETF 자금 패턴 변화
+- 2025년 연간 크립토 ETP 순유입 $46.7B, IBIT(BlackRock) 단독 $25.1B 흡수로 스팟 BTC ETF 카테고리의 약 60% 점유.
+- 유입 패턴: 상반기~7월 강세(BTC $110k 돌파 견인), 11월부터 30일 이동평균 순유입이 음전환—연말 방어적 포지셔닝.
+- Q1 2026 기준 글로벌 크립토 ETP 순유입 $18.7B(BTC $12.4B), 2026 연간 페이스가 2025($47.2B) 초과 예상.
+
+### 거래소 집중도
+- Binance 38.3%(2025년 12월 스팟), OKX 16.2%로 양사 합산 54% 이상. Bybit·Bitget 포함 상위 4개사가 스팟 70%+.
+- OKX는 2025년 9월 파생상품 월간 거래량 $1.3T로 Binance 추월—파생 시장 집중도 이동 주목.
+
+### 알고 트레이딩 비중
+- 거래소별 공식 알고/수동 거래 분리 통계 미공개. 간접 지표로 상위 4개 거래소 70%+ 집중 + 고빈도 유동성 패턴이 알고 비중 확대 지속을 시사.
+- 2024 대비 AI 봇 플래시 크래시(2025-05 $2B, 2025-10 $3.21B) 사례 증가 → 알고 비중 상승 부작용 가시화.
+
+### 참고
+- [Bitcoin ETF record outflows deceptive — CryptoSlate](https://cryptoslate.com/bitcoin-etf-record-outflows-are-deceptive-as-crypto-products-absorbed-46-7-billion-in-2025/)
+- [Crypto Exchange Market Share — CoinGecko](https://www.coingecko.com/research/publications/centralized-crypto-exchanges-market-share)
+- [Crypto ETFs 2025 Year in Review — Yahoo Finance](https://finance.yahoo.com/news/crypto-etfs-2025-bitcoin-ethereum-140103429.html)

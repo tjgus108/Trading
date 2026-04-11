@@ -71,3 +71,22 @@
 - Cycle 12: 다른 데이터 소스 견고성 (News/Sentiment/Onchain) 재검증
 - Cycle 13: 모델 성능 검증 (Feature importance bias 확인)
 - 옵션 2: MAR (Minimum Acceptable Return) 기반 평가 — Sortino 계산 시 MAR 파라미터 추가
+
+---
+
+## Cycle 13 - AnomalyDetector 강화 ✅ COMPLETED
+
+**Task:** 크립토 특화 거래량 급증 감지 추가
+
+**Files Modified:**
+1. `/home/user/Trading/src/monitoring/anomaly_detector.py`
+   - `__init__` line 56: `volume_surge_multiplier` 파라미터 추가 (default 3.0)
+   - `detect()` lines 84-87: `_detect_volume_surge` 호출 추가
+   - lines 163-189: `_detect_volume_surge()` 메서드 신규 추가
+     - rolling mean 대비 3배 이상 → 이상치 (MEDIUM)
+     - 4.5배 이상 → HIGH severity
+
+2. `/home/user/Trading/tests/test_anomaly_detector.py` (신규)
+   - 5개 테스트: 5 passed ✅
+
+**Test Results:** 5/5 passed
