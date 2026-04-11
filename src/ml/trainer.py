@@ -130,6 +130,7 @@ class WalkForwardTrainer:
         (rolling/ewm은 미래 데이터 포함 금지)
         """
         try:
+            from sklearn.calibration import CalibratedClassifierCV
             from sklearn.ensemble import RandomForestClassifier
             from sklearn.metrics import accuracy_score
         except ImportError:
@@ -177,22 +178,29 @@ class WalkForwardTrainer:
         )
 
         # 학습
-        clf = RandomForestClassifier(
+        base_clf = RandomForestClassifier(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
             random_state=42,
             n_jobs=-1,
             class_weight="balanced",
         )
-        clf.fit(X_train, y_train)
+        base_clf.fit(X_train, y_train)
 
-        # 성과 평가
+        # Calibration: validation set으로 isotonic regression 적용
+        # RF predict_proba는 과신(overconfident) 경향 → calibration으로 보정
+        # method="isotonic" (비모수적, val set 크기 충분할 때 선호)
+        # cv="prefit": base_clf가 이미 학습된 상태 → val set만 calibration에 사용
+        clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
+        clf.fit(X_val, y_val)
+
+        # 성과 평가 (calibrated 모델 기준)
         train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
         val_acc = float(accuracy_score(y_val, clf.predict(X_val)))
         test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
 
-        # 피처 중요도
-        feat_importance = dict(zip(X_train.columns, clf.feature_importances_))
+        # 피처 중요도 (base estimator에서 추출)
+        feat_importance = dict(zip(X_train.columns, base_clf.feature_importances_))
 
         fail_reasons = []
         if test_acc < MIN_ACCURACY:
@@ -201,7 +209,7 @@ class WalkForwardTrainer:
             fail_reasons.append(f"val_accuracy {val_acc:.3f} < {MIN_ACCURACY}")
 
         self._trained_model = clf
-        self._class_order = list(clf.classes_)
+        self._class_order = list(base_clf.classes_)
         self._feature_names = list(X_train.columns)
         model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
 
@@ -236,7 +244,9 @@ class WalkForwardTrainer:
         if self._trained_model is None:
             raise RuntimeError("모델이 학습되지 않음 — train() 먼저 호출")
 
-        importances = self._trained_model.feature_importances_
+        # CalibratedClassifierCV는 feature_importances_ 없음 → base estimator에서 추출
+        base = getattr(self._trained_model, "estimator", self._trained_model)
+        importances = base.feature_importances_
         names = getattr(self, "_feature_names", [f"f{i}" for i in range(len(importances))])
         ranked = sorted(zip(names, importances), key=lambda x: x[1], reverse=True)
         if top_n is not None:

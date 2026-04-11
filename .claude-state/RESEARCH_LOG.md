@@ -552,3 +552,21 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [2025 Crypto Regulatory Round-Up — Chainalysis](https://www.chainalysis.com/blog/2025-crypto-regulatory-round-up/)
 - [South Korea Crypto Regulations — CoinTelegraph](https://cointelegraph.com/learn/articles/crypto-regulations-in-south-korea)
 - [AI Crypto Trading Bots Legal Guide — internetlawyer-blog.com](https://www.internetlawyer-blog.com/ai-crypto-trading-bots-navigating-state-federal-and-international-laws/)
+
+## [2026-04-11] Cycle 27 — Psychological Failure Modes
+
+### 운영자 실수 패턴
+- 드로다운 발생 시 봇을 수동 중단하거나 파라미터를 즉흥 수정 → 정상 손실 구간을 전략 실패로 오인한 감정적 개입
+- 백테스트 과최적화(Overfitting)로 연 수백% 수익률 착각 → 실제 자본 과대 투입 후 라이브 시 즉시 붕괴 (in-sample vs out-of-sample 상관관계 0.05 미만)
+- "Set and forget" 심리로 모니터링 방치 → 이상 거동·슬리피지 누적 미감지. 자동화 계좌의 73%가 6개월 내 실패
+- 2025-05 플래시 크래시: AI 봇들이 정상 조건 전용으로 과적합되어 2분 만에 $2B 매도 집행, 변동성 레짐 전환 미감지
+
+### 방지책
+- 백테스트 지표(Sharpe, MDD)에 walk-forward 검증 필수. 단일 in-sample 결과로 자본 배분 금지
+- 드로다운 한도(예: 일일 3%) 초과 시 자동 서킷브레이커 적용, 수동 개입 프로세스 사전 문서화
+- 라이브 실행 시 소규모(실제 운용 자본의 5% 이하) 파일럿 우선 → 심리적 손실 내성 확인 후 증액
+
+### 참고
+- [Do Trading Bots Fail? — Finance Monthly](https://www.finance-monthly.com/2024/01/do-trading-bots-fail/)
+- [How to Avoid Overfitting in Crypto Trading Bots — DEV Community](https://dev.to/trendrider/how-to-avoid-overfitting-in-crypto-trading-bots-lessons-from-10000-backtested-trades-2oci)
+- [AI Trading Bots Advisory — CFTC](https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AITradingBots.html)

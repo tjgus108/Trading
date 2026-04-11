@@ -3,6 +3,7 @@ RiskManager / CircuitBreaker 단위 테스트.
 """
 
 import math
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -251,3 +252,37 @@ def test_jitter_pct_clamped_at_five_percent():
     """jitter_pct > 0.05 전달 시 내부적으로 0.05로 클램프된다."""
     rm = _make_rm(jitter_pct=0.99)
     assert rm.jitter_pct == pytest.approx(0.05)
+
+
+# ── Session Filter ────────────────────────────────────────────────────────────
+
+def test_session_filter_reduced_asia_halves_position():
+    """session_filter=True + 아시아(평일 REDUCED) 세션 → 50% 축소."""
+    from datetime import timezone
+    rm = _make_rm(session_filter=True)
+    rm_off = _make_rm(session_filter=False)
+
+    # 평일 09:00 UTC → REDUCED (아시아 세션)
+    ts = datetime(2026, 4, 13, 9, 0, 0, tzinfo=timezone.utc)  # Monday
+
+    base = rm_off.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    filtered = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000, timestamp=ts)
+
+    assert filtered.status == RiskStatus.APPROVED
+    assert abs(filtered.position_size - base.position_size * 0.50) < 1e-5
+
+
+def test_session_filter_weekend_scales_to_30_pct():
+    """session_filter=True + 주말 → 30% 축소."""
+    from datetime import timezone
+    rm = _make_rm(session_filter=True)
+    rm_off = _make_rm(session_filter=False)
+
+    # Saturday 14:00 UTC
+    ts = datetime(2026, 4, 11, 14, 0, 0, tzinfo=timezone.utc)  # Saturday
+
+    base = rm_off.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    filtered = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000, timestamp=ts)
+
+    assert filtered.status == RiskStatus.APPROVED
+    assert abs(filtered.position_size - base.position_size * 0.30) < 1e-5

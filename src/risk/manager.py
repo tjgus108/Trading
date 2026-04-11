@@ -9,7 +9,10 @@ import math
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Union
+
+from src.strategy.base import SessionType, is_active_session
 
 import numpy as np
 import pandas as pd
@@ -105,6 +108,7 @@ class RiskManager:
         max_position_size: float = 0.10,   # 계좌 대비 최대 10%
         circuit_breaker: Optional[CircuitBreaker] = None,
         jitter_pct: float = 0.0,  # ±jitter_pct 랜덤 노이즈 (0~0.05)
+        session_filter: bool = False,  # True 시 세션별 포지션 축소 활성화
     ):
         self.risk_per_trade = risk_per_trade
         self.atr_multiplier_sl = atr_multiplier_sl
@@ -112,6 +116,7 @@ class RiskManager:
         self.max_position_size = max_position_size
         self.circuit_breaker = circuit_breaker
         self.jitter_pct = max(0.0, min(jitter_pct, 0.05))  # 상한 5%
+        self.session_filter = session_filter
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
@@ -170,6 +175,7 @@ class RiskManager:
         account_balance: float,
         last_candle_pct_change: float = 0.0,
         candle_df: Optional[pd.DataFrame] = None,  # adaptive multiplier용
+        timestamp: Union[datetime, None] = None,  # 세션 필터용 UTC 시각
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -216,6 +222,22 @@ class RiskManager:
             position_size = position_size * (1.0 + noise)
             position_size = min(position_size, max_size)  # 클램프 재적용
             logger.debug("Order jitter applied: noise=%.4f%%", noise * 100)
+
+        # 세션 필터: REDUCED 세션 → 50% 축소, 주말 → 30% 축소
+        if self.session_filter:
+            session = is_active_session(timestamp)
+            if session == SessionType.REDUCED:
+                ts = timestamp
+                if ts is None:
+                    from datetime import timezone
+                    ts = datetime.now(timezone.utc)
+                is_weekend = ts.weekday() >= 5
+                scale = 0.30 if is_weekend else 0.50
+                position_size *= scale
+                logger.debug(
+                    "Session filter (%s): position_size scaled by %.0f%%",
+                    "weekend" if is_weekend else "asia/off-hours", scale * 100,
+                )
 
         if action == "BUY":
             stop_loss = entry_price - sl_distance

@@ -392,6 +392,35 @@ class TestWalkForwardTrainer:
         assert pred.action in ("BUY", "SELL", "HOLD")
         assert 0.0 <= pred.confidence <= 1.0
 
+    def test_calibrated_proba_sum_to_one(self):
+        """Calibration 후 predict_proba 합이 1.0 (±1e-6)."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+
+        # 내부 모델로 직접 확인
+        from src.ml.features import FeatureBuilder
+        fb = FeatureBuilder()
+        X, _ = fb.build(df)
+        proba = trainer._trained_model.predict_proba(X)
+        row_sums = proba.sum(axis=1)
+        assert (row_sums - 1.0).abs().max() < 1e-6 if hasattr(row_sums, "abs") else True
+        # numpy array 경우
+        import numpy as np
+        assert np.allclose(proba.sum(axis=1), 1.0, atol=1e-6)
+
+    def test_calibrated_model_is_wrapped(self):
+        """학습 후 _trained_model이 CalibratedClassifierCV 래퍼인지 확인."""
+        pytest.importorskip("sklearn")
+        from sklearn.calibration import CalibratedClassifierCV
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+        assert isinstance(trainer._trained_model, CalibratedClassifierCV)
+
 
 # ---------------------------------------------------------------------------
 # C1: MLRFStrategy

@@ -2241,3 +2241,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 트레이딩 봇 법적/규제. 개인 자기 자금만 라이선스 불필요. 한국 가상자산 이용자 보호법 (2024-07)상 자동매매 그레이존. EU MiCA 2025 시행. 타인 자금/유료 신호는 라이선스 필수.
 **Tests:** 5977 passed (+2 from Cycle 25, 22% 속도 개선).
 **Next Cycle:** 27 (B+D+F)
+
+## [2026-04-11 04:14 UTC] Cycle 27 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:16 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 11:00 UTC] Cycle 27 COMPLETED — B + D + F
+**[B] Risk:** src/risk/manager.py에 session_filter 파라미터 추가 (기본 False). 활성화 시 REDUCED+평일 50%, 주말 30% 자동 축소. jitter 이후 적용. +2 tests.
+**[D] ML:** src/ml/trainer.py에 CalibratedClassifierCV(isotonic) 적용. RF predict_proba 과신 보정. validation set만 사용 (data leakage 방지). +2 tests (sklearn 미설치 시 skip).
+**[F] Research:** 자동매매 심리적 실패. in-sample/OOS 상관 0.05 미만 → 숫자 과신 → 과잉 투자 → 패닉 개입. CFTC advisory 인용. 방지: 자본 상한 고정, 개입 금지 룰.
+**Tests:** 5979 passed (+2 from Cycle 26).
+**Next Cycle:** 28 (E+A+F)
