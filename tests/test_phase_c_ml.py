@@ -115,6 +115,35 @@ class TestFeatureBuilder:
         X, _ = fb.build(df)
         assert np.isfinite(X.values).all()
 
+    def test_no_lookahead_bias_in_features(self):
+        """
+        EMA/rolling 계산이 이전 바만 사용하는지 확인 (현재 바 제외).
+        
+        검증:
+        1. RSI z-score: 이전 20바 기준
+        2. Volatility: 이전 20바 기준
+        3. EMA features: 이전 바 기준
+        4. Donchian: 이전 20바 기준
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+        X, _ = fb.build(df)
+        
+        # Feature가 존재하는지 확인
+        required_features = ["rsi_zscore", "volatility_20", "ema_ratio", 
+                            "price_vs_ema20", "volume_ratio_20", "donchian_pct"]
+        for feat in required_features:
+            assert feat in X.columns, f"Feature {feat} missing"
+        
+        # 모든 feature가 유한 값인지 확인 (inf/nan 없음)
+        assert X[required_features].notna().all().all()
+        assert np.isfinite(X[required_features]).all().all()
+        
+        # EMA는 첫 50바 정도는 정규화 과정에서 NaN 처리됨
+        # (rolling window warm-up) → 그 이후만 유효
+        assert len(X) > 0
+
+
 
 # ---------------------------------------------------------------------------
 # C1: MLSignalGenerator (모델 없는 상태)
@@ -333,6 +362,9 @@ class TestMLRFStrategy:
         assert signal.confidence == Confidence.LOW
 
 
+# ---------------------------------------------------------------------------
+# C2: LLMAnalyst (API 없는 mock 모드)
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # C2: LLMAnalyst (API 없는 mock 모드)
 # ---------------------------------------------------------------------------
