@@ -34,7 +34,7 @@ class TrendPersistenceStrategy(BaseStrategy):
         autocorr = (
             deviations.rolling(_LOOKBACK, min_periods=2)
             .apply(
-                lambda x: pd.Series(x).autocorr(lag=1) if len(x) >= 2 else 0.0,
+                lambda x: pd.Series(x).autocorr(lag=1) if len(x) >= 3 else 0.0,
                 raw=False,
             )
             .fillna(0.0)
