@@ -193,6 +193,7 @@ class TestFeedParallel:
 
 
 
+    @pytest.mark.slow
     def test_fetch_with_retry_logging(self):
         """Fetch retry 시 에러 로그에 symbol, timeframe, attempt 정보 포함."""
         connector = MagicMock()
@@ -251,6 +252,7 @@ class TestFeedParallel:
             assert error_call_args[3] == 100  # limit
             assert error_call_args[4] == 2  # max_retries
 
+    @pytest.mark.slow
     def test_fetch_error_log_includes_context(self):
         """Transient 에러 모두 실패 시 exhausted 로그에 context 포함."""
         import ccxt

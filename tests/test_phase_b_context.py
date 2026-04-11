@@ -156,6 +156,7 @@ class TestOnchainFetcher:
         assert f._last_successful is not None
         assert f._last_successful.onchain_score == initial.onchain_score
 
+    @pytest.mark.slow
     def test_max_retries_parameter_in_blockchain_fetch(self):
         """blockchain.info fetch 시 max_retries 파라미터 영향 검증."""
         f = OnchainFetcher(max_retries=2)

@@ -121,7 +121,16 @@ class ExchangeConnector:
         return data
 
     def fetch_balance(self) -> dict:
-        return self.exchange.fetch_balance()
+        """잔고 조회. None 또는 빈 dict 응답 시 안전한 기본값 반환."""
+        try:
+            result = self.exchange.fetch_balance()
+        except Exception as exc:
+            logger.warning("fetch_balance failed: %s", exc)
+            return {"total": {}, "free": {}, "used": {}}
+        if not result or not isinstance(result, dict):
+            logger.warning("fetch_balance returned unexpected response: %r", result)
+            return {"total": {}, "free": {}, "used": {}}
+        return result
 
     def fetch_ticker(self, symbol: str) -> dict:
         return self.exchange.fetch_ticker(symbol)

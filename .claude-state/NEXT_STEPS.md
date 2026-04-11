@@ -1,3 +1,13 @@
+# Cycle 58 - Research: Bot Running Costs
+
+## [2026-04-11] Cycle 58 — Bot Running Costs
+- VPS: $20~40/월 (기본), $100~200/월 (고성능 멀티봇)
+- API: 거래소 API 자체는 무료, 3rd-party 봇 플랫폼 구독료 별도 ($25~240+/월)
+- 전력/유지보수: 클라우드 기준 별도 전력비 없음, 관리 기회비용 $150~600/월 (주 3시간 기준)
+- 현실적 최소 비용: VPS $20 + 관리시간 → 월 $50~100 수준이면 자체 봇 운영 가능
+
+---
+
 # Cycle 56 - Data & Infrastructure 캐시 키 검증 완료
 
 ## [2026-04-11] Cycle 56 — DataFeed 멀티 심볼 캐시 키 충돌 검증

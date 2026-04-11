@@ -171,3 +171,29 @@ def test_create_order_raises_after_max_retries():
         conn.create_order("BTC/USDT", "buy", 0.01, max_retries=2)
 
     assert conn._exchange.create_market_order.call_count == 2
+
+
+# ── fetch_balance 견고성 테스트 ────────────────────────────────────────────
+
+def test_fetch_balance_none_response(caplog):
+    """fetch_balance가 None을 반환할 때 안전한 기본값을 돌려준다."""
+    conn = _make_connector()
+    conn._exchange.fetch_balance.return_value = None
+
+    with caplog.at_level(logging.WARNING, logger="src.exchange.connector"):
+        result = conn.fetch_balance()
+
+    assert result == {"total": {}, "free": {}, "used": {}}
+    assert any("unexpected" in r.message for r in caplog.records)
+
+
+def test_fetch_balance_exception(caplog):
+    """fetch_balance 호출 중 예외 발생 시 안전한 기본값을 돌려준다."""
+    conn = _make_connector()
+    conn._exchange.fetch_balance.side_effect = ccxt.NetworkError("connection dropped")
+
+    with caplog.at_level(logging.WARNING, logger="src.exchange.connector"):
+        result = conn.fetch_balance()
+
+    assert result == {"total": {}, "free": {}, "used": {}}
+    assert any("fetch_balance failed" in r.message for r in caplog.records)
