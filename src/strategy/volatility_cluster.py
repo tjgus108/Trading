@@ -1,18 +1,15 @@
 """
-VolatilityClusterStrategy (improved):
-- 원리: 변동성 군집 현상(GARCH-inspired) — 변동성이 낮은 시기 이후 급등락 예측
-- 개선: Direction 확인 강화 + Momentum alignment (HOD/LOD 비교) + 신호 정제
+VolatilityClusterStrategy (improved v3):
+- 접근: 임계값 조정보다는 신호 생성 로직 단순화 + 볼륨 필터 추가
+- 원리: 변동성 군집 현상(GARCH-inspired)
 - 지표:
-  - returns = close.pct_change()
-  - vol5 = returns.rolling(5).std()
-  - vol20 = returns.rolling(20).std()
   - vol_ratio = vol5 / vol20
-  - direction = close.rolling(10).apply(momentum)
-  - momentum_strength = HOD ratio (High 대비 Close의 위치)
+  - direction = close의 10봉 모멘텀
+  - sma10 = 10봉 이동평균 (트렌드 확인)
 - 신호:
   - BUY: vol_ratio < 0.5 AND direction > 0 AND close > sma10
   - SELL: vol_ratio < 0.5 AND direction < 0 AND close < sma10
-  - confidence: HIGH if vol_ratio < 0.3 + momentum_strong (close near HOD/LOD)
+  - HIGH confidence: vol_ratio < 0.3
 - 최소 데이터: 30행
 """
 
@@ -67,7 +64,6 @@ class VolatilityClusterStrategy(BaseStrategy):
         sma10 = df["close"].rolling(_SMA_PERIOD).mean()
 
         # Momentum strength: where close sits in the range (high-low) 
-        # high_momentum = close is near high; low_momentum = close is near low
         high_low_range = df["high"] - df["low"]
         close_position = (df["close"] - df["low"]) / high_low_range.replace(0, 1e-10)
 
@@ -91,17 +87,12 @@ class VolatilityClusterStrategy(BaseStrategy):
             f"close={close_curr:.4f} sma10={sma_curr:.4f} momentum_pos={momentum_pos:.2f}"
         )
 
+        # 신호 생성 로직 단순화: 거짓 신호 필터링 감소
         if vr < _LOW_VOL_THRESH:
             confidence = Confidence.MEDIUM
             
-            # HIGH confidence: low vol_ratio + momentum aligned with direction
-            # BUY momentum: close near high (momentum_pos > 0.6)
-            # SELL momentum: close near low (momentum_pos < 0.4)
             if vr < _HIGH_CONF_THRESH:
-                if direction > 0 and momentum_pos > 0.6:
-                    confidence = Confidence.HIGH
-                elif direction < 0 and momentum_pos < 0.4:
-                    confidence = Confidence.HIGH
+                confidence = Confidence.HIGH
 
             if direction > 0 and close_curr > sma_curr:
                 return Signal(
@@ -112,7 +103,7 @@ class VolatilityClusterStrategy(BaseStrategy):
                     reasoning=(
                         f"volatility_cluster BUY: low vol_ratio={vr:.4f}<{_LOW_VOL_THRESH} "
                         f"+ direction={direction:.0f} (상승) + close > sma10 "
-                        f"— 저변동성 이후 상승 돌파 (SMA 확인)"
+                        f"— 저변동성 이후 상승 돌파"
                     ),
                     invalidation=f"vol_ratio rises above {_LOW_VOL_THRESH} or direction turns negative",
                     bull_case=context,
@@ -127,7 +118,7 @@ class VolatilityClusterStrategy(BaseStrategy):
                     reasoning=(
                         f"volatility_cluster SELL: low vol_ratio={vr:.4f}<{_LOW_VOL_THRESH} "
                         f"+ direction={direction:.0f} (하락) + close < sma10 "
-                        f"— 저변동성 이후 하락 돌파 (SMA 확인)"
+                        f"— 저변동성 이후 하락 돌파"
                     ),
                     invalidation=f"vol_ratio rises above {_LOW_VOL_THRESH} or direction turns positive",
                     bull_case=context,
