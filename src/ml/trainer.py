@@ -123,8 +123,11 @@ class WalkForwardTrainer:
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
-        walk-forward 학습 실행.
+        walk-forward 학습 실행 (데이터 누출 방지).
         df: DataFeed.fetch() 반환 DataFrame (지표 포함, 최소 200 캔들 권장)
+        
+        중요: 시계열 분할을 먼저 한 후, 각 구간에서만 피처 계산
+        (rolling/ewm은 미래 데이터 포함 금지)
         """
         try:
             from sklearn.ensemble import RandomForestClassifier
@@ -138,31 +141,39 @@ class WalkForwardTrainer:
                 fail_reasons=["scikit-learn not installed"],
             )
 
-        X, y = self.feature_builder.build(df)
-        n = len(X)
+        # 데이터 누출 방지: raw df를 먼저 분할
+        n_total = len(df)
+        train_end = int(n_total * 0.60)
+        val_end = int(n_total * 0.80)
 
+        df_train = df.iloc[:train_end].copy()
+        df_val = df.iloc[train_end:val_end].copy()
+        df_test = df.iloc[val_end:].copy()
+
+        logger.info(
+            "Walk-forward split: n_total=%d train=%d val=%d test=%d",
+            n_total, len(df_train), len(df_val), len(df_test),
+        )
+
+        # 각 구간별로 피처 계산 (rolling/ewm이 미래 데이터 포함 금지)
+        X_train, y_train = self.feature_builder.build(df_train)
+        X_val, y_val = self.feature_builder.build(df_val)
+        X_test, y_test = self.feature_builder.build(df_test)
+
+        # 전체 샘플 수
+        n = len(X_train) + len(X_val) + len(X_test)
+        
         if n < 100:
             return TrainingResult(
-                model_name="", n_samples=n, n_features=X.shape[1] if n > 0 else 0,
+                model_name="", n_samples=n, n_features=X_train.shape[1] if len(X_train) > 0 else 0,
                 train_accuracy=0, val_accuracy=0, test_accuracy=0,
                 feature_importances={}, passed=False,
                 fail_reasons=[f"샘플 부족: {n} < 100"],
             )
 
-        # 60/20/20 시계열 분할
-        train_end = int(n * 0.60)
-        val_end = int(n * 0.80)
-
-        X_train = X.iloc[:train_end]
-        y_train = y.iloc[:train_end]
-        X_val = X.iloc[train_end:val_end]
-        y_val = y.iloc[train_end:val_end]
-        X_test = X.iloc[val_end:]
-        y_test = y.iloc[val_end:]
-
         logger.info(
-            "Training RF: n=%d train=%d val=%d test=%d features=%d",
-            n, len(X_train), len(X_val), len(X_test), X.shape[1],
+            "Training RF: n_train=%d n_val=%d n_test=%d features=%d",
+            len(X_train), len(X_val), len(X_test), X_train.shape[1] if len(X_train) > 0 else 0,
         )
 
         # 학습
@@ -181,7 +192,7 @@ class WalkForwardTrainer:
         test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
 
         # 피처 중요도
-        feat_importance = dict(zip(X.columns, clf.feature_importances_))
+        feat_importance = dict(zip(X_train.columns, clf.feature_importances_))
 
         fail_reasons = []
         if test_acc < MIN_ACCURACY:
@@ -191,13 +202,13 @@ class WalkForwardTrainer:
 
         self._trained_model = clf
         self._class_order = list(clf.classes_)
-        self._feature_names = list(X.columns)
+        self._feature_names = list(X_train.columns)
         model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
 
         result = TrainingResult(
             model_name=model_name,
             n_samples=n,
-            n_features=X.shape[1],
+            n_features=X_train.shape[1],
             train_accuracy=round(train_acc, 4),
             val_accuracy=round(val_acc, 4),
             test_accuracy=round(test_acc, 4),

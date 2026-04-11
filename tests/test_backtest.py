@@ -70,3 +70,35 @@ def test_backtest_summary_format():
     summary = result.summary()
     assert "BACKTEST_RESULT:" in summary
     assert "verdict:" in summary
+
+
+def test_backtest_report_to_markdown():
+    """BacktestReport.to_markdown() 형식 검증."""
+    from src.backtest.report import BacktestReport
+    
+    trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}, {"pnl_pct": 0.015}]
+    report = BacktestReport.from_trades(trades)
+    markdown = report.to_markdown()
+    
+    assert "| Metric | Value |" in markdown
+    assert "Total Return" in markdown
+    assert "Sharpe Ratio" in markdown
+    assert "Total Trades | 3 |" in markdown
+
+
+def test_backtest_report_markdown_vs_summary():
+    """to_markdown()는 to_summary()보다 콤팩트해야 함."""
+    from src.backtest.report import BacktestReport
+    
+    trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}]
+    report = BacktestReport.from_trades(trades)
+    
+    markdown = report.to_markdown()
+    summary = report.summary()
+    
+    # markdown은 테이블 형식 (줄 수 적음), summary는 텍스트 형식
+    markdown_lines = len(markdown.split('\n'))
+    summary_lines = len(summary.split('\n'))
+    
+    assert markdown_lines < summary_lines
+    assert markdown.count('|') >= 16  # 최소 header + separators + 8 rows

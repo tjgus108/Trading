@@ -263,3 +263,30 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [MarketSenseAI — Springer Nature](https://link.springer.com/article/10.1007/s00521-024-10613-4)
 - [TradingAgents Multi-Agent Framework](https://tradingagents-ai.github.io/)
 - [LLM Agents vs Human Traders — arXiv](https://arxiv.org/html/2502.15800v3)
+
+
+## [2026-04-11] Cycle 11 — Paper → Live Transition
+
+### Top 5 실패 원인
+- **오버피팅**: 90%의 알고 전략이 live에서 실패하는 근본 원인. 역사적 데이터를 암기한 전략은 새로운 시장 구조에서 즉시 붕괴.
+- **슬리피지·수수료 미반영**: 백테스트에서 시장가 체결, 0 수수료 가정 → live에서 BTC/ETH도 1~5 bps 슬리피지 발생, 중소형 알트는 0.5~2%+.
+- **감정(Emotional Gap)**: Paper에서는 없는 실자본 스트레스. 전략 규칙 이탈, 조기 청산, 과도 포지션 등 행동 오류 유발.
+- **레짐 변화 무대응**: Paper 기간과 live 기간의 시장 구조가 다름 — ETF 유입 이후 크립토 레짐이 기관화. 훈련 시 존재하지 않던 새 레짐에서 모델 오작동.
+- **실행 인프라 차이**: 지연(latency), 부분 체결(partial fill), 네트워크 장애 등 paper에서는 없는 운영 리스크. 거래소 API rate limit 초과 시 주문 누락.
+
+### 체크리스트 (프로 퀀트 기준)
+- **OOS 검증 완료**: Walk-forward test로 훈련 기간 외 구간에서 Sharpe/MDD 지표 재확인. 파라미터 1개당 OOS 트레이드 200개 이상 확보 권장.
+- **실제 비용 반영 재백테스트**: 슬리피지(BTC 5 bps, 알트 0.5~2%), 수수료, 펀딩비 전부 포함한 상태로 Sharpe >= 1.0 재통과 여부 확인.
+- **소규모 live 테스트**: 전체 자본의 1~5%로 먼저 live 실행 → 체결가 vs 백테스트 가정 차이(implementation shortfall) 측정 후 전략 조정.
+- **서킷브레이커 사전 설정**: 일일 MDD 3%, 주간 7% 초과 시 자동 중단 로직 배포 완료 후 live 전환.
+- **레짐 커버리지 확인**: 최소 상승/하락/횡보 3개 레짐에서 전략 성과 양호한지 스트레스 테스트 실시.
+
+### 크립토 특화 주의점
+- **펀딩비(Funding Rate)**: 선물 거래 시 롱/숏 포지션 보유 비용. Paper에서 무시하면 실전 수익성 과대 계산됨 — 특히 연율 30~100% 구간에서 치명적.
+- **유동성 깊이(Market Depth)**: 포지션 크기가 호가창 깊이 0.1% 초과 시 자체 슬리피지 폭발. 소규모 알트코인에서 대형 포지션은 50%+ 슬리피지 유발 가능.
+- **거래소 API 불안정**: ccxt 기반 운영 시 rate limit, 타임아웃, 부분 체결 처리 로직이 없으면 실전에서 미체결 주문 누적.
+
+### 참고
+- [Paper vs Live Trading — Alpaca](https://alpaca.markets/learn/paper-trading-vs-live-trading-a-data-backed-guide-on-when-to-start-trading-real-money)
+- [Overfitting Crypto Strategies — TrendRider](https://trendrider.net/blog/how-to-avoid-overfitting-crypto-trading)
+- [Backtesting with Realistic Costs — Paybis](https://paybis.com/blog/how-to-backtest-crypto-bot/)

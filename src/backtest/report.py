@@ -77,6 +77,27 @@ class BacktestReport:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    def to_markdown(self) -> str:
+        """
+        Markdown 형식의 간결한 성과 보고서.
+        
+        Returns:
+            str: 마크다운 형식 테이블
+        """
+        return (
+            f"| Metric | Value |\n"
+            f"|--------|-------|\n"
+            f"| Total Return | {self.total_return:+.2%} |\n"
+            f"| Ann. Return | {self.ann_return:+.2%} |\n"
+            f"| Sharpe Ratio | {self.sharpe_ratio:.3f} |\n"
+            f"| Sortino Ratio | {self.sortino_ratio:.3f} |\n"
+            f"| Max Drawdown | {self.max_drawdown:.2%} |\n"
+            f"| Win Rate | {self.win_rate:.1%} |\n"
+            f"| Profit Factor | {self.profit_factor:.2f} |\n"
+            f"| Total Trades | {self.total_trades} |\n"
+        )
+
+
     @classmethod
     def from_trades(
         cls,
