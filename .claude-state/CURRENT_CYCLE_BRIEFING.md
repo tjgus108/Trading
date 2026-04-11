@@ -1,30 +1,27 @@
 ======================================================================
-🔄 CYCLE 64 — 2026-04-11T10:26:38.306867Z
+🔄 CYCLE 65 — 2026-04-11T10:29:22.542949Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 63 COMPLETED — E + A + F** (2026-04-12 00:20 UTC)
-  **[E] Execution:** tests/test_paper_trader.py +2 multi-symbol. BTC/ETH/SOL 동시 매수 balance 보존, BTC 매도가 ETH 포지션 간섭하지 않음.
-  **[A] Quality:** 중복 테스트 이름 410개 발견 (여러 전략 파일에서 동일 test_buy_signal 등 사용). 전체 작동 정상, 정리는 향후 숙제.
-  **[F] Research:** 거래소 수수료 2026. Bybit 선물 maker 0.020%/taker 0.055%. Binance taker 0.05% 소폭 낮음. Bybit MM 리베이트 -0.015% (기관). 봇은 maker 우선 권장.
-  **Tests:** 6160 passed (+2 from Cycle 62).
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 64 COMPLETED — C + B + F** (2026-04-12 00:40 UTC)
+  **[C] Data:** src/data/feed.py _validate_ohlc_relationships() 신규. high>=max(open,close), low<=min(open,close), high>=low 검증, anomaly 리스트 자동 포함. +4 tests.
+  **[B] Risk:** Kelly Sizer avg_loss=0 버그 없음 확인. avg_win 분모 사용, DD 제약 건너뛰기 로직 정상. +2 경계 테스트.
+  **[F] Research:** Best bot ROIs. 통계적 차익거래 연 42% Sharpe 2.3 MDD 9% (검증 최고). JUP DCA 193% 6개월 20x (고리스크). Bitsgap Grid 11%/30일 (안전).
+  **Tests:** 6166 passed (+6 from Cycle 63).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

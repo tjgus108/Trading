@@ -60,6 +60,17 @@ class TestNextCandleClose:
         with pytest.raises(ValueError, match="Unsupported timeframe"):
             self.scheduler.next_candle_close("3h")
 
+    @pytest.mark.parametrize("bad_tf", ["0", "-1m", "999999h", "", "0m"])
+    def test_invalid_interval_values_raise(self, bad_tf):
+        """음수, 0, 매우 큰 값, 빈 문자열 등 비정상 타임프레임은 ValueError."""
+        with pytest.raises(ValueError, match="Unsupported timeframe"):
+            self.scheduler.next_candle_close(bad_tf)
+
+    def test_very_large_timeframe_raises(self):
+        """매우 큰 숫자가 포함된 타임프레임 문자열도 ValueError."""
+        with pytest.raises(ValueError, match="Unsupported timeframe"):
+            self.scheduler.next_candle_close("99999d")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 타임프레임별 간격 정합성

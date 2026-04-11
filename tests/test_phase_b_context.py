@@ -822,3 +822,33 @@ class TestNewsMonitorRobustness:
         result3 = m.fetch()
         assert result3.level == "HIGH"
         assert result3.source == "fallback"
+
+
+# ---------------------------------------------------------------------------
+# MarketContext: composite_score 경계 (극단값)
+# ---------------------------------------------------------------------------
+
+class TestCompositeScoreEdge:
+    """모든 소스 극단값에서 composite_score 경계 검증."""
+
+    def test_all_sources_max_bullish_clamped_to_plus3(self):
+        """감성+온체인 모두 최대 강세 → composite_score == +3.0 (상한 클램프)."""
+        f = SentimentFetcher()
+        o = OnchainFetcher()
+        # sentiment_score=+3.0 (극단 공포 역추세 + 음펀딩비)
+        # onchain_score=+3.0  (outflow + accumulating + undervalued)
+        sent = f.mock(fear_greed=0, funding_rate=-0.001)
+        och = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING", nvt_signal="UNDERVALUED")
+        ctx = MarketContext(sentiment=sent, onchain=och)
+        assert ctx.composite_score == 3.0
+
+    def test_all_sources_max_bearish_clamped_to_minus3(self):
+        """감성+온체인 모두 최대 약세 → composite_score == -3.0 (하한 클램프)."""
+        f = SentimentFetcher()
+        o = OnchainFetcher()
+        # sentiment_score=-3.0 (극단 탐욕 + 과열 펀딩비)
+        # onchain_score=-3.0  (inflow_spike + distributing + overvalued)
+        sent = f.mock(fear_greed=100, funding_rate=0.001)
+        och = o.mock(exchange_flow="INFLOW_SPIKE", whale_activity="DISTRIBUTING", nvt_signal="OVERVALUED")
+        ctx = MarketContext(sentiment=sent, onchain=och)
+        assert ctx.composite_score == -3.0

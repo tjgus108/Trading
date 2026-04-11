@@ -1,3 +1,17 @@
+# Cycle 65 - Category D: ML & Signals - composite_score 경계 테스트 완료
+
+## [2026-04-11] Cycle 65 — MarketContext composite_score 극단값 경계 테스트
+
+### 작업 완료
+- `tests/test_phase_b_context.py`에 `TestCompositeScoreEdge` 클래스 추가 (파일 끝)
+  - `test_all_sources_max_bullish_clamped_to_plus3`: 감성+온체인 최대 강세 → +3.0 클램프 확인
+  - `test_all_sources_max_bearish_clamped_to_minus3`: 감성+온체인 최대 약세 → -3.0 클램프 확인
+
+### 테스트 결과
+- TestCompositeScoreEdge: 2/2 PASS
+
+---
+
 # Cycle 64 - Category C: Data & Infrastructure - OHLC 검증 완료
 
 ## [2026-04-11] Cycle 64 — Feed 데이터 OHLC 유효성 검증
