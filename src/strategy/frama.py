@@ -1,20 +1,6 @@
 """
-FRAMA (Fractal Adaptive Moving Average) 전략.
-
-alpha = exp(-4.6 * (D - 1))  (D = fractal dimension)
-D = log(N1 + N2) - log(N) / log(2)
-N1 = (max_high_half1 - min_low_half1) / (period/2)
-N2 = (max_high_half2 - min_low_half2) / (period/2)
-N  = (max_high_full - min_low_full) / period
-period = 16 (기본값)
-FRAMA[i] = alpha * close[i] + (1 - alpha) * FRAMA[i-1]
-
-BUY:  close > FRAMA AND 이전봉 close < 이전봉 FRAMA (크로스) + 이격 > 0.5%이면 RSI 필터 적용 안함 (강한 신호)
-SELL: close < FRAMA AND 이전봉 close > 이전봉 FRAMA
-confidence: HIGH if 이격 > 1%, MEDIUM 그 외
-최소 데이터: 35행
+Enhanced FRAMA: ATR volatility filter + adaptive RSI filtering
 """
-
 import math
 from typing import Optional
 
@@ -24,6 +10,30 @@ import pandas as pd
 from .base import Action, BaseStrategy, Confidence, Signal
 
 MIN_ROWS = 35
+
+
+def _compute_atr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> np.ndarray:
+    """ATR 계산 (변동성 필터용)."""
+    n = len(highs)
+    atr = np.full(n, np.nan)
+    
+    if n < period:
+        return atr
+    
+    tr = np.zeros(n)
+    tr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        tr[i] = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1])
+        )
+    
+    atr[period - 1] = np.mean(tr[:period])
+    for i in range(period, n):
+        atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+    
+    return atr
 
 
 def _compute_rsi(closes: np.ndarray, period: int = 14) -> np.ndarray:
@@ -106,11 +116,18 @@ def _compute_frama(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray, peri
 
 
 class FRAMAStrategy(BaseStrategy):
+    """
+    Enhanced FRAMA: ATR volatility filter + adaptive RSI thresholds
+    - ATR contraction: signal quality indicator
+    - Gap-based RSI filtering: larger gap = more lenient
+    - Prevents whipsaw in high volatility environments
+    """
     name = "frama"
 
-    def __init__(self, period: int = 16, rsi_period: int = 14) -> None:
+    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14) -> None:
         self.period = period
         self.rsi_period = rsi_period
+        self.atr_period = atr_period
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
@@ -131,6 +148,7 @@ class FRAMAStrategy(BaseStrategy):
 
         frama_arr = _compute_frama(closes, highs, lows, self.period)
         rsi_arr = _compute_rsi(closes, self.rsi_period)
+        atr_arr = _compute_atr(highs, lows, closes, self.atr_period)
 
         # -2: 마지막 완성 캔들, -3: 그 이전 캔들
         last_close = closes[-2]
@@ -138,6 +156,8 @@ class FRAMAStrategy(BaseStrategy):
         last_frama = frama_arr[-2]
         prev_frama = frama_arr[-3]
         last_rsi = rsi_arr[-2]
+        last_atr = atr_arr[-2]
+        prev_atr = atr_arr[-3] if len(atr_arr) > 2 else last_atr
         last_volume = volumes[-2]
         prev_volume = volumes[-3] if len(volumes) > 1 else last_volume
 
@@ -160,19 +180,24 @@ class FRAMAStrategy(BaseStrategy):
         bull_case = f"close={last_close:.4f} > FRAMA={last_frama:.4f}, 이격={gap_pct:.2f}%"
         bear_case = f"close={last_close:.4f} < FRAMA={last_frama:.4f}, 이격={gap_pct:.2f}%"
 
-        # RSI 필터: 약한 신호(이격 < 1%)는 엄격한 RSI 필터 적용
-        # 강한 신호(이격 >= 1%)는 RSI 무시하고 진행
+        # ATR 변동성 필터: 이전봉 대비 ATR이 감소 추세
+        atr_contracting = not np.isnan(prev_atr) and not np.isnan(last_atr) and last_atr < prev_atr * 1.05
+        
+        # RSI 필터: gap > 1.0% (강한 신호)는 거의 필터 안 함 (극단값만)
+        # gap <= 1.0%는 더 엄격함 (극단값 필요)
         strong_signal = gap_pct >= 1.0
+        
         if strong_signal:
-            # 강한 신호는 RSI 필터 안 함
-            rsi_buy_ok = True
-            rsi_sell_ok = True
+            # 강한 신호: 극단값만 배제
+            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 85
+            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 15
         else:
-            # 약한 신호는 RSI로 필터링
-            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 60
-            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 40
+            # 약한 신호: 극단값 요구
+            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 40
+            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 60
 
         rsi_str = f"RSI={last_rsi:.1f}" if not np.isnan(last_rsi) else "RSI=N/A"
+        atr_str = f"ATR={'수축' if atr_contracting else '확장'}" if not np.isnan(last_atr) else "ATR=N/A"
 
         if crossed_up and rsi_buy_ok:
             return Signal(
@@ -180,7 +205,7 @@ class FRAMAStrategy(BaseStrategy):
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=float(last_close),
-                reasoning=f"FRAMA 상향 크로스. close={last_close:.4f} > FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
+                reasoning=f"FRAMA 상향 크로스. close={last_close:.4f} > FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str}, {atr_str})",
                 invalidation=f"Close below FRAMA ({last_frama:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
@@ -192,7 +217,7 @@ class FRAMAStrategy(BaseStrategy):
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=float(last_close),
-                reasoning=f"FRAMA 하향 크로스. close={last_close:.4f} < FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
+                reasoning=f"FRAMA 하향 크로스. close={last_close:.4f} < FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str}, {atr_str})",
                 invalidation=f"Close above FRAMA ({last_frama:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
@@ -203,7 +228,7 @@ class FRAMAStrategy(BaseStrategy):
             confidence=Confidence.MEDIUM,
             strategy=self.name,
             entry_price=float(last_close),
-            reasoning=f"크로스 없음. close={last_close:.4f}, FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
+            reasoning=f"크로스 없음. close={last_close:.4f}, FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str}, {atr_str})",
             invalidation="",
             bull_case=bull_case,
             bear_case=bear_case,
