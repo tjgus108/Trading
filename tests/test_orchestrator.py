@@ -115,10 +115,25 @@ def test_unknown_strategy_raises(tmp_path):
 
 
 def test_run_once_returns_pipeline_result(cfg, mock_connector):
+    """Optimize by mocking external API calls (sentiment, news, etc)."""
     orch = _make_orch(cfg, mock_connector)
-    result = orch.run_once()
-    assert isinstance(result, PipelineResult)
-    assert result.status in ("OK", "BLOCKED", "ERROR")
+    # Mock sentiment fetcher to avoid slow HTTP retries
+    with patch("src.data.sentiment.SentimentFetcher.fetch") as mock_sentiment:
+        from src.data.sentiment import SentimentData
+        mock_sentiment.return_value = SentimentData(
+            fear_greed_index=50, fear_greed_label="Neutral",
+            funding_rate=0.0001, open_interest=1e9,
+            sentiment_score=0.0, source="mock"
+        )
+        # Mock onchain data fetch to avoid HTTP calls
+        with patch("src.data.onchain.OnchainFetcher.fetch") as mock_onchain:
+            mock_onchain.return_value = MagicMock(
+                flow_label="NEUTRAL", whale_label="NEUTRAL",
+                nvt_ratio=None, sentiment_score=0.0
+            )
+            result = orch.run_once()
+            assert isinstance(result, PipelineResult)
+            assert result.status in ("OK", "BLOCKED", "ERROR")
 
 
 def test_backtest_gate_blocks_live_on_fail(cfg, mock_connector):
