@@ -492,3 +492,124 @@ class TestSentimentFetcherFallbackIntegration:
         # 3차 호출: 여전히 실패
         result3 = f.fetch()
         assert result3.fear_greed_index == 30  # fallback 유지
+
+
+
+
+class TestNewsMonitorRobustness:
+    """NewsMonitor 에러 처리 및 fallback 메커니즘."""
+
+    def test_fetch_api_exception_uses_fallback(self):
+        """API 예외 발생 시 fallback 데이터 사용."""
+        import time
+        m = NewsMonitor(max_retries=1, use_cache_seconds=0)
+        
+        # 1차: 성공
+        m._fetch_headlines = lambda: ["emergency shutdown reported"]
+        result1 = m.fetch()
+        assert result1.level == "HIGH"
+        
+        # 2차: _classify 예외 발생 (심각한 오류)
+        m._fetch_headlines = lambda: ["valid headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("parse error"))
+        
+        result2 = m.fetch()
+        assert result2.source == "fallback"
+        assert result2.level == "HIGH"
+
+    def test_fetch_all_apis_fail_no_fallback_returns_neutral(self):
+        """API 예외 + fallback 없을 시 중립 데이터 반환."""
+        m = NewsMonitor(max_retries=1)
+        m._last_successful = None  # fallback 없음
+        
+        # _classify 예외 발생
+        m._fetch_headlines = lambda: []
+        m._classify = lambda h: (_ for _ in ()).throw(RuntimeError("error"))
+        
+        result = m.fetch()
+        assert result.level == "NONE"
+        assert result.source == "unavailable"
+
+    def test_partial_api_failure_uses_available_data(self):
+        """API 실패 후 빈 헤드라인 → NONE 분류."""
+        m = NewsMonitor()
+        m._fetch_headlines = lambda: []
+        result = m.fetch()
+        assert result.level == "NONE"
+
+    def test_cache_returns_same_data_within_timeout(self):
+        """캐시 유효 시간 내 재호출 시 같은 데이터 반환."""
+        import time
+        m = NewsMonitor(use_cache_seconds=300)
+        
+        mock_event = m.mock(level="MEDIUM", event_text="Fed meeting")
+        m._cache = mock_event
+        m._cache_time = time.time()
+        
+        result = m.fetch()
+        assert result is mock_event
+
+    def test_max_retries_parameter_affects_behavior(self):
+        """max_retries 파라미터로 재시도 횟수 제어."""
+        m1 = NewsMonitor(max_retries=1)
+        assert m1.max_retries == 1
+        
+        m2 = NewsMonitor(max_retries=3)
+        assert m2.max_retries == 3
+
+    def test_fallback_last_successful_tracked(self):
+        """성공한 데이터가 _last_successful에 저장됨."""
+        m = NewsMonitor(max_retries=1)
+        
+        # 초기 상태
+        assert m._last_successful is None
+        
+        # 성공한 fetch
+        m._fetch_headlines = lambda: ["hack", "breach"]
+        result = m.fetch()
+        assert m._last_successful is not None
+        assert m._last_successful.level == "HIGH"
+
+    def test_classify_exception_returns_fallback(self):
+        """_classify 예외 시 fallback 또는 neutral 반환."""
+        m = NewsMonitor()
+        m._last_successful = m.mock(level="MEDIUM")
+        m._fetch_headlines = lambda: ["valid headline"]
+        
+        # _classify 에러 시뮬레이션
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("mock error"))
+        
+        result = m.fetch()
+        # fallback이 있으므로 MEDIUM 반환
+        assert result.source == "fallback"
+
+    def test_unavailable_source_when_classify_fails_and_no_fallback(self):
+        """_classify 실패 + fallback 없을 때 source='unavailable'."""
+        m = NewsMonitor()
+        m._last_successful = None
+        m._fetch_headlines = lambda: ["valid headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("error"))
+        
+        result = m.fetch()
+        assert result.source == "unavailable"
+
+    def test_fallback_survives_classify_failures(self):
+        """이전 fallback이 여러 번 _classify 실패 시에도 계속 사용."""
+        m = NewsMonitor(max_retries=1, use_cache_seconds=0)
+        
+        # 1차: 성공
+        m._fetch_headlines = lambda: ["ban", "shutdown"]
+        result1 = m.fetch()
+        assert result1.level == "HIGH"
+        
+        # 2차: _classify 실패
+        m._fetch_headlines = lambda: ["headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(RuntimeError("error"))
+        result2 = m.fetch()
+        assert result2.level == "HIGH"
+        assert result2.source == "fallback"
+        
+        # 3차: 여전히 실패
+        result3 = m.fetch()
+        assert result3.level == "HIGH"
+        assert result3.source == "fallback"
