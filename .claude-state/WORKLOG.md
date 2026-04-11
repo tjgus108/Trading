@@ -3130,3 +3130,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 대시보드 베스트 프랙티스. 3계층 구조: 수익성(PF/Sharpe) + 리스크(MDD/마진) + 운영(에러/알림). 모듈형 패널 + 전략별 성과 분리 표시.
 **Tests:** 6045 passed (+7 from Cycle 40).
 **Next Cycle:** 42 (B+D+F)
+
+## [2026-04-11 09:02 UTC] Cycle 42 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:04 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 16:05 UTC] Cycle 42 COMPLETED — B + D + F
+**[B] Risk:** tests/test_portfolio_optimizer.py +3 경계. zero correlation 3방법 합=1, 전체 NaN fallback, 단일 데이터 fallback. 버그 없음 확인.
+**[D] ML:** tests/test_phase_c_ml.py +2 일관성 테스트. 모든 피처 동일 길이/인덱스, X/y 정렬. features.py shift(1) 일관 적용, label 분리 확인.
+**[F] Research:** 봇 보안 침해 2025. AIXBT 55 ETH (세션 토큰), Polymarket GitHub 악성코드, Nova $500K (수동 내부). 주요 벡터: API 키 노출, 세션 토큰 탈취, 오픈소스 봇 악성코드.
+**Tests:** 6050 passed (+5 from Cycle 41).
+**Next Cycle:** 43 (E+A+F)

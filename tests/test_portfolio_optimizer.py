@@ -204,3 +204,49 @@ def test_var_cvar_all_positive_returns():
     var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
     assert var == 0.0
     assert cvar == 0.0
+
+
+# ── Boundary: zero correlation, all-NaN, single data point ───────────────────
+
+def test_zero_correlation_all_methods():
+    """모든 자산이 독립(zero correlation)일 때 세 방법 모두 합=1, 비중>0."""
+    rng = np.random.default_rng(99)
+    # 각 자산을 독립 시드로 생성 → correlation ≈ 0
+    data = {
+        "A": pd.Series(rng.normal(0, 0.01, 500)),
+        "B": pd.Series(rng.normal(0, 0.01, 500)),
+        "C": pd.Series(rng.normal(0, 0.01, 500)),
+    }
+    for method in ["mean_variance", "risk_parity", "equal_weight"]:
+        opt = PortfolioOptimizer(method=method, min_weight=0.0, max_weight=1.0)
+        result = opt.optimize(data)
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9, f"{method}: weights don't sum to 1"
+        for sym, w in result.weights.items():
+            assert w >= 0.0, f"{method}: {sym} weight {w} is negative"
+
+
+def test_all_nan_returns_fallback():
+    """모든 값이 NaN인 경우 dropna() 후 len<2 → equal_weight fallback."""
+    data = {
+        "BTC": pd.Series([np.nan, np.nan, np.nan]),
+        "ETH": pd.Series([np.nan, np.nan, np.nan]),
+    }
+    for method in ["mean_variance", "risk_parity", "equal_weight"]:
+        opt = PortfolioOptimizer(method=method)
+        result = opt.optimize(data)
+        assert result.method == "equal_weight"
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9
+
+
+def test_single_data_point_fallback():
+    """공통 인덱스 1행만 있을 때 equal_weight fallback."""
+    data = {
+        "BTC": pd.Series([0.01]),
+        "ETH": pd.Series([0.02]),
+        "SOL": pd.Series([0.005]),
+    }
+    for method in ["mean_variance", "risk_parity"]:
+        opt = PortfolioOptimizer(method=method)
+        result = opt.optimize(data)
+        assert result.method == "equal_weight"
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9

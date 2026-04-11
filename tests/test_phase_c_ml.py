@@ -208,6 +208,50 @@ class TestFeatureBuilder:
             "레이블 누수 가능성"
         )
 
+    def test_all_features_same_length_and_index(self):
+        """
+        _compute_features()가 반환하는 모든 컬럼이 동일한 길이와 인덱스를 가짐.
+        시계열 일관성 핵심 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+        feat = fb._compute_features(df)
+
+        # 모든 컬럼 길이가 df와 동일
+        assert len(feat) == len(df), (
+            f"피처 행 수({len(feat)}) != 입력 df 행 수({len(df)})"
+        )
+
+        # 인덱스가 df와 정확히 일치
+        assert feat.index.equals(df.index), "피처 인덱스가 입력 df 인덱스와 불일치"
+
+        # 컬럼 간 길이 모두 동일 (DataFrame이므로 보장되지만 명시적 확인)
+        col_lengths = {col: len(feat[col]) for col in feat.columns}
+        unique_lengths = set(col_lengths.values())
+        assert len(unique_lengths) == 1, (
+            f"컬럼 간 길이 불일치: {col_lengths}"
+        )
+
+        # feature_names 목록의 모든 피처가 존재
+        for name in fb.feature_names:
+            assert name in feat.columns, f"feature_names의 '{name}'이 feat에 없음"
+
+        # 인덱스가 단조증가(시계열 순서) 유지
+        assert feat.index.is_monotonic_increasing, "피처 인덱스가 시계열 순서 미유지"
+
+    def test_xy_index_aligned(self):
+        """
+        build()가 반환하는 X와 y의 인덱스가 완전히 일치함을 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder(forward_n=5, threshold=0.003)
+        X, y = fb.build(df)
+
+        assert X.index.equals(y.index), "X와 y의 인덱스 불일치 — 정렬 오류"
+        assert len(X) == len(y), f"X({len(X)})와 y({len(y)}) 길이 불일치"
+        # 인덱스 단조증가
+        assert X.index.is_monotonic_increasing, "build() 결과 인덱스 시계열 순서 미유지"
+
     def test_rolling_features_use_prior_bars_only(self):
         """
         rolling/ewm 피처가 현재 바 포함 여부 직접 검증.

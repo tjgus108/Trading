@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 41 — 2026-04-11T08:57:46.028836Z
+🔄 CYCLE 42 — 2026-04-11T09:02:29.468404Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 40 COMPLETED — D + E + F 🎯 마일스톤** (2026-04-11 15:25 UTC)
-  **[D] ML:** tests/test_adaptive_selector.py +2 경계 (단일 전략, 빈 history).
-  **[E] Execution:** src/notifier.py HTML bold 포맷 + 숫자 콤마 (65,000.00). Telegram 메시지 가독성 개선. +2 tests.
-  **[F] Research:** 2026 크립토 전망. 전체 거래량 65% 자동화 예상. AI 봇 온체인+소셜 실시간 분석 주류. 변동성 증가 → 모멘텀/아비트라지 수요 급증. 레짐 감지 + 멀티 신호 결합 + DCA 자동화 우선.
-  **Tests:** 6038 passed (+4 from Cycle 39).
+**Cycle 41 COMPLETED — A + C + F** (2026-04-11 15:45 UTC)
+  **[A] Quality:** BacktestReport 17개 메트릭 필드 검증 (from_trades, from_backtest_result, _empty 모두). 모든 메트릭 일관되게 초기화됨, 누락 없음. 기존 12 tests 통과.
+  **[C] Data:** tests/test_feed_parallel.py +2 cache_stats + fetch_multiple 통합 검증. 연속 호출 누적 정확, 부분 캐시 히트 통계 정확.
+  **[F] Research:** 대시보드 베스트 프랙티스. 3계층 구조: 수익성(PF/Sharpe) + 리스크(MDD/마진) + 운영(에러/알림). 모듈형 패널 + 전략별 성과 분리 표시.
+  **Tests:** 6045 passed (+7 from Cycle 40).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
