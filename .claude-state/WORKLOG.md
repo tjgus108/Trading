@@ -7374,3 +7374,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 17:52 UTC] Cycle 91 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 18:01 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 11:40 UTC] Cycle 91 COMPLETED — A + C + SIM + F
+**[A] Quality:** 8개 SIM 개선 전략 회귀 체크 — 7 pass, narrow_range 테스트 파일 없음 (별도 추가 필요).
+**[C] Data:** tests/test_sentiment.py +2. 단일 소스 실패 시 graceful, 전체 실패 시 중립 반환.
+**[SIM] No-op:** roc_ma_cross 3가지 개선 시도했으나 원본이 이미 최적화 (Sharpe 2.985 PASS). 추가 조정 시 오히려 저하.
+**[F] Research:** Q2 2026. AI 모멘텀 + 리스크 관리 필수. 레짐 감지 + 전략 전환 구조.
+**Tests:** 6286 passed (+4 from Cycle 90).
+**Next Cycle:** 92 (B+D+SIM+F)
