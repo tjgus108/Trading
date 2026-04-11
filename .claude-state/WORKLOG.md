@@ -6968,3 +6968,6 @@ ImplShortfall: -5.00bps
 **Tests:** 6261 passed (+4 from Cycle 84).
 **SIM 누적 개선:** wick_reversal +15.1%p, engulfing_zone +10.2%p, frama +4.1%p, **cmf +11.6%p** = **+41.0%p 총**
 **Next Cycle:** 86 (A+C+SIM+F)
+
+## [2026-04-11 16:30 UTC] Cycle 86 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

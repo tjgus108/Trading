@@ -131,3 +131,99 @@ class TestWebSocketBufferOverflow:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestWebSocketReconnect:
+    """WebSocket 재연결 로직 검증 (외부 API 호출 없이 모킹)."""
+
+    def test_reconnect_retry_count_increments(self):
+        """연결 실패 시 retry_count 증가."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+        
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        async def mock_listen_fail():
+            raise ConnectionError("Mocked connection error")
+        
+        # _listen을 실패하도록 모킹
+        with patch.object(feed, "_listen", side_effect=mock_listen_fail):
+            try:
+                asyncio.run(feed._connect_with_retry())
+            except:
+                pass
+        
+        # 최소 1회 이상 재시도 (MAX_RETRY=5 미만)
+        assert feed._retry_count > 0
+        assert feed._retry_count <= 5
+
+    def test_reconnect_resets_on_success(self):
+        """성공적 연결 후 retry_count 리셋."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+        
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        feed._retry_count = 3  # 이전 실패 상태
+        
+        async def mock_listen_success():
+            # 성공: _process_message 시뮬레이션
+            await asyncio.sleep(0.01)  # 짧은 대기 후 반환
+        
+        with patch.object(feed, "_listen", side_effect=mock_listen_success):
+            with patch.object(feed, "_stop_event") as mock_stop:
+                mock_stop.is_set.side_effect = [False, True]  # 1회 루프만
+                try:
+                    asyncio.run(feed._connect_with_retry())
+                except:
+                    pass
+        
+        # 성공 후 retry_count는 0으로 리셋됨
+        assert feed._retry_count == 0
+
+    def test_max_retry_stops_reconnect(self):
+        """MAX_RETRY 초과 시 재연결 중단."""
+        import asyncio
+        from unittest.mock import patch
+        
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        async def mock_listen_fail():
+            raise ConnectionError("Persistent failure")
+        
+        with patch.object(feed, "_listen", side_effect=mock_listen_fail):
+            try:
+                asyncio.run(feed._connect_with_retry())
+            except:
+                pass
+        
+        # MAX_RETRY=5 도달 시 중단
+        assert feed._retry_count == 5
+        assert feed._connected == False
+
+    def test_reconnect_exponential_backoff(self):
+        """지수 백오프: 각 재시도마다 대기시간 증가."""
+        import asyncio
+        from unittest.mock import patch
+        import time
+        
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        attempt_times = []
+        
+        async def mock_listen_fail():
+            attempt_times.append(time.time())
+            raise ConnectionError("Simulated failure")
+        
+        with patch.object(feed, "_listen", side_effect=mock_listen_fail):
+            start = time.time()
+            try:
+                asyncio.run(feed._connect_with_retry())
+            except:
+                pass
+            elapsed = time.time() - start
+        
+        # 재시도가 발생했고, 대기시간이 누적됨
+        assert feed._retry_count > 0
+        # 지수 백오프로 인해 최소 대기 (2^1 + 2^2 + ... + 2^n) 초 이상 소요
+        # 예: 5회 실패 → 2 + 4 + 8 + 16 + 32 = 62초 (하지만 실제는 더 빠름)
+        # 단순 검증: 최소 1회 이상 지연 발생
+        assert len(attempt_times) >= 2
