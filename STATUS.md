@@ -87,7 +87,8 @@
 - ✅ Cycle 79 완료 (C+B+F: **Notifier XSS 방어** + Risk ATR 경계 + Maker/Taker)
 - ✅ **Cycle 80 완료** 🎯 (D+E+F: adaptive_selector + Dashboard 80 배지 + Best Resources)
 - ✅ Cycle 81 완료 (A+C+F: Report JSON round-trip + TTL 경계 + USDT Risk)
-- ⏳ **Cycle 82 대기** (B+D+F + **SIM 신규**)
+- ✅ **Cycle 82 완료** (B+D+**SIM**+F: VaR 경계 + LLM parse + **wick_reversal -14.17%→+0.93% 개선**)
+- ⏳ **Cycle 83 대기** (E+A+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -96,7 +97,8 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,239개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,244개** (0 warnings ✨) |
+| 🎯 SIM 개선 | wick_reversal -14.17% → +0.93% |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

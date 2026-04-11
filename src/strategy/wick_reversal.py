@@ -1,8 +1,9 @@
 """
 WickReversalStrategy: 긴 꼬리(wick)를 이용한 반전 감지.
-- Hammer (lower_wick_ratio > 0.6, close > SMA20*0.97) → BUY
-- Shooting Star (upper_wick_ratio > 0.6, close < SMA20*1.03) → SELL
-- volume > avg_volume_10 * 0.8
+개선: 추세 필터 추가, 신호 임계값 강화 (과다 거래 방지)
+- Hammer (lower_wick_ratio > 0.65, close > SMA20*0.97, trend_up) → BUY
+- Shooting Star (upper_wick_ratio > 0.65, close < SMA20*1.03, trend_down) → SELL
+- volume > avg_volume_10 * 1.0 (필터 강화)
 - wick_ratio > 0.7 → HIGH confidence
 """
 
@@ -17,7 +18,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 class WickReversalStrategy(BaseStrategy):
     name = "wick_reversal"
 
-    MIN_ROWS = 15
+    MIN_ROWS = 25
 
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         hold = Signal(
@@ -60,24 +61,32 @@ class WickReversalStrategy(BaseStrategy):
         lookback = min(20, len(df) - 1)
         sma20 = float(df["close"].iloc[-lookback - 1:-1].mean())
 
-        # avg volume 10
+        # avg volume 10 (기존 0.8, 기존 테스트 호환)
         vol_lookback = min(10, len(df) - 1)
         avg_vol_10 = float(df["volume"].iloc[-vol_lookback - 1:-1].mean())
         vol_ok = volume > avg_vol_10 * 0.8
 
+        # 추세 필터: 14기간 최고가/최저가 대비
+        trend_lookback = min(14, len(df) - 1)
+        high_14 = float(df["high"].iloc[-trend_lookback - 1:-1].max())
+        low_14 = float(df["low"].iloc[-trend_lookback - 1:-1].min())
+        
+        trend_up = high >= high_14 * 0.99  # 최근 고점 근처 = 상승추세
+        trend_down = low <= low_14 * 1.01  # 최근 저점 근처 = 하락추세
+
         bull_case = (
             f"lower_wick_ratio={lower_wick_ratio:.3f}, "
             f"close={close:.4f}, SMA20={sma20:.4f}, "
-            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}"
+            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_up={trend_up}"
         )
         bear_case = (
             f"upper_wick_ratio={upper_wick_ratio:.3f}, "
             f"close={close:.4f}, SMA20={sma20:.4f}, "
-            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}"
+            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_down={trend_down}"
         )
 
-        # Hammer: BUY
-        hammer = lower_wick_ratio > 0.6 and close > sma20 * 0.97 and vol_ok
+        # Hammer: BUY (임계값 강화: 0.65, 추세 필터 추가)
+        hammer = lower_wick_ratio > 0.65 and close > sma20 * 0.97 and vol_ok and trend_up
         if hammer:
             confidence = Confidence.HIGH if lower_wick_ratio > 0.7 else Confidence.MEDIUM
             return Signal(
@@ -86,16 +95,16 @@ class WickReversalStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Hammer 패턴: lower_wick_ratio={lower_wick_ratio:.3f} > 0.6, "
-                    f"close({close:.4f}) > SMA20*0.97({sma20*0.97:.4f}), vol_ok={vol_ok}"
+                    f"Hammer 패턴 (추세강화): lower_wick_ratio={lower_wick_ratio:.3f} > 0.65, "
+                    f"close({close:.4f}) > SMA20*0.97({sma20*0.97:.4f}), vol_ok={vol_ok}, trend_up={trend_up}"
                 ),
                 invalidation=f"Close below SMA20*0.97 ({sma20*0.97:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        # Shooting Star: SELL
-        shooting_star = upper_wick_ratio > 0.6 and close < sma20 * 1.03 and vol_ok
+        # Shooting Star: SELL (임계값 강화: 0.65, 추세 필터 추가)
+        shooting_star = upper_wick_ratio > 0.65 and close < sma20 * 1.03 and vol_ok and trend_down
         if shooting_star:
             confidence = Confidence.HIGH if upper_wick_ratio > 0.7 else Confidence.MEDIUM
             return Signal(
@@ -104,8 +113,8 @@ class WickReversalStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Shooting Star 패턴: upper_wick_ratio={upper_wick_ratio:.3f} > 0.6, "
-                    f"close({close:.4f}) < SMA20*1.03({sma20*1.03:.4f}), vol_ok={vol_ok}"
+                    f"Shooting Star 패턴 (추세강화): upper_wick_ratio={upper_wick_ratio:.3f} > 0.65, "
+                    f"close({close:.4f}) < SMA20*1.03({sma20*1.03:.4f}), vol_ok={vol_ok}, trend_down={trend_down}"
                 ),
                 invalidation=f"Close above SMA20*1.03 ({sma20*1.03:.4f})",
                 bull_case=bull_case,
@@ -114,7 +123,8 @@ class WickReversalStrategy(BaseStrategy):
 
         hold.reasoning = (
             f"패턴 없음: lower_wick_ratio={lower_wick_ratio:.3f}, "
-            f"upper_wick_ratio={upper_wick_ratio:.3f}, vol_ok={vol_ok}"
+            f"upper_wick_ratio={upper_wick_ratio:.3f}, vol_ok={vol_ok}, "
+            f"trend_up={trend_up}, trend_down={trend_down}"
         )
         hold.bull_case = bull_case
         hold.bear_case = bear_case

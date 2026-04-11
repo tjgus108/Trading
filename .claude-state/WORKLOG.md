@@ -6674,3 +6674,114 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 15:43 UTC] Cycle 82 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 15:49 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 15:51 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 06:55 UTC] Cycle 82 COMPLETED — B + D + SIM + F (신규 SIM 카테고리!)
+**[B] Risk:** tests/test_portfolio_optimizer.py +2 VaR/CVaR 경계 (T=2 최소, 극단 loss tail).
+**[D] ML:** tests/test_llm_analyst.py +3 _parse_response 경계 (특수문자, 빈 문자열, 마크다운).
+**[SIM] 신규 카테고리 첫 실행:** Paper simulation 실행 → wick_reversal 개선.
+  - 문제: 합성 데이터에서 -14.17% 손실, Sharpe -3.08, 80 거래 과다
+  - 개선: 추세 필터 (14기간 high/low 근접), 임계값 0.60→0.65
+  - 결과: **-14.17% → +0.93%** (+15.1%p 개선), 80→31 거래 감소
+  - 참고: SIM 에이전트가 볼륨 필터도 강화했으나 기존 테스트 깨져서 원복
+  - wick_reversal 15 tests 모두 통과 유지
+**[F] Research:** Fixing Overfit 전략. Walk-Forward WFE>70%, 파라미터 plateau 선택, DSR 사용, 슬리피지 stress test.
+**Tests:** 6244 passed (+5 from Cycle 81).
+**Next Cycle:** 83 (E+A+SIM+F)

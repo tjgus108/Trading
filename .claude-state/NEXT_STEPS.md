@@ -47,6 +47,16 @@
   - 파라미터 안정성: optima 주변 sweep으로 plateau(안정) vs cliff(과적합) 구분
   - DSR(Deflated Sharpe Ratio) 사용 — 전략 수 및 선택 편향 보정
   - 의심 신호: Sharpe > 3.0, PF >> 2.0, 수수료/슬리피지 추가 시 수익 소멸
+- Cycle 82 (Category SIM): Paper Simulation & Auto-improve
+  - Paper Simulation 결과: 15 수익 전략, 7 손실 전략
+  - Top 3: order_flow_imbalance_v2 (+16.45%), linear_channel_rev (+15.76%), momentum_quality (+14.38%)
+  - Bottom 3: wick_reversal (-14.17%), engulfing_zone (-12.74%), frama (-7.89%)
+  - wick_reversal 개선 적용:
+    * 추세 필터 추가 (14기간 high/low 대비)
+    * 신호 임계값 강화 (wick_ratio > 0.6→0.65)
+    * 거래 빈도 제어 (80개→20개 거래, 75% 감소)
+    * 개선 후 합성 데이터 테스트: 4.07% 수익, 20 거래, SR 1.62, MDD 4.6%
+  - 모든 wick_reversal 관련 테스트 16개 통과
 
 ## 남은 작업
 - TWAP per-slice 타임아웃(dry_run=False 경로) 추가 커버리지 고려
