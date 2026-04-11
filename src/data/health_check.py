@@ -136,7 +136,7 @@ class DataFeedsHealthCheck:
         anomalies = []
         if live_count == 0 and disconnected_count > 0:
             anomalies.append("all_feeds_disconnected")
-        if fallback_count > 0 and live_count == 0:
+        if fallback_count > 0:
             anomalies.append("operating_in_degraded_mode")
 
         result.anomalies = anomalies
@@ -146,20 +146,24 @@ class DataFeedsHealthCheck:
     def _check_single(self, name: str, feed_obj: Any, feed_type: str) -> FeedHealthReport:
         """단일 피드 상태 확인."""
         try:
-            # WebSocketDataAdapter (래퍼) — 먼저 확인 (hasattr 안 겹치게)
-            if feed_type == "adapter" or hasattr(feed_obj, "_ws"):
+            # feed_type이 명시적으로 지정되면 우선 사용 (테스트 및 타입 안정성)
+            if feed_type == "adapter":
                 return self._check_ws_adapter(name, feed_obj)
-
-            # BinanceWebSocketFeed
-            if feed_type == "websocket" or hasattr(feed_obj, "is_connected"):
+            elif feed_type == "websocket":
                 return self._check_websocket_feed(name, feed_obj)
-
-            # DataFeed (REST)
-            if feed_type == "rest" or hasattr(feed_obj, "fetch"):
+            elif feed_type == "rest":
                 return self._check_rest_feed(name, feed_obj)
-
-            # DEXPriceFeed
-            if feed_type == "dex" or hasattr(feed_obj, "get_price"):
+            elif feed_type == "dex":
+                return self._check_dex_feed(name, feed_obj)
+            
+            # feed_type이 "unknown"이면 hasattr 기반 자동 감지
+            if hasattr(feed_obj, "_ws"):
+                return self._check_ws_adapter(name, feed_obj)
+            if hasattr(feed_obj, "is_connected"):
+                return self._check_websocket_feed(name, feed_obj)
+            if hasattr(feed_obj, "fetch"):
+                return self._check_rest_feed(name, feed_obj)
+            if hasattr(feed_obj, "get_price"):
                 return self._check_dex_feed(name, feed_obj)
 
             # 알려지지 않은 유형
@@ -222,14 +226,14 @@ class DataFeedsHealthCheck:
             if is_connected:
                 status = FeedStatus.LIVE
                 is_avail = True
+            elif retry_count >= max_retry:
+                # 최대 재시도 초과 → DISCONNECTED
+                status = FeedStatus.DISCONNECTED
+                is_avail = False
             elif candle_count > 0 and retry_count < max_retry:
                 # 연결 끊겼지만 캔들 있고 재시도 중
                 status = FeedStatus.FALLBACK
                 is_avail = True
-            elif retry_count >= max_retry:
-                # 최대 재시도 초과
-                status = FeedStatus.DISCONNECTED
-                is_avail = False
             else:
                 # 연결 시도 중
                 status = FeedStatus.FALLBACK
