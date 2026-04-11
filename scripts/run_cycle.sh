@@ -17,7 +17,21 @@ git fetch origin main
 git checkout main
 git pull origin main
 
-# 2. 이전 사이클 완료 확인 (브리핑 파일 존재 여부)
+# 2. Paper Simulation (실제 Bybit 데이터 수익률 테스트)
+# - 아직 PAPER_SIMULATION_REPORT.md가 실제 데이터로 안 돌았으면 먼저 실행
+# - 이미 실제 데이터 리포트가 있어도 매일 한 번은 재실행 (Paper 모니터링)
+REPORT=".claude-state/PAPER_SIMULATION_REPORT.md"
+if [ ! -f "$REPORT" ] || ! grep -q "Bybit BTC/USDT" "$REPORT" 2>/dev/null; then
+    echo "--- Running Paper Simulation (Real Bybit data) ---"
+    python3 scripts/paper_simulation.py || echo "Paper sim failed — continuing cycle"
+    if [ -f "$REPORT" ] && grep -q "Bybit" "$REPORT" 2>/dev/null; then
+        git add "$REPORT" .claude-state/
+        git commit -m "paper: 실제 Bybit 데이터 시뮬레이션 결과" || true
+        git push origin main || true
+    fi
+fi
+
+# 3. 이전 사이클 완료 확인 (브리핑 파일 존재 여부)
 # CYCLE_STATE.txt는 이미 다음 사이클 번호를 가리키고 있음
 
 # 3. 새 사이클 브리핑 생성
