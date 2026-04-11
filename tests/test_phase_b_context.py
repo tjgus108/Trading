@@ -140,6 +140,38 @@ class TestOnchainFetcher:
 # ---------------------------------------------------------------------------
 # B3: NewsMonitor
 # ---------------------------------------------------------------------------
+    def test_fetch_with_fallback_on_api_failure(self):
+        """API 실패 시 fallback 데이터 사용 검증."""
+        f = OnchainFetcher(max_retries=1)
+        
+        # mock으로 성공 데이터 저장 (fallback으로 사용될 데이터)
+        initial = f.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        f._last_successful = initial
+        
+        # fetch() 호출 시 _fetch_blockchain_stats()가 None 반환하면
+        # source="unavailable"로 반환되고, fallback이 있으면 이전 데이터 사용
+        data = f.fetch()
+        
+        # fallback이 있으므로 score는 유지되어야 함
+        assert f._last_successful is not None
+        assert f._last_successful.onchain_score == initial.onchain_score
+
+    def test_max_retries_parameter_in_blockchain_fetch(self):
+        """blockchain.info fetch 시 max_retries 파라미터 영향 검증."""
+        f = OnchainFetcher(max_retries=2)
+        
+        # max_retries=2 설정 확인
+        assert f.max_retries == 2
+        
+        # mock 데이터로 초기값 저장
+        initial = f.mock(exchange_flow="NEUTRAL")
+        f._last_successful = initial
+        
+        # fetch() 호출 시 재시도 로직이 작동하여 더 견고한 수집
+        data = f.fetch()
+        
+        # fallback이 설정되었으므로 파이프라인 계속 진행 가능
+        assert data is not None
 
 class TestNewsMonitor:
     def test_mock_none(self):

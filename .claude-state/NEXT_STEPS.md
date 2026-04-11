@@ -490,3 +490,41 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 - 두 메트릭 모두 포트폴리오 복원력(resilience) 측정에 활용
 
 ---
+
+## Cycle 9 - Category F: Research ✅ COMPLETED
+
+**주제:** 2025년 퀀트 헤지펀드 리스크 관리 도구
+
+**핵심 인사이트:**
+- Axioma(SimCorp): 팩터 리스크 모델 + VaR + ML 기반 비선형 팩터 (2025년 업데이트)
+- 실무 VaR 관행: 95% = 모니터링, 99% = hard limit. 팻테일 구간에서는 CVaR(Expected Shortfall) 전환
+- 상관관계 급증 대응: correlation-adjusted VaR 또는 gross leverage 자동 축소 "correlation throttle"
+
+**우리 봇 적용 후보:**
+- `src/risk/` VaR 95%/99% 두 단계 계산 (경고/포지션 축소 트리거)
+- 전략 간 상관계수 0.7+ → 포지션 축소 (Cycle 5 앙상블 교훈과 연결)
+- CVaR 지표를 BacktestEngine 리포트에 추가 (Sortino에 이어 팻테일 대응 지표)
+
+
+## Cycle 9 - Category B: VolTargeting 개선 ✅ COMPLETED
+
+**Task:** vol_targeting.py 버그 수정 + 경계 조건 테스트 추가
+
+**Files Modified:**
+1. `/home/user/Trading/src/risk/vol_targeting.py` (75 → 87 lines)
+   - Bug 1 (line 20): 미사용 `from typing import Optional` import 제거
+   - Bug 2 (lines 52-55): `closes`에 비양수 값 포함 시 `np.log`가 -inf/nan 반환하는 문제 방어. `np.any(closes <= 0)` 체크 추가, fallback으로 target_vol 반환
+   - Bug 3 (lines 66-73): `adjust()`가 `scalar()` + debug log에서 `realized_vol()`을 2번 호출하는 문제 수정. `_scalar_from_rv()` 헬퍼 메서드 추가, `rv`를 한 번만 계산
+   - Bug 4 (line 70): `base_size <= 0` 입력 검증 추가, ValueError 발생
+
+**Files Created:**
+1. `/home/user/Trading/tests/test_vol_targeting.py` (6개 테스트)
+   - `test_nonpositive_base_size_raises`: base_size=0, -1 모두 ValueError
+   - `test_nonpositive_close_price_fallback`: close=0 포함 시 scalar=1.0 fallback
+   - `test_scalar_clipped_to_max`: 낮은 변동성 → max_scalar=2.0 클리핑
+   - `test_scalar_clipped_to_min`: 높은 변동성 → min_scalar=0.1 클리핑
+   - `test_adjust_returns_base_when_vol_equals_target`: fallback 경로 scalar=1.0
+   - `test_adjust_no_double_call`: realized_vol() 정확히 1회 호출 검증 (monkeypatch)
+
+**Test Results:**
+- test_vol_targeting.py: 6 passed ✅

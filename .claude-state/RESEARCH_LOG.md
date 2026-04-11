@@ -226,3 +226,23 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Sharpe, Sortino & Calmar — XBTO](https://www.xbto.com/resources/sharpe-sortino-and-calmar-a-practical-guide-to-risk-adjusted-return-metrics-for-crypto-investors)
 - [Sortino: A Sharper Ratio — CME Group / Red Rock Capital](https://www.cmegroup.com/education/files/rr-sortino-a-sharper-ratio.pdf)
 - [ARK Invest — Measuring Bitcoin's Risk and Reward](https://www.ark-invest.com/articles/analyst-research/measuring-bitcoins-risk-and-reward)
+
+
+## [2026-04-11] Cycle 9 — Hedge Fund Risk Tools
+
+### 실전 도구
+- **Axioma (SimCorp)**: 팩터 리스크 모델 + VaR + 스트레스 테스트 통합 플랫폼. 2025년 5월 Worldwide Equity Factor Risk Model 업데이트에 머신러닝 기반 비선형 잔차 팩터 추가. 헤지펀드용 최적화·헤지 구축·규제 보고까지 원스톱.
+- **MSCI RiskMetrics**: VaR/Expected Shortfall·상관관계 모델링 표준. 프랍 펌 및 기관 모두 내부 리스크 계산 벤치마크로 사용.
+- **자체 구축 vs 상용**: 대형 퀀트 펀드(Two Sigma, DE Shaw 등)는 상용 도구를 레퍼런스로만 활용하고 실제 한도 집행은 자체 시스템으로 운영. 중형 이하는 Axioma/Bloomberg PORT를 그대로 사용.
+- **VaR 한도 관행**: 95% VaR는 일상 모니터링, 99% VaR는 hard limit으로 사용. 상관관계 급증(스트레스 시장) 대응은 correlation-adjusted VaR 또는 Expected Shortfall(CVaR)로 전환 — 정규분포 가정이 붕괴되는 구간에서 VaR보다 ES가 더 보수적 한도 제시.
+- **레버리지 한도**: 규제(Form PF 기준) + 내부 기준 이중 적용. 상관관계 급증 시 자동으로 gross leverage 축소하는 "correlation throttle" 프로토콜 운영.
+
+### 우리 봇 적용 힌트
+- `src/risk/` 에 95%/99% 두 단계 VaR 계산 추가 — 95%는 경고, 99%는 포지션 축소 트리거로 사용.
+- 상관관계 급증 감지: 복수 전략 운영 시 전략 간 수익률 상관계수가 0.7 이상으로 오르면 앙상블 가중치 리밸런싱 또는 전체 포지션 축소 (Cycle 5 교훈과 연결).
+- VaR보다 CVaR(Expected Shortfall)가 팻테일 이벤트(October 2025 등)에서 더 정확한 리스크 한도 기준 — 백테스트 엔진 리포트에 CVaR 추가 고려.
+
+### 참고
+- [Axioma Risk for Hedge Funds — SimCorp](https://www.axioma.com/solutions/hedge-fund-manager/)
+- [RiskMetrics for Hedge Funds — MSCI](https://www.msci.com/documents/10199/3cdaaa94-43a6-4fb9-be62-f159ed624f19)
+- [Quant Hedge Fund Due Diligence 2026 — Resonanz Capital](https://resonanzcapital.com/insights/quant-hedge-funds-in-2026-a-due-diligence-framework-by-strategy-type)

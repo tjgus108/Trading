@@ -17,7 +17,6 @@ target_vol: 연환산 목표 변동성 (e.g. 0.20 = 20% p.a.)
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -47,11 +46,16 @@ class VolTargeting:
         if len(df) < 2:
             return self.target_vol  # fallback → scalar=1.0
 
-        closes = df["close"].values[-self.window:]
+        closes = df["close"].values[-self.window:].astype(float)
         if len(closes) < 2:
             return self.target_vol
 
-        log_returns = np.diff(np.log(closes.astype(float)))
+        # Bug fix: 비양수 가격이 포함되면 np.log가 -inf/nan을 반환하므로 방어
+        if np.any(closes <= 0):
+            logger.warning("VolTargeting: non-positive close price detected, using fallback vol")
+            return self.target_vol
+
+        log_returns = np.diff(np.log(closes))
         std = float(np.std(log_returns, ddof=1))
         return std * np.sqrt(self.annualization)
 
@@ -64,11 +68,28 @@ class VolTargeting:
         return float(np.clip(s, self.min_scalar, self.max_scalar))
 
     def adjust(self, base_size: float, df: pd.DataFrame) -> float:
-        """base_size * vol_scalar 반환."""
-        s = self.scalar(df)
+        """base_size * vol_scalar 반환.
+
+        Raises:
+            ValueError: base_size가 0 이하인 경우.
+        """
+        # Bug fix: base_size <= 0이면 의미 없는 결과이므로 조기 차단
+        if base_size <= 0:
+            raise ValueError(f"base_size must be positive, got {base_size}")
+
+        # Bug fix: realized_vol()을 한 번만 호출 (기존 코드는 scalar() + debug log에서 2회 호출)
+        rv = self.realized_vol(df)
+        s = self._scalar_from_rv(rv)
         adjusted = base_size * s
         logger.debug(
             "VolTargeting: rv=%.4f target=%.4f scalar=%.4f base=%.6f → %.6f",
-            self.realized_vol(df), self.target_vol, s, base_size, adjusted,
+            rv, self.target_vol, s, base_size, adjusted,
         )
         return adjusted
+
+    def _scalar_from_rv(self, rv: float) -> float:
+        """rv를 직접 받아 scalar 계산. adjust()의 중복 호출 방지용."""
+        if rv <= 0:
+            return 1.0
+        s = self.target_vol / rv
+        return float(np.clip(s, self.min_scalar, self.max_scalar))

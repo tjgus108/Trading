@@ -578,3 +578,15 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** Sortino vs Sharpe 실전 비교. 크립토 양의 비대칭 분포에서 Sharpe 과소평가, Sortino 더 적합. 두 지표 병행 리포팅이 실무 표준.
 **Tests:** 5824 passed, 27 skipped (+4 from Cycle 7).
 **Next Cycle:** 9 (C+B+F — 2회차)
+
+## [2026-04-11 02:37 UTC] Cycle 9 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:39 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:39:06Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order

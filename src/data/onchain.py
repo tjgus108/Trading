@@ -4,7 +4,7 @@ B2. OnchainFetcher: 온체인 데이터 수집.
 데이터 소스:
   - blockchain.com REST API (무료, BTC 네트워크 기본 지표)
   - Glassnode (GLASSNODE_API_KEY 있을 때)
-  - 연결 실패 시 score=0 반환 — 파이프라인 블록 금지
+  - 연결 실패 시 graceful degradation: fallback 또는 중립 데이터 반환
 
 onchain-agent가 이 모듈을 사용한다.
 
@@ -49,25 +49,49 @@ class OnchainData:
 
 class OnchainFetcher:
     """
-    온체인 데이터 수집기.
+    온체인 데이터 수집기 (재시도 + fallback 지원).
 
-    fetch()로 OnchainData 반환. API 실패 시 score=0 중립 반환.
-    Glassnode API key는 환경변수 GLASSNODE_API_KEY에서 읽기.
+    fetch()로 OnchainData 반환.
+    - API 성공 시: 실제 데이터 반환
+    - 일부 API 실패: 성공한 API 데이터만 사용
+    - 모든 API 실패: fallback(이전 성공 데이터) 또는 중립 데이터 반환
+    
+    파이프라인 블록 절대 금지.
     """
 
-    def __init__(self, use_cache_seconds: int = 600):
+    def __init__(self, use_cache_seconds: int = 600, max_retries: int = 2):
         self.use_cache_seconds = use_cache_seconds
+        self.max_retries = max_retries  # 각 API별 최대 재시도 횟수
         self._glassnode_key = os.environ.get("GLASSNODE_API_KEY")
         self._cache: Optional[OnchainData] = None
         self._cache_time: float = 0.0
+        self._last_successful: Optional[OnchainData] = None  # 이전 성공한 데이터
 
     def fetch(self) -> OnchainData:
+        """최신 온체인 데이터 반환. cache_seconds 내 재호출 시 캐시 반환.
+        
+        모든 API 실패 시:
+        1. 이전 성공한 데이터 반환 (fallback)
+        2. 그것도 없으면 중립 데이터 반환 (score=0)
+        """
         now = time.time()
         if self._cache and (now - self._cache_time) < self.use_cache_seconds:
             return self._cache
 
         stats = self._fetch_blockchain_stats()
         data = self._analyze(stats)
+        
+        # blockchain.info 성공했으면 데이터 저장
+        if stats is not None or data.source != "unavailable":
+            self._last_successful = data
+        else:
+            # 모든 API 실패 - fallback 사용
+            if self._last_successful:
+                logger.warning("All onchain APIs failed, using fallback data from %s", self._last_successful.source)
+                data = self._last_successful
+            else:
+                logger.warning("All onchain APIs failed, no fallback available. Returning neutral.")
+        
         self._cache = data
         self._cache_time = now
         logger.info(data.summary())
@@ -96,18 +120,25 @@ class OnchainFetcher:
     # ------------------------------------------------------------------
 
     def _fetch_blockchain_stats(self) -> Optional[dict]:
-        try:
-            req = urllib.request.Request(
-                BLOCKCHAIN_STATS_URL,
-                headers={"User-Agent": "TradingBot/1.0"},
-            )
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                return json.loads(resp.read())
-        except Exception as e:
-            logger.debug("blockchain.info fetch failed: %s", e)
-            return None
+        """blockchain.info API 조회 (재시도 포함)."""
+        for attempt in range(self.max_retries + 1):
+            try:
+                req = urllib.request.Request(
+                    BLOCKCHAIN_STATS_URL,
+                    headers={"User-Agent": "TradingBot/1.0"},
+                )
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    return json.loads(resp.read())
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.debug("blockchain.info fetch attempt %d/%d failed: %s", attempt + 1, self.max_retries + 1, e)
+                    time.sleep(0.5 * (2 ** attempt))  # exponential backoff: 0.5s, 1s, 2s
+                else:
+                    logger.warning("blockchain.info fetch failed after %d attempts: %s", self.max_retries + 1, e)
+        return None
 
     def _analyze(self, stats: Optional[dict]) -> OnchainData:
+        """blockchain.info 데이터 분석 + Glassnode 보충."""
         if stats is None:
             return OnchainData(
                 exchange_flow="NEUTRAL",
@@ -163,21 +194,30 @@ class OnchainFetcher:
         )
 
     def _fetch_glassnode_signals(self) -> tuple[str, str]:
-        """Glassnode API로 exchange flow + whale 데이터 조회."""
+        """Glassnode API로 exchange flow + whale 데이터 조회 (부분 실패 허용)."""
         try:
-            # exchange net position change (proxy for inflow/outflow)
             base = "https://api.glassnode.com/v1/metrics"
             headers = {"User-Agent": "TradingBot/1.0"}
 
-            def _get(endpoint: str) -> Optional[dict]:
-                url = f"{base}/{endpoint}?a=BTC&api_key={self._glassnode_key}&i=24h&limit=2"
-                req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                    data = json.loads(resp.read())
-                return data[-1] if data else None
+            def _get_with_retry(endpoint: str) -> Optional[dict]:
+                """개별 엔드포인트 조회 (재시도 포함)."""
+                for attempt in range(self.max_retries + 1):
+                    try:
+                        url = f"{base}/{endpoint}?a=BTC&api_key={self._glassnode_key}&i=24h&limit=2"
+                        req = urllib.request.Request(url, headers=headers)
+                        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                            data = json.loads(resp.read())
+                        return data[-1] if data else None
+                    except Exception as e:
+                        if attempt < self.max_retries:
+                            logger.debug("Glassnode %s attempt %d/%d failed: %s", endpoint, attempt + 1, self.max_retries + 1, e)
+                            time.sleep(0.5 * (2 ** attempt))
+                        else:
+                            logger.debug("Glassnode %s failed after %d attempts: %s", endpoint, self.max_retries + 1, e)
+                return None
 
             # exchange_net_position_change: 양수 = 유입(매도 신호), 음수 = 유출(매수 신호)
-            net_pos = _get("distribution/exchange_net_position_change")
+            net_pos = _get_with_retry("distribution/exchange_net_position_change")
             exchange_flow = "NEUTRAL"
             if net_pos and "v" in net_pos:
                 v = net_pos["v"]
@@ -187,14 +227,14 @@ class OnchainFetcher:
                     exchange_flow = "OUTFLOW"
 
             # supply_held_by_whales (1000+ BTC 주소)
-            whale_supply = _get("supply/supply_held_by_whales")
+            whale_supply = _get_with_retry("supply/supply_held_by_whales")
             whale_activity = "NEUTRAL"
             # 단일 포인트만 있어 변화 감지 어려움 → NEUTRAL 유지
 
             return exchange_flow, whale_activity
 
         except Exception as e:
-            logger.debug("Glassnode fetch failed: %s", e)
+            logger.debug("Glassnode signals extraction failed: %s", e)
             return "NEUTRAL", "NEUTRAL"
 
     def _score_from_fields(
