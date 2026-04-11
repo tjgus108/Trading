@@ -1,11 +1,10 @@
 """
-RelativeVolumeStrategy:
+RelativeVolumeStrategy (Improved):
 - RVOL = current_volume / avg_volume_20
 - VWAP = 거래량 가중 이동 평균 (rolling 20)
-- BUY: RVOL > 2.0 AND close > open (양봉) AND close > VWAP
-- SELL: RVOL > 2.0 AND close < open (음봉) AND close < VWAP
-- HOLD: RVOL < 1.5
-- confidence: RVOL > 3.0 AND 볼린저 상/하단 조건 → HIGH, 그 외 MEDIUM
+- BUY: RVOL > 1.5 AND close > open AND (close > VWAP OR RVOL > 2.2)
+- SELL: RVOL > 1.5 AND close < open AND (close < VWAP OR RVOL > 2.2)
+- confidence: RVOL > 2.5 AND BB condition → HIGH, 그 외 MEDIUM
 - 최소 행: 25
 """
 
@@ -15,9 +14,9 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _MIN_ROWS = 25
 _VOL_LOOKBACK = 20
-_RVOL_BUY_SELL = 2.0
-_RVOL_HOLD = 1.5
-_RVOL_HIGH_CONF = 3.0
+_RVOL_BUY_SELL = 1.5
+_RVOL_ALT = 2.2
+_RVOL_HIGH_CONF = 2.5
 _BB_WINDOW = 20
 _BB_STD = 2.0
 
@@ -60,7 +59,8 @@ class RelativeVolumeStrategy(BaseStrategy):
             f"vwap={vwap:.2f} bb_upper={bb_upper:.2f} bb_lower={bb_lower:.2f}"
         )
 
-        if rvol > _RVOL_BUY_SELL and bull_candle and close > vwap:
+        # BUY: RVOL > 1.5 + 양봉 + (VWAP 돌파 OR 고RVOL > 2.2)
+        if rvol > _RVOL_BUY_SELL and bull_candle and (close > vwap or rvol > _RVOL_ALT):
             high_conf = rvol > _RVOL_HIGH_CONF and close > bb_upper
             conf = Confidence.HIGH if high_conf else Confidence.MEDIUM
             return Signal(
@@ -74,7 +74,8 @@ class RelativeVolumeStrategy(BaseStrategy):
                 bear_case=info,
             )
 
-        if rvol > _RVOL_BUY_SELL and bear_candle and close < vwap:
+        # SELL: RVOL > 1.5 + 음봉 + (VWAP 이탈 OR 고RVOL > 2.2)
+        if rvol > _RVOL_BUY_SELL and bear_candle and (close < vwap or rvol > _RVOL_ALT):
             high_conf = rvol > _RVOL_HIGH_CONF and close < bb_lower
             conf = Confidence.HIGH if high_conf else Confidence.MEDIUM
             return Signal(

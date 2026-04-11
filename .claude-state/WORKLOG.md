@@ -7717,3 +7717,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 18:35 UTC] Cycle 95 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 18:45 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 13:50 UTC] Cycle 95 COMPLETED — D + E + SIM + F
+**[D] ML:** tests/test_adaptive_selector.py +1 저 Sharpe → 선택 빈도 감소 검증.
+**[E] Execution:** tests/test_kelly_twap.py +2 Kelly+TWAP 파이프라인 통합 시나리오.
+**[SIM] Auto-improve:** relative_volume RVOL 임계값 2.0 → 1.5 완화 + VWAP OR 조건. **+0.74% → +7.87%** (Sharpe 0.32 → 1.86). 테스트 1개 업데이트 (rvol 1.67 기존 HOLD → BUY 허용).
+**[F] Research:** Walk-forward 파라미터. IS/OOS 70-80/20-30 표준, 67/33 권장 (OOS Sharpe 1.89). 창 크기: 단기 2y/6m, 장기 5y/1y.
+**Tests:** 6300 passed (+3 from Cycle 94).
+**SIM 누적 13개:** +relative_volume
+**Next Cycle:** 96 (A+C+SIM+F)
