@@ -1,3 +1,15 @@
+# Cycle 73 - Category F: Research
+## Status: COMPLETE
+
+## [2026-04-11] Cycle 73 — Crypto Options Bots & Gamma Exposure
+- Positive GEX → 딜러 매수/매도 헤지로 변동성 억제, 주요 스트라이크에 가격 pin → mean-revert 전략 유효
+- Negative GEX → 헤지 흐름이 추세 가속, 방향성 추세추종 유리 (기존 `gex_signal` 전략이 이 패턴 구현 완료)
+- 크립토 GEX는 주식 대비 참여자 구조 차이로 flow-based 보정 필요 (Glassnode taker-flow GEX 모델)
+- 자동화 봇 트렌드: 딜러 헤징 흐름 선행 예측 + 0DTE 옵션 만기 gamma flip 레벨 활용
+
+참고: `/home/user/Trading/src/strategy/gex_strategy.py` — Positive/Negative GEX 분기 이미 구현
+
+---
 # Cycle 72 - Category D: ML & Signals
 ## Status: COMPLETE
 

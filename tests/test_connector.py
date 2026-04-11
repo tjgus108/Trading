@@ -220,3 +220,53 @@ def test_cancel_order_not_connected():
 
     with pytest.raises(RuntimeError, match="connect()"):
         conn.cancel_order("ord-99", "BTC/USDT")
+
+
+# ── wait_for_fill 경계 테스트 ──────────────────────────────────────────────
+
+def test_wait_for_fill_timeout_preserves_partial_fill():
+    """timeout 발생 시 cancel 후 partial fill 수량(filled)을 반환에 포함."""
+    conn = _make_connector()
+    # fetch_order는 항상 open + partial fill 반환 (체결 안 됨)
+    conn._exchange.fetch_order.return_value = {
+        "id": "ord-1",
+        "status": "open",
+        "filled": 0.3,
+        "amount": 1.0,
+        "symbol": "BTC/USDT",
+    }
+    conn._exchange.cancel_order.return_value = {"id": "ord-1", "status": "canceled"}
+
+    import unittest.mock as _mock
+    # call1: deadline 설정(1000.0), call2: while 진입(1000.0 < 1001), call3: 탈출(2000.0)
+    call_count = [0]
+    def _time():
+        call_count[0] += 1
+        return 1000.0 if call_count[0] <= 2 else 2000.0
+
+    with _mock.patch("src.exchange.connector.time.time", side_effect=_time), \
+         _mock.patch("src.exchange.connector.time.sleep"):
+        result = conn.wait_for_fill("ord-1", "BTC/USDT", timeout=1)
+
+    assert result["status"] == "timeout"
+    assert result["filled"] == 0.3, f"partial fill lost: {result}"
+    assert result["amount"] == 1.0
+    conn._exchange.cancel_order.assert_called_once()
+
+
+def test_wait_for_fill_partial_fill_then_closed():
+    """partial fill 후 최종 closed → closed 주문 그대로 반환."""
+    conn = _make_connector()
+    partial = {"id": "ord-2", "status": "open", "filled": 0.5, "amount": 1.0}
+    filled = {"id": "ord-2", "status": "closed", "filled": 1.0, "amount": 1.0}
+    conn._exchange.fetch_order.side_effect = [partial, filled]
+
+    import unittest.mock as _mock
+    # time은 항상 deadline 이내
+    with _mock.patch("src.exchange.connector.time.time", return_value=500.0), \
+         _mock.patch("src.exchange.connector.time.sleep"):
+        result = conn.wait_for_fill("ord-2", "BTC/USDT", timeout=60)
+
+    assert result["status"] == "closed"
+    assert result["filled"] == 1.0
+    conn._exchange.cancel_order.assert_not_called()

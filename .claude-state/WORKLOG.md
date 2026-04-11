@@ -6138,3 +6138,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Bayesian 최적화. TPE/Optuna 75% pair 승리, 예산 13-17%로 90% 최적치. Walk-forward 필수. Optuna 도입으로 파라미터 자동 튜닝 가능.
 **Tests:** 6202 passed (+7 from Cycle 71).
 **Next Cycle:** 73 (E+A+F)
+
+## [2026-04-11 11:20 UTC] Cycle 73 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:22 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 03:40 UTC] Cycle 73 COMPLETED — E + A + F
+**[E] Execution BUG FIX:** src/exchange/connector.py wait_for_fill가 timeout 시 partial fill 수량 유실하던 버그 수정. last_order 변수로 마지막 fetch 보존, filled/amount 반환 포함. +2 tests.
+**[A] Quality:** tests/test_strategy_correlation.py +3. 모든 신호 동일 (+1.0), 완전 반대 (-1.0), 혼합 반대 검증.
+**[F] Research:** 크립토 옵션 GEX. Positive GEX → 가격 pin mean-revert, Negative GEX → 추세 가속. 기존 gex_strategy.py 이미 구현됨.
+**Tests:** 6207 passed (+5 from Cycle 72). 9번째 CRITICAL 버그 수정.
+**Next Cycle:** 74 (C+B+F)

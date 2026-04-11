@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 72 — 2026-04-11T11:18:03.988110Z
+🔄 CYCLE 73 — 2026-04-11T11:20:28.546376Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 71 COMPLETED — A + C + F** (2026-04-12 03:00 UTC)
-  **[A] Quality:** tests/test_backtest_engine.py +2 fee tracking. BUY+SELL 사이클 수수료 2배 누적 정확성 검증.
-  **[C] Data:** tests/test_websocket_buffer.py 신규 +5. deque(maxlen=1000) 자동 제거, 5000개 캔들 메모리 안전.
-  **[F] Research:** Tx 비용 최적화. 배치+calldata 압축, 동적 base fee, Flashbots private pool, L2(Arbitrum/Base) 90% 절감.
-  **Tests:** 6195 passed (+7 from Cycle 70).
+**Cycle 72 COMPLETED — B + D + F** (2026-04-12 03:20 UTC)
+  **[B] Risk:** tests/test_risk_manager.py +2 복합 시나리오. 멀티포지션+드로다운+jitter APPROVED, 드로다운 한계 전환 검증.
+  **[D] ML:** tests/test_hmm_fallback.py 신규 +5. hmmlearn 미설치 시 graceful fallback (Bollinger Band 기반) 확인.
+  **[F] Research:** Bayesian 최적화. TPE/Optuna 75% pair 승리, 예산 13-17%로 90% 최적치. Walk-forward 필수. Optuna 도입으로 파라미터 자동 튜닝 가능.
+  **Tests:** 6202 passed (+7 from Cycle 71).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

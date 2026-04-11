@@ -185,15 +185,25 @@ class ExchangeConnector:
         return self.exchange.cancel_order(order_id, symbol)
 
     def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60) -> dict:
-        """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환."""
+        """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환.
+
+        반환 시 filled/amount를 포함해 partial fill 수량을 보존한다.
+        """
         deadline = time.time() + timeout
+        last_order: dict = {}
         while time.time() < deadline:
-            order = self.fetch_order(order_id, symbol)
-            status = order.get("status")
+            last_order = self.fetch_order(order_id, symbol)
+            status = last_order.get("status")
             if status == "closed":
-                return order
+                return last_order
             if status == "canceled":
-                return order
+                return last_order
             time.sleep(2)
         self.cancel_order(order_id, symbol)
-        return {"status": "timeout", "id": order_id, "symbol": symbol}
+        return {
+            "status": "timeout",
+            "id": order_id,
+            "symbol": symbol,
+            "filled": last_order.get("filled", 0.0),
+            "amount": last_order.get("amount", 0.0),
+        }
