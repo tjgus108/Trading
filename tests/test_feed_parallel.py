@@ -238,6 +238,84 @@ class TestFeedParallel:
             assert call_args[4] == 3  # max_retries
             assert call_args[5] == "ValueError"  # error_type
             assert "Invalid data format" in call_args[6]  # message
+    def test_cache_stats_initial(self):
+        """캐시 통계 초기값 (hit=0, miss=0)."""
+        connector = MagicMock()
+        feed = DataFeed(connector)
+        
+        stats = feed.cache_stats()
+        
+        assert stats['hit_count'] == 0
+        assert stats['miss_count'] == 0
+        assert stats['total'] == 0
+        assert stats['hit_rate'] == 0.0
+        assert stats['cached_keys'] == 0
+
+    def test_cache_stats_after_fetch(self):
+        """첫 fetch 후 miss=1, hit=0."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector)
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        
+        assert stats['hit_count'] == 0
+        assert stats['miss_count'] == 1
+        assert stats['total'] == 1
+        assert stats['hit_rate'] == 0.0
+        assert stats['cached_keys'] == 1
+
+    def test_cache_stats_after_hit_and_miss(self):
+        """캐시 히트/미스 혼합 시 통계."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 fetch: miss
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        # 두 번째 fetch (같은 심볼/타임프레임): hit
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        # 새로운 심볼: miss
+        feed.fetch("ETH/USDT", "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        
+        assert stats['hit_count'] == 1
+        assert stats['miss_count'] == 2
+        assert stats['total'] == 3
+        assert stats['hit_rate'] == 1/3
+        assert stats['cached_keys'] == 2
+
+    def test_cache_stats_hit_rate_100_percent(self):
+        """캐시 히트율 100% 케이스."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 fetch: miss
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        # 3번 반복 hit
+        for _ in range(3):
+            feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        
+        assert stats['hit_count'] == 3
+        assert stats['miss_count'] == 1
+        assert stats['total'] == 4
+        assert stats['hit_rate'] == 0.75
+        assert stats['cached_keys'] == 1
+
 
 
 if __name__ == "__main__":

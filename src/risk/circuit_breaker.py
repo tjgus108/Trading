@@ -5,6 +5,7 @@ Circuit Breaker: 다층 자동 거래 중단.
   (포지션 full-block이 아닌 50% 축소 신호를 반환)
 - 상관관계 급증: 전략 간 상관계수 ≥ corr_threshold → size_multiplier=0.7 축소
 - 플래시 크래시 감지: 단일 캔들 가격 변동 ≥ flash_crash_pct → 즉시 완전 차단
+- 연속 손실 쿨다운: 연속 손실 ≥ max_consecutive_losses → cooldown_periods 동안 거래 차단
 """
 import logging
 from typing import Optional
@@ -22,6 +23,8 @@ class CircuitBreaker:
         atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
         corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소
         flash_crash_pct: float = 0.10,        # 단일 캔들 10% 이상 변동 → 즉시 차단
+        max_consecutive_losses: int = 5,      # 연속 손실 한계
+        cooldown_periods: int = 3,            # 쿨다운 기간 (트레이드 횟수 단위)
         correlation_tracker: Optional[SignalCorrelationTracker] = None,
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
@@ -29,10 +32,14 @@ class CircuitBreaker:
         self.atr_surge_multiplier = atr_surge_multiplier
         self.corr_threshold = corr_threshold
         self.flash_crash_pct = flash_crash_pct
+        self.max_consecutive_losses = max_consecutive_losses
+        self.cooldown_periods = cooldown_periods
         self._correlation_tracker = correlation_tracker
         self._triggered: bool = False
         self._reason: str = ""
         self._daily_start_balance: float = 0.0
+        self._consecutive_losses: int = 0
+        self._cooldown_remaining: int = 0
 
     # ── 내부 헬퍼 ──────────────────────────────────────────────────────────────
     def _make_result(
@@ -52,6 +59,45 @@ class CircuitBreaker:
             "correlation_throttle": correlation_throttle,
             "size_multiplier": size_multiplier,   # 1.0=정상, 0.7=상관축소, 0.5=반축소, 0.0=완전차단
         }
+
+    # ── 트레이드 결과 기록 ─────────────────────────────────────────────────────
+    def record_trade_result(self, is_loss: bool) -> None:
+        """트레이드 결과 기록. 손실 시 연속 손실 카운터 증가, 수익 시 초기화.
+        연속 손실이 max_consecutive_losses에 도달하면 쿨다운 시작.
+        """
+        if self._cooldown_remaining > 0:
+            # 쿨다운 중에는 카운터 변경 없음
+            return
+
+        if is_loss:
+            self._consecutive_losses += 1
+            logger.info(
+                "CircuitBreaker: 연속 손실 %d/%d",
+                self._consecutive_losses, self.max_consecutive_losses,
+            )
+            if self._consecutive_losses >= self.max_consecutive_losses:
+                self._cooldown_remaining = self.cooldown_periods
+                logger.warning(
+                    "CircuitBreaker COOLDOWN 시작: 연속 손실 %d회 → %d 기간 대기",
+                    self._consecutive_losses, self.cooldown_periods,
+                )
+        else:
+            if self._consecutive_losses > 0:
+                logger.info(
+                    "CircuitBreaker: 연속 손실 초기화 (이전 %d회)", self._consecutive_losses
+                )
+            self._consecutive_losses = 0
+
+    def tick_cooldown(self) -> None:
+        """쿨다운 카운터를 1 감소. 쿨다운 종료 시 연속 손실 카운터도 초기화."""
+        if self._cooldown_remaining > 0:
+            self._cooldown_remaining -= 1
+            logger.info(
+                "CircuitBreaker: 쿨다운 잔여 %d 기간", self._cooldown_remaining
+            )
+            if self._cooldown_remaining == 0:
+                self._consecutive_losses = 0
+                logger.info("CircuitBreaker: 쿨다운 종료, 연속 손실 초기화")
 
     # ── 메인 체크 ──────────────────────────────────────────────────────────────
     def check(
@@ -76,6 +122,7 @@ class CircuitBreaker:
         ATR surge와 correlation throttle이 동시 발생하면 더 보수적인 값(0.5) 사용.
         낙폭 조건은 항상 우선 — triggered=True, size_multiplier=0.0.
         플래시 크래시(candle_open/candle_close 제공 시)는 낙폭보다 먼저 체크.
+        연속 손실 쿨다운은 낙폭 체크 이후, ATR/상관 체크 이전에 수행.
         """
         if daily_start_balance <= 0 or peak_balance <= 0:
             return self._make_result(False, "", 0.0)
@@ -118,6 +165,15 @@ class CircuitBreaker:
             return self._make_result(True, self._reason, total_dd, size_multiplier=0.0)
 
         worst = max(daily_dd, total_dd)
+
+        # ── 연속 손실 쿨다운 체크 ────────────────────────────────────────────
+        if self._cooldown_remaining > 0:
+            reason = (
+                f"연속 손실 쿨다운: {self._consecutive_losses}회 연속 손실, "
+                f"잔여 {self._cooldown_remaining} 기간"
+            )
+            logger.warning("CircuitBreaker COOLDOWN ACTIVE: %s", reason)
+            return self._make_result(True, reason, worst, size_multiplier=0.0)
 
         # ── ATR 변동성 급등 체크 ──────────────────────────────────────────────
         atr_surge = False
@@ -196,8 +252,18 @@ class CircuitBreaker:
         """전체 상태 초기화."""
         self._triggered = False
         self._reason = ""
+        self._consecutive_losses = 0
+        self._cooldown_remaining = 0
         logger.info("CircuitBreaker: 전체 리셋")
 
     @property
     def is_triggered(self) -> bool:
         return self._triggered
+
+    @property
+    def consecutive_losses(self) -> int:
+        return self._consecutive_losses
+
+    @property
+    def cooldown_remaining(self) -> int:
+        return self._cooldown_remaining

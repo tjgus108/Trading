@@ -35,6 +35,8 @@ class DataFeed:
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._cache_ttl = cache_ttl  # 초
         self._max_retries = max_retries
+        self._hit_count = 0          # 캐시 히트 수
+        self._miss_count = 0         # 캐시 미스 수
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         key = (symbol, timeframe, limit)
@@ -42,8 +44,10 @@ class DataFeed:
         if key in self._cache:
             cached_summary, ts = self._cache[key]
             if now - ts < self._cache_ttl:
+                self._hit_count += 1
                 return cached_summary  # 캐시 히트
         # 캐시 미스: 실제 fetch (retry 포함)
+        self._miss_count += 1
         summary = self._fetch_with_retry(symbol, timeframe, limit)
         self._cache[key] = (summary, now)
         return summary
@@ -134,6 +138,29 @@ class DataFeed:
             keys_to_del = [k for k in self._cache if k[0] == symbol or k[1] == timeframe]
             for k in keys_to_del:
                 del self._cache[k]
+
+    def cache_stats(self) -> dict:
+        """
+        캐시 히트율/미스율 통계 조회.
+        
+        Returns:
+            {
+                'hit_count': int,     # 캐시 히트 수
+                'miss_count': int,    # 캐시 미스 수
+                'total': int,         # 총 fetch 시도 수
+                'hit_rate': float,    # 히트율 (0.0 ~ 1.0)
+                'cached_keys': int,   # 현재 캐시된 키 개수
+            }
+        """
+        total = self._hit_count + self._miss_count
+        hit_rate = self._hit_count / total if total > 0 else 0.0
+        return {
+            'hit_count': self._hit_count,
+            'miss_count': self._miss_count,
+            'total': total,
+            'hit_rate': hit_rate,
+            'cached_keys': len(self._cache),
+        }
 
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)

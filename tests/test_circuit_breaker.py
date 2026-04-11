@@ -285,3 +285,55 @@ def test_flash_crash_omitted_no_effect():
         daily_start_balance=10000.0,
     )
     assert result["triggered"] is False
+
+
+# ── 연속 손실 쿨다운 ────────────────────────────────────────
+def _cb_with_cooldown(max_losses: int = 3, cooldown: int = 2) -> CircuitBreaker:
+    return CircuitBreaker(max_consecutive_losses=max_losses, cooldown_periods=cooldown)
+
+
+def test_cooldown_blocks_after_consecutive_losses():
+    """연속 손실 3회 → 쿨다운 시작, check() triggered=True"""
+    cb = _cb_with_cooldown(max_losses=3, cooldown=2)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+    assert result["size_multiplier"] == 0.0
+    assert cb.cooldown_remaining == 2
+
+
+def test_cooldown_expires_after_tick():
+    """tick_cooldown 2회 후 쿨다운 해제, 이후 check() 정상 통과"""
+    cb = _cb_with_cooldown(max_losses=3, cooldown=2)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 1
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 0
+    assert cb.consecutive_losses == 0  # 쿨다운 종료 시 초기화
+
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is False
+
+
+def test_win_resets_consecutive_losses():
+    """손실 2회 후 수익 → 연속 손실 카운터 0으로 초기화"""
+    cb = _cb_with_cooldown(max_losses=3, cooldown=2)
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.consecutive_losses == 2
+    cb.record_trade_result(is_loss=False)
+    assert cb.consecutive_losses == 0
+    assert cb.cooldown_remaining == 0
