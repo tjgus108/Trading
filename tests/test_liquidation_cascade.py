@@ -289,3 +289,55 @@ def test_get_recent_retry_success_on_second_attempt():
         assert len(result) == 1
         assert result[0]["side"] == "SELL"
         assert call_count == 2  # 첫 실패 + 두 번째 성공
+
+# ---------------------------------------------------------------------------
+# 17. get_recent returns list of dicts with required fields
+# ---------------------------------------------------------------------------
+
+def test_get_recent_format_validation():
+    """get_recent() 반환 데이터 형식 검증: list[dict] with symbol, side, price, executedQty."""
+    fetcher = LiquidationFetcher.mock(long_liq=1_000_000, short_liq=500_000)
+    result = fetcher.get_recent()
+    
+    # 리스트 형식 확인
+    assert isinstance(result, list)
+    assert len(result) > 0
+    
+    # 각 원소가 dict 확인
+    for item in result:
+        assert isinstance(item, dict)
+        # 필수 필드 확인
+        assert "symbol" in item
+        assert "side" in item
+        assert "price" in item
+        assert "executedQty" in item or "origQty" in item
+        assert "time" in item
+        
+        # side는 SELL 또는 BUY
+        assert item["side"] in ["SELL", "BUY"]
+
+
+# ---------------------------------------------------------------------------
+# 18. compute_pressure returns LiquidationPressure with valid ranges
+# ---------------------------------------------------------------------------
+
+def test_compute_pressure_format_validation():
+    """compute_pressure() 반환 데이터 형식 검증: LiquidationPressure 필드 범위 확인."""
+    fetcher = LiquidationFetcher.mock(long_liq=1_000_000, short_liq=500_000)
+    pressure = fetcher.compute_pressure()
+    
+    # 타입 확인
+    assert isinstance(pressure, LiquidationPressure)
+    
+    # 필드 존재 및 타입 확인
+    assert isinstance(pressure.long_liq_usd, float) and pressure.long_liq_usd >= 0
+    assert isinstance(pressure.short_liq_usd, float) and pressure.short_liq_usd >= 0
+    assert isinstance(pressure.liq_ratio, float)
+    assert isinstance(pressure.total_liq_usd, float) and pressure.total_liq_usd >= 0
+    assert isinstance(pressure.cascade_risk, bool)
+    assert isinstance(pressure.score, float)
+    
+    # 범위 검증
+    assert 0 <= pressure.liq_ratio <= 1.0, f"liq_ratio out of range: {pressure.liq_ratio}"
+    assert -3.0 <= pressure.score <= 3.0, f"score out of range: {pressure.score}"
+    assert pressure.total_liq_usd == pressure.long_liq_usd + pressure.short_liq_usd
