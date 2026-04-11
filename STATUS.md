@@ -41,7 +41,8 @@
 - ✅ Cycle 33 완료 (E+A+F: exchange/README + 품질 감사 재실행 + long-term 리서치)
 - ✅ Cycle 34 완료 (C+B+F: cache_stats + 연속 손실 쿨다운 + Paper→Live 리서치)
 - ✅ Cycle 35 완료 (D+E+F: MultiSignal tie + dispatcher 로그 확장 + TradingView webhook)
-- ⏳ **Cycle 36 대기** (A+C+F)
+- ✅ Cycle 36 완료 (A+C+F: Monte Carlo 경계 + 에러 분류 + 선물 vs 현물 리서치)
+- ⏳ **Cycle 37 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -50,7 +51,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,008개** |
+| ✅ 통과 테스트 | **6,020개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

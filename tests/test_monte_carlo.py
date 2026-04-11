@@ -1,0 +1,138 @@
+"""
+MonteCarlo 클래스 단위 테스트 - 경계 조건 & 복원력 체크.
+"""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.backtest.monte_carlo import MonteCarlo, MonteCarloResult
+
+
+def test_monte_carlo_basic():
+    """정상 케이스: 500개 수익률로 100번 시뮬레이션."""
+    returns = pd.Series(np.random.randn(500) * 0.001 + 0.0005)
+    mc = MonteCarlo(n_simulations=100, block_size=20, seed=42)
+    result = mc.run(returns)
+    
+    assert isinstance(result, MonteCarloResult)
+    assert len(result.final_returns) == 100
+    assert len(result.sharpes) == 100
+    assert len(result.max_drawdowns) == 100
+
+
+def test_monte_carlo_empty_returns():
+    """빈 Series: 예외 없이 처리, 결과는 0 또는 NaN."""
+    returns = pd.Series(dtype=float)
+    mc = MonteCarlo(n_simulations=100, block_size=20)
+    result = mc.run(returns)
+    
+    # 빈 배열에서 np.prod(1+[]) = 1, 따라서 final_return = 0
+    assert len(result.final_returns) == 100
+    assert np.all(result.final_returns == 0.0)
+    # Sharpe와 MDD는 NaN
+    assert np.all(np.isnan(result.sharpes))
+    assert np.all(np.isnan(result.max_drawdowns))
+
+
+def test_monte_carlo_single_trade():
+    """1개 trade만: block_size=1로 자동 조정."""
+    returns = pd.Series([0.001])
+    mc = MonteCarlo(n_simulations=50, block_size=20, seed=42)
+    result = mc.run(returns)
+    
+    # block_size가 1로 조정됨
+    assert len(result.final_returns) == 50
+    # 모든 시뮬이 동일한 수익률을 반복
+    assert np.allclose(result.final_returns, [0.001] * 50, atol=1e-10)
+
+
+def test_monte_carlo_negative_returns():
+    """음의 수익률도 처리."""
+    returns = pd.Series([-0.001, -0.002, -0.0015] * 100)
+    mc = MonteCarlo(n_simulations=100, block_size=10, seed=42)
+    result = mc.run(returns)
+    
+    assert len(result.final_returns) == 100
+    # 모든 최종 수익률이 음수
+    assert np.all(result.final_returns < 0)
+
+
+def test_monte_carlo_block_size_exceeds_data():
+    """block_size > data length: 경고 후 block_size=1로 조정."""
+    returns = pd.Series(np.random.randn(5) * 0.001)
+    mc = MonteCarlo(n_simulations=50, block_size=20)
+    
+    # 경고가 로깅될 것
+    result = mc.run(returns)
+    assert len(result.final_returns) == 50
+
+
+def test_monte_carlo_with_nans():
+    """NaN 값 포함: dropna() 후 처리."""
+    data = np.random.randn(100) * 0.001
+    data[10] = np.nan
+    data[50] = np.nan
+    returns = pd.Series(data)
+    
+    mc = MonteCarlo(n_simulations=50, block_size=10)
+    result = mc.run(returns)
+    
+    # NaN 제거 후 98개 데이터로 실행
+    assert len(result.final_returns) == 50
+
+
+def test_monte_carlo_result_properties():
+    """MonteCarloResult의 percentile 프로퍼티 정상 동작."""
+    returns = pd.Series(np.random.randn(200) * 0.001 + 0.0003)
+    mc = MonteCarlo(n_simulations=100, block_size=20, seed=42)
+    result = mc.run(returns)
+    
+    # percentile 체크
+    assert result.p5_return <= result.p50_return <= result.p95_return
+    assert result.p5_sharpe <= result.median_sharpe
+    assert result.median_mdd <= result.p95_mdd
+    
+    # 확률도 [0, 1] 범위
+    prob = result.prob_positive()
+    assert 0.0 <= prob <= 1.0
+
+
+def test_monte_carlo_seed_reproducibility():
+    """seed로 재현성 검증."""
+    returns = pd.Series(np.random.randn(500) * 0.001 + 0.0005)
+    
+    mc1 = MonteCarlo(n_simulations=100, block_size=20, seed=42)
+    result1 = mc1.run(returns)
+    
+    mc2 = MonteCarlo(n_simulations=100, block_size=20, seed=42)
+    result2 = mc2.run(returns)
+    
+    # 동일한 seed면 동일 결과
+    np.testing.assert_array_almost_equal(result1.final_returns, result2.final_returns)
+
+
+def test_monte_carlo_zero_volatility():
+    """0 변동성 returns: Sharpe 계산 안정성."""
+    returns = pd.Series([0.0001] * 100)
+    mc = MonteCarlo(n_simulations=50, block_size=10)
+    result = mc.run(returns)
+    
+    # 0 변동성이므로 Sharpe는 0.0
+    assert len(result.sharpes) == 50
+    assert np.all(result.sharpes == 0.0)
+
+
+def test_monte_carlo_annualization_param():
+    """다른 annualization 값으로도 정상 동작."""
+    returns = pd.Series(np.random.randn(500) * 0.001 + 0.0005)
+    
+    mc_daily = MonteCarlo(n_simulations=50, block_size=20, annualization=252)
+    result_daily = mc_daily.run(returns)
+    
+    mc_hourly = MonteCarlo(n_simulations=50, block_size=20, annualization=252*24)
+    result_hourly = mc_hourly.run(returns)
+    
+    # 둘 다 결과를 반환해야 함
+    assert len(result_daily.sharpes) == 50
+    assert len(result_hourly.sharpes) == 50

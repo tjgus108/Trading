@@ -2775,3 +2775,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** TradingView webhook 봇. Plus 필수, 포트 80/443 한정, 응답 3초 제한. Pine Script 바 마감 1회만 실행으로 고빈도 불가. 외부 Flask 서버 연동 필요, 지연/보안 리스크.
 **Tests:** 6008 passed (+3 from Cycle 34).
 **Next Cycle:** 36 (A+C+F)
+
+## [2026-04-11 08:42 UTC] Cycle 36 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:44 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 14:05 UTC] Cycle 36 COMPLETED — A + C + F
+**[A] Quality:** tests/test_monte_carlo.py 신규 (+10 경계 조건). Monte Carlo 빈 데이터/단일 거래/NaN/음수/seed 재현성/0 변동성/annualization 검증. src/backtest/monte_carlo.py에 빈 배열 처리 버그 수정.
+**[C] Data:** src/data/feed.py 에러 분류 (transient vs fatal). NetworkError/Timeout/RateLimit → 재시도, BadSymbol/Auth → 즉시 raise. +2 tests.
+**[F] Research:** 선물 vs 현물 봇. 선물은 레버리지(5~10x) 수익 확대 가능하나 청산/펀딩비 리스크. 현물은 청산 없고 그리드 적합. 성과 차이는 봇 유형보다 전략/레짐 적합성에 의존.
+**Tests:** 6020 passed (+12 from Cycle 35).
+**Next Cycle:** 37 (B+D+F)

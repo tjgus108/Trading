@@ -203,26 +203,26 @@ class TestFeedParallel:
             assert error_call_args[4] == 2  # max_retries
 
     def test_fetch_error_log_includes_context(self):
-        """Fetch 실패 시 에러 로그에 symbol, timeframe, limit, max_retries, error_type 포함."""
+        """Transient 에러 모두 실패 시 exhausted 로그에 context 포함."""
+        import ccxt
         connector = MagicMock()
-        error = ValueError("Invalid data format")
+        error = ccxt.NetworkError("Connection failed")
         connector.fetch_ohlcv.side_effect = error
 
         feed = DataFeed(connector, max_retries=3)
         
         with patch("src.data.feed.logger") as mock_logger:
-            with pytest.raises(ValueError):
+            with pytest.raises(ccxt.NetworkError):
                 feed.fetch("BTC/USDT", "1h", limit=500)
             
-            # Error 로그 확인
+            # Error 로그 확인 (exhausted)
             error_calls = mock_logger.error.call_args_list
             assert len(error_calls) >= 1
             
             error_call = error_calls[0]
-            # 호출의 format string은 [0][0][0], 인자들은 [0][0][1:]
             call_args = error_call[0]  # (format_string, arg1, arg2, ...)
             
-            # 포맷 문자열 확인
+            # Exhausted 포맷 확인
             format_str = call_args[0]
             assert "symbol=%s" in format_str
             assert "timeframe=%s" in format_str
@@ -236,8 +236,8 @@ class TestFeedParallel:
             assert call_args[2] == "1h"  # timeframe
             assert call_args[3] == 500  # limit
             assert call_args[4] == 3  # max_retries
-            assert call_args[5] == "ValueError"  # error_type
-            assert "Invalid data format" in call_args[6]  # message
+            assert call_args[5] == "NetworkError"  # error_type
+            assert "Connection failed" in call_args[6]  # message
     def test_cache_stats_initial(self):
         """캐시 통계 초기값 (hit=0, miss=0)."""
         connector = MagicMock()
@@ -320,3 +320,46 @@ class TestFeedParallel:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestErrorClassification:
+    """에러 분류 (Transient vs Fatal) 테스트."""
+
+    def test_transient_network_error_retry(self):
+        """NetworkError는 transient → 재시도."""
+        import ccxt
+        from unittest.mock import MagicMock, patch
+
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = [
+            ccxt.NetworkError("Connection failed"),
+            [[1704067200000, 42000, 42500, 41800, 42300, 100]],
+        ]
+
+        feed = DataFeed(connector, max_retries=2)
+        
+        with patch("src.data.feed.logger"):
+            result = feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        # 첫 시도 실패 후 두 번째 시도에서 성공
+        assert result.symbol == "BTC/USDT"
+        assert result.candles == 1
+        assert connector.fetch_ohlcv.call_count == 2
+
+    def test_fatal_bad_symbol_no_retry(self):
+        """BadSymbol은 fatal → 즉시 중단."""
+        import ccxt
+        from unittest.mock import MagicMock, patch
+
+        connector = MagicMock()
+        error = ccxt.BadSymbol("Invalid symbol: FAKE/USDT")
+        connector.fetch_ohlcv.side_effect = error
+
+        feed = DataFeed(connector, max_retries=3)
+        
+        with patch("src.data.feed.logger"):
+            with pytest.raises(ccxt.BadSymbol):
+                feed.fetch("FAKE/USDT", "1h", limit=500)
+        
+        # 재시도하지 않음 (call_count = 1)
+        assert connector.fetch_ohlcv.call_count == 1

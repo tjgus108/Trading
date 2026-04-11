@@ -1,5 +1,5 @@
 ======================================================================
-🔄 CYCLE 36 — 2026-04-11T08:40:19.230583Z
+🔄 CYCLE 36 — 2026-04-11T08:42:11.517927Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
@@ -17,15 +17,17 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 34 COMPLETED — C + B + F** (2026-04-11 13:25 UTC)
-  **[C] Data:** src/data/feed.py에 cache_stats() 메서드 추가. hit_count/miss_count 추적, hit_rate 계산. +4 tests.
-  **[B] Risk:** src/risk/circuit_breaker.py 연속 손실 쿨다운 구현. record_trade_result() + tick_cooldown() + max_consecutive_losses 도달 시 cooldown_remaining 설정. +3 tests. 기존 로직 전무했음.
-  **[F] Research:** Paper→Live 전환 기준. 4~8주 paper + 100+ 트레이드 + 상승/하락 레짐 각 1회. 전환 지표 Sharpe≥1.0, PF≥1.5, MDD≤20%. 자본 5~10%로 시작 후 증액.
-  **Tests:** 6005 passed 🎉 (+7 from Cycle 33).
+**Cycle 35 COMPLETED — D + E + F** (2026-04-11 13:45 UTC)
+  **[D] ML:** tests/test_multi_signal.py에 동점 처리 테스트 3개 추가. _aggregate() tie 로직이 이미 정확히 HOLD+LOW 반환함을 검증.
+  **[E] Execution:** scripts/cycle_dispatcher.py에 read_worklog_summary() 추가. 브리핑에 이전 사이클 요약 + CRITICAL/FAIL/ERROR/pending 감지 자동 삽입. 다음 사이클부터 더 풍부한 컨텍스트.
+  **[F] Research:** TradingView webhook 봇. Plus 필수, 포트 80/443 한정, 응답 3초 제한. Pine Script 바 마감 1회만 실행으로 고빈도 불가. 외부 Flask 서버 연동 필요, 지연/보안 리스크.
+  **Tests:** 6008 passed (+3 from Cycle 34).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
   - FAIL 기록 존재
+  - ERROR 기록 존재
+  - pending 항목 존재
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

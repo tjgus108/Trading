@@ -8,12 +8,39 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+import ccxt
 import numpy as np
 import pandas as pd
 
 from src.exchange.connector import ExchangeConnector
 
 logger = logging.getLogger(__name__)
+
+
+# Error classification
+def _is_transient_error(error: Exception) -> bool:
+    """네트워크/속도 제한 에러는 재시도 가능."""
+    transient_types = (
+        ccxt.NetworkError,
+        ccxt.RequestTimeout,
+        ccxt.RateLimitExceeded,
+        TimeoutError,
+        ConnectionError,
+    )
+    return isinstance(error, transient_types)
+
+
+def _is_fatal_error(error: Exception) -> bool:
+    """인증, 심볼, 권한 에러는 즉시 중단."""
+    fatal_types = (
+        ccxt.BadSymbol,
+        ccxt.InvalidAddress,
+        ccxt.AuthenticationError,
+        ccxt.PermissionDenied,
+        ValueError,  # Invalid data format
+        KeyError,    # Missing required fields
+    )
+    return isinstance(error, fatal_types)
 
 
 @dataclass
@@ -53,7 +80,7 @@ class DataFeed:
         return summary
 
     def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
-        """Retry 로직과 함께 fetch. 실패 시 상세 로그."""
+        """Retry 로직과 함께 fetch. 에러 분류로 재시도 판단."""
         last_error = None
         for attempt in range(1, self._max_retries + 1):
             try:
@@ -63,19 +90,38 @@ class DataFeed:
                 )
                 return self._fetch_fresh(symbol, timeframe, limit)
             except Exception as e:
+                # Fatal 에러는 재시도하지 않음
+                if _is_fatal_error(e):
+                    error_type = type(e).__name__
+                    logger.error(
+                        "Fatal error (no retry): symbol=%s, timeframe=%s, "
+                        "error_type=%s, message=%s",
+                        symbol, timeframe, error_type, str(e)
+                    )
+                    raise
+                
+                # Transient 에러만 재시도
                 last_error = e
                 if attempt < self._max_retries:
                     logger.warning(
-                        "Fetch failed for %s %s: %s (attempt %d/%d, retrying...)",
+                        "Transient error: symbol=%s, timeframe=%s, "
+                        "error=%s (attempt %d/%d, retrying...)",
                         symbol, timeframe, str(e), attempt, self._max_retries
                     )
-                    time.sleep(0.5 * attempt)  # exponential backoff
+                    time.sleep(0.5 * attempt)
+                else:
+                    # 마지막 재시도도 transient이면 로그
+                    logger.warning(
+                        "Final transient error: symbol=%s, timeframe=%s, "
+                        "error=%s (attempt %d/%d)",
+                        symbol, timeframe, str(e), attempt, self._max_retries
+                    )
         
-        # 모든 시도 실패 — 상세 컨텍스트 포함
+        # 모든 재시도 실패
         error_type = type(last_error).__name__
         logger.error(
-            "Fetch exhausted: symbol=%s, timeframe=%s, limit=%d, max_retries=%d, "
-            "error_type=%s, message=%s",
+            "Fetch exhausted: symbol=%s, timeframe=%s, limit=%d, "
+            "max_retries=%d, error_type=%s, message=%s",
             symbol, timeframe, limit, self._max_retries, error_type, str(last_error)
         )
         raise last_error
