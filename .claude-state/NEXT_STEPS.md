@@ -1,3 +1,21 @@
+# Cycle 88 - Q1 2026 리서치
+
+## [2026-04-11] Cycle 88 — Q1 2026 Lessons
+- BTC Q1 -22%, 고점 대비 -30% 하락 — 트렌드 추종 봇은 whipsaw로 손실
+- 그리드/DCA 전략이 횡보 구간(전체 60~70%)에서 상대적으로 유리
+- 과최적화(curve-fitting) 봇은 레짐 전환 시 실패 — 백테스트 성과 ≠ 실거래
+- circuit breaker 미탑재 봇은 플래시크래시 시 최악 가격에 청산
+
+## 시사점 (봇 개선 방향)
+- 레짐 감지 강화 (trending vs. ranging 구분)
+- MDD 방어용 circuit breaker 로직 추가 고려
+- lob_maker PF 1.5 미달 — VPIN 임계값 상향 재시도
+
+## 이전 미완성
+- lob_maker Profit Factor 1.36 < 1.5 (FAIL)
+- engulfing_zone 전략 개선 대기
+
+---
 # Cycle 87 - Regime Adaptive 전략 검증 완료
 
 ## 결과
@@ -11,34 +29,3 @@
 ## 다음 사이클
 - lob_maker Profit Factor 1.5 이상 개선 고려
 - engulfing_zone 전략 개선
-
----
-# Cycle 86 - lob_maker 개선 완료
-
-## 결과
-**개선 전**: -3.28% (Sharpe: -0.89, PF: 0.93, WR: N/A)
-**개선 후**: +8.92% (Sharpe: 2.27, PF: 1.36, WR: 44.7%)
-
-### 수정 파일
-- `/home/user/Trading/src/strategy/lob_strategy.py`
-
-### 개선 내용
-1. **OFI 계산 단순화**: (close-open)/(high-low) 방식으로 안정화
-2. **VPIN 최소 임계값 추가**: 0.35 → 0.42 (거짓 신호 필터링)
-3. **RSI 극도 상황 필터**: 과매도/과매수 극단값에서만 신호 차단
-4. **Volume 임계값 미세 조정**: 1.2 → 1.25 (더 강한 확인)
-
-### 테스트 결과
-- 모든 8개 단위 테스트 PASS
-- Backtesting: +8.92% (합성 데이터, 1000시간)
-
-## 미완성
-- **Profit Factor 1.36 < 1.5 (FAIL)**: 여전히 승률 개선 필요
-- 추가 개선 방향:
-  - VPIN 0.45 이상으로 상향 (신호 감소, 정확도 증가)
-  - 추세 필터 (EMA) 재도입 고려
-  - Win/Loss 비율 분석 필요
-
-## 다음 싸이클
-- `engulfing_zone` 개선 예정
-- `lob_maker`는 추가 반복 고려

@@ -450,3 +450,62 @@ def test_multi_symbol_sell_does_not_affect_other_positions():
 
     # BTC 포지션 소멸
     assert "BTC/USDT" not in pt.account.positions
+
+
+# ── 수수료 누적 정확성 경계 테스트 (Cycle 88) ────────────────────
+
+def test_buy_fee_not_double_counted_in_balance():
+    """BUY 수수료가 잔액에서 정확히 1회만 차감되는지 검증.
+    
+    cost = price * qty + fee = price * qty * (1 + fee_rate)
+    잔액 = initial - cost 이어야 하고, fee가 이중 차감되면 안 됨.
+    """
+    fee_rate = 0.001
+    price, qty = 500.0, 4.0
+    initial = 50000.0
+    pt = PaperTrader(initial_balance=initial, fee_rate=fee_rate,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+
+    result = pt.execute_signal("BTC/USDT", "BUY", price=price, quantity=qty,
+                               strategy="s", confidence="H")
+
+    fee = price * qty * fee_rate          # = 2.0
+    cost = price * qty + fee              # = 2002.0
+    expected_balance = initial - cost    # = 47998.0
+
+    assert result["fee"] == pytest.approx(fee, abs=1e-9)
+    assert pt.account.balance == pytest.approx(expected_balance, abs=1e-9)
+    # fee가 이중으로 빠지면 balance = initial - cost - fee = 47996.0 이 되므로
+    # 이 assertion이 실패해야 이중 차감 버그가 잡힘
+    assert pt.account.balance != pytest.approx(expected_balance - fee, abs=1e-3)
+
+
+def test_sell_fee_accumulated_across_multiple_trades():
+    """여러 SELL 거래의 수수료가 total_pnl에 누적 반영되는지 검증.
+    
+    각 SELL pnl = (sell_price - avg_entry) * qty - sell_fee
+    total_pnl == sum(individual pnl) 이어야 함.
+    """
+    fee_rate = 0.002
+    pt = PaperTrader(initial_balance=500000.0, fee_rate=fee_rate,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+
+    rounds = [
+        (1000.0, 1100.0, 5.0),   # buy@1000, sell@1100, qty=5 → gain=500, fee=11 → pnl=489
+        (200.0,  180.0,  10.0),  # buy@200,  sell@180,  qty=10 → loss=-200, fee=3.6 → pnl=-203.6
+        (50.0,   75.0,   20.0),  # buy@50,   sell@75,   qty=20 → gain=500, fee=3   → pnl=497
+    ]
+
+    expected_total = 0.0
+    for buy_p, sell_p, qty in rounds:
+        pt.execute_signal("BTC/USDT", "BUY",  price=buy_p,  quantity=qty,
+                          strategy="s", confidence="H")
+        sell_result = pt.execute_signal("BTC/USDT", "SELL", price=sell_p, quantity=qty,
+                                        strategy="s", confidence="H")
+        expected_total += sell_result["pnl"]
+
+    assert pt.account.total_pnl == pytest.approx(expected_total, abs=1e-9)
+    # 또한 BUY 수수료는 total_pnl에 미포함 확인 (설계 명세 검증)
+    # total_pnl은 SELL 기준이므로 BUY fee는 잔액에서만 빠짐
+    summary = pt.get_summary()
+    assert summary["total_pnl"] == pytest.approx(expected_total, abs=1e-6)

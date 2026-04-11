@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 87 — 2026-04-11T16:53:08.346390Z
+🔄 CYCLE 88 — 2026-04-11T17:25:46.309863Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 86 COMPLETED — A + C + SIM + F** (2026-04-12 09:00 UTC)
-  **[A] Quality:** Quality audit 재실행 — PASS 22 유지 (기준 엄격).
-  **[C] Data:** tests/test_websocket_buffer.py +4 재연결 테스트. retry count 증가/리셋, MAX_RETRY 중단, exponential backoff.
-  **[SIM] Auto-improve:** lob_strategy 개선. OFI proxy 단순화, VPIN 최소 0.42, RSI 극도 필터, Volume 강화. **-3.28% → +8.92% (+12.2%p)**. Sharpe -0.89 → 2.27 (3배).
-  **[F] Research:** LOB MM. OFI skew + VPIN toxic flow 필터 조합이 핵심. 동적 스프레드 조정.
+**Cycle 87 COMPLETED — B + D + SIM + F** (2026-04-12 09:35 UTC)
+  **[B] Risk:** tests/test_risk_manager.py +2 jitter seed 일관성, jitter=0 불변.
+  **[D] ML:** tests/test_regime_adaptive.py +2 레짐 전환 LOW confidence, bull 레짐 SELL 억제.
+  **[SIM] Auto-improve:** htf_ema 개선. Cross distance 필터 (range*0.3). **-2.26% → +1.79% (+4.05%p)**. 21 tests 유지.
+  **[F] Research:** 단순 전략 보강. ATR 변동성 필터 + HTF 트렌드 정렬 3단 조합이 주류.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
