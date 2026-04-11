@@ -43,6 +43,34 @@ def _is_fatal_error(error: Exception) -> bool:
     return isinstance(error, fatal_types)
 
 
+def _is_rate_limit_error(error: Exception) -> bool:
+    """Rate limit 에러 여부 감지."""
+    return isinstance(error, ccxt.RateLimitExceeded)
+
+
+def _backoff_with_rate_limit(error: Exception, attempt: int) -> None:
+    """
+    Rate limit 에러는 긴 backoff, 다른 transient 에러는 짧은 backoff.
+    
+    Args:
+        error: 발생한 예외
+        attempt: 시도 번호 (1부터)
+    """
+    if _is_rate_limit_error(error):
+        # Rate limit: 2초 + attempt * 2초 (2s, 4s, 6s, ...)
+        wait_time = 2 + attempt * 2
+        logger.info(
+            "RateLimitExceeded detected: backing off %d seconds (attempt %d)",
+            wait_time, attempt
+        )
+    else:
+        # 다른 transient 에러: 0.5초 * attempt (0.5s, 1s, 1.5s, ...)
+        wait_time = 0.5 * attempt
+    
+    time.sleep(wait_time)
+
+
+
 @dataclass
 class DataSummary:
     symbol: str
@@ -108,7 +136,7 @@ class DataFeed:
                         "error=%s (attempt %d/%d, retrying...)",
                         symbol, timeframe, str(e), attempt, self._max_retries
                     )
-                    time.sleep(0.5 * attempt)
+                    _backoff_with_rate_limit(e, attempt)
                 else:
                     # 마지막 재시도도 transient이면 로그
                     logger.warning(

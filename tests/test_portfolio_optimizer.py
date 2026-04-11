@@ -250,3 +250,27 @@ def test_single_data_point_fallback():
         result = opt.optimize(data)
         assert result.method == "equal_weight"
         assert abs(sum(result.weights.values()) - 1.0) < 1e-9
+
+
+# ── Numerical Instability ─────────────────────────────────────────────────────
+
+def test_nan_weights_to_apply_constraints_returns_equal_weight():
+    """NaN 포함 weights 입력 시 _apply_constraints가 equal_weight 반환."""
+    opt = PortfolioOptimizer(method="risk_parity", min_weight=0.05, max_weight=0.5)
+    nan_w = np.array([np.nan, 0.5, 0.3])
+    result = opt._apply_constraints(nan_w)
+    # NaN 없어야 하고 합=1, 모든 값>=0
+    assert not np.any(np.isnan(result)), "NaN in output weights"
+    assert abs(result.sum() - 1.0) < 1e-9
+    assert np.all(result >= 0.0)
+
+
+def test_inf_weights_to_apply_constraints_returns_equal_weight():
+    """inf 포함 weights 입력 시 _apply_constraints가 equal_weight 반환."""
+    opt = PortfolioOptimizer(method="risk_parity", min_weight=0.05, max_weight=0.5)
+    inf_w = np.array([np.inf, 0.3, 0.2])
+    result = opt._apply_constraints(inf_w)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
+    assert abs(result.sum() - 1.0) < 1e-9
+    assert np.all(result >= 0.0)

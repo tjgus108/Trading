@@ -1,34 +1,51 @@
-# Cycle 53 - Category A: Quality Assurance — Pipeline 통합 테스트 완료
+# Cycle 54 - Category B: Risk Management 완료
 
-## [2026-04-11] Cycle 53 — Pipeline end-to-end 통합 테스트 확장
+## [2026-04-11] Cycle 54 — Portfolio Optimizer Sanity Check 강화
 
-### 작업 완료
-- `tests/test_pipeline_specialist.py`: 2개 실전 시나리오 통합 테스트 추가
-  - `test_full_pipeline_specialist_ensemble_with_risk_and_twap`: SpecialistEnsemble 합의(BUY) + RiskManager approval + TWAP 실행 완전 흐름
-  - `test_full_pipeline_specialist_conflict_blocks_at_alpha`: SpecialistEnsemble 강한 반대(SELL conf=0.92) → alpha에서 HOLD 블록, risk/execution 건너뜀
-  - `test_full_pipeline_kelly_sizer_and_vol_targeting_together`: Kelly Sizer + VolTargeting 순차 조정 검증
+### 버그 수정
+- `src/risk/portfolio_optimizer.py` `_apply_constraints()`:
+  - NaN/inf 입력 방어 추가 (시작 시 `np.isfinite` 체크 → equal_weight fallback)
+  - 500회 루프에서 수렴 성공 시 즉시 break 후 후처리로 진입하도록 개선
+  - 최종 반환 전 `clip(w, 0, None) / sum` 으로 합=1, 음수=0 강제 보장
 
-### 파일 변경
-- `tests/test_pipeline_specialist.py`: 3개 통합 테스트 추가 (~150줄)
+### 테스트 추가 (수치 불안정 시나리오)
+- `tests/test_portfolio_optimizer.py`:
+  - `test_nan_weights_to_apply_constraints_returns_equal_weight`: NaN 입력 → equal_weight
+  - `test_inf_weights_to_apply_constraints_returns_equal_weight`: inf 입력 → equal_weight
 
 ### 테스트 결과
-- tests/test_pipeline_specialist.py: 13/13 PASS ✓
-  - 기존 10개 테스트 + 신규 3개 통합 테스트
+- tests/test_portfolio_optimizer.py: 23/23 PASS ✓
 
 ---
 
-# Cycle 52 - Category D: ML & Signals — specialist_agents voting edge cases 완료
+# Cycle 54 - Category C: DataFeed rate limit 감지 완료
 
-## [2026-04-11] Cycle 52 — SpecialistEnsemble voting edge case 테스트 추가
+## [2026-04-11] Cycle 54 — DataFeed rate limit 감지 + backoff
 
 ### 작업 완료
-- `tests/test_specialist_agents.py`: 4개 edge case 테스트 추가
-  - `test_ensemble_two_buy_one_sell_returns_buy`: 2:1 split (BUY vs SELL, HOLD 없음) → 다수결 BUY
-  - `test_ensemble_unanimous_sell`: 3개 모두 SELL → unanimous SELL
-  - `test_ensemble_all_hold_no_failures`: 에이전트 실패 없이 all-HOLD → HOLD, confidence <= 1.0
-  - (기존 test_ensemble_all_agents_fail 보완: 정상 경로 all-HOLD 구분)
+- `src/data/feed.py`: RateLimitExceeded 전용 처리 추가
+  - `_is_rate_limit_error()`: ccxt.RateLimitExceeded 감지
+  - `_backoff_with_rate_limit()`: rate limit은 긴 backoff (2 + attempt*2초), 다른 transient는 짧은 backoff (0.5*attempt초)
+  - `_fetch_with_retry()` line 139: 동적 backoff 호출로 변경
+
+### 파일 변경
+- `src/data/feed.py`: +3개 함수 (46-70줄)
+- `tests/test_rate_limit_backoff.py`: 신규 테스트 파일 (6개 테스트)
 
 ### 테스트 결과
-- tests/test_specialist_agents.py: 22/22 PASS
+- tests/test_rate_limit_backoff.py: 6/6 PASS ✓
+  - test_is_rate_limit_error (감지 로직)
+  - test_backoff_with_rate_limit_long_wait (첫 시도: 4초)
+  - test_backoff_with_rate_limit_increasing (증가형: 4s, 6s, 8s)
+  - test_backoff_with_other_transient_error (다른 에러: 0.5s*attempt)
+  - test_fetch_with_rate_limit_retry (재시도 성공)
+  - test_fetch_with_rate_limit_exhausted (재시도 실패)
+- tests/test_feed_parallel.py::TestErrorClassification (회귀): 1/1 PASS ✓
+
+---
+
+# Cycle 54 - Category F: Research — ETF Flows as Signal
+
+(이전 항목...)
 
 ---

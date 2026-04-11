@@ -164,9 +164,16 @@ class PortfolioOptimizer:
         return max(0.0, var), max(0.0, cvar)
 
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
-        """min/max 제약을 유지하면서 합=1.0 보장 (iterative projection)."""
+        """min/max 제약을 유지하면서 합=1.0 보장 (iterative projection).
+        
+        수치 불안정(NaN/inf) 입력 방어: 유효하지 않은 값은 equal_weight로 대체.
+        최종 반환 전 합=1, 모든 가중치>=0 강제 검증.
+        """
         n = len(weights)
         w = weights.copy()
+        # NaN / inf 방어: 수치 불안정 입력은 equal_weight로 대체
+        if not np.all(np.isfinite(w)) or w.sum() <= 0:
+            return np.ones(n) / n
         for _ in range(500):
             total = w.sum()
             if total <= 0:
@@ -174,7 +181,8 @@ class PortfolioOptimizer:
             w = w / total
             w_clipped = np.clip(w, self.min_weight, self.max_weight)
             if np.max(np.abs(w_clipped - w)) < 1e-12:
-                return w_clipped
+                w = w_clipped
+                break
             w = w_clipped
         # 수렴 실패 시: 마지막으로 클리핑 후 정규화를 충분히 반복
         for _ in range(100):
@@ -185,7 +193,12 @@ class PortfolioOptimizer:
             w = w / total
             if np.all(w <= self.max_weight + 1e-12) and np.all(w >= self.min_weight - 1e-12):
                 break
-        return w
+        # 최종 합=1, 음수 제거 보장
+        w = np.clip(w, 0.0, None)
+        total = w.sum()
+        if total <= 0:
+            return np.ones(n) / n
+        return w / total
 
     def _mean_variance(self, returns_matrix: np.ndarray, symbols: list) -> np.ndarray:
         """몬테카를로: n_simulations개 랜덤 포트폴리오 중 최대 Sharpe 선택.

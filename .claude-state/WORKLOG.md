@@ -4280,3 +4280,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** ATR 배수 최적값. 손절 1.5x + 익절 3.0x (R:R 1:2) 장기 유리. 단타 1.5-2.0x, 포지션 2.5-3.5x. 3x ATR 손절이 고정 대비 15% 향상.
 **Tests:** 6113 passed (+5 from Cycle 52).
 **Next Cycle:** 54 (C+B+F)
+
+## [2026-04-11 09:42 UTC] Cycle 54 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:45 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 20:40 UTC] Cycle 54 COMPLETED — C + B + F
+**[C] Data:** src/data/feed.py rate limit 감지 추가. _is_rate_limit_error() + _backoff_with_rate_limit() (4/6/8초). 다른 transient는 기존 짧은 backoff. +6 tests.
+**[B] Risk CRITICAL:** src/risk/portfolio_optimizer.py _apply_constraints() NaN/inf 버그 수정. np.isfinite 체크 + clip(w,0)/sum 강제 정규화. 이전에는 NaN weights 그대로 반환됨. +2 tests.
+**[F] Research:** ETF flows as signal. 2025 $46.7B 유입, 누적 $56.9B. ETF 월간 플로우 > LTH 공급 > 규제 > Fed 순 우선. 월별 보조 필터로 추가 권장.
+**Tests:** 6121 passed (+8 from Cycle 53).
+**Next Cycle:** 55 (D+E+F)
