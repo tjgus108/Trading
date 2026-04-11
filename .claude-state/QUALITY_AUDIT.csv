@@ -1,0 +1,386 @@
+module,class,name,sharpe,win_rate,profit_factor,max_dd,trades,total_return,passed,fees,slip_cost,fail_reasons
+cmf,CMFStrategy,cmf,6.853,0.571,2.294,0.043,28,0.1557,True,197.52,98.76,[]
+adaptive_rsi,AdaptiveRSIStrategy,adaptive_rsi,6.661,0.7,4.018,0.011,10,0.0987,False,69.65,34.82,['trades 10 < 15']
+wick_reversal,WickReversalStrategy,wick_reversal,6.506,0.543,2.033,0.035,35,0.1683,True,232.79,116.4,[]
+crossover_confluence,CrossoverConfluenceStrategy,crossover_confluence,6.462,0.833,7.374,0.011,6,0.0683,False,39.01,19.5,['trades 6 < 15']
+elder_impulse,ElderImpulseStrategy,elder_impulse,6.29,0.625,2.699,0.035,16,0.1088,True,106.68,53.34,[]
+ema_dynamic_support,EMADynamicSupportStrategy,ema_dynamic_support,5.946,0.636,3.184,0.012,11,0.0921,False,86.18,43.09,['trades 11 < 15']
+price_range_breakout,PriceRangeBreakoutStrategy,price_range_breakout,5.89,0.8,6.975,0.011,5,0.0621,False,35.96,17.98,['trades 5 < 15']
+momentum_quality,MomentumQualityStrategy,momentum_quality,5.535,0.518,1.917,0.032,27,0.1246,True,196.62,98.31,[]
+engulfing_zone,BullishEngulfingZoneStrategy,engulfing_zone,5.501,0.6,2.495,0.033,15,0.0918,True,105.78,52.89,[]
+supertrend_multi,SupertrendMultiStrategy,supertrend_multi,5.379,0.48,1.97,0.044,25,0.1098,True,182.35,91.17,[]
+value_area,ValueAreaStrategy,value_area,5.244,0.533,1.837,0.05,30,0.117,True,196.47,98.23,[]
+price_action_momentum,PriceActionMomentumStrategy,price_action_momentum,5.239,0.588,2.237,0.022,17,0.0906,True,118.57,59.28,[]
+bb_bandwidth,BBBandwidthStrategy,bb_bandwidth,5.149,0.571,2.362,0.022,14,0.0843,False,104.78,52.39,['trades 14 < 15']
+order_flow_imbalance_v2,OrderFlowImbalanceV2Strategy,order_flow_imbalance_v2,5.003,0.516,1.772,0.043,31,0.1158,True,205.66,102.83,[]
+htf_ema,HigherTimeframeEMAStrategy,htf_ema,4.913,0.52,1.851,0.032,25,0.103,True,168.23,84.11,[]
+price_pattern_recog,PricePatternRecogStrategy,price_pattern_recog,4.813,1.0,291225995075.83,0.0,2,0.0284,False,13.71,6.85,['trades 2 < 15']
+pre_breakout,PreBreakoutStrategy,pre_breakout,4.765,0.75,5.479,0.012,4,0.0459,False,36.41,18.2,['trades 4 < 15']
+linear_channel_rev,LinearChannelReversionStrategy,linear_channel_rev,4.622,0.5,1.853,0.053,24,0.0928,True,153.59,76.8,[]
+vol_spread_analysis,VolSpreadAnalysisStrategy,vol_spread_analysis,4.59,0.571,2.129,0.033,14,0.0732,False,98.21,49.1,['trades 14 < 15']
+volume_spread_analysis_v2,VolumeSpreadAnalysisV2Strategy,volume_spread_analysis_v2,4.566,0.571,2.164,0.033,14,0.0716,False,100.53,50.27,['trades 14 < 15']
+price_cluster,PriceClusterStrategy,price_cluster,4.507,0.533,2.058,0.022,15,0.073,True,96.06,48.03,[]
+frama,FRAMAStrategy,frama,4.372,0.514,1.616,0.046,35,0.105,True,234.03,117.02,[]
+narrow_range,NarrowRangeStrategy,narrow_range,4.31,0.5,1.611,0.043,34,0.1011,True,226.35,113.18,[]
+nr7,NR7Strategy,nr7,4.31,0.5,1.611,0.043,34,0.1011,True,226.35,113.18,[]
+trend_break_confirm,TrendBreakConfirmStrategy,trend_break_confirm,4.215,0.538,2.073,0.032,13,0.0647,False,86.13,43.07,['trades 13 < 15']
+lob_strategy,LOBOFIStrategy,lob_maker,4.093,0.562,1.93,0.023,16,0.0636,True,109.45,54.72,[]
+ema_stack,EMAStackStrategy,ema_stack,4.026,0.452,1.487,0.045,42,0.1032,False,298.46,149.23,['profit_factor 1.49 < 1.5']
+dema_cross,DEMACrossStrategy,dema_cross,3.805,0.5,1.696,0.032,20,0.0699,True,129.2,64.6,[]
+zero_lag_ema,ZeroLagEMAStrategy,zero_lag_ema,3.805,0.5,1.696,0.032,20,0.0699,True,129.2,64.6,[]
+relative_volume,RelativeVolumeStrategy,relative_volume,3.762,0.5,1.757,0.033,18,0.0654,True,118.39,59.2,[]
+bb_keltner_squeeze,BBKeltnerSqueezeStrategy,bb_keltner_squeeze,3.747,0.571,2.455,0.022,7,0.0437,False,50.57,25.28,['trades 7 < 15']
+positional_scaling,PositionalScalingStrategy,positional_scaling,3.724,0.5,1.737,0.033,18,0.0647,True,123.39,61.7,[]
+trend_momentum_blend,TrendMomentumBlendStrategy,trend_momentum_blend,3.634,0.447,1.404,0.045,47,0.0991,False,337.32,168.66,['profit_factor 1.40 < 1.5']
+multi_tf_trend,MultiTFTrendStrategy,multi_tf_trend,3.621,0.444,1.465,0.038,36,0.0858,False,253.99,126.99,['profit_factor 1.46 < 1.5']
+ultimate_oscillator,UltimateOscillatorStrategy,ultimate_oscillator,3.62,1.0,195654971065.163,0.0,1,0.0193,False,5.99,3.0,['trades 1 < 15']
+consolidation_breakout,ConsolidationBreakoutStrategy,consolidation_breakout,3.598,1.0,193450735127.146,0.0,1,0.0189,False,8.53,4.27,['trades 1 < 15']
+consecutive_candles,ConsecutiveCandlesStrategy,consecutive_candles,3.575,1.0,191738541783.491,0.001,1,0.0186,False,10.82,5.41,['trades 1 < 15']
+trend_follow_filter,TrendFollowFilterStrategy,trend_follow_filter,3.551,0.441,1.483,0.064,34,0.0822,False,240.88,120.44,['profit_factor 1.48 < 1.5']
+guppy,GuppyStrategy,guppy,3.53,0.442,1.369,0.057,52,0.0997,False,361.49,180.75,['profit_factor 1.37 < 1.5']
+trend_slope_filter,TrendSlopeFilterStrategy,trend_slope_filter,3.529,0.442,1.409,0.042,43,0.0913,False,305.16,152.58,['profit_factor 1.41 < 1.5']
+pmo_strategy,PriceMomentumOscillator,pmo_strategy,3.51,0.583,1.948,0.022,12,0.0473,False,74.39,37.2,['trades 12 < 15']
+acceleration_band,AccelerationBandStrategy,acceleration_band,3.452,0.481,1.511,0.052,27,0.0708,True,184.7,92.35,[]
+body_momentum,BodyMomentumStrategy,body_momentum,3.426,0.571,2.214,0.022,7,0.0374,False,42.88,21.44,['trades 7 < 15']
+three_bar_reversal,ThreeBarReversalStrategy,three_bar_reversal,3.392,0.667,3.669,0.011,3,0.0272,False,22.31,11.15,['trades 3 < 15']
+volatility_cluster,VolatilityClusterStrategy,volatility_cluster,3.372,0.5,1.697,0.043,16,0.0546,True,104.43,52.21,[]
+trima,TRIMAStrategy,trima,3.203,0.545,1.851,0.022,11,0.0416,False,66.31,33.16,['trades 11 < 15']
+adaptive_threshold,AdaptiveThresholdStrategy,adaptive_threshold,3.17,0.452,1.379,0.063,42,0.0801,False,287.59,143.79,['profit_factor 1.38 < 1.5']
+trend_exhaustion,TrendExhaustionStrategy,trend_exhaustion,3.0,0.46,1.382,0.072,37,0.0737,False,245.14,122.57,['profit_factor 1.38 < 1.5']
+roc_ma_cross,ROCMACrossStrategy,roc_ma_cross,2.985,0.5,1.577,0.025,18,0.0492,True,118.76,59.38,[]
+pivot_reversal,PivotReversalStrategy,pivot_reversal,2.923,0.419,1.282,0.073,62,0.088,False,421.14,210.57,['profit_factor 1.28 < 1.5']
+stc,STCStrategy,stc,2.82,0.5,1.711,0.042,10,0.0358,False,61.49,30.74,['trades 10 < 15']
+volume_weighted_momentum,VolumeWeightedMomentumStrategy,volume_weighted_momentum,2.787,0.423,1.292,0.069,52,0.0762,False,358.55,179.28,['profit_factor 1.29 < 1.5']
+cyclic_momentum,CyclicMomentumStrategy,cyclic_momentum,2.747,0.524,1.49,0.052,21,0.0496,False,133.87,66.93,['profit_factor 1.49 < 1.5']
+dpo_cross,DPOCrossStrategy,dpo_cross,2.737,0.439,1.325,0.076,41,0.0659,False,281.67,140.84,['profit_factor 1.32 < 1.5']
+volume_momentum_break,VolumeMomentumBreakStrategy,volume_momentum_break,2.719,0.48,1.436,0.054,25,0.0515,False,169.46,84.73,['profit_factor 1.44 < 1.5']
+confluence_zone,ConfluenceZoneStrategy,confluence_zone,2.694,0.438,1.36,0.043,32,0.0592,False,211.8,105.9,['profit_factor 1.36 < 1.5']
+trend_intensity_index,TrendIntensityIndexV2Strategy,trend_intensity_index,2.63,0.462,1.585,0.043,13,0.0387,False,83.63,41.81,['trades 13 < 15']
+range_expansion,RangeExpansionStrategy,range_expansion,2.622,0.474,1.463,0.046,19,0.0443,False,129.38,64.69,['profit_factor 1.46 < 1.5']
+bid_ask_imbalance,BidAskImbalanceStrategy,bid_ask_imbalance,2.61,0.474,1.464,0.038,19,0.0452,False,128.6,64.3,['profit_factor 1.46 < 1.5']
+signal_line_cross,SignalLineCrossStrategy,signal_line_cross,2.536,0.455,1.418,0.043,22,0.0464,False,139.24,69.62,['profit_factor 1.42 < 1.5']
+trend_acceleration,TrendAccelerationStrategy,trend_acceleration,2.452,0.413,1.271,0.063,46,0.0622,False,330.48,165.24,['profit_factor 1.27 < 1.5']
+autocorr_strategy,AutoCorrelationStrategy,autocorr_strategy,2.431,0.438,1.273,0.058,48,0.0619,False,320.58,160.29,['profit_factor 1.27 < 1.5']
+rsi_momentum_div,RSIMomentumDivStrategy,rsi_momentum_div,2.405,0.439,1.28,0.083,41,0.0573,False,294.18,147.09,['profit_factor 1.28 < 1.5']
+fvg_strategy,FairValueGapStrategy,fvg_strategy,2.351,0.452,1.329,0.032,31,0.0491,False,205.6,102.8,['profit_factor 1.33 < 1.5']
+trend_strength_index,TrendStrengthIndexStrategy,trend_strength_index,2.337,0.471,1.441,0.022,17,0.0363,False,107.85,53.92,['profit_factor 1.44 < 1.5']
+failed_breakout,FailedBreakoutStrategy,failed_breakout,2.318,0.423,1.343,0.052,26,0.0463,False,190.4,95.2,['profit_factor 1.34 < 1.5']
+mean_rev_bounce,MeanRevBounceStrategy,mean_rev_bounce,2.246,0.409,1.376,0.067,22,0.0406,False,145.19,72.59,['profit_factor 1.38 < 1.5']
+alligator,AlligatorStrategy,alligator,2.213,0.404,1.25,0.053,47,0.0553,False,327.94,163.97,['profit_factor 1.25 < 1.5']
+cci_breakout,CCIBreakoutStrategy,cci_breakout,2.16,0.421,1.268,0.069,38,0.0499,False,264.77,132.39,['profit_factor 1.27 < 1.5']
+seasonal_cycle,SeasonalCycleStrategy,seasonal_cycle,2.129,0.467,1.428,0.022,15,0.0314,False,103.87,51.94,['profit_factor 1.43 < 1.5']
+divergence_confirmation,DivergenceConfirmationStrategy,divergence_confirmation,2.076,0.448,1.308,0.043,29,0.0399,False,191.74,95.87,['profit_factor 1.31 < 1.5']
+balance_of_power,BalanceOfPowerStrategy,balance_of_power,2.01,0.444,1.308,0.058,27,0.0387,False,182.11,91.06,['profit_factor 1.31 < 1.5']
+trend_filtered_mean_rev,TrendFilteredMeanRevStrategy,trend_filtered_mean_rev,1.955,0.5,1.838,0.011,4,0.0163,False,26.81,13.41,['trades 4 < 15']
+adaptive_trend,AdaptiveTrendStrategy,adaptive_trend,1.927,0.409,1.224,0.074,44,0.0465,False,300.3,150.15,['profit_factor 1.22 < 1.5']
+trend_momentum_score,TrendMomentumScoreStrategy,trend_momentum_score,1.92,0.396,1.209,0.073,53,0.0498,False,360.88,180.44,['profit_factor 1.21 < 1.5']
+volatility_expansion,VolatilityExpansionStrategy,volatility_expansion,1.917,0.5,1.535,0.022,8,0.02,False,54.56,27.28,['trades 8 < 15']
+volume_surge,VolumeSurgeStrategy,volume_surge,1.917,0.5,1.826,0.011,4,0.0159,False,30.01,15.01,['trades 4 < 15']
+ema_envelope,EMAEnvelopeStrategy,ema_envelope,1.911,0.48,1.299,0.05,25,0.0334,False,161.44,80.72,['profit_factor 1.30 < 1.5']
+adaptive_rsi_thresh,AdaptiveRSIThresholdStrategy,adaptive_rsi_thresh,1.907,0.429,1.39,0.022,14,0.0279,False,98.04,49.02,"['profit_factor 1.39 < 1.5', 'trades 14 < 15']"
+trend_consistency,TrendConsistencyStrategy,trend_consistency,1.907,0.405,1.232,0.051,42,0.0447,False,290.94,145.47,['profit_factor 1.23 < 1.5']
+price_structure_analysis,PriceStructureAnalysisStrategy,price_structure_analysis,1.894,0.404,1.22,0.071,47,0.0462,False,315.11,157.56,['profit_factor 1.22 < 1.5']
+pmo,PMOStrategy,pmo,1.871,0.444,1.328,0.045,18,0.0299,False,116.01,58.01,['profit_factor 1.33 < 1.5']
+tema_cross,TEMACrossStrategy,tema_cross,1.87,0.462,1.271,0.047,26,0.0365,False,179.0,89.5,['profit_factor 1.27 < 1.5']
+macd_hist_div,MACDHistDivStrategy,macd_hist_div,1.829,0.45,1.314,0.047,20,0.03,False,147.91,73.95,['profit_factor 1.31 < 1.5']
+dual_momentum,DualMomentumStrategy,dual_momentum,1.786,0.408,1.199,0.073,49,0.0447,False,333.11,166.56,['profit_factor 1.20 < 1.5']
+volume_oscillator,VolumeOscillatorStrategy,volume_oscillator,1.781,0.424,1.238,0.076,33,0.0373,False,223.99,111.99,['profit_factor 1.24 < 1.5']
+pin_bar,PinBarStrategy,pin_bar,1.735,0.405,1.21,0.078,42,0.0398,False,294.05,147.02,['profit_factor 1.21 < 1.5']
+price_channel_break,PriceChannelBreakStrategy,price_channel_break,1.699,0.406,1.236,0.046,32,0.0343,False,221.38,110.69,['profit_factor 1.24 < 1.5']
+trend_follow_break,TrendFollowBreakStrategy,trend_follow_break,1.698,0.409,1.273,0.047,22,0.0292,False,149.33,74.66,['profit_factor 1.27 < 1.5']
+acc_dist,AccDistStrategy,acc_dist,1.695,0.391,1.196,0.082,46,0.0412,False,318.5,159.25,['profit_factor 1.20 < 1.5']
+coppock_enhanced,CoppockEnhancedStrategy,coppock_enhanced,1.681,0.429,1.343,0.043,14,0.0221,False,87.61,43.81,"['profit_factor 1.34 < 1.5', 'trades 14 < 15']"
+vol_adj_momentum,VolAdjMomentumStrategy,vol_adj_momentum,1.662,0.382,1.181,0.093,55,0.0431,False,372.78,186.39,['profit_factor 1.18 < 1.5']
+fractal_break,FractalBreakStrategy,fractal_break,1.659,0.412,1.182,0.055,51,0.0419,False,355.0,177.5,['profit_factor 1.18 < 1.5']
+volume_climax,VolumeClimaxStrategy,volume_climax,1.654,0.5,2.1,0.01,2,0.0095,False,12.23,6.11,['trades 2 < 15']
+tema_strategy,TEMAStrategy,tema_strategy,1.628,0.435,1.257,0.033,23,0.0284,False,149.57,74.79,['profit_factor 1.26 < 1.5']
+lr_channel,LRChannelStrategy,lr_channel,1.623,0.462,1.352,0.035,13,0.0218,False,80.74,40.37,"['profit_factor 1.35 < 1.5', 'trades 13 < 15']"
+trend_channel,TrendChannelStrategy,trend_channel,1.623,0.462,1.352,0.035,13,0.0218,False,80.74,40.37,"['profit_factor 1.35 < 1.5', 'trades 13 < 15']"
+gartley_pattern,SimplifiedGartleyStrategy,gartley_pattern,1.599,0.444,1.303,0.084,18,0.0252,False,110.82,55.41,['profit_factor 1.30 < 1.5']
+dpo,DPOStrategy,dpo,1.595,0.404,1.182,0.083,47,0.038,False,312.23,156.12,['profit_factor 1.18 < 1.5']
+composite_momentum,CompositeMomentumStrategy,composite_momentum,1.594,0.405,1.195,0.063,42,0.036,False,293.98,146.99,['profit_factor 1.20 < 1.5']
+velocity_entry,VelocityEntryStrategy,velocity_entry,1.558,0.386,1.168,0.066,57,0.0407,False,387.09,193.54,['profit_factor 1.17 < 1.5']
+triple_screen,TripleScreenStrategy,triple_screen,1.547,0.5,1.612,0.022,4,0.0118,False,29.39,14.69,['trades 4 < 15']
+carry_strategy,CarryStrategy,carry_strategy,1.499,0.4,1.194,0.045,35,0.0313,False,233.0,116.5,['profit_factor 1.19 < 1.5']
+zlema_cross,ZLEMACrossStrategy,zlema_cross,1.47,0.452,1.204,0.048,31,0.0301,False,211.08,105.54,['profit_factor 1.20 < 1.5']
+smi,SMIStrategy,smi,1.453,0.429,1.191,0.073,35,0.0301,False,247.02,123.51,['profit_factor 1.19 < 1.5']
+ema_fan,EMAFanStrategy,ema_fan,1.434,0.4,1.189,0.051,35,0.0295,False,243.93,121.97,['profit_factor 1.19 < 1.5']
+momentum,MomentumStrategy,momentum,1.411,0.383,1.166,0.053,47,0.0333,False,316.54,158.27,['profit_factor 1.17 < 1.5']
+channel_midline,ChannelMidlineStrategy,channel_midline,1.378,0.429,1.202,0.042,28,0.026,False,191.44,95.72,['profit_factor 1.20 < 1.5']
+proc_trend,PRoCTrendStrategy,proc_trend,1.323,0.385,1.167,0.059,39,0.0288,False,268.3,134.15,['profit_factor 1.17 < 1.5']
+vwrsi,VolumeWeightedRSIStrategy,vwrsi,1.306,0.44,1.202,0.089,25,0.023,False,163.37,81.68,['profit_factor 1.20 < 1.5']
+smart_beta,SmartBetaStrategy,smart_beta,1.303,0.409,1.157,0.056,44,0.0295,False,297.05,148.53,['profit_factor 1.16 < 1.5']
+sine_wave,SineWaveStrategy,sine_wave,1.281,0.414,1.188,0.063,29,0.0242,False,182.23,91.12,['profit_factor 1.19 < 1.5']
+price_action_filter,PriceActionFilterStrategy,price_action_filter,1.269,0.417,1.284,0.047,12,0.0166,False,95.42,47.71,"['profit_factor 1.28 < 1.5', 'trades 12 < 15']"
+trend_fibonacci,TrendFibonacciStrategy,trend_fibonacci,1.2,0.44,1.188,0.085,25,0.0205,False,164.21,82.11,['profit_factor 1.19 < 1.5']
+bop,BOPStrategy,bop,1.173,0.409,1.199,0.08,22,0.0195,False,151.49,75.74,['profit_factor 1.20 < 1.5']
+atr_trailing,ATRTrailingStrategy,atr_trailing,1.155,0.386,1.132,0.064,57,0.0284,False,384.89,192.44,['profit_factor 1.13 < 1.5']
+obv,OBVStrategy,obv,1.14,0.421,1.206,0.046,19,0.0176,False,128.3,64.15,['profit_factor 1.21 < 1.5']
+cumulative_delta,CumulativeDeltaStrategy,cumulative_delta,1.133,0.4,1.142,0.064,45,0.0253,False,291.82,145.91,['profit_factor 1.14 < 1.5']
+price_momentum_osc,PriceMomentumOscStrategy,price_momentum_osc,1.126,0.444,1.207,0.035,18,0.0167,False,114.69,57.35,['profit_factor 1.21 < 1.5']
+ema_cloud,EMACloudStrategy,ema_cloud,1.123,0.385,1.133,0.07,52,0.0261,False,348.12,174.06,['profit_factor 1.13 < 1.5']
+hybrid_trend_rev,HybridTrendReversionStrategy,hybrid_trend_rev,1.119,0.381,1.146,0.046,42,0.0239,False,290.88,145.44,['profit_factor 1.15 < 1.5']
+keltner_breakout,KeltnerBreakoutStrategy,keltner_breakout,1.086,0.409,1.189,0.064,22,0.0175,False,153.81,76.91,['profit_factor 1.19 < 1.5']
+price_rsi_div,PriceRSIDivergenceStrategy,price_rsi_div,1.041,0.407,1.171,0.083,27,0.0179,False,173.57,86.78,['profit_factor 1.17 < 1.5']
+mean_reversion_channel,MeanReversionChannelStrategy,mean_reversion_channel,1.027,0.455,1.252,0.034,11,0.012,False,73.78,36.89,"['profit_factor 1.25 < 1.5', 'trades 11 < 15']"
+zlmacd,ZeroLagMACDStrategy,zlmacd,1.016,0.435,1.168,0.053,23,0.0162,False,148.46,74.23,['profit_factor 1.17 < 1.5']
+gaussian_channel,GaussianChannelStrategy,gaussian_channel,1.014,0.412,1.187,0.043,17,0.0149,False,110.22,55.11,['profit_factor 1.19 < 1.5']
+cyber_cycle,CyberCycleStrategy,cyber_cycle,1.013,0.389,1.143,0.063,36,0.02,False,240.82,120.41,['profit_factor 1.14 < 1.5']
+apo,APOStrategy,apo,0.955,0.4,1.218,0.063,10,0.0111,False,65.64,32.82,"['sharpe 0.96 < 1.0', 'profit_factor 1.22 < 1.5', 'trades 10 < 15']"
+night_star,NightStarStrategy,night_star,0.92,0.5,1.358,0.022,4,0.0062,False,27.25,13.62,"['sharpe 0.92 < 1.0', 'profit_factor 1.36 < 1.5', 'trades 4 < 15']"
+heikin_ashi,HeikinAshiStrategy,heikin_ashi,0.917,0.408,1.119,0.058,49,0.0198,False,323.53,161.77,"['sharpe 0.92 < 1.0', 'profit_factor 1.12 < 1.5']"
+atr_channel,ATRChannelStrategy,atr_channel,0.902,0.394,1.136,0.056,33,0.0168,False,232.03,116.01,"['sharpe 0.90 < 1.0', 'profit_factor 1.14 < 1.5']"
+consolidation_break,ConsolidationBreakStrategy,consolidation_break,0.889,0.429,1.26,0.033,7,0.0085,False,49.65,24.82,"['sharpe 0.89 < 1.0', 'profit_factor 1.26 < 1.5', 'trades 7 < 15']"
+bb_reversion,BBReversionStrategy,bb_reversion,0.847,0.435,1.156,0.088,23,0.0133,False,163.04,81.52,"['sharpe 0.85 < 1.0', 'profit_factor 1.16 < 1.5']"
+sr_flip,SRFlipStrategy,sr_flip,0.816,0.386,1.103,0.064,57,0.0182,False,387.61,193.81,"['sharpe 0.82 < 1.0', 'profit_factor 1.10 < 1.5']"
+gann_swing,GannSwingStrategy,gann_swing,0.809,0.377,1.108,0.069,53,0.0174,False,352.86,176.43,"['sharpe 0.81 < 1.0', 'profit_factor 1.11 < 1.5']"
+volatility_breakout_v2,VolatilityBreakoutV2Strategy,volatility_breakout_v2,0.764,0.383,1.096,0.076,60,0.017,False,396.55,198.27,"['sharpe 0.76 < 1.0', 'profit_factor 1.10 < 1.5']"
+rvi,RVIStrategy,rvi,0.704,0.395,1.106,0.074,38,0.013,False,254.49,127.25,"['sharpe 0.70 < 1.0', 'profit_factor 1.11 < 1.5']"
+ema_dynamic_band,EMADynamicBandStrategy,ema_dynamic_band,0.701,0.393,1.123,0.077,28,0.0114,False,184.89,92.44,"['sharpe 0.70 < 1.0', 'profit_factor 1.12 < 1.5']"
+session_high_low,SessionHighLowStrategy,session_high_low,0.659,0.381,1.126,0.043,21,0.0095,False,139.38,69.69,"['sharpe 0.66 < 1.0', 'profit_factor 1.13 < 1.5']"
+price_squeeze,PriceSqueezeStrategy,price_squeeze,0.647,0.4,1.217,0.021,5,0.0053,False,33.56,16.78,"['sharpe 0.65 < 1.0', 'profit_factor 1.22 < 1.5', 'trades 5 < 15']"
+cci_divergence,CCIDivergenceStrategy,cci_divergence,0.645,0.429,1.151,0.053,14,0.0079,False,95.23,47.61,"['sharpe 0.65 < 1.0', 'profit_factor 1.15 < 1.5', 'trades 14 < 15']"
+mean_rev_band_v2,MeanRevBandV2Strategy,mean_rev_band_v2,0.632,0.375,1.107,0.06,32,0.0106,False,219.88,109.94,"['sharpe 0.63 < 1.0', 'profit_factor 1.11 < 1.5']"
+ichimoku_cloud_pos,IchimokuCloudPosStrategy,ichimoku_cloud_pos,0.618,0.378,1.09,0.088,45,0.0115,False,293.6,146.8,"['sharpe 0.62 < 1.0', 'profit_factor 1.09 < 1.5']"
+cmo,CMOStrategy,cmo,0.615,0.385,1.141,0.042,13,0.0075,False,90.3,45.15,"['sharpe 0.61 < 1.0', 'profit_factor 1.14 < 1.5', 'trades 13 < 15']"
+vol_adj_trend,VolAdjustedTrendStrategy,vol_adj_trend,0.609,0.417,1.146,0.043,12,0.0069,False,78.98,39.49,"['sharpe 0.61 < 1.0', 'profit_factor 1.15 < 1.5', 'trades 12 < 15']"
+entropy_momentum,EntropyMomentumStrategy,entropy_momentum,0.594,0.405,1.097,0.063,37,0.0102,False,237.19,118.59,"['sharpe 0.59 < 1.0', 'profit_factor 1.10 < 1.5']"
+market_structure_break,MarketStructureBreakStrategy,market_structure_break,0.519,0.362,1.083,0.076,47,0.009,False,312.86,156.43,"['sharpe 0.52 < 1.0', 'profit_factor 1.08 < 1.5']"
+vwap_deviation,VWAPDeviationStrategy,vwap_deviation,0.46,0.385,1.097,0.067,26,0.0064,False,173.5,86.75,"['sharpe 0.46 < 1.0', 'profit_factor 1.10 < 1.5']"
+vcp,VCPStrategy,vcp,0.458,0.368,1.099,0.061,19,0.0059,False,127.23,63.61,"['sharpe 0.46 < 1.0', 'profit_factor 1.10 < 1.5']"
+hurst_strategy,HurstExponentStrategy,hurst_strategy,0.442,0.4,1.085,0.053,30,0.0063,False,200.6,100.3,"['sharpe 0.44 < 1.0', 'profit_factor 1.08 < 1.5']"
+force_index,ForceIndexStrategy,force_index,0.437,0.375,1.075,0.071,48,0.0069,False,309.34,154.67,"['sharpe 0.44 < 1.0', 'profit_factor 1.08 < 1.5']"
+double_top_bottom,DoubleTopBottomStrategy,double_top_bottom,0.43,0.391,1.093,0.049,23,0.0057,False,159.4,79.7,"['sharpe 0.43 < 1.0', 'profit_factor 1.09 < 1.5']"
+fib_retracement,FibRetracementStrategy,fib_retracement,0.427,0.385,1.102,0.038,13,0.0048,False,85.05,42.53,"['sharpe 0.43 < 1.0', 'profit_factor 1.10 < 1.5', 'trades 13 < 15']"
+parabolic_momentum,ParabolicMomentumStrategy,parabolic_momentum,0.389,0.358,1.068,0.074,53,0.0056,False,352.86,176.43,"['sharpe 0.39 < 1.0', 'profit_factor 1.07 < 1.5']"
+mcginley,McGinleyStrategy,mcginley,0.369,0.4,1.082,0.056,20,0.0044,False,123.09,61.54,"['sharpe 0.37 < 1.0', 'profit_factor 1.08 < 1.5']"
+cci,CCIStrategy,cci,0.368,0.433,1.083,0.06,30,0.0047,False,206.63,103.31,"['sharpe 0.37 < 1.0', 'profit_factor 1.08 < 1.5']"
+adaptive_stop,AdaptiveStopStrategy,adaptive_stop,0.354,0.364,1.065,0.072,55,0.0046,False,359.92,179.96,"['sharpe 0.35 < 1.0', 'profit_factor 1.06 < 1.5']"
+regime_momentum,RegimeMomentumStrategy,regime_momentum,0.313,0.367,1.066,0.072,49,0.0036,False,320.15,160.07,"['sharpe 0.31 < 1.0', 'profit_factor 1.07 < 1.5']"
+overextension,OverextensionStrategy,overextension,0.311,0.364,1.077,0.052,22,0.0035,False,148.59,74.3,"['sharpe 0.31 < 1.0', 'profit_factor 1.08 < 1.5']"
+trendline_break,TrendlineBreakStrategy,trendline_break,0.301,0.4,1.066,0.077,40,0.0034,False,260.11,130.06,"['sharpe 0.30 < 1.0', 'profit_factor 1.07 < 1.5']"
+tick_volume,TickVolumeStrategy,tick_volume,0.3,0.389,1.067,0.046,36,0.0034,False,243.72,121.86,"['sharpe 0.30 < 1.0', 'profit_factor 1.07 < 1.5']"
+price_channel_filter,PriceChannelFilterStrategy,price_channel_filter,0.289,0.375,1.064,0.06,40,0.0031,False,271.04,135.52,"['sharpe 0.29 < 1.0', 'profit_factor 1.06 < 1.5']"
+ichimoku,IchimokuStrategy,ichimoku,0.258,0.367,1.059,0.072,49,0.0021,False,322.77,161.38,"['sharpe 0.26 < 1.0', 'profit_factor 1.06 < 1.5']"
+momentum_divergence_v2,MomentumDivergenceV2Strategy,momentum_divergence_v2,0.257,0.375,1.067,0.063,24,0.0025,False,151.28,75.64,"['sharpe 0.26 < 1.0', 'profit_factor 1.07 < 1.5']"
+zscore_mean_reversion,ZScoreMeanReversionStrategy,zscore_mean_reversion,0.256,0.417,1.074,0.098,24,0.0024,False,167.61,83.81,"['sharpe 0.26 < 1.0', 'profit_factor 1.07 < 1.5']"
+mean_rev_zscore,MeanRevZScoreStrategy,mean_rev_zscore,0.245,0.375,1.09,0.036,8,0.0019,False,57.85,28.92,"['sharpe 0.24 < 1.0', 'profit_factor 1.09 < 1.5', 'trades 8 < 15']"
+choppiness,ChoppinessStrategy,choppiness,0.243,0.375,1.07,0.065,24,0.0022,False,156.96,78.48,"['sharpe 0.24 < 1.0', 'profit_factor 1.07 < 1.5']"
+price_divergence_index,PriceDivergenceIndexStrategy,price_divergence_index,0.217,0.444,1.087,0.031,9,0.0015,False,58.27,29.13,"['sharpe 0.22 < 1.0', 'profit_factor 1.09 < 1.5', 'trades 9 < 15']"
+awesome_oscillator,AwesomeOscillatorStrategy,awesome_oscillator,0.128,0.382,1.048,0.061,34,-0.0005,False,229.88,114.94,"['sharpe 0.13 < 1.0', 'profit_factor 1.05 < 1.5']"
+price_channel,PriceChannelStrategy,price_channel,0.114,0.375,1.056,0.04,16,0.0002,False,100.24,50.12,"['sharpe 0.11 < 1.0', 'profit_factor 1.06 < 1.5']"
+spread_momentum,SpreadMomentumStrategy,spread_momentum,0.099,0.372,1.045,0.053,43,-0.0017,False,288.68,144.34,"['sharpe 0.10 < 1.0', 'profit_factor 1.05 < 1.5']"
+ppo,PPOStrategy,ppo,0.09,0.364,1.048,0.063,11,0.0,False,72.51,36.26,"['sharpe 0.09 < 1.0', 'profit_factor 1.05 < 1.5', 'trades 11 < 15']"
+pivot_point_rev,PivotPointRevStrategy,pivot_point_rev,0.083,0.393,1.047,0.045,28,-0.001,False,176.98,88.49,"['sharpe 0.08 < 1.0', 'profit_factor 1.05 < 1.5']"
+kijun_bounce,KijunBounceStrategy,kijun_bounce,0.022,0.364,1.039,0.032,11,-0.0008,False,70.36,35.18,"['sharpe 0.02 < 1.0', 'profit_factor 1.04 < 1.5', 'trades 11 < 15']"
+cloud_cover,CloudCoverStrategy,cloud_cover,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+doji_pattern,DojiPatternStrategy,doji_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+dynamic_pivot_channel,DynamicPivotChannelStrategy,dynamic_pivot_channel,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+exhaustion_bar,ExhaustionBarStrategy,exhaustion_bar,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+flag_pennant,FlagPennantStrategy,flag_pennant,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+gex_strategy,GEXStrategy,gex_signal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+harami,HaramiStrategy,harami,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+harmonic_pattern,HarmonicPatternStrategy,harmonic_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+heston_lstm_strategy,HestonLSTMStrategy,heston_lstm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+high_low_reversal,HighLowReversalStrategy,high_low_reversal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+klinger,KlingerStrategy,klinger,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+lstm_strategy,MLLSTMStrategy,ml_lstm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+market_maker_sig,MarketMakerStrategy,market_maker_sig,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+marubozu,MarubozuStrategy,marubozu,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+mass_index,MassIndexStrategy,mass_index,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+ml_strategy,MLRFStrategy,ml_rf,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+morning_evening_star,MorningEveningStarStrategy,morning_evening_star,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+order_block,OrderBlockStrategy,order_block,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+pa_confirm,PriceActionConfirmStrategy,pa_confirm,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+pivot_band,PivotBandStrategy,pivot_band,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+price_action_quality,PriceActionQualityStrategy,price_action_quality,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+psychological_line,PsychologicalLineStrategy,psychological_line,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+smc_strategy,SmartMoneyConceptStrategy,smc_strategy,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+squeeze_momentum,SqueezeMomentumStrategy,squeeze_momentum,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+supertrend,SuperTrendStrategy,supertrend,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+three_candles,ThreeCandlesStrategy,three_candles,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+three_soldiers_crows,ThreeSoldiersAndCrowsStrategy,three_soldiers_crows,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+trend_exhaustion_signal,TrendExhaustionSignalStrategy,trend_exhaustion_signal,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+trend_quality,TrendQualityStrategy,trend_quality,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+volatility_regime,VolatilityRegimeStrategy,volatility_regime,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+vortex,VortexStrategy,vortex,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+wedge_pattern,WedgePatternStrategy,wedge_pattern,0.0,0.0,0.0,0.0,0,0.0,False,0.0,0.0,['no trades generated']
+vwap_band,VWAPBandStrategy,vwap_band,-0.075,0.357,1.026,0.032,14,-0.0025,False,99.61,49.81,"['sharpe -0.08 < 1.0', 'profit_factor 1.03 < 1.5', 'trades 14 < 15']"
+trend_persistence,TrendPersistenceStrategy,trend_persistence,-0.095,0.382,1.03,0.064,55,-0.0078,False,367.5,183.75,"['sharpe -0.09 < 1.0', 'profit_factor 1.03 < 1.5']"
+price_impact,PriceImpactStrategy,price_impact,-0.126,0.372,1.024,0.092,43,-0.0073,False,287.45,143.72,"['sharpe -0.13 < 1.0', 'profit_factor 1.02 < 1.5']"
+oscillator_band,OscillatorBandStrategy,oscillator_band,-0.135,0.37,1.019,0.061,27,-0.0053,False,172.84,86.42,"['sharpe -0.13 < 1.0', 'profit_factor 1.02 < 1.5']"
+macd_slope,MACDSlopeStrategy,macd_slope,-0.143,0.381,1.025,0.073,42,-0.0077,False,292.77,146.39,"['sharpe -0.14 < 1.0', 'profit_factor 1.02 < 1.5']"
+momentum_mean_rev,MomentumMeanRevStrategy,momentum_mean_rev,-0.145,0.333,1.01,0.045,15,-0.0035,False,91.37,45.68,"['sharpe -0.15 < 1.0', 'profit_factor 1.01 < 1.5']"
+stochrsi_div,StochRSIDivStrategy,stochrsi_div,-0.147,0.393,1.022,0.07,28,-0.0056,False,188.96,94.48,"['sharpe -0.15 < 1.0', 'profit_factor 1.02 < 1.5']"
+vwap_cross,VWAPCrossStrategy,vwap_cross,-0.166,0.333,1.005,0.043,9,-0.0027,False,60.12,30.06,"['sharpe -0.17 < 1.0', 'profit_factor 1.01 < 1.5', 'trades 9 < 15']"
+vpt_signal,VPTSignalStrategy,vpt_signal,-0.192,0.333,1.0,0.033,9,-0.003,False,60.52,30.26,"['sharpe -0.19 < 1.0', 'profit_factor 1.00 < 1.5', 'trades 9 < 15']"
+tail_risk_filter,TailRiskFilterStrategy,tail_risk_filter,-0.2,0.385,1.019,0.094,52,-0.0104,False,333.18,166.59,"['sharpe -0.20 < 1.0', 'profit_factor 1.02 < 1.5']"
+gap_fill,GapFillStrategy,gap_fill,-0.208,0.367,1.02,0.098,49,-0.0102,False,333.36,166.68,"['sharpe -0.21 < 1.0', 'profit_factor 1.02 < 1.5']"
+spread_analysis,SpreadAnalysisStrategy,spread_analysis,-0.236,0.375,1.014,0.091,40,-0.0096,False,263.22,131.61,"['sharpe -0.24 < 1.0', 'profit_factor 1.01 < 1.5']"
+volume_price_trend_v2,VolumePriceTrendV2Strategy,volume_price_trend_v2,-0.294,0.367,1.012,0.091,49,-0.0125,False,324.26,162.13,"['sharpe -0.29 < 1.0', 'profit_factor 1.01 < 1.5']"
+smart_money_flow,SmartMoneyFlowStrategy,smart_money_flow,-0.295,0.35,1.007,0.079,40,-0.0109,False,251.52,125.76,"['sharpe -0.30 < 1.0', 'profit_factor 1.01 < 1.5']"
+trend_strength_filter,TrendStrengthFilterStrategy,trend_strength_filter,-0.307,0.364,1.011,0.071,44,-0.0116,False,294.54,147.27,"['sharpe -0.31 < 1.0', 'profit_factor 1.01 < 1.5']"
+aroon,AroonStrategy,aroon,-0.354,0.35,1.002,0.074,40,-0.0124,False,260.72,130.36,"['sharpe -0.35 < 1.0', 'profit_factor 1.00 < 1.5']"
+range_bias,RangeBiasStrategy,range_bias,-0.388,0.364,1.005,0.114,44,-0.0135,False,298.63,149.31,"['sharpe -0.39 < 1.0', 'profit_factor 1.00 < 1.5']"
+entropy_strategy,ApproximateEntropyStrategy,entropy_strategy,-0.397,0.355,0.998,0.104,31,-0.0112,False,215.52,107.76,"['sharpe -0.40 < 1.0', 'profit_factor 1.00 < 1.5']"
+adx_trend,ADXTrendStrategy,adx_trend,-0.423,0.353,0.978,0.047,17,-0.0079,False,110.84,55.42,"['sharpe -0.42 < 1.0', 'profit_factor 0.98 < 1.5']"
+volatility_ratio,VolatilityRatioStrategy,volatility_ratio,-0.45,0.4,0.957,0.04,10,-0.0061,False,66.72,33.36,"['sharpe -0.45 < 1.0', 'profit_factor 0.96 < 1.5', 'trades 10 < 15']"
+williams_fractal,WilliamsFractalStrategy,williams_fractal,-0.486,0.364,0.994,0.075,44,-0.0163,False,290.47,145.24,"['sharpe -0.49 < 1.0', 'profit_factor 0.99 < 1.5']"
+swing_point,SwingPointStrategy,swing_point,-0.499,0.356,0.997,0.094,59,-0.0201,False,382.54,191.27,"['sharpe -0.50 < 1.0', 'profit_factor 1.00 < 1.5']"
+high_low_channel,HighLowChannelStrategy,high_low_channel,-0.505,0.361,0.989,0.066,36,-0.0146,False,237.69,118.85,"['sharpe -0.50 < 1.0', 'profit_factor 0.99 < 1.5']"
+pivot_point,PivotPointStrategy,pivot_point,-0.532,0.362,0.993,0.104,58,-0.0209,False,367.13,183.57,"['sharpe -0.53 < 1.0', 'profit_factor 0.99 < 1.5']"
+multi_score,MultiScoreStrategy,multi_score,-0.539,0.353,0.991,0.083,51,-0.0193,False,328.72,164.36,"['sharpe -0.54 < 1.0', 'profit_factor 0.99 < 1.5']"
+price_envelope,PriceEnvelopeStrategy,price_envelope,-0.557,0.34,0.99,0.113,50,-0.0198,False,328.2,164.1,"['sharpe -0.56 < 1.0', 'profit_factor 0.99 < 1.5']"
+opening_momentum,OpeningMomentumStrategy,opening_momentum,-0.559,0.364,0.981,0.046,33,-0.0154,False,222.24,111.12,"['sharpe -0.56 < 1.0', 'profit_factor 0.98 < 1.5']"
+keltner_channel_v2,KeltnerChannelV2Strategy,keltner_channel_v2,-0.573,0.346,0.972,0.055,26,-0.0131,False,170.27,85.13,"['sharpe -0.57 < 1.0', 'profit_factor 0.97 < 1.5']"
+order_flow_imbalance,OrderFlowImbalanceStrategy,order_flow_imbalance,-0.573,0.352,0.989,0.133,54,-0.021,False,344.43,172.22,"['sharpe -0.57 < 1.0', 'profit_factor 0.99 < 1.5']"
+historical_volatility,HistoricalVolatilityStrategy,historical_volatility,-0.579,0.375,0.979,0.1,32,-0.0153,False,218.4,109.2,"['sharpe -0.58 < 1.0', 'profit_factor 0.98 < 1.5']"
+rsi_trend_filter,RSITrendFilterStrategy,rsi_trend_filter,-0.59,0.364,0.967,0.056,22,-0.0122,False,150.78,75.39,"['sharpe -0.59 < 1.0', 'profit_factor 0.97 < 1.5']"
+alma,ALMAStrategy,alma,-0.608,0.379,0.972,0.084,29,-0.0148,False,188.76,94.38,"['sharpe -0.61 < 1.0', 'profit_factor 0.97 < 1.5']"
+fractal_dimension,FractalDimensionStrategy,fractal_dimension,-0.611,0.333,0.955,0.043,18,-0.0115,False,121.33,60.67,"['sharpe -0.61 < 1.0', 'profit_factor 0.95 < 1.5']"
+tsi,TSIStrategy,tsi,-0.616,0.333,0.92,0.052,9,-0.008,False,57.56,28.78,"['sharpe -0.62 < 1.0', 'profit_factor 0.92 < 1.5', 'trades 9 < 15']"
+inside_bar,InsideBarStrategy,inside_bar,-0.63,0.364,0.962,0.058,22,-0.0131,False,150.59,75.3,"['sharpe -0.63 < 1.0', 'profit_factor 0.96 < 1.5']"
+momentum_persistence,MomentumPersistenceStrategy,momentum_persistence,-0.639,0.375,0.973,0.071,32,-0.0164,False,213.42,106.71,"['sharpe -0.64 < 1.0', 'profit_factor 0.97 < 1.5']"
+inverse_fisher_rsi,InverseFisherRSIStrategy,inverse_fisher_rsi,-0.683,0.36,0.957,0.074,25,-0.0149,False,158.57,79.28,"['sharpe -0.68 < 1.0', 'profit_factor 0.96 < 1.5']"
+tii_strategy,TrendIntensityIndexStrategy,tii_strategy,-0.689,0.367,0.963,0.057,30,-0.0168,False,189.89,94.95,"['sharpe -0.69 < 1.0', 'profit_factor 0.96 < 1.5']"
+poc_strategy,POCStrategy,poc_strategy,-0.691,0.37,0.983,0.104,54,-0.0242,False,364.43,182.22,"['sharpe -0.69 < 1.0', 'profit_factor 0.98 < 1.5']"
+adaptive_volatility,AdaptiveVolatilityStrategy,adaptive_volatility,-0.705,0.347,0.977,0.072,49,-0.0229,False,317.88,158.94,"['sharpe -0.70 < 1.0', 'profit_factor 0.98 < 1.5']"
+trend_strength,TrendStrengthStrategy,trend_strength,-0.718,0.342,0.97,0.067,38,-0.0196,False,250.73,125.37,"['sharpe -0.72 < 1.0', 'profit_factor 0.97 < 1.5']"
+stochastic_momentum,StochasticMomentumStrategy,stochastic_momentum,-0.742,0.364,0.948,0.086,22,-0.0151,False,145.82,72.91,"['sharpe -0.74 < 1.0', 'profit_factor 0.95 < 1.5']"
+sr_bounce,SRBounceStrategy,sr_bounce,-0.754,0.353,0.935,0.062,17,-0.0132,False,115.87,57.94,"['sharpe -0.75 < 1.0', 'profit_factor 0.93 < 1.5']"
+trix_signal,TRIXSignalStrategy,trix_signal,-0.77,0.375,0.927,0.063,16,-0.0125,False,98.92,49.46,"['sharpe -0.77 < 1.0', 'profit_factor 0.93 < 1.5']"
+relative_strength,RelativeStrengthStrategy,relative_strength,-0.798,0.354,0.969,0.105,48,-0.0248,False,305.54,152.77,"['sharpe -0.80 < 1.0', 'profit_factor 0.97 < 1.5']"
+ichimoku_advanced,IchimokuAdvancedStrategy,ichimoku_advanced,-0.846,0.364,0.964,0.107,44,-0.0245,False,287.0,143.5,"['sharpe -0.85 < 1.0', 'profit_factor 0.96 < 1.5']"
+rsi_divergence,RsiDivergenceStrategy,rsi_divergence,-0.908,0.346,0.933,0.07,26,-0.0194,False,165.46,82.73,"['sharpe -0.91 < 1.0', 'profit_factor 0.93 < 1.5']"
+breakout_vol_ratio,BreakoutVolRatioStrategy,breakout_vol_ratio,-0.96,0.364,0.881,0.033,11,-0.0125,False,75.0,37.5,"['sharpe -0.96 < 1.0', 'profit_factor 0.88 < 1.5', 'trades 11 < 15']"
+stoch_momentum,StochasticMomentumStrategy,stoch_momentum,-0.973,0.394,0.94,0.071,33,-0.0231,False,208.68,104.34,"['sharpe -0.97 < 1.0', 'profit_factor 0.94 < 1.5']"
+ha_trend,HATrendStrategy,ha_trend,-0.994,0.357,0.947,0.078,42,-0.0277,False,268.14,134.07,"['sharpe -0.99 < 1.0', 'profit_factor 0.95 < 1.5']"
+ease_of_movement,EaseOfMovementStrategy,ease_of_movement,-1.002,0.348,0.953,0.069,46,-0.0294,False,308.81,154.4,"['sharpe -1.00 < 1.0', 'profit_factor 0.95 < 1.5']"
+vw_macd,VWMACDStrategy,vw_macd,-1.029,0.389,0.906,0.072,18,-0.0166,False,111.33,55.66,"['sharpe -1.03 < 1.0', 'profit_factor 0.91 < 1.5']"
+spinning_top,SpinningTopStrategy,spinning_top,-1.098,0.355,0.923,0.08,31,-0.0247,False,189.58,94.79,"['sharpe -1.10 < 1.0', 'profit_factor 0.92 < 1.5']"
+obv_divergence,OBVDivergenceStrategy,obv_divergence,-1.099,0.361,0.932,0.092,36,-0.0279,False,233.81,116.9,"['sharpe -1.10 < 1.0', 'profit_factor 0.93 < 1.5']"
+supertrend_rsi,SupertrendRSIStrategy,supertrend_rsi,-1.107,0.34,0.942,0.078,47,-0.033,False,295.3,147.65,"['sharpe -1.11 < 1.0', 'profit_factor 0.94 < 1.5']"
+micro_trend,MicroTrendStrategy,micro_trend,-1.149,0.353,0.946,0.117,51,-0.0359,False,336.06,168.03,"['sharpe -1.15 < 1.0', 'profit_factor 0.95 < 1.5']"
+normalized_price_osc,NormalizedPriceOscStrategy,normalized_price_osc,-1.188,0.375,0.902,0.076,24,-0.0229,False,152.59,76.29,"['sharpe -1.19 < 1.0', 'profit_factor 0.90 < 1.5']"
+heiken_ashi_trend,HeikenAshiTrendStrategy,heiken_ashi_trend,-1.307,0.348,0.925,0.077,46,-0.0376,False,289.99,145.0,"['sharpe -1.31 < 1.0', 'profit_factor 0.92 < 1.5']"
+price_deviation,PriceDeviationStrategy,price_deviation,-1.344,0.341,0.923,0.129,44,-0.0372,False,299.19,149.6,"['sharpe -1.34 < 1.0', 'profit_factor 0.92 < 1.5']"
+chande_momentum,ChandeMomentumStrategy,chande_momentum,-1.347,0.375,0.905,0.07,32,-0.0307,False,214.8,107.4,"['sharpe -1.35 < 1.0', 'profit_factor 0.91 < 1.5']"
+volume_profile,VolumeProfileStrategy,volume_profile,-1.414,0.349,0.914,0.084,43,-0.0378,False,278.48,139.24,"['sharpe -1.41 < 1.0', 'profit_factor 0.91 < 1.5']"
+tweezer,TweezerStrategy,tweezer,-1.498,0.3,0.792,0.043,10,-0.0186,False,63.32,31.66,"['sharpe -1.50 < 1.0', 'profit_factor 0.79 < 1.5', 'trades 10 < 15']"
+macd_strategy,MACDStrategy,macd,-1.513,0.3,0.791,0.063,10,-0.0187,False,64.42,32.21,"['sharpe -1.51 < 1.0', 'profit_factor 0.79 < 1.5', 'trades 10 < 15']"
+price_compression_signal,PriceCompressionSignalStrategy,price_compression_signal,-1.515,0.357,0.823,0.058,14,-0.0217,False,96.47,48.24,"['sharpe -1.52 < 1.0', 'profit_factor 0.82 < 1.5', 'trades 14 < 15']"
+hhll_channel,HHLLChannelStrategy,hhll_channel,-1.542,0.357,0.881,0.075,28,-0.0318,False,187.56,93.78,"['sharpe -1.54 < 1.0', 'profit_factor 0.88 < 1.5']"
+price_rhythm,PriceRhythmStrategy,price_rhythm,-1.551,0.318,0.857,0.063,22,-0.0294,False,140.41,70.21,"['sharpe -1.55 < 1.0', 'profit_factor 0.86 < 1.5']"
+price_velocity_filter,PriceVelocityFilterStrategy,price_velocity_filter,-1.566,0.353,0.917,0.087,51,-0.0459,False,335.15,167.58,"['sharpe -1.57 < 1.0', 'profit_factor 0.92 < 1.5']"
+volume_roc,VolumeROCStrategy,volume_roc,-1.587,0.348,0.904,0.095,46,-0.0437,False,290.43,145.22,"['sharpe -1.59 < 1.0', 'profit_factor 0.90 < 1.5']"
+kama,KAMAStrategy,kama,-1.643,0.353,0.881,0.09,34,-0.0383,False,217.87,108.94,"['sharpe -1.64 < 1.0', 'profit_factor 0.88 < 1.5']"
+market_pressure,MarketPressureStrategy,market_pressure,-1.644,0.359,0.892,0.101,39,-0.0406,False,251.19,125.6,"['sharpe -1.64 < 1.0', 'profit_factor 0.89 < 1.5']"
+breakout_confirm,BreakoutConfirmationStrategy,breakout_confirm,-1.701,0.333,0.81,0.063,15,-0.0249,False,98.83,49.41,"['sharpe -1.70 < 1.0', 'profit_factor 0.81 < 1.5']"
+liquidity_score,LiquidityScoreStrategy,liquidity_score,-1.732,0.353,0.876,0.095,34,-0.0392,False,223.08,111.54,"['sharpe -1.73 < 1.0', 'profit_factor 0.88 < 1.5']"
+ha_smoothed,HeikinAshiSmoothedStrategy,ha_smoothed,-1.76,0.362,0.891,0.086,47,-0.0479,False,289.55,144.77,"['sharpe -1.76 < 1.0', 'profit_factor 0.89 < 1.5']"
+turtle_trading,TurtleTradingStrategy,turtle_trading,-1.76,0.333,0.818,0.036,18,-0.0286,False,119.86,59.93,"['sharpe -1.76 < 1.0', 'profit_factor 0.82 < 1.5']"
+r_squared,RSquaredStrategy,r_squared,-1.761,0.31,0.86,0.075,29,-0.0374,False,194.78,97.39,"['sharpe -1.76 < 1.0', 'profit_factor 0.86 < 1.5']"
+price_velocity,PriceVelocityStrategy,price_velocity,-1.768,0.345,0.903,0.081,55,-0.0531,False,348.36,174.18,"['sharpe -1.77 < 1.0', 'profit_factor 0.90 < 1.5']"
+price_cycle_detector,PriceCycleDetectorStrategy,price_cycle_detector,-1.783,0.34,0.9,0.11,53,-0.0519,False,339.82,169.91,"['sharpe -1.78 < 1.0', 'profit_factor 0.90 < 1.5']"
+breakout_confirm_v2,BreakoutConfirmV2Strategy,breakout_confirm_v2,-1.788,0.333,0.773,0.043,12,-0.0229,False,79.64,39.82,"['sharpe -1.79 < 1.0', 'profit_factor 0.77 < 1.5', 'trades 12 < 15']"
+range_bound,RangeBoundStrategy,range_bound,-1.862,0.25,0.611,0.032,4,-0.0138,False,28.51,14.26,"['sharpe -1.86 < 1.0', 'profit_factor 0.61 < 1.5', 'trades 4 < 15']"
+adx_regime,ADXRegimeStrategy,adx_regime,-1.906,0.325,0.873,0.091,40,-0.0458,False,257.37,128.69,"['sharpe -1.91 < 1.0', 'profit_factor 0.87 < 1.5']"
+exhaustion_reversal,ExhaustionReversalStrategy,exhaustion_reversal,-1.918,0.286,0.69,0.043,7,-0.0187,False,46.4,23.2,"['sharpe -1.92 < 1.0', 'profit_factor 0.69 < 1.5', 'trades 7 < 15']"
+trix,TRIXStrategy,trix,-2.013,0.2,0.593,0.032,5,-0.0148,False,29.01,14.5,"['sharpe -2.01 < 1.0', 'profit_factor 0.59 < 1.5', 'trades 5 < 15']"
+sr_breakout,SRBreakoutStrategy,sr_breakout,-2.018,0.3,0.723,0.032,10,-0.0235,False,66.26,33.13,"['sharpe -2.02 < 1.0', 'profit_factor 0.72 < 1.5', 'trades 10 < 15']"
+adaptive_momentum,AdaptiveMomentumStrategy,adaptive_momentum,-2.019,0.347,0.882,0.095,49,-0.055,False,321.39,160.7,"['sharpe -2.02 < 1.0', 'profit_factor 0.88 < 1.5']"
+rsi_band,RSIBandStrategy,rsi_band,-2.025,0.316,0.858,0.068,38,-0.0491,False,247.13,123.56,"['sharpe -2.03 < 1.0', 'profit_factor 0.86 < 1.5']"
+median_price,MedianPriceStrategy,median_price,-2.057,0.348,0.868,0.094,46,-0.055,False,293.27,146.64,"['sharpe -2.06 < 1.0', 'profit_factor 0.87 < 1.5']"
+linear_regression,LinearRegressionStrategy,linear_regression,-2.208,0.3,0.785,0.059,20,-0.0381,False,133.74,66.87,"['sharpe -2.21 < 1.0', 'profit_factor 0.78 < 1.5']"
+trend_reversal,TrendReversalPatternStrategy,trend_reversal,-2.238,0.5,0.566,0.022,4,-0.0106,False,27.07,13.54,"['sharpe -2.24 < 1.0', 'profit_factor 0.57 < 1.5', 'trades 4 < 15']"
+adaptive_cycle,AdaptiveCycleStrategy,adaptive_cycle,-2.267,0.333,0.833,0.089,36,-0.0526,False,233.97,116.99,"['sharpe -2.27 < 1.0', 'profit_factor 0.83 < 1.5']"
+donchian_midline,DonchianMidlineStrategy,donchian_midline,-2.286,0.348,0.791,0.057,23,-0.0398,False,148.23,74.12,"['sharpe -2.29 < 1.0', 'profit_factor 0.79 < 1.5']"
+connors_rsi,ConnorsRSIStrategy,connors_rsi,-2.365,0.25,0.682,0.066,12,-0.0294,False,69.99,35.0,"['sharpe -2.36 < 1.0', 'profit_factor 0.68 < 1.5', 'trades 12 < 15']"
+mean_reversion_score,MeanReversionScoreStrategy,mean_reversion_score,-2.389,0.325,0.832,0.107,40,-0.0573,False,260.17,130.09,"['sharpe -2.39 < 1.0', 'profit_factor 0.83 < 1.5']"
+momentum_breadth,MomentumBreadthStrategy,momentum_breadth,-2.428,0.327,0.859,0.102,52,-0.0681,False,342.21,171.1,"['sharpe -2.43 < 1.0', 'profit_factor 0.86 < 1.5']"
+renko_trend,RenkoTrendStrategy,renko_trend,-2.438,0.325,0.833,0.09,40,-0.0574,False,259.03,129.52,"['sharpe -2.44 < 1.0', 'profit_factor 0.83 < 1.5']"
+keltner_rsi,KeltnerRSIStrategy,keltner_rsi,-2.451,0.324,0.82,0.125,37,-0.0553,False,243.25,121.62,"['sharpe -2.45 < 1.0', 'profit_factor 0.82 < 1.5']"
+market_microstructure,MarketMicrostructureStrategy,market_microstructure,-2.51,0.35,0.824,0.125,40,-0.059,False,253.08,126.54,"['sharpe -2.51 < 1.0', 'profit_factor 0.82 < 1.5']"
+ichimoku_breakout,IchimokuBreakoutStrategy,ichimoku_breakout,-2.542,0.25,0.619,0.052,8,-0.0264,False,48.12,24.06,"['sharpe -2.54 < 1.0', 'profit_factor 0.62 < 1.5', 'trades 8 < 15']"
+momentum_quality_v2,MomentumQualityV2Strategy,momentum_quality_v2,-2.575,0.308,0.783,0.072,26,-0.0496,False,175.7,87.85,"['sharpe -2.57 < 1.0', 'profit_factor 0.78 < 1.5']"
+volatility_surface,VolatilitySurfaceStrategy,volatility_surface,-2.579,0.306,0.812,0.113,36,-0.0601,False,231.05,115.52,"['sharpe -2.58 < 1.0', 'profit_factor 0.81 < 1.5']"
+ema_ribbon,EMARibbonStrategy,ema_ribbon,-2.637,0.25,0.612,0.042,8,-0.0272,False,54.42,27.21,"['sharpe -2.64 < 1.0', 'profit_factor 0.61 < 1.5', 'trades 8 < 15']"
+fisher_transform,FisherTransformStrategy,fisher_transform,-2.657,0.309,0.814,0.101,42,-0.0667,False,263.61,131.81,"['sharpe -2.66 < 1.0', 'profit_factor 0.81 < 1.5']"
+multi_factor,MultiFactorScoreStrategy,multi_factor,-2.806,0.317,0.805,0.068,41,-0.0678,False,265.04,132.52,"['sharpe -2.81 < 1.0', 'profit_factor 0.81 < 1.5']"
+range_trading,RangeTradingStrategy,range_trading,-2.883,0.308,0.824,0.172,52,-0.0802,False,351.39,175.69,"['sharpe -2.88 < 1.0', 'profit_factor 0.82 < 1.5']"
+market_breadth_proxy,MarketBreadthProxyStrategy,market_breadth_proxy,-2.933,0.344,0.775,0.108,32,-0.0597,False,212.02,106.01,"['sharpe -2.93 < 1.0', 'profit_factor 0.78 < 1.5']"
+pivot_points,PivotPointsStrategy,pivot_points,-2.987,0.327,0.813,0.171,49,-0.0781,False,331.84,165.92,"['sharpe -2.99 < 1.0', 'profit_factor 0.81 < 1.5']"
+anchored_vwap,AnchoredVWAPStrategy,anchored_vwap,-2.992,0.318,0.801,0.133,44,-0.0743,False,279.42,139.71,"['sharpe -2.99 < 1.0', 'profit_factor 0.80 < 1.5']"
+keltner_channel,KeltnerChannelStrategy,keltner_channel,-2.998,0.333,0.784,0.139,39,-0.0679,False,258.93,129.47,"['sharpe -3.00 < 1.0', 'profit_factor 0.78 < 1.5']"
+adl,ADLStrategy,adl,-3.017,0.316,0.698,0.094,19,-0.0468,False,122.14,61.07,"['sharpe -3.02 < 1.0', 'profit_factor 0.70 < 1.5']"
+scalping_signal,ScalpingSignalStrategy,scalping_signal,-3.041,0.306,0.768,0.12,36,-0.0684,False,216.37,108.19,"['sharpe -3.04 < 1.0', 'profit_factor 0.77 < 1.5']"
+trend_strength_composite,TrendStrengthCompositeStrategy,trend_strength_composite,-3.124,0.308,0.731,0.083,26,-0.0576,False,162.28,81.14,"['sharpe -3.12 < 1.0', 'profit_factor 0.73 < 1.5']"
+momentum_reversal,MomentumReversalStrategy,momentum_reversal,-3.158,0.333,0.748,0.078,30,-0.0626,False,197.12,98.56,"['sharpe -3.16 < 1.0', 'profit_factor 0.75 < 1.5']"
+vol_price_confirm,VolumePriceConfirmStrategy,vol_price_confirm,-3.18,0.25,0.61,0.045,12,-0.0403,False,79.07,39.54,"['sharpe -3.18 < 1.0', 'profit_factor 0.61 < 1.5', 'trades 12 < 15']"
+colored_candles,ColoredCandlesStrategy,colored_candles,-3.209,0.324,0.767,0.097,37,-0.0702,False,235.41,117.71,"['sharpe -3.21 < 1.0', 'profit_factor 0.77 < 1.5']"
+swing_momentum,SwingMomentumStrategy,swing_momentum,-3.273,0.323,0.747,0.096,31,-0.0661,False,207.02,103.51,"['sharpe -3.27 < 1.0', 'profit_factor 0.75 < 1.5']"
+candle_body_filter,CandleBodyFilterStrategy,candle_body_filter,-3.277,0.25,0.403,0.022,4,-0.0199,False,24.49,12.25,"['sharpe -3.28 < 1.0', 'profit_factor 0.40 < 1.5', 'trades 4 < 15']"
+price_flow_index,PriceFlowIndexStrategy,price_flow_index,-3.299,0.308,0.713,0.088,26,-0.0592,False,174.45,87.23,"['sharpe -3.30 < 1.0', 'profit_factor 0.71 < 1.5']"
+mr_entry,MeanReversionEntryStrategy,mr_entry,-3.323,0.263,0.66,0.073,19,-0.049,False,120.17,60.09,"['sharpe -3.32 < 1.0', 'profit_factor 0.66 < 1.5']"
+parabolic_sar_trend,ParabolicSARTrendStrategy,parabolic_sar_trend,-3.33,0.323,0.744,0.103,31,-0.0668,False,210.05,105.02,"['sharpe -3.33 < 1.0', 'profit_factor 0.74 < 1.5']"
+impulse_system,ImpulseSystemStrategy,impulse_system,-3.405,0.316,0.798,0.098,57,-0.0965,False,360.78,180.39,"['sharpe -3.41 < 1.0', 'profit_factor 0.80 < 1.5']"
+liquidity_sweep,LiquiditySweepStrategy,liquidity_sweep,-3.433,0.267,0.714,0.089,30,-0.0675,False,189.23,94.61,"['sharpe -3.43 < 1.0', 'profit_factor 0.71 < 1.5']"
+trend_quality_filter,TrendQualityFilterStrategy,trend_quality_filter,-3.461,0.222,0.528,0.045,9,-0.0371,False,55.76,27.88,"['sharpe -3.46 < 1.0', 'profit_factor 0.53 < 1.5', 'trades 9 < 15']"
+stoch_rsi,StochRSIStrategy,stoch_rsi,-3.482,0.281,0.723,0.089,32,-0.0716,False,200.38,100.19,"['sharpe -3.48 < 1.0', 'profit_factor 0.72 < 1.5']"
+higher_high_momentum,HigherHighMomentumStrategy,higher_high_momentum,-3.484,0.309,0.793,0.097,55,-0.0954,False,356.59,178.29,"['sharpe -3.48 < 1.0', 'profit_factor 0.79 < 1.5']"
+candle_score,CandleScoreStrategy,candle_score,-3.495,0.25,0.588,0.066,12,-0.043,False,80.65,40.32,"['sharpe -3.49 < 1.0', 'profit_factor 0.59 < 1.5', 'trades 12 < 15']"
+chandelier_exit,ChandelierExitStrategy,chandelier_exit,-3.538,0.304,0.772,0.121,46,-0.0877,False,296.33,148.16,"['sharpe -3.54 < 1.0', 'profit_factor 0.77 < 1.5']"
+breakout_retest,BreakoutRetestStrategy,breakout_retest,-3.553,0.222,0.528,0.063,9,-0.0377,False,61.52,30.76,"['sharpe -3.55 < 1.0', 'profit_factor 0.53 < 1.5', 'trades 9 < 15']"
+momentum_accel,MomentumAccelerationStrategy,momentum_accel,-3.593,0.308,0.781,0.096,52,-0.0961,False,336.82,168.41,"['sharpe -3.59 < 1.0', 'profit_factor 0.78 < 1.5']"
+elder_force,ElderForceIndexStrategy,elder_force,-3.594,0.3,0.742,0.129,40,-0.0819,False,246.91,123.45,"['sharpe -3.59 < 1.0', 'profit_factor 0.74 < 1.5']"
+disparity_index,DisparityIndexStrategy,disparity_index,-3.649,0.25,0.609,0.071,16,-0.053,False,101.23,50.62,"['sharpe -3.65 < 1.0', 'profit_factor 0.61 < 1.5']"
+stochastic,StochasticStrategy,stochastic,-3.721,0.269,0.68,0.104,26,-0.0694,False,160.55,80.27,"['sharpe -3.72 < 1.0', 'profit_factor 0.68 < 1.5']"
+parabolic_move,ParabolicMoveStrategy,parabolic_move,-3.79,0.0,0.0,0.011,1,-0.0108,False,6.59,3.3,"['sharpe -3.79 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
+key_reversal,KeyReversalStrategy,key_reversal,-3.794,0.0,0.0,0.011,1,-0.0109,False,6.78,3.39,"['sharpe -3.79 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
+dual_thrust,DualThrustStrategy,dual_thrust,-3.802,0.0,0.0,0.011,1,-0.0109,False,7.09,3.54,"['sharpe -3.80 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
+candle_pattern_score,CandlePatternScoreStrategy,candle_pattern_score,-3.814,0.0,0.0,0.011,1,-0.011,False,7.83,3.91,"['sharpe -3.81 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
+star_pattern,StarPatternStrategy,star_pattern,-3.817,0.0,0.0,0.011,1,-0.011,False,8.01,4.01,"['sharpe -3.82 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 1 < 15']"
+breakout_pullback,BreakoutPullbackStrategy,breakout_pullback,-3.989,0.231,0.545,0.07,13,-0.0511,False,88.48,44.24,"['sharpe -3.99 < 1.0', 'profit_factor 0.54 < 1.5', 'trades 13 < 15']"
+intraday_momentum,IntradayMomentumStrategy,intraday_momentum,-4.062,0.317,0.714,0.122,41,-0.0919,False,257.1,128.55,"['sharpe -4.06 < 1.0', 'profit_factor 0.71 < 1.5']"
+gap_strategy,GapStrategy,gap_strategy,-4.135,0.312,0.675,0.134,32,-0.0812,False,202.04,101.02,"['sharpe -4.14 < 1.0', 'profit_factor 0.68 < 1.5']"
+relative_momentum_index,RelativeMomentumIndexStrategy,relative_momentum_index,-4.139,0.312,0.685,0.129,32,-0.0813,False,217.26,108.63,"['sharpe -4.14 < 1.0', 'profit_factor 0.69 < 1.5']"
+adaptive_ma_cross,AdaptiveMACrossStrategy,adaptive_ma_cross,-4.291,0.267,0.545,0.062,15,-0.056,False,92.18,46.09,"['sharpe -4.29 < 1.0', 'profit_factor 0.54 < 1.5']"
+laguerre_rsi,LaguerreRSIStrategy,laguerre_rsi,-4.324,0.286,0.654,0.093,28,-0.0807,False,173.26,86.63,"['sharpe -4.32 < 1.0', 'profit_factor 0.65 < 1.5']"
+dual_ema_cross,DualEMACrossStrategy,dual_ema_cross,-4.381,0.2,0.456,0.048,10,-0.0479,False,64.3,32.15,"['sharpe -4.38 < 1.0', 'profit_factor 0.46 < 1.5', 'trades 10 < 15']"
+ehlers_fisher,EhlersFisherStrategy,ehlers_fisher,-4.403,0.32,0.718,0.169,50,-0.1097,False,313.38,156.69,"['sharpe -4.40 < 1.0', 'profit_factor 0.72 < 1.5']"
+regime_filter,RegimeFilterStrategy,regime_filter,-4.456,0.269,0.633,0.108,26,-0.0797,False,163.57,81.79,"['sharpe -4.46 < 1.0', 'profit_factor 0.63 < 1.5']"
+mfi,MFIStrategy,mfi,-4.468,0.2,0.45,0.067,10,-0.0491,False,73.99,37.0,"['sharpe -4.47 < 1.0', 'profit_factor 0.45 < 1.5', 'trades 10 < 15']"
+wick_analysis,WickAnalysisStrategy,wick_analysis,-4.528,0.305,0.734,0.136,59,-0.1223,False,372.99,186.49,"['sharpe -4.53 < 1.0', 'profit_factor 0.73 < 1.5']"
+volatility_trend,VolatilityTrendStrategy,volatility_trend,-4.537,0.295,0.695,0.125,44,-0.1048,False,270.7,135.35,"['sharpe -4.54 < 1.0', 'profit_factor 0.70 < 1.5']"
+volatility_breakout,VolatilityBreakoutStrategy,volatility_breakout,-4.565,0.263,0.559,0.067,19,-0.0667,False,123.9,61.95,"['sharpe -4.56 < 1.0', 'profit_factor 0.56 < 1.5']"
+price_path_efficiency,PricePathEfficiencyStrategy,price_path_efficiency,-4.594,0.278,0.665,0.113,36,-0.097,False,222.05,111.02,"['sharpe -4.59 < 1.0', 'profit_factor 0.66 < 1.5']"
+roc_divergence,ROCDivergenceStrategy,roc_divergence,-5.086,0.21,0.521,0.092,19,-0.0753,False,121.88,60.94,"['sharpe -5.09 < 1.0', 'profit_factor 0.52 < 1.5']"
+gap_momentum,GapMomentumStrategy,gap_momentum,-5.108,0.294,0.624,0.143,34,-0.1007,False,212.9,106.45,"['sharpe -5.11 < 1.0', 'profit_factor 0.62 < 1.5']"
+bb_squeeze,BbSqueezeStrategy,bb_squeeze,-5.149,0.2,0.475,0.067,15,-0.0669,False,104.74,52.37,"['sharpe -5.15 < 1.0', 'profit_factor 0.48 < 1.5']"
+coppock,CoppockStrategy,coppock,-5.35,0.295,0.657,0.15,44,-0.1215,False,278.8,139.4,"['sharpe -5.35 < 1.0', 'profit_factor 0.66 < 1.5']"
+vol_mean_rev,VolatilityMeanReversionStrategy,vol_mean_rev,-5.363,0.0,0.0,0.021,2,-0.0215,False,12.78,6.39,"['sharpe -5.36 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
+momentum_div,MomentumDivergenceStrategy,momentum_div,-5.366,0.312,0.657,0.134,48,-0.1263,False,307.95,153.98,"['sharpe -5.37 < 1.0', 'profit_factor 0.66 < 1.5']"
+candle_pattern,CandlePatternStrategy,candle_pattern,-5.37,0.0,0.0,0.021,2,-0.0215,False,13.23,6.61,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
+engulfing,EngulfingStrategy,engulfing,-5.37,0.0,0.0,0.021,2,-0.0215,False,13.23,6.61,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
+rsi_ob_os,RSIOBOSStrategy,rsi_ob_os,-5.374,0.0,0.0,0.02,2,-0.0204,False,13.94,6.97,"['sharpe -5.37 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 2 < 15']"
+demarker,DeMarkerStrategy,demarker,-5.433,0.273,0.528,0.097,22,-0.0835,False,138.72,69.36,"['sharpe -5.43 < 1.0', 'profit_factor 0.53 < 1.5']"
+roc,ROCStrategy,roc,-5.439,0.281,0.6,0.125,32,-0.104,False,207.44,103.72,"['sharpe -5.44 < 1.0', 'profit_factor 0.60 < 1.5']"
+divergence_score,DivergenceScoreStrategy,divergence_score,-5.599,0.277,0.644,0.143,47,-0.1304,False,281.33,140.67,"['sharpe -5.60 < 1.0', 'profit_factor 0.64 < 1.5']"
+bollinger_squeeze,BollingerSqueezeStrategy,bollinger_squeeze,-5.608,0.24,0.528,0.127,25,-0.0959,False,163.98,81.99,"['sharpe -5.61 < 1.0', 'profit_factor 0.53 < 1.5']"
+price_action_scorer,PriceActionScorerStrategy,price_action_scorer,-5.822,0.279,0.632,0.157,43,-0.1287,False,276.7,138.35,"['sharpe -5.82 < 1.0', 'profit_factor 0.63 < 1.5']"
+cme_basis_strategy,CMEBasisStrategy,cme_basis,-5.927,0.276,0.644,0.208,58,-0.1556,False,343.36,171.68,"['sharpe -5.93 < 1.0', 'max_drawdown 20.8% > 20%', 'profit_factor 0.64 < 1.5']"
+multi_timeframe_momentum,MultiTimeframeMomentumStrategy,multi_timeframe_momentum,-5.969,0.275,0.604,0.128,40,-0.1275,False,252.55,126.28,"['sharpe -5.97 < 1.0', 'profit_factor 0.60 < 1.5']"
+cup_handle,CupHandleStrategy,cup_handle,-6.003,0.125,0.265,0.054,8,-0.0543,False,46.9,23.45,"['sharpe -6.00 < 1.0', 'profit_factor 0.27 < 1.5', 'trades 8 < 15']"
+bull_bear_power,BullBearPowerStrategy,bull_bear_power,-6.31,0.2,0.454,0.103,20,-0.0963,False,125.19,62.59,"['sharpe -6.31 < 1.0', 'profit_factor 0.45 < 1.5']"
+elder_ray,ElderRayStrategy,elder_ray,-6.31,0.2,0.454,0.103,20,-0.0963,False,125.19,62.59,"['sharpe -6.31 < 1.0', 'profit_factor 0.45 < 1.5']"
+stoch_divergence,StochDivergenceStrategy,stoch_divergence,-6.597,0.0,0.0,0.032,3,-0.0323,False,21.32,10.66,"['sharpe -6.60 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 3 < 15']"
+williams_r,WilliamsRStrategy,williams_r,-6.699,0.222,0.535,0.149,36,-0.1344,False,224.92,112.46,"['sharpe -6.70 < 1.0', 'profit_factor 0.53 < 1.5']"
+opening_range_breakout,OpeningRangeBreakoutStrategy,opening_range_breakout,-7.465,0.236,0.582,0.181,55,-0.1809,False,334.87,167.44,"['sharpe -7.47 < 1.0', 'profit_factor 0.58 < 1.5']"
+volume_oscillator_v2,VolumeOscillatorV2Strategy,volume_oscillator_v2,-7.579,0.237,0.496,0.177,38,-0.1509,False,232.09,116.04,"['sharpe -7.58 < 1.0', 'profit_factor 0.50 < 1.5']"
+parabolic_sar,ParabolicSARStrategy,parabolic_sar,-7.679,0.231,0.429,0.122,26,-0.1217,False,159.28,79.64,"['sharpe -7.68 < 1.0', 'profit_factor 0.43 < 1.5']"
+chaikin_osc,ChaikinOscillatorStrategy,chaikin_osc,-8.143,0.133,0.275,0.101,15,-0.1009,False,90.9,45.45,"['sharpe -8.14 < 1.0', 'profit_factor 0.28 < 1.5']"
+volume_weighted_rsi,VolumeWeightedRSIStrategy,volume_weighted_rsi,-8.164,0.2,0.387,0.122,25,-0.1219,False,154.01,77.01,"['sharpe -8.16 < 1.0', 'profit_factor 0.39 < 1.5']"
+vpt,VPTStrategy,vpt,-9.272,0.194,0.366,0.176,31,-0.1599,False,193.96,96.98,"['sharpe -9.27 < 1.0', 'profit_factor 0.37 < 1.5']"
+wavetrend_osc,WaveTrendOscStrategy,wavetrend_osc,-9.355,0.0,0.0,0.064,6,-0.0635,False,40.71,20.35,"['sharpe -9.36 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 6 < 15']"
+money_flow_index,MoneyFlowIndexStrategy,money_flow_index,-10.843,0.0,0.0,0.084,8,-0.084,False,55.79,27.9,"['sharpe -10.84 < 1.0', 'profit_factor 0.00 < 1.5', 'trades 8 < 15']"
+absolute_strength_hist,AbsoluteStrengthHistStrategy,absolute_strength_hist,-12.847,0.133,0.231,0.201,30,-0.2009,False,176.2,88.1,"['sharpe -12.85 < 1.0', 'max_drawdown 20.1% > 20%', 'profit_factor 0.23 < 1.5']"
