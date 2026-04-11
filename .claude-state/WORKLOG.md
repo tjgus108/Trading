@@ -6374,3 +6374,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Top 5 지표. EMA, RSI, MACD, Bollinger, Stochastic이 프로 봇 주류. 2025 비후행 지표(StochRSI, Fisher Transform) 주목.
 **Tests:** 6221 passed (+7 from Cycle 75).
 **Next Cycle:** 77 (B+D+F)
+
+## [2026-04-11 11:32 UTC] Cycle 77 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:34 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 05:00 UTC] Cycle 77 COMPLETED — B + D + F
+**[B] Risk:** tests/test_drawdown_monitor.py +2. set_daily/weekly_start 후 새 기준 추적 정상.
+**[D] ML:** tests/test_heston_lstm.py +4 경계. 소량 데이터, 고/저 변동성, 데이터 부족 처리 모두 정상.
+**[F] Research:** Stoch Vol 모델. Heston+LSTM hybrid Sharpe 2.1 (BTC 2024). GARCH 단독 예측력 제한적, ML 보정 조합 권장.
+**Tests:** 6223 passed (+2 from Cycle 76).
+**Next Cycle:** 78 (E+A+F)

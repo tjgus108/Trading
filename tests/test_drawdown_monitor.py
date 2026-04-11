@@ -156,3 +156,39 @@ def test_force_liquidate_not_cleared_by_reset_daily():
     m.reset_daily(8400)        # 일일 리셋 시도
     assert m.is_halted() is True
     assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+
+# ── set_daily_start / set_weekly_start 리셋 후 새 기간 추적 ──
+
+def test_set_daily_start_resets_tracking():
+    """set_daily_start 호출 후 새 기준으로 일일 낙폭 재계산."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    m.update(9650)              # 3.5% → WARNING 발생
+    assert m.is_halted()
+
+    # 다음날: set_daily_start로 기준 갱신, 경고는 reset_daily로만 해제
+    m.reset_daily(9650)         # 경고 해제 + 새 일일 기준 9650
+    assert not m.is_halted()
+
+    status = m.update(9370)     # 9650 대비 ~2.9% 낙폭 → 경고 없음
+    assert status.halted is False
+    assert abs(status.daily_drawdown_pct - (9650 - 9370) / 9650) < 1e-6
+
+
+def test_set_weekly_start_resets_tracking():
+    """set_weekly_start 호출 후 새 주간 기준으로 낙폭 재계산."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_weekly_start(10000)
+    m.set_daily_start(9400)
+    m.update(9200)              # 주간 8% → HALT 발생
+    assert m.is_halted()
+
+    # 다음주: 수동 해제 후 새 주간 기준 설정
+    m.force_resume()
+    m.set_weekly_start(9200)    # 새 주간 기준
+    m.set_daily_start(9200)
+
+    status = m.update(9000)     # 9200 대비 ~2.2% — 주간 한계 미만
+    assert status.halted is False
+    assert abs(status.weekly_drawdown_pct - (9200 - 9000) / 9200) < 1e-6

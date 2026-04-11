@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 76 — 2026-04-11T11:29:26.669433Z
+🔄 CYCLE 77 — 2026-04-11T11:32:15.314126Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 75 COMPLETED — D + E + F** (2026-04-12 04:20 UTC)
-  **[D] ML BUG FIX:** src/ml/lstm_model.py _train_torch 저장 시 `X` 미정의 변수 참조 버그 수정 (X.shape → seq_X_raw.shape). +2 tests (numpy fallback 검증).
-  **[E] Execution:** tests/test_kelly_twap.py +2 TWAP 전역 timeout. time.time 모킹으로 슬라이스 조기 종료, budget 내 정상 완료 검증.
-  **[F] Research:** Solana 봇. Jupiter Perps 일평균 $1B/79% 점유율. Telegram 봇(Trojan, BONKbot, Axiom) 주도. Jupiter 라우팅 + Phantom 지갑 표준 패턴.
-  **Tests:** 6214 passed (+2 from Cycle 74). 10번째 CRITICAL 버그 수정.
+**Cycle 76 COMPLETED — A + C + F** (2026-04-12 04:40 UTC)
+  **[A] Quality:** tests/test_lstm_strategy.py +2 회귀 테스트 (Cycle 75 NameError 수정 검증). model_path 유효성, n_features 저장 검증.
+  **[C] Data:** tests/test_gex_cme.py +5 경계 조건. 빈 result, 누락 키, 0 price, 0 items 처리.
+  **[F] Research:** Top 5 지표. EMA, RSI, MACD, Bollinger, Stochastic이 프로 봇 주류. 2025 비후행 지표(StochRSI, Fisher Transform) 주목.
+  **Tests:** 6221 passed (+7 from Cycle 75).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
