@@ -339,3 +339,22 @@ def test_render_html_no_cycle90_below_90():
     html = _render_html(data)
     assert "CYCLE 90 MILESTONE" not in html
     assert "CYCLE 80 MILESTONE" in html
+
+
+def test_render_html_cumulative_pnl_displayed():
+    """cumulative_pnl 값이 HTML에 부호 포함으로 표시되고, 음수일 때 red 색상 적용."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 10,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": -345.67,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "Cumulative P&amp;L" in html
+    assert "-345.67" in html
+    assert 'color:red' in html
