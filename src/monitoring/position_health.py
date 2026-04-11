@@ -92,10 +92,22 @@ class PositionHealthMonitor:
 
         reason = "; ".join(reasons) if reasons else "정상 범위"
 
-        logger.debug(
-            "PositionHealth: %s side=%s pnl=%.2%% stop_dist=%.2%% rr=%.2f",
-            status, side, unrealized_pct, stop_distance, rr,
-        )
+        # 상태에 따른 로그 레벨 차등 — CRITICAL은 즉각 알림 가능하도록 WARNING 레벨
+        if status == "CRITICAL":
+            logger.warning(
+                "PositionHealth CRITICAL: side=%s pnl=%.2f%% stop_dist=%.2f%% rr=%.2f reason=%s",
+                side, unrealized_pct * 100, stop_distance * 100, rr, reason,
+            )
+        elif status == "WARNING":
+            logger.info(
+                "PositionHealth WARNING: side=%s pnl=%.2f%% stop_dist=%.2f%% rr=%.2f reason=%s",
+                side, unrealized_pct * 100, stop_distance * 100, rr, reason,
+            )
+        else:
+            logger.debug(
+                "PositionHealth HEALTHY: side=%s pnl=%.2f%% stop_dist=%.2f%% rr=%.2f",
+                side, unrealized_pct * 100, stop_distance * 100, rr,
+            )
 
         return PositionHealth(
             status=status,

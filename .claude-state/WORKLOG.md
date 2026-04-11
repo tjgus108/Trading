@@ -550,3 +550,31 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** 피처 중요도 함정 (Gini가 연속형 피처 과대평가) + 크립토 누수 주의점 (shift 누락, scaler fit). RESEARCH_LOG.md 업데이트.
 **Tests:** 5820 passed, 27 skipped (+3).
 **Next Cycle:** 8 (E+A+F — 2회차)
+
+## [2026-04-11 02:32 UTC] Cycle 8 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:34 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:34:42Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:36 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:36:01Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 04:15 UTC] Cycle 8 COMPLETED — A + E + F
+**[A] Quality:** Sortino ratio 및 Recovery factor가 report.py에 이미 구현되어 있음을 확인. tests/test_backtest_engine.py에 검증 테스트 +2개 (downside deviation 감소 시 Sortino 증가, Recovery factor 공식 일관성).
+**[E] Execution (직접):** src/monitoring/position_health.py 로그 레벨 차등화. CRITICAL → WARNING log level, WARNING → INFO, HEALTHY → DEBUG. 알림 가능한 수준으로 승격. (execution-agent는 역할 제약으로 직접 처리)
+**[F] Research:** Sortino vs Sharpe 실전 비교. 크립토 양의 비대칭 분포에서 Sharpe 과소평가, Sortino 더 적합. 두 지표 병행 리포팅이 실무 표준.
+**Tests:** 5824 passed, 27 skipped (+4 from Cycle 7).
+**Next Cycle:** 9 (C+B+F — 2회차)

@@ -202,3 +202,27 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Backtesting AI Crypto Safely — Blockchain Council](https://www.blockchain-council.org/cryptocurrency/backtesting-ai-crypto-trading-strategies-avoiding-overfitting-lookahead-bias-data-leakage/)
 - [Look-Ahead Bias in ML Trading — MarketCalls](https://www.marketcalls.in/machine-learning/understanding-look-ahead-bias-and-how-to-avoid-it-in-trading-strategies.html)
 - [Purged Cross-Validation — Wikipedia](https://en.wikipedia.org/wiki/Purged_cross-validation)
+
+
+## [2026-04-11] Cycle 8 — Sortino vs Sharpe
+
+### 실전 비교
+- Sharpe는 상승 변동성까지 리스크로 계산해 강한 상승장 전략을 과소평가한다. Sortino는 하방 변동성만 분리하므로 비대칭 수익 구조를 가진 전략의 실제 효용을 더 정확히 반영.
+- 둘 중 하나만 보면 안 됨. 두 지표를 같이 제시했을 때 Sortino > Sharpe면 상승 변동성이 큰 전략, Sortino ≈ Sharpe면 수익 분포가 대칭에 가까운 전략으로 해석.
+- 백테스트 엔진의 현재 Sharpe >= 1.0 기준은 그대로 유지하되, Sortino도 추가 리포팅하면 전략 성격을 더 명확히 파악 가능.
+- 실전 사례: BTC의 Sortino(1.86)가 Sharpe의 거의 2배 — 상승 변동성이 크게 기여. Trend 전략 Sortino 3.83 vs BTC Sortino 1.93으로 전략이 순수 하방 리스크 대비 2배 효율.
+
+### 크립토 적용
+- 크립토는 정상적으로 양의 비대칭(positive skew) 분포를 보임. Sharpe는 이 상승 꼬리(upside tail)를 페널티로 계산 → 크립토 전략의 리스크 조정 성과를 구조적으로 낮춰 보임.
+- 따라서 크립토 전략 평가에서 Sortino가 더 대표성 있는 지표. 단, MAR(최소 수용 수익률) 설정에 따라 Sortino 수치가 크게 달라지므로 MAR을 명시하지 않은 Sortino 비교는 의미 없음.
+- 권장: MAR = 0(또는 무위험 금리)으로 고정하고, 전략 간 비교 시 동일 MAR 사용.
+
+### Sortino 계산 흔한 실수
+- **MAR 불일치**: 수익률은 일 단위인데 MAR은 연간값 그대로 사용 → 하방 편차가 과소/과대 계산됨. 반드시 수익률 주기와 동일한 단위로 MAR 변환.
+- **하방 편차 산출 방식**: MAR 이하 수익률만 사용해 표준편차 계산할 때 전체 N으로 나누느냐 음수 개수로 나누느냐에 따라 결과 달라짐. CFA Institute 원문 기준은 전체 N으로 나눔.
+- **비정규 분포 무시**: 크래시 이벤트로 인한 극단 음수 수익(팻테일)이 하방 편차를 왜곡. 단순 std 대신 Lower Partial Moment(LPM) 사용 고려.
+
+### 참고
+- [Sharpe, Sortino & Calmar — XBTO](https://www.xbto.com/resources/sharpe-sortino-and-calmar-a-practical-guide-to-risk-adjusted-return-metrics-for-crypto-investors)
+- [Sortino: A Sharper Ratio — CME Group / Red Rock Capital](https://www.cmegroup.com/education/files/rr-sortino-a-sharper-ratio.pdf)
+- [ARK Invest — Measuring Bitcoin's Risk and Reward](https://www.ark-invest.com/articles/analyst-research/measuring-bitcoins-risk-and-reward)

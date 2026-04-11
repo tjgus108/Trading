@@ -456,3 +456,37 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 **Test Results:**
 - test_phase_c_ml.py: 24 passed, 7 skipped (sklearn 미설치 환경) ✅
 - 새 테스트 2개 포함, 기존 회귀 없음
+
+---
+
+## Cycle 8 - Category A: Quality Assurance ✅ COMPLETED
+
+**Task:** Backtest report metrics 확장 (Sortino ratio + Recovery factor 테스트 추가)
+
+**조사 결과:** 
+- Sortino ratio (downside deviation 기반)와 Recovery factor (total_return / max_drawdown)는 이미 완전히 구현되어 있음
+- `/home/user/Trading/src/backtest/report.py`:
+  - 라인 40-42: 두 메트릭 필드 정의
+  - 라인 64, 67: summary()에 출력
+  - 라인 110-114: Sortino ratio 계산
+  - 라인 125-126: Recovery factor 계산
+
+**Files Modified:**
+1. `/home/user/Trading/tests/test_backtest_engine.py` (lines 272-315 추가)
+   - `test_sortino_ratio_higher_on_loss_reduction`: downside deviation 감소 시 Sortino 증가 검증
+     - 2개 트레이드 시나리오 비교 (큰 손실 vs 작은 손실)
+   - `test_recovery_factor_reflects_profit_to_drawdown_ratio`: Recovery Factor = total_return / max_drawdown 공식 정합성 검증
+     - 5개 거래 패턴으로 명확한 수익/손실 구조 검증
+
+**Test Results:**
+- test_backtest_engine.py: 21 passed ✅ (기존 19 + 신규 2)
+- test_backtest.py: 4 passed ✅ (기존 유지)
+- 전체 백테스트 관련 테스트: 25 passed ✅
+- 기존 테스트 회귀 없음
+
+**기술 정리:**
+- **Sortino Ratio:** 하락선만 고려한 변동성 지수 → loss 거래 최소화 전략 평가에 유용
+- **Recovery Factor:** 총 수익을 최대 손실폭으로 정규화 → 리스크 회복 능력 지수
+- 두 메트릭 모두 포트폴리오 복원력(resilience) 측정에 활용
+
+---

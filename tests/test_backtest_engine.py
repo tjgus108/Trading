@@ -267,3 +267,64 @@ def test_max_hold_candles_forces_close():
     ).run(AlwaysBuyStrategy(), df)
     # MAX_HOLD_CANDLES마다 강제 청산되므로 거래 발생해야 함
     assert result.total_trades > 0
+
+
+# ---------------------------------------------------------------------------
+# 신규 5: Sortino Ratio (downside deviation 기반) 테스트
+# ---------------------------------------------------------------------------
+
+def test_sortino_ratio_higher_on_loss_reduction():
+    """음수 PnL이 줄어들면 Sortino는 증가해야 한다 (downside deviation 감소)."""
+    from src.backtest.report import BacktestReport
+    
+    # 시나리오 1: 큰 손실 거래들
+    trades_with_big_losses = [
+        {"pnl_pct": 0.02},
+        {"pnl_pct": -0.10},  # 큰 손실
+        {"pnl_pct": 0.01},
+        {"pnl_pct": -0.08},  # 큰 손실
+        {"pnl_pct": 0.03},
+    ]
+    
+    # 시나리오 2: 작은 손실 거래들
+    trades_with_small_losses = [
+        {"pnl_pct": 0.02},
+        {"pnl_pct": -0.02},  # 작은 손실
+        {"pnl_pct": 0.01},
+        {"pnl_pct": -0.01},  # 작은 손실
+        {"pnl_pct": 0.03},
+    ]
+    
+    report_big_loss = BacktestReport.from_trades(trades_with_big_losses, annualization=252*24)
+    report_small_loss = BacktestReport.from_trades(trades_with_small_losses, annualization=252*24)
+    
+    # downside deviation이 작을수록 Sortino 비율이 커야 함
+    assert report_small_loss.sortino_ratio > report_big_loss.sortino_ratio, (
+        f"Small losses Sortino({report_small_loss.sortino_ratio:.3f}) should be > "
+        f"Big losses Sortino({report_big_loss.sortino_ratio:.3f})"
+    )
+
+
+def test_recovery_factor_reflects_profit_to_drawdown_ratio():
+    """Recovery Factor = total_return / max_drawdown 검증."""
+    from src.backtest.report import BacktestReport
+    
+    # 데이터: 명확한 수익/손실 패턴
+    trades = [
+        {"pnl_pct": 0.05},   # +5%
+        {"pnl_pct": 0.05},   # +5% cumsum: +10.25%
+        {"pnl_pct": -0.10},  # -10% (누적이 가장 낮아짐) → DD 발생
+        {"pnl_pct": 0.10},   # +10% 회복
+        {"pnl_pct": 0.05},   # +5%
+    ]
+    
+    report = BacktestReport.from_trades(trades, annualization=252*24)
+    
+    # Recovery Factor는 total_return / max_drawdown으로 정의됨
+    # max_drawdown이 0이 아니면 recovery > 0 이어야 함
+    if report.max_drawdown > 1e-9:
+        expected_recovery = report.total_return / report.max_drawdown
+        assert abs(report.recovery_factor - expected_recovery) < 1e-6, (
+            f"Recovery factor mismatch: got {report.recovery_factor:.6f}, "
+            f"expected {expected_recovery:.6f}"
+        )

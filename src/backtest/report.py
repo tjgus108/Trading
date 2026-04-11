@@ -7,6 +7,8 @@ BacktestEngine 결과(trades list + equity curve)로부터
 지표:
   - Total Return, Ann. Return, Ann. Volatility, Sharpe Ratio
   - Max Drawdown, Calmar Ratio (Ann. Return / MDD)
+  - Sortino Ratio (downside deviation 기반)
+  - Recovery Factor (total_return / max_drawdown)
   - Win Rate, Profit Factor, Avg Win/Loss
   - Total Trades, Avg Hold Periods
 
@@ -35,7 +37,9 @@ class BacktestReport:
 
     # 리스크 조정 성과
     sharpe_ratio: float
+    sortino_ratio: float         # downside deviation 기반 샤프 비율 (신규)
     calmar_ratio: float          # ann_return / max_drawdown
+    recovery_factor: float       # total_return / max_drawdown (신규)
     max_drawdown: float          # 최대 낙폭 (양수)
 
     # 거래 통계
@@ -57,8 +61,10 @@ class BacktestReport:
             f"Ann. Return:     {self.ann_return:+.2%}\n"
             f"Ann. Volatility: {self.ann_volatility:.2%}\n"
             f"Sharpe Ratio:    {self.sharpe_ratio:.3f}\n"
+            f"Sortino Ratio:   {self.sortino_ratio:.3f}\n"
             f"Max Drawdown:    {self.max_drawdown:.2%}\n"
             f"Calmar Ratio:    {self.calmar_ratio:.3f}\n"
+            f"Recovery Factor: {self.recovery_factor:.3f}\n"
             f"Win Rate:        {self.win_rate:.1%}\n"
             f"Profit Factor:   {self.profit_factor:.2f}\n"
             f"Avg Win:         {self.avg_win:+.4f}\n"
@@ -101,6 +107,12 @@ class BacktestReport:
         per_period_rf = risk_free_rate / annualization
         sharpe = float((pnls.mean() - per_period_rf) / pnls.std()) * np.sqrt(annualization) if pnls.std() > 0 else 0.0
 
+        # Sortino Ratio: downside deviation 기반
+        downside = np.where(pnls < 0, pnls, 0.0)
+        downside_var = np.mean(downside ** 2)
+        downside_dev = np.sqrt(downside_var) if downside_var > 0 else 0.0
+        sortino = float((pnls.mean() - per_period_rf) / downside_dev) * np.sqrt(annualization) if downside_dev > 0 else 0.0
+
         # Max Drawdown
         equity = np.cumprod(1 + pnls)
         peak = np.maximum.accumulate(equity)
@@ -109,6 +121,9 @@ class BacktestReport:
 
         # Calmar
         calmar = ann_return / mdd if mdd > 1e-9 else 0.0
+
+        # Recovery Factor: total_return / max_drawdown
+        recovery = total_return / mdd if mdd > 1e-9 else (float("inf") if total_return > 0 else 0.0)
 
         # 거래 통계
         wins = pnls[pnls > 0]
@@ -138,7 +153,9 @@ class BacktestReport:
             ann_return=ann_return,
             ann_volatility=ann_vol,
             sharpe_ratio=sharpe,
+            sortino_ratio=sortino,
             calmar_ratio=calmar,
+            recovery_factor=recovery,
             max_drawdown=mdd,
             total_trades=n,
             win_rate=win_rate,
@@ -159,13 +176,16 @@ class BacktestReport:
             result: BacktestEngine.run() 반환값
             annualization: 연환산 인수 (기본 1h 타임프레임 기준)
         """
+        recovery = result.total_return / result.max_drawdown if result.max_drawdown > 1e-9 else (float("inf") if result.total_return > 0 else 0.0)
         return cls(
             total_return=result.total_return,
             ann_return=0.0,          # BacktestResult에 미포함 — 필요 시 from_trades() 사용
             ann_volatility=0.0,      # 동일
             sharpe_ratio=result.sharpe_ratio,
+            sortino_ratio=0.0,       # BacktestResult에 미포함 — 필요 시 from_trades() 사용
             calmar_ratio=(result.total_return / result.max_drawdown
                           if result.max_drawdown > 1e-9 else 0.0),
+            recovery_factor=recovery,
             max_drawdown=result.max_drawdown,
             total_trades=result.total_trades,
             win_rate=result.win_rate,
@@ -181,7 +201,8 @@ class BacktestReport:
     def _empty(cls, annualization: int) -> "BacktestReport":
         return cls(
             total_return=0.0, ann_return=0.0, ann_volatility=0.0,
-            sharpe_ratio=0.0, calmar_ratio=0.0, max_drawdown=0.0,
+            sharpe_ratio=0.0, sortino_ratio=0.0, calmar_ratio=0.0, recovery_factor=0.0,
+            max_drawdown=0.0,
             total_trades=0, win_rate=0.0, profit_factor=0.0,
             avg_win=0.0, avg_loss=0.0, win_loss_ratio=0.0,
             max_consecutive_losses=0, annualization=annualization,
