@@ -98,7 +98,8 @@
 - ✅ **Cycle 90 완료** 🎯 (D+E+**SIM**+F: **narrow_range -0.36%→+14.90% Sharpe 5.82 TOP3**)
 - ✅ Cycle 91 완료 (A+C+F: 8 회귀 + sentiment partial + Q2 priorities)
 - ✅ **Cycle 92 완료** (B+D+**SIM**+F: DD granularity + ensemble edge + **acceleration_band 0%→+2.77%**)
-- ⏳ **Cycle 93 대기** (E+A+SIM+F)
+- ✅ **Cycle 93 완료** (E+A+**SIM**+F: run_once non-fatal + Sharpe/Sortino + **volatility_cluster**)
+- ⏳ **Cycle 94 대기** (C+B+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -107,8 +108,8 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,293개** (0 warnings ✨) |
-| 🎯 SIM 누적 개선 9개 | +wick+engulf+frama+cmf+lob+htf+vol_br+narrow+**accel_band** |
+| ✅ 통과 테스트 | **6,295개** (0 warnings ✨) |
+| 🎯 SIM 누적 개선 10개 | +wick+engulf+frama+cmf+lob+htf+vol_br+narrow+accel+**vol_cluster** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
