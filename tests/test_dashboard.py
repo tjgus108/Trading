@@ -189,3 +189,39 @@ def test_render_html_no_milestone_below_50():
     html = _render_html(data)
     assert "CYCLE 50 MILESTONE" not in html
     assert "-10.00" in html
+
+
+def test_render_html_cycle60_milestone():
+    """cycle_count >= 60 이면 CYCLE 60 + CYCLE 50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 60,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 500.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 60 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle60_below_60():
+    """cycle_count < 60 이면 CYCLE 60 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 59,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 60 MILESTONE" not in html
+    assert "CYCLE 50 MILESTONE" in html

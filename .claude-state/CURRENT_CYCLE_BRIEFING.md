@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 59 — 2026-04-11T10:13:52.761606Z
+🔄 CYCLE 60 — 2026-04-11T10:16:38.186687Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 58 COMPLETED — E + A + F** (2026-04-11 22:20 UTC)
-  **[E] Execution:** src/exchange/connector.py fetch_balance None/예외 안전 처리. +2 tests.
-  **[A] Quality:** pytest.ini slow marker 추가. 상위 3개 느린 테스트(1.5s+)에 @slow 태그. pytest -m slow 또는 -m "not slow" 필터 가능.
-  **[F] Research:** 봇 running 비용. VPS $20-40/월 기본, $100-200 고성능. 거래소 API 무료. 3rd-party 플랫폼 +$25-240. 관리 기회비용 $150-600/월. 최소 $50-100/월.
-  **Tests:** 6135 passed (+2 from Cycle 57). 1 flaky (test_buy_insufficient_balance) 재실행 통과.
+**Cycle 59 COMPLETED — C + B + F** (2026-04-11 22:45 UTC)
+  **[C] Data:** src/data/feed.py 빈 DataFrame ValueError 가드. test_feed_boundary.py 신규 +2 tests.
+  **[B] Risk:** src/risk/vol_targeting.py target_vol <= 0 ValueError. +3 경계 (작은/큰/음수 target_vol).
+  **[F] Research:** Pairs Trading 크립토. Cointegration(ADF/Johansen)이 correlation보다 안정. Copula+cointegration 결합이 우수. BTC/ETH 유동성 1순위. z-score ±2 진입 / ±0.5 청산 표준.
+  **Tests:** 6140 passed (+5 from Cycle 58).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
