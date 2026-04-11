@@ -81,3 +81,21 @@
 - Report: `/home/user/Trading/.claude-state/BACKTEST_REPORT.md`
 - Results CSV: `/home/user/Trading/.claude-state/QUALITY_AUDIT.csv`
 - Audit Script: `/home/user/Trading/scripts/quality_audit.py`
+
+---
+
+## Cycle 14 - Category B: Risk Management - VaR/CVaR 검증 ✅ COMPLETED
+
+**Task:** portfolio_optimizer.py VaR/CVaR 정확도 검증 + 경계 조건 테스트
+
+**Findings:**
+- `_compute_var_cvar()`: historical simulation 방식, 손실 양수 반환 — 로직 정상
+- cutoff_idx 경계(T=20, confidence=0.95 → cutoff=1): CVaR==VaR 허용 케이스 미검증
+- 모든 수익률 양수 시 max(0,x) 처리로 VaR=0/CVaR=0 반환 — 미검증
+
+**Changes:**
+1. `tests/test_portfolio_optimizer.py` lines 182-204 — 경계 조건 테스트 2개 추가
+   - `test_var_cvar_small_sample_boundary`: T=20 cutoff=1 경계 검증
+   - `test_var_cvar_all_positive_returns`: 전 양수 수익률 VaR=0 검증
+
+**Test Results:** 18/18 passed ✅

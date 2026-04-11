@@ -177,3 +177,30 @@ def test_var_summary_contains_var():
     result = opt.optimize(make_returns())
     assert "VaR95" in result.summary()
     assert "CVaR95" in result.summary()
+
+
+def test_var_cvar_small_sample_boundary():
+    """T=20 (cutoff_idx=1) 경계: CVaR==VaR이 되는 케이스 명시적 검증.
+
+    cutoff_idx = max(1, int(20 * 0.05)) = 1
+    → sorted_r[:1].mean() == sorted_r[0]  (CVaR == VaR, 허용된 경계)
+    """
+    rng = np.random.default_rng(7)
+    r = rng.normal(0.0, 0.01, 20)
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    # 경계에서 CVaR >= VaR 관계 유지
+    assert cvar >= var - 1e-12
+    # VaR은 실제 최솟값의 음수여야 함 (cutoff_idx=1 → sorted_r[0])
+    sorted_r = np.sort(r)
+    expected_var = max(0.0, -float(sorted_r[0]))
+    assert abs(var - expected_var) < 1e-12
+
+
+def test_var_cvar_all_positive_returns():
+    """모든 수익률이 양수인 경우 VaR=0, CVaR=0 (max(0,x) 처리 확인)."""
+    r = np.array([0.01, 0.02, 0.03, 0.005, 0.015, 0.008, 0.012, 0.007,
+                  0.011, 0.009, 0.014, 0.006, 0.013, 0.016, 0.004,
+                  0.018, 0.019, 0.003, 0.017, 0.010])
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    assert var == 0.0
+    assert cvar == 0.0

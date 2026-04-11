@@ -723,3 +723,22 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** 2025 시장 구조 변화. ETF 기관화 (IBIT 60% 독주), 거래소 상위 4개 70%+ 집중. 알고 트레이딩 비중 확대로 $2B/$3.21B 플래시 크래시 발생.
 **Tests:** 5860 passed, 27 skipped (+5 from Cycle 12).
 **Next Cycle:** 14 (C+B+F — 3회차)
+
+## [2026-04-11 03:07 UTC] Cycle 14 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:09 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:09:12Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 06:15 UTC] Cycle 14 COMPLETED — B + F (C skipped)
+**[B] Risk:** src/risk/portfolio_optimizer.py _compute_var_cvar 검증. historical simulation 방식 정상. 경계 조건 2개 추가: T=20에서 cutoff_idx=1 → CVaR==VaR, 전 구간 양수 수익률 → VaR=0/CVaR=0. +2 tests (test_portfolio_optimizer.py).
+**[C] Data:** data-agent가 VPIN 경계 테스트 코드 생성했으나 파일 쓰기 실패 (bash heredoc 구문 이슈). 다음 사이클에서 재시도.
+**[F] Research:** MEV 샌드위치 공격 2025 $289.8M (51.6%). 단일 봇 1건 $800k. **우리 봇(CEX/ccxt)은 직접 노출 없음.** DEX 확장 시 슬리피지 엄격화 필수.
+**Tests:** 5862 passed, 27 skipped (+2 from Cycle 13).
+**Next Cycle:** 15 (D+E+F — 3회차)

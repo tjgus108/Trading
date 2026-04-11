@@ -330,3 +330,19 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Bitcoin ETF record outflows deceptive — CryptoSlate](https://cryptoslate.com/bitcoin-etf-record-outflows-are-deceptive-as-crypto-products-absorbed-46-7-billion-in-2025/)
 - [Crypto Exchange Market Share — CoinGecko](https://www.coingecko.com/research/publications/centralized-crypto-exchanges-market-share)
 - [Crypto ETFs 2025 Year in Review — Yahoo Finance](https://finance.yahoo.com/news/crypto-etfs-2025-bitcoin-ethereum-140103429.html)
+
+## [2026-04-11] Cycle 14 — MEV and Bot Competition
+
+### MEV 현황
+- 2025년 MEV 총 거래량 $561.9M 중 샌드위치 공격이 51.6%($289.8M) 차지. 일평균 4,400건 이상.
+- jaredfromsubway.eth 등 단일 봇이 2025-01 샌드위치 1건으로 $800k 수익; AI·ML 기반 봇들이 체인형 공격(샌드위치+차익거래 연결) 고도화.
+- 이더리움 트랜잭션의 80%가 Flashbots Protect·MEV Blocker 등 프라이빗 RPC 사용—그러나 프라이빗 채널도 2024-11~12월 2,932건 샌드위치 피해 확인($40.9만 손실).
+
+### 우리 봇 영향
+- CEX 기반 봇(ccxt)은 온체인 MEV 직접 노출 없음. 단, DEX 연동·크로스 마켓 차익거래 추가 시 프론트러닝 리스크 즉시 발생.
+- 슬리피지 설정 엄격화(tight slippage) + 고유동성 풀 한정 + 주문 크기 분할로 샌드위치 공격 비용 억제 가능.
+
+### 참고
+- [Sandwiched and Silent (arxiv 2512.17602)](https://arxiv.org/html/2512.17602v1)
+- [Flashbots Protect RPC](https://docs.flashbots.net/flashbots-protect/overview)
+- [Solana MEV 현황 — Solana Compass](https://solanacompass.com/learn/accelerate-25/scale-or-die-at-accelerate-2025-the-state-of-solana-mev)
