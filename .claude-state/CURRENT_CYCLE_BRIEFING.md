@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 96 — 2026-04-11T18:48:38.703305Z
+🔄 CYCLE 97 — 2026-04-11T19:17:17.072845Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 95 COMPLETED — D + E + SIM + F** (2026-04-12 13:50 UTC)
-  **[D] ML:** tests/test_adaptive_selector.py +1 저 Sharpe → 선택 빈도 감소 검증.
-  **[E] Execution:** tests/test_kelly_twap.py +2 Kelly+TWAP 파이프라인 통합 시나리오.
-  **[SIM] Auto-improve:** relative_volume RVOL 임계값 2.0 → 1.5 완화 + VWAP OR 조건. **+0.74% → +7.87%** (Sharpe 0.32 → 1.86). 테스트 1개 업데이트 (rvol 1.67 기존 HOLD → BUY 허용).
-  **[F] Research:** Walk-forward 파라미터. IS/OOS 70-80/20-30 표준, 67/33 권장 (OOS Sharpe 1.89). 창 크기: 단기 2y/6m, 장기 5y/1y.
+**Cycle 96 COMPLETED — A + C + SIM + F** (2026-04-12 14:30 UTC)
+  **[A] Quality:** 13 SIM 회귀 138/138 PASS 확인.
+  **[C] Data:** src/data/news.py 중복 감지 공백/대소문자 정규화. +2 tests.
+  **[SIM] No-op:** dema_cross 5가지 필터 시도 모두 실패 (PF 1.38 → 1.22/1.32 악화). 구조적 한계 확인, 원본 복원.
+  **[F] Research:** Kelly 실전. 풀 켈리는 백테스트 전용, 실전은 Half/Quarter Kelly 또는 Fixed Fractional 1-2%. Kelly-Lite가 균형점.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

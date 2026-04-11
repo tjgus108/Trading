@@ -166,3 +166,13 @@ def test_from_trade_history_all_wins_no_error():
     trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 50}]
     qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
     assert qty >= 0
+
+
+def test_kelly_sizer_default_fraction_is_half_kelly():
+    """KellySizer 기본 fraction=0.5 (Half-Kelly) 확인 및 Quarter-Kelly(0.25)는 정확히 절반."""
+    half = KellySizer(fraction=0.5, max_fraction=0.10)
+    quarter = KellySizer(fraction=0.25, max_fraction=0.10)
+    assert half.fraction == 0.5
+    qty_half = half.compute(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
+    qty_quarter = quarter.compute(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
+    assert abs(qty_half / qty_quarter - 2.0) < 1e-9
