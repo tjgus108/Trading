@@ -211,6 +211,30 @@ def test_weight_shifts_with_changing_sharpe():
     assert sh_rsi_after > sh_rsi_before, "새 데이터 반영 후 rsi_div Sharpe 상승"
 
 
+def test_low_sharpe_reduces_selection_weight():
+    """최근 성과 낮은 전략은 가중치가 줄어 선택 빈도가 낮아진다."""
+    sel = _make_selector()
+    # ema_cross: 고성과 (양의 PnL, 낮은 분산 → 높은 Sharpe)
+    for p in [10, 11, 10, 12, 11, 10, 12, 11, 10, 11]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div: 저성과 (음/양 혼재 → Sharpe 0 이하)
+    for p in [5, -8, 3, -9, 4, -7, 2, -6, 5, -8]:
+        sel.record_pnl("rsi_div", p)
+
+    ema_sharpe = sel.sharpe("ema_cross")
+    rsi_sharpe = sel.sharpe("rsi_div")
+    assert ema_sharpe > 0, f"ema_cross Sharpe should be positive, got {ema_sharpe}"
+    assert rsi_sharpe <= 0, f"rsi_div Sharpe should be <=0, got {rsi_sharpe}"
+
+    counts = {"ema_cross": 0, "rsi_div": 0, "funding": 0}
+    for _ in range(300):
+        counts[sel.select().name] += 1
+    # rsi_div Sharpe<=0 → 가중치 0 → 선택 비율이 ema_cross보다 낮아야 함
+    assert counts["ema_cross"] > counts["rsi_div"], (
+        f"저성과 rsi_div 선택 비율이 낮아야 함: {counts}"
+    )
+
+
 def test_select_weight_proportional_after_reversal():
     """가중치 역전 후 select() 선택 빈도가 바뀐다."""
     sel = _make_selector()

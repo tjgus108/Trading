@@ -478,3 +478,90 @@ class TestTWAPSliceSum:
                 f"n_slices={n_slices}, total_qty={total_qty}: "
                 f"filled_qty={result.filled_qty}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Kelly + TWAP 파이프라인 통합 시나리오
+# ---------------------------------------------------------------------------
+
+class TestKellyTWAPPipelineIntegration:
+    """KellySizer가 산출한 position_size를 TWAPExecutor가 실행하는 통합 경로 검증."""
+
+    def _build_trades(self, n: int = 12, win_rate: float = 0.6) -> list[dict]:
+        """재현 가능한 거래 이력 생성."""
+        trades = []
+        for i in range(n):
+            if i % 10 < int(win_rate * 10):
+                trades.append({"pnl": 200.0})
+            else:
+                trades.append({"pnl": -100.0})
+        return trades
+
+    def test_kelly_size_fed_into_twap_buy(self):
+        """시나리오 1: Kelly size → TWAP buy 실행 → filled_qty <= kelly_size."""
+        capital = 50_000.0
+        price = 50_000.0
+        trades = self._build_trades(n=12, win_rate=0.6)
+
+        kelly_size = KellySizer.from_trade_history(
+            trades=trades,
+            capital=capital,
+            price=price,
+        )
+        assert kelly_size > 0, "Kelly should yield positive size for profitable history"
+
+        executor = TWAPExecutor(n_slices=5, interval_seconds=0, dry_run=True)
+        np.random.seed(0)
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=kelly_size,
+            price_limit=price,
+        )
+
+        assert result.slices_executed == 5
+        assert result.total_qty == kelly_size
+        assert result.filled_qty <= kelly_size + 1e-8
+        assert result.dry_run is True
+        # avg_price는 price ±1% 이내
+        assert abs(result.avg_price - price) / price < 0.01
+
+    def test_kelly_atr_reduced_size_fed_into_twap_sell(self):
+        """시나리오 2: 고변동성(ATR 3x) → Kelly 축소 → TWAP sell 슬라이스 합계 검증."""
+        capital = 100_000.0
+        price = 2_000.0
+        target_atr = 50.0
+        high_atr = 150.0  # 3x → atr_factor ≈ 0.333
+
+        sizer = KellySizer(fraction=0.5, max_fraction=0.10, min_fraction=0.001)
+        base_size = sizer.compute(
+            win_rate=0.6, avg_win=0.02, avg_loss=0.01,
+            capital=capital, price=price,
+            atr=target_atr, target_atr=target_atr,
+        )
+        reduced_size = sizer.compute(
+            win_rate=0.6, avg_win=0.02, avg_loss=0.01,
+            capital=capital, price=price,
+            atr=high_atr, target_atr=target_atr,
+        )
+        assert reduced_size < base_size, "High ATR must reduce Kelly size"
+
+        import unittest.mock as mock
+        executor = TWAPExecutor(n_slices=4, interval_seconds=0, dry_run=True)
+        # 부분 체결 없이 실행
+        with mock.patch("numpy.random.random", return_value=1.0), \
+             mock.patch("numpy.random.uniform", return_value=0.0):
+            result = executor.execute(
+                connector=None,
+                symbol="ETH/USDT",
+                side="sell",
+                total_qty=reduced_size,
+                price_limit=price,
+            )
+
+        assert result.slices_executed == 4
+        assert abs(result.filled_qty - reduced_size) < 1e-9, (
+            f"filled_qty {result.filled_qty} != reduced_size {reduced_size}"
+        )
+        assert result.timeout_occurred is False

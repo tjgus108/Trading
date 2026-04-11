@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 94 — 2026-04-11T18:23:05.302969Z
+🔄 CYCLE 95 — 2026-04-11T18:35:35.017170Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 93 COMPLETED — E + A + SIM + F** (2026-04-12 12:45 UTC)
-  **[E] Execution:** tests/test_orchestrator.py +2 run_once non-fatal. drawdown/regime 예외 시 pipeline 계속.
-  **[A] Quality:** 품질 감사 재실행 시도 (백그라운드, 결과 미도달).
-  **[SIM] Auto-improve:** volatility_cluster 개선. 14 tests 통과. 시뮬 리포트 갱신.
-  **[F] Research:** Sharpe vs Sortino. Sharpe 1차 필터, Sortino 하방 검증 2단계 권장. Sortino >= 1.2 추가 조건.
+**Cycle 94 COMPLETED — C + B + SIM + F (double SIM)** (2026-04-12 13:20 UTC)
+  **[C] Data:** tests/test_onchain_consistency.py +2 TTL 캐시 검증.
+  **[B] Risk:** tests/test_notifier.py 심각도별 알림 검증 (수정 없음).
+  **[SIM] Auto-improve 2개 동시 완료!**
+    1. **value_area** Sharpe 0.90 → **1.30 PASS 달성!** EMA 추세+볼륨+VA breach 1.5σ+고확신 조건.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
