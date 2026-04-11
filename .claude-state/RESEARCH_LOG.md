@@ -622,3 +622,22 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [DEXs Hit Record Market Share — CoinDesk](https://www.coindesk.com/markets/2025/07/21/decentralized-crypto-exchanges-hit-record-market-share-in-q2-volume-coingecko-report)
 - [Hyperliquid chips away at Binance — The Block](https://www.theblock.co/post/368674/hyperliquid-captures-80-of-decentralized-perps-market-chipping-away-at-binance)
 - [Institutional Crypto Adoption 2025 — Grayscale](https://research.grayscale.com/reports/2026-digital-asset-outlook-dawn-of-the-institutional-era)
+
+## [2026-04-11] Cycle 31 — Developer Regrets
+
+### Top 후회 사례
+- **백테스트 과적합**: 과거 특정 기간에 최적화된 파라미터가 라이브에서 즉시 붕괴. 백테스트 Sharpe가 40% 이상 하락하거나 MDD가 2배 이상 증가하면 이미 과적합
+- **트랜잭션 비용 미반영**: 수수료·슬리피지 누락으로 백테스트 수익성이 실제와 극단적으로 괴리. 초기부터 현실적 비용 모델 미적용 후회
+- **리스크 한도 부재**: 손절/일일 손실 한도 없이 배포하면 작은 버그가 대규모 드로다운으로 확대. "실행 중단" 로직을 처음부터 설계하지 않은 것이 최대 후회
+- **API 키 노출**: 코드 저장소·스크린샷·공유 설정 파일에 API 키 유출 — 계정 탈취로 직결. 보안 설계 후행 처리 후회
+
+### 초기에 했어야 할 일
+- **Walk-forward 검증 습관화**: 초기 윈도우 학습 → 다음 윈도우 테스트 → 롤링 반복. 단순 전체 기간 백테스트 금지
+- **단순 전략 우선 배포**: 복잡한 다중 인디케이터 조합보다 단일 규칙 전략으로 라이브 동작 확인 후 확장
+- **서킷브레이커 설계 선행**: 일일 드로다운 한도·레짐 감지 필터를 첫 번째 기능으로 구현
+- **Paper trading 의무화**: 실자본 투입 전 최소 30일 포워드 테스트로 슬리피지·레이턴시 현실 확인
+
+### 참고
+- [The Biggest Mistakes I Made Building a Crypto Bot — Medium](https://swaeth.medium.com/the-biggest-mistakes-i-made-building-a-crypto-bot-7d3509883f25)
+- [Common Pitfalls: What Beginners Get Wrong — Coin Bureau](https://coinbureau.com/guides/crypto-trading-bot-mistakes-to-avoid)
+- [Why Most Crypto Trading Bots Fail — DEV Community](https://dev.to/matrixtrak/why-most-crypto-trading-bots-fail-and-how-to-build-one-that-actually-works-257g)

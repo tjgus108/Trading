@@ -144,6 +144,63 @@ class TestFeedParallel:
         assert "donchian_high" in btc_summary.indicators
         assert "vwap" in btc_summary.indicators
 
+    def test_fetch_with_retry_logging(self):
+        """Fetch retry 시 에러 로그에 symbol, timeframe, attempt 정보 포함."""
+        connector = MagicMock()
+        # 처음 2번 실패, 3번째 성공
+        connector.fetch_ohlcv.side_effect = [
+            Exception("Network error"),
+            Exception("Timeout"),
+            [[1704067200000, 42000, 42500, 41800, 42300, 100]],
+        ]
+
+        feed = DataFeed(connector, max_retries=3)
+        
+        with patch("src.data.feed.logger") as mock_logger:
+            result = feed.fetch("BTC/USDT", "1h", limit=500)
+            
+            assert result.symbol == "BTC/USDT"
+            # Warning 로그 확인 (시도 1, 2에서)
+            warning_calls = mock_logger.warning.call_args_list
+            assert len(warning_calls) == 2
+            # call('format', 'BTC/USDT', '1h', error_msg, 1, 3)
+            call_args_0 = warning_calls[0][0]
+            call_args_1 = warning_calls[1][0]
+            
+            # 첫 번째 warning: attempt 1/3
+            assert "BTC/USDT" in call_args_0[1]
+            assert "1h" in call_args_0[2]
+            assert call_args_0[4] == 1  # attempt
+            assert call_args_0[5] == 3  # max_retries
+            
+            # 두 번째 warning: attempt 2/3
+            assert "BTC/USDT" in call_args_1[1]
+            assert "1h" in call_args_1[2]
+            assert call_args_1[4] == 2  # attempt
+            assert call_args_1[5] == 3  # max_retries
+
+    def test_fetch_max_retries_exceeded(self):
+        """모든 retry 실패 후 에러 로그 + 예외 발생."""
+        connector = MagicMock()
+        error = Exception("Persistent API error")
+        connector.fetch_ohlcv.side_effect = error
+
+        feed = DataFeed(connector, max_retries=2)
+        
+        with patch("src.data.feed.logger") as mock_logger:
+            with pytest.raises(Exception) as exc_info:
+                feed.fetch("ETH/USDT", "4h", limit=100)
+            
+            assert str(exc_info.value) == "Persistent API error"
+            # Error 로그 확인
+            error_calls = mock_logger.error.call_args_list
+            assert len(error_calls) >= 1
+            # call('format', 'ETH/USDT', '4h', 2, error_msg)
+            error_call_args = error_calls[0][0]
+            assert "ETH/USDT" in error_call_args[1]
+            assert "4h" in error_call_args[2]
+            assert error_call_args[3] == 2  # max_retries
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

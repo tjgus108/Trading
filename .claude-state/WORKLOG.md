@@ -2477,3 +2477,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** 2025 시장 마이크로구조. Binance CEX 점유율 32%로 하락, Hyperliquid 등 Perp DEX 파생 26% 장악. 기관 $70B+ 유입. 추세추종이 기관 주도 환경에서 유리.
 **Tests:** 5995 passed (+4 from Cycle 29).
 **Next Cycle:** 31 (A+C+F)
+
+## [2026-04-11 04:25 UTC] Cycle 31 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md

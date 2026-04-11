@@ -30,10 +30,11 @@ class DataSummary:
 
 
 class DataFeed:
-    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60):
+    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._cache_ttl = cache_ttl  # 초
+        self._max_retries = max_retries
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         key = (symbol, timeframe, limit)
@@ -42,11 +43,36 @@ class DataFeed:
             cached_summary, ts = self._cache[key]
             if now - ts < self._cache_ttl:
                 return cached_summary  # 캐시 히트
-        # 캐시 미스: 실제 fetch
-        summary = self._fetch_fresh(symbol, timeframe, limit)
+        # 캐시 미스: 실제 fetch (retry 포함)
+        summary = self._fetch_with_retry(symbol, timeframe, limit)
         self._cache[key] = (summary, now)
         return summary
 
+    def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
+        """Retry 로직과 함께 fetch. 실패 시 상세 로그."""
+        last_error = None
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                logger.debug(
+                    "Fetching %s %s (limit=%d), attempt %d/%d",
+                    symbol, timeframe, limit, attempt, self._max_retries
+                )
+                return self._fetch_fresh(symbol, timeframe, limit)
+            except Exception as e:
+                last_error = e
+                if attempt < self._max_retries:
+                    logger.warning(
+                        "Fetch failed for %s %s: %s (attempt %d/%d, retrying...)",
+                        symbol, timeframe, str(e), attempt, self._max_retries
+                    )
+                    time.sleep(0.5 * attempt)  # exponential backoff
+        
+        # 모든 시도 실패
+        logger.error(
+            "Fetch failed for %s %s after %d attempts: %s",
+            symbol, timeframe, self._max_retries, str(last_error)
+        )
+        raise last_error
 
     def fetch_multiple(
         self,
