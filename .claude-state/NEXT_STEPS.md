@@ -1,3 +1,31 @@
+# Cycle 47 - Category F: Research 완료
+
+## [2026-04-11] Cycle 47 — Overfitting Detection Methods
+- 2024 핵심 신기법: CPCV(Combinatorial Purged CV) — PBO·DSR 대비 우위, Bagged/Adaptive 변형 등장
+- ML 시대 과제: 비정상성·레짐 시프트 대응, 합성 통제 환경에서 OOS 테스트 방법 비교
+- 실용 결론: PBO+DSR 기본 유지, CPCV로 보완 가능
+
+---
+
+# Cycle 47 - Category D: ML & Signals 완료
+
+## [2026-04-11] Cycle 47 — EnsembleSignal.conflicts_with() 엣지 케이스 테스트
+
+### 작업 완료
+- `tests/test_ensemble_conflicts.py` 신규 생성 (9개 테스트)
+  - 동일 action(BUY vs BUY, SELL vs SELL) → False
+  - action=HOLD, consensus=HOLD → opposites에 없으므로 항상 False
+  - confidence 경계값: 0.70(>=임계값) → True, 0.69 → False
+  - NEUTRAL consensus → False
+
+### 파일 변경
+- `tests/test_ensemble_conflicts.py`: 신규 생성 (9개)
+
+### 테스트 결과
+- 9/9 PASS
+
+---
+
 # Cycle 46 - Category C: Data & Infrastructure 완료
 
 ## [2026-04-11] Cycle 46 — DataFeed 캐시 expire on miss 검증

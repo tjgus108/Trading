@@ -124,6 +124,58 @@ class TestKellySizer:
         qty = KellySizer.from_trade_history([], capital=100_000, price=50_000)
         assert qty == 0.0
 
+    def test_kelly_max_drawdown_constraint_active(self):
+        """max_dd_constrained < half_kelly 이면 제약이 실제로 적용되어 사이즈 감소."""
+        # kelly_f=0.88, half_kelly=0.44, max_dd_constrained=0.02/(0.10*1)=0.20
+        # → final_fraction=0.20, not 0.44
+        capital, price = 100_000, 1.0
+
+        sizer_no_dd = KellySizer(fraction=0.5, max_fraction=1.0, min_fraction=0.0)
+        qty_no_dd = sizer_no_dd.compute(
+            win_rate=0.9, avg_win=0.50, avg_loss=0.10,
+            capital=capital, price=price,
+        )
+
+        sizer_dd = KellySizer(
+            fraction=0.5, max_fraction=1.0, min_fraction=0.0,
+            max_drawdown=0.02, leverage=1.0,
+        )
+        qty_dd = sizer_dd.compute(
+            win_rate=0.9, avg_win=0.50, avg_loss=0.10,
+            capital=capital, price=price,
+        )
+
+        assert qty_dd < qty_no_dd, "DD constraint should reduce position size"
+        # max_dd_constrained=0.20 → qty = capital * 0.20 / price
+        expected = capital * 0.20 / price
+        assert abs(qty_dd - expected) < 1e-6, f"Expected {expected}, got {qty_dd}"
+
+    def test_kelly_max_drawdown_constraint_exact_boundary(self):
+        """max_dd_constrained == half_kelly 경계: 제약 없는 경우와 결과 동일."""
+        # kelly_f=0.40, half_kelly=0.20, max_drawdown=0.01 → max_dd_constrained=0.20
+        capital, price = 100_000, 1.0
+
+        sizer_no_dd = KellySizer(fraction=0.5, max_fraction=1.0, min_fraction=0.0)
+        qty_no_dd = sizer_no_dd.compute(
+            win_rate=0.6, avg_win=0.10, avg_loss=0.05,
+            capital=capital, price=price,
+        )
+
+        sizer_dd = KellySizer(
+            fraction=0.5, max_fraction=1.0, min_fraction=0.0,
+            max_drawdown=0.01, leverage=1.0,
+        )
+        qty_dd = sizer_dd.compute(
+            win_rate=0.6, avg_win=0.10, avg_loss=0.05,
+            capital=capital, price=price,
+        )
+
+        # min(half_kelly=0.20, max_dd_constrained=0.20) = 0.20 → 동일
+        assert abs(qty_dd - qty_no_dd) < 1e-6, (
+            f"At exact boundary qty should match: {qty_dd} vs {qty_no_dd}"
+        )
+
+
 
 # ---------------------------------------------------------------------------
 # TWAPExecutor 테스트

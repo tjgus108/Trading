@@ -1,30 +1,27 @@
 ======================================================================
-🔄 CYCLE 46 — 2026-04-11T09:14:13.449596Z
+🔄 CYCLE 47 — 2026-04-11T09:21:19.698738Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 45 COMPLETED — D + E + F** (2026-04-11 17:10 UTC)
-  **[D] ML:** src/strategy/base.py Signal에 metadata optional dict 필드 추가. 하위호환 유지. +1 test.
-  **[E] Execution:** tests/test_connector.py +2 MockExchangeConnector 오버드래프트 경계 (buy/sell max(0,...) 가드 검증).
-  **[F] Research:** Sub-second latency. 소매 40-60ms, 기관 Equinix 0.3ms, FPGA 100-150ns. Python 봇 현실적 목표 100-500ms. 알고리즘보다 실행 레이어가 병목.
-  **Tests:** 6070 passed (+3 from Cycle 44).
-
-**[!] 감지된 이슈:**
-  - FAIL 기록 존재
+**Cycle 46 COMPLETED — A + C + F** (2026-04-11 17:35 UTC)
+  **[A] Quality:** dashboard.py stop()에 server_close() 추가로 socket 정리. pytest.ini ResourceWarning 필터. 경고 6 → 0.
+  **[C] Data:** tests/test_feed_parallel.py +2 TTL 경계 (59s 히트, 60s 만료 미스). Mock time 활용.
+  **[F] Research:** 세금 이슈. 미국 Form 1099-DA 2025 도입, 단기 10-37%. 한국 2027 연기, 연 250만원 초과 22% 분리과세. 고빈도 봇은 세금 소프트웨어 필수.
+  **Tests:** 6072 passed, **0 warnings** (+2 from Cycle 45).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

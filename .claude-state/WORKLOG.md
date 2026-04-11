@@ -3866,3 +3866,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 세금 이슈. 미국 Form 1099-DA 2025 도입, 단기 10-37%. 한국 2027 연기, 연 250만원 초과 22% 분리과세. 고빈도 봇은 세금 소프트웨어 필수.
 **Tests:** 6072 passed, **0 warnings** (+2 from Cycle 45).
 **Next Cycle:** 47 (B+D+F)
+
+## [2026-04-11 09:21 UTC] Cycle 47 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:23 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 17:55 UTC] Cycle 47 COMPLETED — B + D + F
+**[B] Risk:** tests/test_kelly_twap.py +2 경계. half_kelly > max_dd_constrained 시 제약 적용, 경계 동일값 시 변화 없음.
+**[D] ML:** tests/test_ensemble_conflicts.py 신규 +9. conflicts_with() action=HOLD 시 None 안전 처리, confidence 경계 0.7 정확 동작.
+**[F] Research:** 과적합 검증 신기법. CPCV(Combinatorial Purged CV)가 PBO/DSR 대비 OOS 우위. White's Reality Check는 열위. PBO+DSR 유지 + CPCV 보완 권장.
+**Tests:** 6083 passed (+11 from Cycle 46).
+**Next Cycle:** 48 (E+A+F)
