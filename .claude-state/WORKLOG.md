@@ -1037,3 +1037,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** 변동성 체제 전환 감지 신기법. Soft Regime HAR (확률 가중 블렌딩), Ensemble-HMM Voting, Probabilistic-Attention Transformer. 저유동성 과적합 한계 여전.
 **Tests:** 5888 passed (+6 from Cycle 16).
 **Next Cycle:** 18 (E+A+F)
+
+## [2026-04-11 03:27 UTC] Cycle 18 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md

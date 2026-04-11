@@ -32,6 +32,37 @@ class ExchangeConnector:
             self._exchange.set_sandbox_mode(True)
         self._exchange.load_markets()
         logger.info("Connected to %s (sandbox=%s)", self.exchange_name, self.sandbox)
+        self.check_api_permissions()
+
+    def check_api_permissions(self) -> dict:
+        """API Key 권한을 조회하고 출금(withdraw) 권한 유무를 확인한다.
+
+        출금 권한이 감지되면 CRITICAL 경고를 남긴다.
+        반환값: {"withdraw": bool, "trade": bool, "read": bool} — 거래소가 제공하는 키
+        거래소가 권한 조회를 지원하지 않으면 빈 dict를 반환하고 WARNING을 남긴다.
+        """
+        try:
+            info = self.exchange.fetch_api_key_permissions()
+        except (ccxt.NotSupported, AttributeError):
+            logger.warning(
+                "check_api_permissions: %s does not support fetchApiKeyPermissions — skipping",
+                self.exchange_name,
+            )
+            return {}
+
+        withdraw_enabled = bool(info.get("withdraw", False))
+        if withdraw_enabled:
+            logger.critical(
+                "SECURITY WARNING: API key has WITHDRAW permission enabled on %s. "
+                "Revoke withdraw permission immediately to prevent fund loss.",
+                self.exchange_name,
+            )
+        else:
+            logger.info(
+                "API key permission check passed: no withdraw permission detected on %s",
+                self.exchange_name,
+            )
+        return info
 
     @property
     def exchange(self) -> ccxt.Exchange:

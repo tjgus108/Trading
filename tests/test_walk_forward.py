@@ -185,3 +185,61 @@ def test_win_rate_calculation():
 
     assert abs(result.win_rate - expected_win_rate) < 1e-9
     assert abs(result.consistency_score - expected_win_rate) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# 경계 조건 테스트 (Cycle 18, Option 1)
+# ---------------------------------------------------------------------------
+
+# 테스트 11: WalkForwardValidator 최소 데이터로 정상 동작
+def test_validator_minimum_data():
+    """정확히 train_window + test_window 데이터로 정상 동작."""
+    validator = WalkForwardValidator(train_window=200, test_window=50, step_size=50)
+    df = make_df(250)  # 정확히 200 + 50
+    result = validator.validate(df, AlwaysBuyStrategy())
+    assert result.windows == 1
+
+
+# 테스트 12: WalkForwardOptimizer 데이터 부족 (< 200)
+def test_optimizer_insufficient_data():
+    """데이터가 200 미만이면 실패 결과 반환."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.funding_rate import FundingRateStrategy
+
+    def factory(params: dict):
+        return FundingRateStrategy(**params)
+
+    opt = WalkForwardOptimizer(
+        strategy_name="funding_rate",
+        strategy_factory=factory,
+        param_grid={"long_threshold": [0.0003], "short_threshold": [-0.0001]},
+        n_windows=2,
+    )
+    df = make_df(100)  # 100 < 200
+    result = opt.run(df)
+    assert not result.is_stable
+    assert len(result.fail_reasons) > 0
+    assert "데이터 부족" in result.fail_reasons[0]
+
+
+# 테스트 13: WalkForwardOptimizer 매개변수 그리드 없음
+def test_optimizer_no_param_grid():
+    """param_grid가 없고 DEFAULT에도 없으면 실패."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.base import BaseStrategy
+
+    class DummyStrategy(BaseStrategy):
+        name = "dummy"
+        def generate(self, df):
+            return None
+
+    opt = WalkForwardOptimizer(
+        strategy_name="unknown_strategy",
+        strategy_factory=lambda p: DummyStrategy(),
+        param_grid=None,  # 명시적으로 없음
+        n_windows=2,
+    )
+    df = make_df(500)
+    result = opt.run(df)
+    assert not result.is_stable
+    assert "파라미터 그리드" in result.fail_reasons[0]

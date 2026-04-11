@@ -397,3 +397,22 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Soft Regime-Switching HAR (arxiv 2510.03236)](https://arxiv.org/html/2510.03236v1)
 - [Probabilistic-Attention Transformer for VIX (ScienceDirect)](https://www.sciencedirect.com/science/article/abs/pii/S0952197624003816)
 - [Ensemble-HMM Voting Framework (AIMS Press)](https://www.aimspress.com/article/id/69045d2fba35de34708adb5d)
+
+## [2026-04-11] Cycle 18 — Exchange API Security
+
+### 보안 사고 사례
+- **Bybit 2025-02** — $1.5B ETH 탈취. 북한 연계 해커가 내부 IT직원 위장 침투(supply-chain), 콜드→핫 이전 서명 과정에서 UI 위장 공격으로 multisig 서명 탈취. 역대 최대 단일 해킹.
+- **DMM Bitcoin 2024-05** — $320M(4,500 BTC) 탈취. 프라이빗 키 탈취로 핫월렛 직접 접근. 2024년 최대 거래소 사고.
+- **WazirX 2024-07** — $235M 피해. 멀티시그 지갑 서명 프로세스 취약점 악용, API 키 탈취 후 대량 출금.
+
+### 베스트 프랙티스
+- **출금 화이트리스트**: API 키에 허용 주소 목록 고정, 임의 주소 출금 차단
+- **최소 권한 원칙**: 트레이딩 봇용 키는 Read+Trade만, 출금 권한 절대 부여 금지
+- **IP 화이트리스트**: API 키를 특정 서버 IP로만 사용 가능하도록 거래소에서 제한
+- **키 로테이션**: 주기적(30~90일) API 키 재발급, 미사용 키 즉시 폐기
+- **환경변수/시크릿 관리**: 코드에 하드코딩 금지, AWS Secrets Manager·Vault 등 사용 + 출금 딜레이 알림 설정
+
+### 참고
+- [Bybit Hack Analysis — Chainalysis](https://www.chainalysis.com/blog/bybit-exchange-hack-february-2025-crypto-security-dprk/)
+- [Coinbase API Security Best Practices](https://docs.cdp.coinbase.com/get-started/authentication/security-best-practices)
+- [Crypto Exchange Hacks Statistics — CoinLaw](https://coinlaw.io/crypto-exchange-hacks-and-security-statistics/)
