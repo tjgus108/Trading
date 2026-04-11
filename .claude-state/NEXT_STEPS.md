@@ -120,3 +120,22 @@
    - `test_var_cvar_all_positive_returns`: 전 양수 수익률 VaR=0 검증
 
 **Test Results:** 18/18 passed ✅
+
+---
+
+## Cycle 15 - Orchestrator Runtime Metrics: Implementation Shortfall 누적 추적 ✅ COMPLETED
+
+**Task:** run_once() 실행 루프에서 Implementation Shortfall 누적 메트릭 추적 추가
+
+**Changes:**
+1. `src/orchestrator.py`
+   - line 19: `from typing import List, Optional`
+   - line 811: `self._impl_shortfall_samples: List[float] = []` 필드 추가
+   - lines 913-924: `run_once()` 내 cycle_count 증가 직후, impl_shortfall_bps 발생 시 samples 누적 + avg 로깅 추가
+     `[metrics] impl_shortfall cycle=N value=Xbps avg=Ybps n=Z`
+
+2. `tests/test_orchestrator.py`
+   - 기존 `test_impl_shortfall_calculated_on_fill` Signal/RiskResult 파라미터 버그 수정 (line 377~391)
+   - `test_impl_shortfall_samples_accumulated` 신규 추가 (lines 415~462): 3 사이클 누적 후 len==3, avg 정확도 검증
+
+**Test Results:** 16/16 passed ✅

@@ -16,7 +16,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from src.alpha.context import MarketContextBuilder
 from src.analysis.strategy_correlation import SignalCorrelationTracker
@@ -807,6 +807,8 @@ class BotOrchestrator:
         self._last_regime: Optional[str] = None
         self._last_tournament_winner: Optional[str] = None
         self._last_run_date: Optional[date] = None
+        # Implementation Shortfall 누적 메트릭
+        self._impl_shortfall_samples: List[float] = []
         self._drawdown_monitor = DrawdownMonitor(
             max_drawdown_pct=getattr(cfg.risk, "max_drawdown", 0.20),
         )
@@ -908,6 +910,18 @@ class BotOrchestrator:
                 logger.warning("circuit_breaker.record_trade_result 실패: %s", e)
 
         self._cycle_count += 1
+
+        # Implementation Shortfall 누적 추적
+        if result.impl_shortfall_bps is not None:
+            self._impl_shortfall_samples.append(result.impl_shortfall_bps)
+            avg_sf = sum(self._impl_shortfall_samples) / len(self._impl_shortfall_samples)
+            logger.info(
+                "[metrics] impl_shortfall cycle=%d value=%.2fbps avg=%.2fbps n=%d",
+                self._cycle_count,
+                result.impl_shortfall_bps,
+                avg_sf,
+                len(self._impl_shortfall_samples),
+            )
 
         # 매 24사이클마다 일일 P&L 리포트 (1h 타임프레임 기준 ~24시간)
         if self._cycle_count % 24 == 0:

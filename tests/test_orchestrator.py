@@ -378,16 +378,18 @@ def test_impl_shortfall_calculated_on_fill(cfg, mock_connector):
         action=Action.BUY,
         confidence=Confidence.HIGH,
         entry_price=50000.0,
-        stop_loss=49000.0,
-        take_profit=52000.0,
         strategy="ema_cross",
+        reasoning="test",
+        invalidation="test",
     )
     risk = RiskResult(
         status=RiskStatus.APPROVED,
+        reason=None,
         position_size=0.01,
         stop_loss=49000.0,
         take_profit=52000.0,
         risk_amount=100.0,
+        portfolio_exposure=0.01,
     )
 
     # avg_price=50100 → shortfall = (50100-50000)/50000 * 10000 = 20bps
@@ -410,3 +412,51 @@ def test_impl_shortfall_calculated_on_fill(cfg, mock_connector):
 
     assert out.impl_shortfall_bps is not None
     assert abs(out.impl_shortfall_bps - 20.0) < 1e-6
+
+
+def test_impl_shortfall_samples_accumulated(cfg, mock_connector):
+    """run_once() 여러 번 호출 시 _impl_shortfall_samples에 값이 누적된다."""
+    from src.pipeline.runner import PipelineResult
+    from src.strategy.base import Action, Confidence, Signal
+    from src.risk.manager import RiskResult, RiskStatus
+
+    orch = _make_orch(cfg, mock_connector)
+
+    signal = Signal(
+        action=Action.BUY,
+        confidence=Confidence.HIGH,
+        entry_price=50000.0,
+        strategy="ema_cross",
+        reasoning="test",
+        invalidation="test",
+    )
+    risk = RiskResult(
+        status=RiskStatus.APPROVED,
+        reason=None,
+        position_size=0.01,
+        stop_loss=49000.0,
+        take_profit=52000.0,
+        risk_amount=100.0,
+        portfolio_exposure=0.01,
+    )
+
+    shortfall_values = [20.0, 15.0, -5.0]  # bps per cycle
+
+    with patch.object(orch._pipeline, "run") as mock_run:
+        for sf in shortfall_values:
+            r = PipelineResult(
+                timestamp="2026-04-11 00:00 UTC",
+                symbol="BTC/USDT",
+                pipeline_step="execution",
+                status="OK",
+                signal=signal,
+                risk=risk,
+            )
+            r.impl_shortfall_bps = sf
+            mock_run.return_value = r
+            orch.run_once()
+
+    assert len(orch._impl_shortfall_samples) == 3
+    expected_avg = sum(shortfall_values) / len(shortfall_values)
+    actual_avg = sum(orch._impl_shortfall_samples) / len(orch._impl_shortfall_samples)
+    assert abs(actual_avg - expected_avg) < 1e-6
