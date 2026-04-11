@@ -517,3 +517,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Bitcoin's Weekend Effect — ResearchGate](https://www.researchgate.net/publication/396418897_Bitcoin's_Weekend_Effect_Returns_Volatility_and_Volume_2014-2024)
 - [Trading Between Hours: Volatility Dispersion Across Multiple Regions — Amberdata](https://blog.amberdata.io/trading-between-hours-volatility-dispersion-across-multiple-regions)
 - [Time-of-day periodicities of trading volume and volatility in Bitcoin — ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S1544612319301904)
+
+## [2026-04-11] Cycle 25 — AI Agent Trading Reality
+
+### 실전 성과
+- Claude Opus 4가 생성한 전략은 백테스트에서 $10K → $32K (SPY $16.6K 대비), Sortino 1.11 vs SPY 0.81 기록.
+- GPT-5, Claude 4, Gemini 등 5개 모델이 Alpha Arena 경쟁에서 각 $10K로 실제 크립토 거래 — 결과는 모델별로 크게 상이.
+- 다중 에이전트 조합(Perplexity+Claude+GPT)이 단독 모델보다 승률 25~40% 향상 보고. 단, 이는 대부분 시뮬레이션/백테스트 기반.
+
+### 비용 vs 수익
+- 단일 분석당 비용: GPT-5 $0.50~1.00, Claude 4 $0.30~0.60. 봇 100개 기준 월 약 $2,400.
+- 토큰 최적화(저렴한 모델 70% + 고급 모델 30% 혼용) 시 비용 80~90% 절감 가능, 월 1차 ROI 달성 사례 있음.
+- 실전 순수익 데이터는 공개 사례 부족 — 대부분 백테스트 수치이며 슬리피지·거래 비용 미반영.
+
+### 참고
+- [Claude Opus 4 Trading Strategy — Medium](https://medium.com/@austin-starks/i-let-claude-opus-4-create-a-trading-strategy-it-destroyed-the-market-c200bf1a19a4)
+- [LLM Trading Bots Comparison — FlowHunt](https://www.flowhunt.io/blog/llm-trading-bots-comparison/)
+- [LLM API Pricing 2025 — IntuitionLabs](https://intuitionlabs.ai/articles/llm-api-pricing-comparison-2025)

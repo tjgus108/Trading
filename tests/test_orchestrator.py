@@ -475,3 +475,93 @@ def test_impl_shortfall_samples_accumulated(cfg, mock_connector):
     expected_avg = sum(shortfall_values) / len(shortfall_values)
     actual_avg = sum(orch._impl_shortfall_samples) / len(orch._impl_shortfall_samples)
     assert abs(actual_avg - expected_avg) < 1e-6
+
+
+# ── DataFeeds health check tests ─────────────────────────────────────────────
+
+def test_run_once_blocks_when_all_feeds_disconnected(cfg):
+    """all_feeds_disconnected 이상이면 pipeline이 스킵되고 BLOCKED 반환."""
+    from src.data.health_check import DataHealthCheck, DataFeedsHealthCheck
+
+    orch = BotOrchestrator(cfg)
+    orch._ready = True
+    orch._dry_run = True
+
+    # _update_funding_rates, _pipeline, _notifier, _risk_manager 등 mock
+    orch._update_funding_rates = MagicMock()
+    orch._drawdown_monitor = MagicMock()
+    orch._drawdown_monitor.update.return_value = MagicMock(halted=False)
+    orch._pipeline = MagicMock()
+    orch._notifier = MagicMock()
+    orch._data_feed = MagicMock()
+    orch._data_feed._cache = {}
+    orch._data_feed.fetch = MagicMock()
+
+    # health_checker가 all_disconnected 반환하도록
+    fake_report = DataHealthCheck(
+        feeds={},
+        live_count=0,
+        fallback_count=0,
+        disconnected_count=1,
+        total_feeds=1,
+        anomalies=["all_feeds_disconnected"],
+    )
+    orch._health_checker = MagicMock(spec=DataFeedsHealthCheck)
+    orch._health_checker.check_all.return_value = fake_report
+
+    result = orch.run_once()
+
+    assert result.status == "BLOCKED"
+    assert "all_feeds_disconnected" in result.notes[0]
+    orch._pipeline.run.assert_not_called()
+    orch._notifier.notify_error.assert_called_once()
+
+
+def test_run_once_warns_on_degraded_mode(cfg):
+    """operating_in_degraded_mode 이상이면 WARNING 로그 후 pipeline은 계속 실행."""
+    import logging
+    from src.data.health_check import DataHealthCheck, DataFeedsHealthCheck
+
+    orch = BotOrchestrator(cfg)
+    orch._ready = True
+    orch._dry_run = True
+
+    orch._update_funding_rates = MagicMock()
+    orch._drawdown_monitor = MagicMock()
+    orch._drawdown_monitor.update.return_value = MagicMock(halted=False)
+    orch._data_feed = MagicMock()
+    orch._data_feed._cache = {}
+    orch._data_feed.fetch = MagicMock()
+    orch._notifier = MagicMock()
+    orch._risk_manager = None
+
+    fake_result = PipelineResult(
+        timestamp="2026-01-01 00:00 UTC",
+        symbol="BTC/USDT",
+        pipeline_step="order",
+        status="NO_ACTION",
+        notes=[],
+    )
+    orch._pipeline = MagicMock()
+    orch._pipeline.run.return_value = fake_result
+    orch._pipeline._fetch_balance_usd = MagicMock(return_value=10000.0)
+    orch._handle_result = MagicMock()
+    orch._update_position_from_result = MagicMock()
+
+    fake_report = DataHealthCheck(
+        feeds={},
+        live_count=1,
+        fallback_count=1,
+        disconnected_count=0,
+        total_feeds=2,
+        anomalies=["operating_in_degraded_mode"],
+    )
+    orch._health_checker = MagicMock(spec=DataFeedsHealthCheck)
+    orch._health_checker.check_all.return_value = fake_report
+
+    with patch("src.orchestrator.logger") as mock_logger:
+        result = orch.run_once()
+
+    orch._pipeline.run.assert_called_once()
+    assert result.status == "NO_ACTION"
+    mock_logger.warning.assert_any_call("DataFeeds degraded_mode: %s", fake_report)

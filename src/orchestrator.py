@@ -24,6 +24,7 @@ from src.analysis.regime_detector import SimpleRegimeDetector
 from src.backtest.engine import BacktestEngine, BacktestResult
 from src.config import AppConfig
 from src.data.feed import DataFeed
+from src.data.health_check import DataFeedsHealthCheck
 from src.exchange.connector import ExchangeConnector
 from src.notifier import TelegramNotifier
 from src.pipeline.runner import PipelineResult, TradingPipeline
@@ -812,6 +813,7 @@ class BotOrchestrator:
         self._drawdown_monitor = DrawdownMonitor(
             max_drawdown_pct=getattr(cfg.risk, "max_drawdown", 0.20),
         )
+        self._health_checker = DataFeedsHealthCheck()
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -885,6 +887,26 @@ class BotOrchestrator:
                 )
         except Exception as e:
             logger.debug("DrawdownMonitor check failed (non-fatal): %s", e)
+
+        # DataFeeds health check
+        try:
+            if self._data_feed is not None:
+                self._health_checker.register_feed("primary_rest", self._data_feed, feed_type="rest")
+            _hc = self._health_checker.check_all()
+            if "all_feeds_disconnected" in _hc.anomalies:
+                from datetime import datetime, timezone
+                _ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+                logger.critical("DataFeeds all_disconnected — skipping pipeline")
+                self._notifier.notify_error("[DATA FEED] 모든 피드 연결 끊김 — 파이프라인 스킵")
+                return PipelineResult(
+                    timestamp=_ts, symbol=self.cfg.trading.symbol,
+                    pipeline_step="health_check", status="BLOCKED",
+                    notes=["DataFeeds all_disconnected"],
+                )
+            if "operating_in_degraded_mode" in _hc.anomalies:
+                logger.warning("DataFeeds degraded_mode: %s", _hc)
+        except Exception as _hce:
+            logger.debug("DataFeeds health check failed (non-fatal): %s", _hce)
 
         try:
             _summary = self._data_feed.fetch(
