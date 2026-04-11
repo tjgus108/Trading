@@ -286,3 +286,100 @@ def test_session_filter_weekend_scales_to_30_pct():
 
     assert filtered.status == RiskStatus.APPROVED
     assert abs(filtered.position_size - base.position_size * 0.30) < 1e-5
+
+
+# ── Integration Tests ─────────────────────────────────────────────────────────
+
+def _make_cb_from_config() -> CircuitBreaker:
+    """config/config.yaml 기준 CircuitBreaker 생성."""
+    return CircuitBreaker(
+        max_daily_loss=0.03,
+        max_drawdown=0.05,
+        max_consecutive_losses=5,
+        flash_crash_pct=0.10,
+    )
+
+
+def test_integration_all_features_approved():
+    """jitter + session_filter + max_total_exposure + VaR(adaptive ATR) 모두 활성화 — 정상 시나리오."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.02,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    # 중변동 candle_df → adaptive multiplier 1.5
+    df = _make_df_with_vol(0.45)
+
+    # 기존 포지션: 총 노출 20% (한도 30% 미만)
+    open_positions = [{"size": 0.04, "price": 50000}]  # 0.04 * 50000 = 2000, 20% of 10000
+
+    # 평일 London session (14:00 UTC) → ACTIVE → 축소 없음
+    ts = datetime(2026, 4, 13, 14, 0, 0, tzinfo=timezone.utc)
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.02,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.APPROVED
+    assert result.position_size > 0
+    assert result.stop_loss < 50000
+    assert result.take_profit > 50000
+    assert result.risk_amount == pytest.approx(100.0)  # 10000 * 0.01
+    # max_position_size=10% → max_size = 10000*0.10/50000 = 0.02
+    assert result.position_size <= 0.02 * 1.05 + 1e-9  # jitter 상한 포함
+
+
+def test_integration_boundary_circuit_and_exposure_blocked():
+    """경계 시나리오: daily_loss 한계치 + total_exposure 한계치 동시 — 서킷 브레이커가 먼저 BLOCK."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    cb._daily_loss = 0.03  # 정확히 한도(>=) → BLOCKED
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.02,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    df = _make_df_with_vol(0.45)
+    # total_exposure도 한계치 초과 (30%)
+    open_positions = [{"size": 0.06, "price": 50000}]  # 3000/10000 = 30%
+
+    ts = datetime(2026, 4, 11, 14, 0, 0, tzinfo=timezone.utc)  # Saturday
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.05,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.BLOCKED
+    assert "Circuit breaker" in result.reason
+    assert "daily_loss" in result.reason
+    assert result.position_size is None

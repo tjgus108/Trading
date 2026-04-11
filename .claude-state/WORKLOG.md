@@ -2834,3 +2834,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 선물 vs 현물 봇. 선물은 레버리지(5~10x) 수익 확대 가능하나 청산/펀딩비 리스크. 현물은 청산 없고 그리드 적합. 성과 차이는 봇 유형보다 전략/레짐 적합성에 의존.
 **Tests:** 6020 passed (+12 from Cycle 35).
 **Next Cycle:** 37 (B+D+F)
+
+## [2026-04-11 08:45 UTC] Cycle 37 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:47 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 14:25 UTC] Cycle 37 COMPLETED — B + D + F
+**[B] Risk:** tests/test_risk_manager.py +2 통합 테스트. jitter+session_filter+open_positions+adaptive ATR 동시 활성화 APPROVED 검증, daily_loss+total_exposure 경계 시 서킷 브레이커 우선 BLOCKED 검증.
+**[D] ML:** src/alpha/llm_analyst.py analyze_signal에 research_insights 파라미터 추가 (프롬프트 주입). _parse_response() 마크다운 정규화 + 최대 3문장. +3 tests.
+**[F] Research:** ccxt 베스트 프랙티스. enableRateLimit=True 필수, sync 멀티스레드 비안전 → async(ccxt.pro), 계층형 예외 처리, exchange 인스턴스 재사용 필수.
+**Tests:** 6025 passed (+5 from Cycle 36).
+**Next Cycle:** 38 (E+A+F)

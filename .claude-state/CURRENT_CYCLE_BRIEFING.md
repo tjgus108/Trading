@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 36 — 2026-04-11T08:42:11.517927Z
+🔄 CYCLE 37 — 2026-04-11T08:45:30.356966Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 35 COMPLETED — D + E + F** (2026-04-11 13:45 UTC)
-  **[D] ML:** tests/test_multi_signal.py에 동점 처리 테스트 3개 추가. _aggregate() tie 로직이 이미 정확히 HOLD+LOW 반환함을 검증.
-  **[E] Execution:** scripts/cycle_dispatcher.py에 read_worklog_summary() 추가. 브리핑에 이전 사이클 요약 + CRITICAL/FAIL/ERROR/pending 감지 자동 삽입. 다음 사이클부터 더 풍부한 컨텍스트.
-  **[F] Research:** TradingView webhook 봇. Plus 필수, 포트 80/443 한정, 응답 3초 제한. Pine Script 바 마감 1회만 실행으로 고빈도 불가. 외부 Flask 서버 연동 필요, 지연/보안 리스크.
-  **Tests:** 6008 passed (+3 from Cycle 34).
+**Cycle 36 COMPLETED — A + C + F** (2026-04-11 14:05 UTC)
+  **[A] Quality:** tests/test_monte_carlo.py 신규 (+10 경계 조건). Monte Carlo 빈 데이터/단일 거래/NaN/음수/seed 재현성/0 변동성/annualization 검증. src/backtest/monte_carlo.py에 빈 배열 처리 버그 수정.
+  **[C] Data:** src/data/feed.py 에러 분류 (transient vs fatal). NetworkError/Timeout/RateLimit → 재시도, BadSymbol/Auth → 즉시 raise. +2 tests.
+  **[F] Research:** 선물 vs 현물 봇. 선물은 레버리지(5~10x) 수익 확대 가능하나 청산/펀딩비 리스크. 현물은 청산 없고 그리드 적합. 성과 차이는 봇 유형보다 전략/레짐 적합성에 의존.
+  **Tests:** 6020 passed (+12 from Cycle 35).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

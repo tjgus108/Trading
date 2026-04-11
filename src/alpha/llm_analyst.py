@@ -56,12 +56,17 @@ class LLMAnalyst:
         signal_reasoning: str,
         context_summary: str = "",
         market_data: str = "",
+        research_insights: str = "",
     ) -> str:
         """
         신호 발생 시 Claude에게 분석 요청.
 
+        Args:
+            research_insights: 과거 리서치 인사이트 요약 (cycle 1~30 등).
+                               짧은 문자열 권장 (<200자). 없으면 생략.
+
         Returns:
-            분석 텍스트 (1~5문장). API 실패 시 "".
+            분석 텍스트 (최대 3문장). API 실패 시 "".
         """
         if not self._enabled:
             return self._mock_analysis(signal_action)
@@ -72,6 +77,7 @@ class LLMAnalyst:
             signal_reasoning=signal_reasoning,
             context_summary=context_summary,
             market_data=market_data,
+            research_insights=research_insights,
         )
 
         try:
@@ -88,6 +94,8 @@ class LLMAnalyst:
             if not text:
                 logger.warning("LLM returned blank text for symbol=%s", symbol)
                 return ""
+            # 응답 파싱 강화: 최대 3문장만 허용, 불필요 접두어 제거
+            text = self._parse_response(text)
             logger.info("LLM analysis: %s...", text[:80])
             return text
         except Exception as e:
@@ -138,25 +146,41 @@ class LLMAnalyst:
         signal_reasoning: str,
         context_summary: str,
         market_data: str,
+        research_insights: str = "",
     ) -> str:
         lines = [
-            f"You are a crypto market analyst reviewing a trading signal.",
-            f"",
+            "You are a crypto market analyst reviewing a trading signal.",
+            "",
             f"Symbol: {symbol}",
             f"Signal: {signal_action}",
             f"Reason: {signal_reasoning}",
         ]
         if context_summary:
-            lines += [f"Market Context: {context_summary}"]
+            lines.append(f"Market Context: {context_summary}")
         if market_data:
-            lines += [f"Key Data: {market_data}"]
+            lines.append(f"Key Data: {market_data}")
+        if research_insights:
+            # 200자 초과 시 잘라내어 컨텍스트 크기 제한
+            snippet = research_insights[:200].strip()
+            lines.append(f"Historical Insights: {snippet}")
         lines += [
-            f"",
-            f"Provide a 2-3 sentence analysis of this signal's validity.",
-            f"Focus on: risk factors, conflicting signals, confidence level.",
-            f"IMPORTANT: Do NOT give buy/sell recommendations. Analysis only.",
+            "",
+            "Provide exactly 2-3 sentences of analysis on this signal's validity.",
+            "Focus on: risk factors, conflicting signals, confidence level.",
+            "IMPORTANT: Do NOT give buy/sell recommendations. Analysis only.",
         ]
         return "\n".join(lines)
+
+    def _parse_response(self, text: str) -> str:
+        """응답 파싱 강화: 최대 3문장 추출, 빈 줄/접두어 정리."""
+        import re
+        # 마크다운 헤더/불릿 제거
+        text = re.sub(r"^[#\-\*]+\s*", "", text, flags=re.MULTILINE).strip()
+        # 문장 분리 (마침표/느낌표/물음표 기준)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        # 빈 문장 제거 후 최대 3개
+        sentences = [s.strip() for s in sentences if s.strip()][:3]
+        return " ".join(sentences)
 
     def _mock_analysis(self, action: str) -> str:
         """API 없을 때 mock 텍스트. 테스트/데모용."""

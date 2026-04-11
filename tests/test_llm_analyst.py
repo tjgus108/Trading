@@ -67,6 +67,36 @@ class TestAnalyzeSignal:
         result = analyst.analyze_signal("BTC/USDT", "BUY", "reason")
         assert "[Mock LLM]" in result
 
+    def test_research_insights_included_in_prompt(self):
+        analyst = self._analyst()
+        analyst._client.messages.create.return_value = _make_response("Analysis here.")
+        analyst.analyze_signal(
+            "BTC/USDT", "BUY", "RSI oversold",
+            research_insights="Cycles 1-30: momentum > mean-reversion in bull markets."
+        )
+        call_args = analyst._client.messages.create.call_args
+        prompt = call_args[1]["messages"][0]["content"]
+        assert "Historical Insights" in prompt
+
+    def test_research_insights_truncated_at_200(self):
+        analyst = self._analyst()
+        analyst._client.messages.create.return_value = _make_response("Ok.")
+        long_insight = "X" * 300
+        analyst.analyze_signal("BTC/USDT", "HOLD", "reason", research_insights=long_insight)
+        call_args = analyst._client.messages.create.call_args
+        prompt = call_args[1]["messages"][0]["content"]
+        # Snippet limited to 200 chars
+        assert "X" * 201 not in prompt
+
+    def test_parse_response_limits_to_3_sentences(self):
+        analyst = LLMAnalyst(enabled=False)
+        analyst._enabled = True
+        analyst._client = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
+        long_text = "Sentence one. Sentence two. Sentence three. Sentence four. Sentence five."
+        analyst._client.messages.create.return_value = _make_response(long_text)
+        result = analyst.analyze_signal("BTC/USDT", "BUY", "reason")
+        assert result.count(".") <= 3
+
 
 # ---------------------------------------------------------------------------
 # classify_news_risk
