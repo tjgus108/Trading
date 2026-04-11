@@ -289,6 +289,50 @@ class TestFeatureBuilder:
                     "look-ahead bias."
                 )
 
+    def test_label_nan_boundary_exactly_forward_n_rows_dropped(self):
+        """
+        Cycle 12 회귀: _compute_labels()가 마지막 forward_n 행을 정확히 NaN으로 남겨야 함.
+        - 마지막 forward_n 행은 NaN → build() 후 X에 없어야 함
+        - 나머지 행은 {-1, 0, 1} 중 하나여야 함 (NaN 없음)
+        """
+        n = 100
+        df = _make_df(n)
+        forward_n = 7
+        fb = FeatureBuilder(forward_n=forward_n, threshold=0.003)
+
+        # 레이블 직접 검사
+        labels = fb._compute_labels(df)
+        last_n = labels.iloc[-forward_n:]
+        rest = labels.iloc[:-forward_n]
+
+        assert last_n.isna().all(), (
+            f"마지막 {forward_n}행 레이블이 NaN이어야 함 — {last_n.dropna()} 남아있음"
+        )
+        assert not rest.isna().any(), (
+            f"나머지 행에 NaN 레이블 존재 — {rest[rest.isna()].index.tolist()}"
+        )
+        assert set(rest.dropna().unique()).issubset({-1, 0, 1}), (
+            f"레이블 값이 범위 밖: {rest.unique()}"
+        )
+
+    def test_shift1_feature_first_row_is_nan_before_dropna(self):
+        """
+        Cycle 11 회귀: shift(1) 기반 피처의 첫 행이 NaN인지 확인.
+        build_features_only()의 dropna() 전에 첫 행에 NaN이 있어야 정상적으로 shift(1)이 적용된 것.
+        직접 _compute_features()로 확인.
+        """
+        df = _make_df(100)
+        fb = FeatureBuilder()
+        feat = fb._compute_features(df)
+
+        # shift(1) 기반 피처: 첫 행은 NaN이어야 함
+        assert pd.isna(feat["volatility_20"].iloc[0]) or pd.isna(feat["return_1"].iloc[0]), (
+            "첫 행에 NaN이 없음 — shift(1)이 적용되지 않았을 가능성"
+        )
+        # return_1 = log(close / close.shift(1)) → row 0은 NaN
+        assert pd.isna(feat["return_1"].iloc[0]), (
+            "return_1 첫 행이 NaN이어야 함 (shift(1) 적용 확인)"
+        )
 
 
 # ---------------------------------------------------------------------------

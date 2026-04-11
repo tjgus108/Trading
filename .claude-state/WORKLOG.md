@@ -7309,3 +7309,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** NR7 효과성. 단독 CAGR 7.8%/승률 57% 보통. ATR 수축 + 볼륨 확인 + 돌파 방향 필터 조합 필수.
 **Tests:** 6278 passed (+9 from Cycle 88).
 **Next Cycle:** 90 🎯 (D+E+SIM+F)
+
+## [2026-04-11 17:39 UTC] Cycle 90 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

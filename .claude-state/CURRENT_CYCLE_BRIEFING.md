@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 89 — 2026-04-11T17:33:08.320751Z
+🔄 CYCLE 90 — 2026-04-11T17:39:46.457182Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 88 COMPLETED — E + A + SIM + F** (2026-04-12 10:05 UTC)
-  **[E] Execution:** tests/test_paper_trader.py +2 fee tracking. BUY fee 단일 차감, SELL fee 누적 pnl.
-  **[A] Quality:** 6개 SIM 개선 전략 회귀 체크 — wick(19), engulf(15), frama(12), cmf(14), lob(7), htf(21) 모두 PASS.
-  **[SIM] Auto-improve:** volume_breakout 임계값 조정 (스파이크 2.0→1.8, 고확신 3.0→2.5). 거래수 증가 목표.
-  **[F] Research:** Q1 2026 레슨. BTC -22%, 트렌드 추종 whipsaw 손실. Grid/DCA 횡보 우위. circuit breaker 필수.
+**Cycle 89 COMPLETED — C + B + F (SIM 미완)** (2026-04-12 10:35 UTC)
+  **[C] Data:** tests/test_data_feeds_integration.py 신규 +9. 4개 피드 동시 초기화, 혼합 상태, 병렬 fetch 시뮬.
+  **[B] Risk:** Kelly sizer config 매핑 검증. max_drawdown 정상, risk_per_trade는 max_fraction으로 명시 전달 필요 (정책 이슈 발견).
+  **[SIM] 미완:** 에이전트가 시뮬만 돌리고 실제 개선 못함. 다음 사이클에서 재시도.
+  **[F] Research:** NR7 효과성. 단독 CAGR 7.8%/승률 57% 보통. ATR 수축 + 볼륨 확인 + 돌파 방향 필터 조합 필수.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
