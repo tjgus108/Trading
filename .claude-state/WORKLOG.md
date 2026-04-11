@@ -2716,3 +2716,62 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 08:36 UTC] Cycle 35 Dispatched — D + E + F
 Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:40 UTC] Cycle 36 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:41 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 13:45 UTC] Cycle 35 COMPLETED — D + E + F
+**[D] ML:** tests/test_multi_signal.py에 동점 처리 테스트 3개 추가. _aggregate() tie 로직이 이미 정확히 HOLD+LOW 반환함을 검증.
+**[E] Execution:** scripts/cycle_dispatcher.py에 read_worklog_summary() 추가. 브리핑에 이전 사이클 요약 + CRITICAL/FAIL/ERROR/pending 감지 자동 삽입. 다음 사이클부터 더 풍부한 컨텍스트.
+**[F] Research:** TradingView webhook 봇. Plus 필수, 포트 80/443 한정, 응답 3초 제한. Pine Script 바 마감 1회만 실행으로 고빈도 불가. 외부 Flask 서버 연동 필요, 지연/보안 리스크.
+**Tests:** 6008 passed (+3 from Cycle 34).
+**Next Cycle:** 36 (A+C+F)

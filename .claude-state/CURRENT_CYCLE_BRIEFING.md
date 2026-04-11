@@ -1,20 +1,31 @@
 ======================================================================
-🔄 CYCLE 35 — 2026-04-11T08:36:55.406099Z
+🔄 CYCLE 36 — 2026-04-11T08:40:19.230583Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
+
+## 이전 사이클 현황
+**Cycle 34 COMPLETED — C + B + F** (2026-04-11 13:25 UTC)
+  **[C] Data:** src/data/feed.py에 cache_stats() 메서드 추가. hit_count/miss_count 추적, hit_rate 계산. +4 tests.
+  **[B] Risk:** src/risk/circuit_breaker.py 연속 손실 쿨다운 구현. record_trade_result() + tick_cooldown() + max_consecutive_losses 도달 시 cooldown_remaining 설정. +3 tests. 기존 로직 전무했음.
+  **[F] Research:** Paper→Live 전환 기준. 4~8주 paper + 100+ 트레이드 + 상승/하락 레짐 각 1회. 전환 지표 Sharpe≥1.0, PF≥1.5, MDD≤20%. 자본 5~10%로 시작 후 증액.
+  **Tests:** 6005 passed 🎉 (+7 from Cycle 33).
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
+  - FAIL 기록 존재
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
