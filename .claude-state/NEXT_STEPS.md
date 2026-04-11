@@ -1,3 +1,19 @@
+# Cycle 52 - Category D: ML & Signals — specialist_agents voting edge cases 완료
+
+## [2026-04-11] Cycle 52 — SpecialistEnsemble voting edge case 테스트 추가
+
+### 작업 완료
+- `tests/test_specialist_agents.py`: 4개 edge case 테스트 추가
+  - `test_ensemble_two_buy_one_sell_returns_buy`: 2:1 split (BUY vs SELL, HOLD 없음) → 다수결 BUY
+  - `test_ensemble_unanimous_sell`: 3개 모두 SELL → unanimous SELL
+  - `test_ensemble_all_hold_no_failures`: 에이전트 실패 없이 all-HOLD → HOLD, confidence <= 1.0
+  - (기존 test_ensemble_all_agents_fail 보완: 정상 경로 all-HOLD 구분)
+
+### 테스트 결과
+- tests/test_specialist_agents.py: 22/22 PASS
+
+---
+
 # Cycle 51 - Category A: Quality Assurance — 완료
 
 ## [2026-04-11] Cycle 51 — Backtest summary() 포맷 개선

@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 51 — 2026-04-11T09:34:53.912507Z
+🔄 CYCLE 52 — 2026-04-11T09:37:48.454804Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 49 COMPLETED — C + B + F** (2026-04-11 18:35 UTC)
-  **[C] Data:** src/data/news.py 중복 감지 추가. MD5 hash (정규화), 24h 윈도우, 만료 자동 제거. NewsEvent.title_hash 필드. +7 tests.
-  **[B] Risk:** tests/test_risk_manager.py +2 multi-position 경계. 동일 방향 누적 30% 경계, 반대 방향 gross 35% BLOCKED (net 5% 아님).
-  **[F] Research:** Bybit 2025 사건. Feb 21 Lazarus $1.5B 해킹 (역대 최대). 멀티시그 강화, API 보안 오버홀. Aug 2025 기관 rate limit 도입, 일반 perp 400 req/s 유지. **우리 봇: API 키 2FA 필수**.
-  **Tests:** 6093 passed (+9 from Cycle 48).
+**Cycle 51 COMPLETED — A + C + F** (2026-04-11 19:25 UTC)
+  **[A] Quality:** src/backtest/report.py summary() 개선. 섹션 분류 (PERFORMANCE/RISK-ADJUSTED/TRADE STATS), 우측 정렬+콤마, NaN 안전 처리.
+  **[C] Data:** src/exchange/connector.py health_check() 추가. connected/market loaded/sandbox 확인, 미연결 시 안전 반환. +4 tests.
+  **[F] Research:** Grid vs DCA. Grid 횡보 유리, DCA 추세 유리. 2025 고변동성 시장은 혼합 운용(핵심 DCA + 변동성 페어 Grid)이 실전 최적.
+  **Tests:** 6103 passed (+4 from Cycle 50).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

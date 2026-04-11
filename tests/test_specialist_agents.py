@@ -276,3 +276,47 @@ def test_ensemble_all_agents_fail_returns_hold():
     # 모두 HOLD(confidence=0)이면 합의 실패 → HOLD
     assert vote.action == "HOLD"
     assert vote.agent_name == "ensemble"
+
+
+def test_ensemble_two_buy_one_sell_returns_buy():
+    """2:1 split (BUY vs SELL, HOLD 없음) → 다수결 BUY, confidence는 BUY 평균."""
+    from unittest.mock import patch
+
+    ensemble = SpecialistEnsemble()
+    df = _make_df()
+
+    buy_vote = SpecialistVote(agent_name="x", action="BUY", confidence=0.70, reasoning="")
+    sell_vote = SpecialistVote(agent_name="y", action="SELL", confidence=0.65, reasoning="")
+
+    with patch.object(ensemble.technical, "analyze", return_value=buy_vote), \
+         patch.object(ensemble.sentiment, "analyze", return_value=buy_vote), \
+         patch.object(ensemble.onchain, "analyze", return_value=sell_vote):
+        vote = ensemble.analyze(df)
+
+    assert vote.action == "BUY"
+    assert vote.confidence == pytest.approx(0.70)  # 평균(0.70, 0.70)
+    assert vote.agent_name == "ensemble"
+
+
+def test_ensemble_unanimous_sell():
+    """3개 모두 SELL → ensemble SELL, confidence = 3개 평균."""
+    ensemble = SpecialistEnsemble()
+    # RSI > 70 + EMA 하락 → Technical SELL
+    # sentiment_score=-2.0 → Sentiment SELL
+    # onchain_score=-2.0   → Onchain SELL
+    df = _make_df(rsi14=75.0, close=90.0, ema20=95.0, ema50=98.0)
+    vote = ensemble.analyze(df, sentiment_score=-2.0, onchain_score=-2.0)
+    assert vote.action == "SELL"
+    assert vote.agent_name == "ensemble"
+    assert 0.0 <= vote.confidence <= 1.0
+
+
+def test_ensemble_all_hold_no_failures():
+    """에이전트 실패 없이 3개 모두 HOLD → HOLD, confidence <= 0.5."""
+    ensemble = SpecialistEnsemble()
+    # RSI=50(중립), EMA 혼재, sentiment/onchain 중립
+    df = _make_df(rsi14=50.0, close=96.0, ema20=97.0, ema50=98.0)
+    vote = ensemble.analyze(df, sentiment_score=0.0, onchain_score=0.0)
+    assert vote.action == "HOLD"
+    assert vote.agent_name == "ensemble"
+    assert 0.0 <= vote.confidence <= 1.0

@@ -337,3 +337,68 @@ def test_win_resets_consecutive_losses():
     cb.record_trade_result(is_loss=False)
     assert cb.consecutive_losses == 0
     assert cb.cooldown_remaining == 0
+
+
+# ── 통합: 다중 조건 동시 트리거 ────────────────────────────────
+def test_flash_crash_takes_priority_over_drawdown_and_atr_and_cooldown():
+    """
+    통합 시나리오 1: 플래시 크래시 + 일일 낙폭 초과 + ATR surge + 연속 손실 쿨다운 동시 발생
+    → 우선순위: flash_crash 최우선, triggered=True, reason에 '플래시 크래시' 포함
+    """
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.05,
+        total_drawdown_limit=0.15,
+        atr_surge_multiplier=2.0,
+        flash_crash_pct=0.10,
+        max_consecutive_losses=3,
+        cooldown_periods=2,
+    )
+    # 연속 손실 쿨다운 활성화
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+
+    result = cb.check(
+        current_balance=9300.0,      # 일일 낙폭 7% (> 5% limit)
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.06,            # ATR surge: 6% vs baseline 2% = 3x
+        baseline_atr=0.02,
+        candle_open=50000.0,
+        candle_close=44000.0,        # 플래시 크래시 -12%
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "플래시 크래시" in result["reason"], f"reason={result['reason']}"
+
+
+def test_drawdown_takes_priority_over_cooldown_and_atr_surge():
+    """
+    통합 시나리오 2: 일일 낙폭 초과 + ATR surge + 연속 손실 쿨다운 동시 발생 (플래시 크래시 없음)
+    → 우선순위: drawdown > cooldown > ATR, triggered=True, reason에 '일일' 포함
+    """
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.05,
+        total_drawdown_limit=0.15,
+        atr_surge_multiplier=2.0,
+        flash_crash_pct=0.10,
+        max_consecutive_losses=3,
+        cooldown_periods=2,
+    )
+    # 연속 손실 쿨다운 활성화
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+
+    result = cb.check(
+        current_balance=9400.0,      # 일일 낙폭 6% (> 5% limit)
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.06,            # ATR surge 조건 충족
+        baseline_atr=0.02,
+        candle_open=50000.0,
+        candle_close=50200.0,        # 캔들 변동 0.4% — 플래시 크래시 아님
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "일일" in result["reason"], f"reason={result['reason']}"
+    # ATR surge는 낙폭에 묻혀 표현되지 않음
+    assert "플래시 크래시" not in result["reason"]
