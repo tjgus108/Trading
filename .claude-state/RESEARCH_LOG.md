@@ -467,3 +467,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Low Latency Trading Infrastructure — QuantVPS](https://www.quantvps.com/blog/low-latency-trading)
 - [Algo Trading VPS Optimization 2025 — TradingFXVPS](https://tradingfxvps.com/api-trading-vps-optimization-2025-websocket-rest-for-algo-strategies/)
 - [Crypto Trading Bot Best Practices 2024 — Alwin.io](https://www.alwin.io/best-practices-for-optimizing-your-crypto-trading-bot-in-2024)
+
+## [2026-04-11] Cycle 22 — New Performance KPIs
+
+### 신규 지표
+- **Deflated Sharpe Ratio (DSR)**: Sharpe를 복수 전략 테스트에 따른 선택 편향(selection bias) + 비정규 수익 분포(팻테일, 왜도)로 보정. Probabilistic Sharpe Ratio(PSR)가 먼저 true SR > 임계값일 확률을 계산하고, DSR은 여러 전략을 시험했을 때의 기댓값 보정까지 추가.
+- **Probability of Backtest Overfitting (PBO)**: CSCV(Combinatorially Symmetric Cross Validation) 방식으로 in-sample 최적 전략이 OOS에서 underperform할 확률을 0~1로 수치화. PBO > 0.5면 과적합으로 판단.
+- **MCC (Matthews Correlation Coefficient)**: TP/TN/FP/FN을 모두 반영하는 이진 분류 품질 지표(범위 -1~1). 클래스 불균형에 강건해 시그널 예측 정확도 평가에서 Accuracy/F1보다 신뢰도 높음.
+- **Calmar Ratio**: 연환산 수익률 / MDD. 드로다운 대비 수익 효율 지표로 크립토처럼 MDD가 급변하는 자산에 유용. Sharpe는 변동성 전체, Calmar은 최악 드로다운만 대비.
+
+### 우리 봇 적용 가능성
+- 백테스트 엔진에 DSR/PBO 추가 시 "Sharpe >= 1.0은 통과하지만 실제론 과적합" 전략을 사전 필터링 가능 — 현재 엔진의 Sharpe·MDD·PF 3종 기준에 DSR을 4번째 게이트로 추가 검토.
+- MCC는 BUY/SELL/HOLD 시그널 품질 평가에 즉시 적용 가능. Signal 생성 후 실제 결과와 대조하는 모니터링 레이어에 MCC 계산 추가.
+
+### 참고
+- [The Deflated Sharpe Ratio — Bailey & Lopez de Prado](https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf)
+- [Probability of Backtest Overfitting — Bailey et al.](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf)
+- [pypbo: PBO in Python — GitHub](https://github.com/esvhd/pypbo)

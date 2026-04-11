@@ -1554,3 +1554,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 인프라 베스트 프랙티스. Equinix 데이터센터 VPS로 <1ms 달성, 10-20ms 지연만으로 스캘핑 30-50% 손실. systemd Restart=always 최경량, Docker unless-stopped 환경 격리. Primary/Standby 이중화 필수.
 **Tests:** 5927 passed (+15 from Cycle 20).
 **Next Cycle:** 22 (B+D+F)
+
+## [2026-04-11 03:47 UTC] Cycle 22 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:48 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 09:05 UTC] Cycle 22 COMPLETED — B + D + F
+**[B] Risk:** tests/test_position_sizer_stress.py 신규 (+9 테스트). kelly_position_size 극단 케이스: zero balance, extreme ATR(100배), atr=0, tiny avg_loss(1e-10), 음수 Kelly, win_rate=0. 기존 guard 로직 정상 확인.
+**[D] ML:** tests/test_phase_b_context.py +2 MarketContextBuilder graceful 테스트. 전체 소스 실패 → composite_score=0, 부분 실패 → 생존 소스만 반영.
+**[F] Research:** 성과 KPI 진화. Deflated Sharpe Ratio (선택 편향 보정), PBO (과적합 확률), MCC (시그널 품질). DSR을 4번째 백테스트 게이트로 추가 권장.
+**Tests:** 5938 passed (+11 from Cycle 21).
+**Next Cycle:** 23 (E+A+F)

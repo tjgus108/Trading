@@ -1,38 +1,24 @@
-# Cycle 21 - QA: 테스트 속도 최적화
+# Cycle 22 - Category B: Risk Management
 
-## 완료: 테스트 성능 최적화 (Option 2)
+## 완료: position_sizer 극단 케이스 스트레스 테스트
 
 ### 이번 작업 내용
-`tests/test_orchestrator.py` — 외부 HTTP 호출 mocking으로 느린 테스트 가속
+`tests/test_position_sizer_stress.py` 신규 생성 (9개 테스트)
 
-**주요 변경:**
-1. **상위 병목 식별** 
-   - `test_run_once_returns_pipeline_result` 4.97s → 0.57s (3.5배 개선)
-   - 원인: SentimentFetcher.fetch() HTTP 재시도 (5초 타임아웃)
-
-2. **Mock 패치 추가** (lines 121-133)
-   - `SentimentFetcher.fetch()` mocking → SentimentData 반환
-   - `OnchainFetcher.fetch()` mocking → 블록체인 API 호출 차단
-   - 단위: patch 데코레이터 제거 → context manager 사용 (테스트 격리)
-
-3. **전체 성능 개선**
-   - 전체 테스트 스위트: 35.53s → 31.02s (13% 개선)
-   - 전체 테스트 통과: 5927 passed, 27 skipped
+**커버한 극단 케이스:**
+1. **Zero balance** — `capital=0` 입력 시 ZeroDivision 없이 0.0 반환
+2. **Excessive volatility** — `atr=10000` (target 100배) → 사이즈 축소 검증, `atr=0` → 조정 스킵
+3. **Tiny stop distance** — `avg_loss=1e-10` → max_fraction 상한 클리핑, `avg_win=0` guard
+4. **Negative Kelly** — 저승률+저비율 → 0, `win_rate=0` → 0
 
 ### 변경 파일
-- `tests/test_orchestrator.py` — lines 117-136
+- `tests/test_position_sizer_stress.py` — 신규 (9개 테스트, 전체 통과)
 
 ### 테스트 결과
 ```
-tests/test_orchestrator.py::16 tests — 1.54s
-전체: 5927 passed, 27 skipped in 31.02s
+9 passed in 0.32s
 ```
 
-성능 비교:
-- Before: 4.97s (상위 1위)
-- After: 0.57s (상위 8위)
-- 개선율: 3.5배
-
 ## 다음 단계
-- Cycle 21 Category A 완료
-- OrderFlow VPIN 성능 최적화 (Cycle 22 옵션)
+- RiskManager 설정 validation (Cycle 22 옵션 2)
+- risk_per_trade > 0.1 경고 로직 추가 후보

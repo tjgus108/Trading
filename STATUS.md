@@ -28,7 +28,8 @@
 - ✅ Cycle 19 완료 (C+B+F: GEX fallback + **Flash crash 감지 누락 발견+수정** + Funding 리서치)
 - ✅ Cycle 20 완료 (D+E+F: funding_rate 필터 + dashboard 개선 + 레버리지 토큰 리서치)
 - ✅ Cycle 21 완료 (A+C+F: 테스트 성능 3.5배 + dex_feed 견고성 + 인프라 리서치)
-- ⏳ **Cycle 22 대기** (B+D+F)
+- ✅ Cycle 22 완료 (B+D+F: position_sizer stress + Context graceful + KPI 리서치)
+- ⏳ **Cycle 23 대기** (E+A+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -37,7 +38,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,927개** |
+| ✅ 통과 테스트 | **5,938개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

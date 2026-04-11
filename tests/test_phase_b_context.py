@@ -500,6 +500,41 @@ class TestMarketContextBuilder:
         builder.set_high_risk_callback(lambda e: called.append(e))
         assert builder._news_monitor.on_high_risk_callback is not None
 
+    def test_all_sources_fail_returns_neutral_context(self):
+        """감성/온체인/뉴스 모두 예외 발생 시 빈 MarketContext 반환, 파이프라인 블록 금지."""
+        builder = MarketContextBuilder()
+        builder._sentiment_fetcher.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+        builder._onchain_fetcher.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+        builder._news_monitor.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+
+        ctx = builder.build(use_mock=False)
+
+        assert isinstance(ctx, MarketContext)
+        assert ctx.sentiment is None
+        assert ctx.onchain is None
+        assert ctx.news is None
+        assert ctx.composite_score == 0.0
+        assert ctx.news_risk_level == "NONE"
+        assert not ctx.is_entry_blocked()
+
+    def test_partial_failure_sentiment_only_uses_remaining(self):
+        """감성 소스만 실패 시 온체인/뉴스 데이터로 컨텍스트 구성."""
+        builder = MarketContextBuilder()
+        builder._sentiment_fetcher.fetch = lambda: (_ for _ in ()).throw(ConnectionError("timeout"))
+        # 나머지 두 소스는 mock 데이터 반환
+        onchain_data = builder._onchain_fetcher.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        news_data = builder._news_monitor.mock(level="NONE")
+        builder._onchain_fetcher.fetch = lambda: onchain_data
+        builder._news_monitor.fetch = lambda: news_data
+
+        ctx = builder.build(use_mock=False)
+
+        assert ctx.sentiment is None          # 실패한 소스 → None
+        assert ctx.onchain is not None        # 성공한 소스 → 유지
+        assert ctx.news is not None
+        assert ctx.onchain.onchain_score > 0  # OUTFLOW + ACCUMULATING → 양수
+        assert not ctx.is_entry_blocked()
+
 
 # ---------------------------------------------------------------------------
 # B1: SentimentFetcher - Robustness Tests (Cycle 6)
