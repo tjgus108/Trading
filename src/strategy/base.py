@@ -4,10 +4,10 @@ BaseStrategy: 모든 전략의 인터페이스.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
@@ -34,6 +34,7 @@ class Signal:
     invalidation: str
     bull_case: str = ""
     bear_case: str = ""
+    metadata: Optional[Dict[str, Any]] = field(default=None)
 
 
 class SessionType(str, Enum):

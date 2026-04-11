@@ -1,3 +1,30 @@
+# Cycle 45 - Category F: Research 완료
+
+## [2026-04-11] Cycle 45 — Sub-second Latency Reality
+- 소매 한계: 최고 브로커도 40~60ms 평균, 인터넷 RTT 기준 대륙 간 최소 ~55ms
+- 기관 수준: Equinix 코로케이션+파이버 크로스커넥트로 0.3ms, FPGA 100~150ns 파이프라인
+- Python 전략 결론: sub-second 실질 의미는 수백ms 단위이며 알고리즘보다 실행 레이어가 병목
+
+---
+
+# Cycle 45 - Category D: ML & Signals 완료
+
+## [2026-04-11] Cycle 45 — Signal metadata 필드 추가
+
+### 작업 완료
+- `src/strategy/base.py`: Signal dataclass에 `metadata: Optional[Dict[str, Any]] = None` 추가
+- 기본값 None으로 기존 전략 코드 무변경, 하위호환 유지
+- `tests/test_strategy.py`: `test_signal_metadata_optional` 테스트 추가
+
+### 파일 변경
+- `src/strategy/base.py`: metadata 필드 추가, import에 `field`, `Any`, `Dict` 추가
+- `tests/test_strategy.py`: 테스트 1개 추가
+
+### 테스트 결과
+- 5/5 PASS
+
+---
+
 # Cycle 44 - Category B: Risk Management 완료
 
 ## [2026-04-11] Cycle 44 — VolTargeting 검증 강화
@@ -29,23 +56,9 @@
 
 ### 파일 변경
 - `tests/test_sentiment.py`: 신규 생성 (11개 테스트 케이스)
-  - TestSentimentConsistency: 동일 입력 일관성 (4개)
-  - TestSentimentFearGreedFailure: F&G API 실패 (2개)
-  - TestSentimentFundingRateFailure: 펀딩비 API 실패 (2개)
-  - TestSentimentOpenInterestFailure: OI API 실패 (1개)
-  - TestSentimentAllSourcesFailure: 전체 실패 및 fallback (2개)
 
 ### 테스트 결과
 - tests/test_sentiment.py: 11/11 PASS ✓
-- mock 데이터: 동일 입력 일관성 확인
-- 캐시 재사용: 캐시 내 동일 데이터 반환 확인
-- F&G API 실패: ConnectionError, JSON 파싱 오류 처리 확인
-- 펀딩비 실패: API 타임아웃, 필드 누락 처리 확인
-- OI 실패: 동시 다중 API 실패 중 선택적 처리 확인
-- Fallback: 이전 성공 데이터 사용 및 neutral 데이터 반환 확인
-
-### 다음 단계
-- Cycle 45 준비
 
 ---
 

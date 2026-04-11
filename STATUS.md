@@ -50,7 +50,8 @@
 - ✅ Cycle 42 완료 (B+D+F: PortOpt 경계 + ML 일관성 + 봇 보안 사고)
 - ✅ Cycle 43 완료 (E+A+F: PaperTrader 경계 + audit_summary + LSTM vs Transformer)
 - ✅ Cycle 44 완료 (C+B+F: Sentiment +11 + VolTarget 경계 + Volume Profile)
-- ⏳ **Cycle 45 대기** (D+E+F)
+- ✅ Cycle 45 완료 (D+E+F: Signal metadata + Mock overdraft + Sub-second latency)
+- ⏳ **Cycle 46 대기** (A+C+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -59,7 +60,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,067개** |
+| ✅ 통과 테스트 | **6,070개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

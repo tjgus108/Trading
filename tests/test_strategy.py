@@ -58,6 +58,32 @@ def test_signal_has_bull_bear_case():
     assert isinstance(signal.invalidation, str)
 
 
+def test_signal_metadata_optional():
+    """Signal.metadata는 기본 None이며, dict 할당 시 저장된다."""
+    from src.strategy.base import Signal, Action, Confidence
+
+    sig_no_meta = Signal(
+        action=Action.HOLD,
+        confidence=Confidence.LOW,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="r",
+        invalidation="i",
+    )
+    assert sig_no_meta.metadata is None
+
+    sig_with_meta = Signal(
+        action=Action.BUY,
+        confidence=Confidence.HIGH,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="r",
+        invalidation="i",
+        metadata={"rsi": 55.0, "atr_ratio": 1.2},
+    )
+    assert sig_with_meta.metadata["rsi"] == 55.0
+
+
 def test_ema_cross_buy_on_crossover():
     """EMA20이 EMA50을 상향 돌파하는 시나리오를 직접 주입 (ATR/VWAP 필터 포함)."""
     df = _make_df(100)

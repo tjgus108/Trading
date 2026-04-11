@@ -69,3 +69,26 @@ def test_check_permissions_not_supported(caplog):
     assert result == {}
     warn_msgs = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert warn_msgs, "Expected WARNING for unsupported exchange"
+
+
+# ── MockExchangeConnector 경계 테스트 ──────────────────────────────────────
+
+from src.exchange.mock_connector import MockExchangeConnector
+
+
+def test_mock_buy_overdraft_clamps_to_zero():
+    """buy 금액이 잔고를 초과해도 USDT 잔고가 음수가 되지 않는다."""
+    conn = MockExchangeConnector(base_price=100.0)
+    # 초기 USDT: 10000, 구매액: 100 * 200 = 20000 → max(0, ...) 로 0 이상이어야 함
+    conn.create_order("BTC/USDT", "buy", 200.0)
+    usdt = conn._balance["total"]["USDT"]
+    assert usdt >= 0, f"USDT balance went negative: {usdt}"
+
+
+def test_mock_sell_overdraft_clamps_to_zero():
+    """sell 수량이 BTC 잔고를 초과해도 BTC 잔고가 음수가 되지 않는다."""
+    conn = MockExchangeConnector(base_price=100.0)
+    # 초기 BTC: 0.0, sell 1.0 → max(0, ...) 로 0 이상이어야 함
+    conn.create_order("BTC/USDT", "sell", 1.0)
+    btc = conn._balance["total"]["BTC"]
+    assert btc >= 0, f"BTC balance went negative: {btc}"
