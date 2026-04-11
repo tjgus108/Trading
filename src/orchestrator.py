@@ -78,8 +78,6 @@ from src.strategy.keltner_channel import KeltnerChannelStrategy
 from src.strategy.price_channel import PriceChannelStrategy
 from src.strategy.pivot_points import PivotPointsStrategy
 from src.strategy.pivot_point import PivotPointStrategy
-from src.strategy.night_star import NightStarStrategy
-from src.strategy.elder_ray import ElderRayStrategy
 from src.strategy.vortex import VortexStrategy
 from src.strategy.dpo import DPOStrategy
 from src.strategy.stc import STCStrategy
@@ -90,10 +88,8 @@ from src.strategy.heikin_ashi import HeikinAshiStrategy
 from src.strategy.coppock import CoppockStrategy
 from src.strategy.fisher_transform import FisherTransformStrategy
 from src.strategy.ppo import PPOStrategy
-from src.strategy.klinger import KlingerStrategy
 from src.strategy.cmo import CMOStrategy
 from src.strategy.chande_momentum import ChandeMomentumStrategy
-from src.strategy.ultimate_oscillator import UltimateOscillatorStrategy
 from src.strategy.zlema_cross import ZLEMACrossStrategy
 from src.strategy.mcginley import McGinleyStrategy
 from src.strategy.roc import ROCStrategy
@@ -101,7 +97,6 @@ from src.strategy.awesome_oscillator import AwesomeOscillatorStrategy
 from src.strategy.connors_rsi import ConnorsRSIStrategy
 from src.strategy.linear_regression import LinearRegressionStrategy
 from src.strategy.williams_fractal import WilliamsFractalStrategy
-from src.strategy.mass_index import MassIndexStrategy
 from src.strategy.smi import SMIStrategy
 from src.strategy.trima import TRIMAStrategy
 from src.strategy.choppiness import ChoppinessStrategy
@@ -111,31 +106,26 @@ from src.strategy.volatility_ratio import VolatilityRatioStrategy
 from src.strategy.pmo import PMOStrategy
 from src.strategy.rvi import RVIStrategy
 from src.strategy.disparity_index import DisparityIndexStrategy
-from src.strategy.psychological_line import PsychologicalLineStrategy
 from src.strategy.tsi import TSIStrategy
 from src.strategy.bop import BOPStrategy
-from src.strategy.volatility_breakout import VolatilityBreakoutLWStrategy, VolatilityBreakoutStrategy
+from src.strategy.volatility_breakout import VolatilityBreakoutStrategy
 from src.strategy.ichimoku_advanced import IchimokuAdvancedStrategy
 from src.strategy.ichimoku_cloud_pos import IchimokuCloudPosStrategy
-from src.strategy.consecutive_candles import ConsecutiveCandlesStrategy
 from src.strategy.guppy import GuppyStrategy
 from src.strategy.apo import APOStrategy
 from src.strategy.zscore_mean_reversion import ZScoreMeanReversionStrategy
 from src.strategy.median_price import MedianPriceStrategy
-from src.strategy.nr7 import NR7Strategy
 from src.strategy.inside_bar import InsideBarStrategy
 from src.strategy.gap_strategy import GapStrategy
 from src.strategy.star_pattern import StarPatternStrategy
 from src.strategy.doji_pattern import DojiPatternStrategy
 from src.strategy.three_candles import ThreeCandlesStrategy
 from src.strategy.harami import HaramiStrategy
-from src.strategy.cloud_cover import CloudCoverStrategy
 from src.strategy.tweezer import TweezerStrategy
 from src.strategy.pin_bar import PinBarStrategy
 from src.strategy.vwap_cross import VWAPCrossStrategy
 from src.strategy.ease_of_movement import EaseOfMovementStrategy
 from src.strategy.sr_breakout import SRBreakoutStrategy
-from src.strategy.trend_channel import TrendChannelStrategy
 from src.strategy.hhll_channel import HHLLChannelStrategy
 from src.strategy.vpt import VPTStrategy
 from src.strategy.adl import ADLStrategy
@@ -143,7 +133,6 @@ from src.strategy.force_index import ForceIndexStrategy
 from src.strategy.marubozu import MarubozuStrategy
 from src.strategy.spinning_top import SpinningTopStrategy
 from src.strategy.proc_trend import PRoCTrendStrategy
-from src.strategy.dual_thrust import DualThrustStrategy
 from src.strategy.r_squared import RSquaredStrategy
 from src.strategy.body_momentum import BodyMomentumStrategy
 from src.strategy.turtle_trading import TurtleTradingStrategy
@@ -157,7 +146,6 @@ from src.strategy.price_envelope import PriceEnvelopeStrategy
 from src.strategy.opening_range_breakout import OpeningRangeBreakoutStrategy
 from src.strategy.session_high_low import SessionHighLowStrategy
 from src.strategy.cci_breakout import CCIBreakoutStrategy
-from src.strategy.squeeze_momentum import SqueezeMomentumStrategy
 from src.strategy.frama import FRAMAStrategy
 from src.strategy.vw_macd import VWMACDStrategy
 from src.strategy.chandelier_exit import ChandelierExitStrategy
@@ -165,11 +153,9 @@ from src.strategy.vwap_band import VWAPBandStrategy
 from src.strategy.vol_adj_momentum import VolAdjMomentumStrategy
 from src.strategy.elder_impulse import ElderImpulseStrategy
 from src.strategy.ha_trend import HATrendStrategy
-from src.strategy.engulfing import EngulfingStrategy
 from src.strategy.morning_evening_star import MorningEveningStarStrategy
 from src.strategy.three_soldiers_crows import ThreeSoldiersAndCrowsStrategy
 from src.strategy.laguerre_rsi import LaguerreRSIStrategy
-from src.strategy.zero_lag_ema import ZeroLagEMAStrategy
 from src.strategy.mean_reversion_channel import MeanReversionChannelStrategy
 from src.strategy.pivot_reversal import PivotReversalStrategy
 from src.strategy.range_expansion import RangeExpansionStrategy
@@ -187,34 +173,27 @@ from src.strategy.vcp import VCPStrategy
 from src.strategy.ema_stack import EMAStackStrategy
 from src.strategy.supertrend_rsi import SupertrendRSIStrategy
 from src.strategy.bb_bandwidth import BBBandwidthStrategy
-from src.strategy.volume_surge import VolumeSurgeStrategy
 from src.strategy.price_velocity import PriceVelocityStrategy
 from src.strategy.multi_score import MultiScoreStrategy
 from src.strategy.adx_regime import ADXRegimeStrategy
 from src.strategy.obv_divergence import OBVDivergenceStrategy
-from src.strategy.rsi_ob_os import RSIOBOSStrategy
 from src.strategy.lr_channel import LRChannelStrategy
 from src.strategy.momentum_reversal import MomentumReversalStrategy
 from src.strategy.cup_handle import CupHandleStrategy
-from src.strategy.flag_pennant import FlagPennantStrategy
 from src.strategy.relative_volume import RelativeVolumeStrategy
 from src.strategy.pmo_strategy import PriceMomentumOscillator
 from src.strategy.fib_retracement import FibRetracementStrategy
-from src.strategy.stoch_divergence import StochDivergenceStrategy
 from src.strategy.ha_smoothed import HeikinAshiSmoothedStrategy
 from src.strategy.keltner_rsi import KeltnerRSIStrategy
 from src.strategy.chaikin_osc import ChaikinOscillatorStrategy
 from src.strategy.alligator import AlligatorStrategy
 from src.strategy.anchored_vwap import AnchoredVWAPStrategy
-from src.strategy.volatility_regime import VolatilityRegimeStrategy
 from src.strategy.zlmacd import ZeroLagMACDStrategy
 from src.strategy.adaptive_stop import AdaptiveStopStrategy
 from src.strategy.engulfing_zone import BullishEngulfingZoneStrategy
-from src.strategy.three_bar_reversal import ThreeBarReversalStrategy
 from src.strategy.tii_strategy import TrendIntensityIndexStrategy
 from src.strategy.htf_ema import HigherTimeframeEMAStrategy
 from src.strategy.donchian_midline import DonchianMidlineStrategy
-from src.strategy.triple_screen import TripleScreenStrategy
 from src.strategy.poc_strategy import POCStrategy
 from src.strategy.bid_ask_imbalance import BidAskImbalanceStrategy
 from src.strategy.gann_swing import GannSwingStrategy
@@ -224,7 +203,6 @@ from src.strategy.price_deviation import PriceDeviationStrategy
 from src.strategy.acceleration_band import AccelerationBandStrategy
 from src.strategy.supertrend_multi import SupertrendMultiStrategy
 from src.strategy.narrow_range import NarrowRangeStrategy
-from src.strategy.parabolic_move import ParabolicMoveStrategy
 from src.strategy.failed_breakout import FailedBreakoutStrategy
 from src.strategy.coppock_enhanced import CoppockEnhancedStrategy
 from src.strategy.cumulative_delta import CumulativeDeltaStrategy
@@ -235,7 +213,6 @@ from src.strategy.hurst_strategy import HurstExponentStrategy
 from src.strategy.entropy_strategy import ApproximateEntropyStrategy
 from src.strategy.sr_bounce import SRBounceStrategy
 from src.strategy.candle_score import CandleScoreStrategy
-from src.strategy.trend_quality import TrendQualityStrategy
 from src.strategy.momentum_div import MomentumDivergenceStrategy
 from src.strategy.roc_ma_cross import ROCMACrossStrategy
 from src.strategy.vpt_confirm import VolumePriceTrendConfirmStrategy
@@ -247,23 +224,12 @@ from src.strategy.ichimoku_breakout import IchimokuBreakoutStrategy
 from src.strategy.macd_slope import MACDSlopeStrategy
 from src.strategy.ema_ribbon import EMARibbonStrategy
 from src.strategy.price_channel_break import PriceChannelBreakStrategy
-from src.strategy.pivot_bounce import PivotBounceStrategy
-from src.strategy.momentum_score import MomentumScoreStrategy
-from src.strategy.mean_rev_band import MeanReversionBandStrategy
-from src.strategy.trend_continuation import TrendContinuationStrategy
 from src.strategy.bb_keltner_squeeze import BBKeltnerSqueezeStrategy
 from src.strategy.rsi_trend_filter import RSITrendFilterStrategy
-from src.strategy.volume_climax import VolumeClimaxStrategy
-from src.strategy.key_reversal import KeyReversalStrategy
-from src.strategy.atr_expansion import ATRExpansionStrategy
-from src.strategy.inside_bar_breakout import InsideBarBreakoutStrategy
 from src.strategy.vol_adj_trend import VolAdjustedTrendStrategy
-from src.strategy.trend_reversal import TrendReversalPatternStrategy
 from src.strategy.dual_ema_cross import DualEMACrossStrategy
 from src.strategy.breakout_confirm import BreakoutConfirmationStrategy
-from src.strategy.exhaustion_bar import ExhaustionBarStrategy
 from src.strategy.linear_channel_rev import LinearChannelReversionStrategy
-from src.strategy.consolidation_breakout import ConsolidationBreakoutStrategy
 from src.strategy.price_rsi_div import PriceRSIDivergenceStrategy
 from src.strategy.momentum_accel import MomentumAccelerationStrategy
 from src.strategy.parabolic_momentum import ParabolicMomentumStrategy
@@ -271,33 +237,26 @@ from src.strategy.exhaustion_reversal import ExhaustionReversalStrategy
 from src.strategy.swing_point import SwingPointStrategy
 from src.strategy.confluence_zone import ConfluenceZoneStrategy
 from src.strategy.adaptive_ma_cross import AdaptiveMACrossStrategy
-from src.strategy.range_bound import RangeBoundStrategy
-from src.strategy.pre_breakout import PreBreakoutStrategy
 from src.strategy.bull_bear_power import BullBearPowerStrategy
 from src.strategy.absolute_strength_hist import AbsoluteStrengthHistStrategy
 from src.strategy.overextension import OverextensionStrategy
-from src.strategy.order_block import OrderBlockStrategy
 from src.strategy.fvg_strategy import FairValueGapStrategy
 from src.strategy.gartley_pattern import SimplifiedGartleyStrategy
 from src.strategy.price_cluster import PriceClusterStrategy
 from src.strategy.liquidity_sweep import LiquiditySweepStrategy
 from src.strategy.market_maker_sig import MarketMakerStrategy
-from src.strategy.pa_confirm import PriceActionConfirmStrategy
 from src.strategy.ema_dynamic_support import EMADynamicSupportStrategy
 from src.strategy.autocorr_strategy import AutoCorrelationStrategy
 from src.strategy.adaptive_rsi_thresh import AdaptiveRSIThresholdStrategy
 from src.strategy.mr_entry import MeanReversionEntryStrategy
-from src.strategy.vol_mean_rev import VolatilityMeanReversionStrategy
 from src.strategy.kijun_bounce import KijunBounceStrategy
 from src.strategy.vol_price_confirm import VolumePriceConfirmStrategy
 from src.strategy.trend_strength_filter import TrendStrengthFilterStrategy
 from src.strategy.vol_spread_analysis import VolSpreadAnalysisStrategy
-from src.strategy.wedge_pattern import WedgePatternStrategy
 from src.strategy.crossover_confluence import CrossoverConfluenceStrategy
 from src.strategy.breakout_retest import BreakoutRetestStrategy
 from src.strategy.volatility_expansion import VolatilityExpansionStrategy
 from src.strategy.cci_divergence import CCIDivergenceStrategy
-from src.strategy.dynamic_pivot_channel import DynamicPivotChannelStrategy
 from src.strategy.hybrid_trend_rev import HybridTrendReversionStrategy
 from src.strategy.multi_factor import MultiFactorScoreStrategy
 from src.strategy.stoch_momentum import StochasticMomentumStrategy
@@ -320,7 +279,6 @@ from src.strategy.mean_rev_zscore import MeanRevZScoreStrategy
 from src.strategy.momentum_persistence import MomentumPersistenceStrategy
 from src.strategy.fractal_break import FractalBreakStrategy
 from src.strategy.market_structure_break import MarketStructureBreakStrategy
-from src.strategy.price_action_quality import PriceActionQualityStrategy
 from src.strategy.regime_filter import RegimeFilterStrategy
 from src.strategy.candle_pattern_score import CandlePatternScoreStrategy
 from src.strategy.multi_tf_trend import MultiTFTrendStrategy
@@ -341,12 +299,6 @@ from src.strategy.vwap_deviation import VWAPDeviationStrategy
 from src.strategy.balance_of_power import BalanceOfPowerStrategy
 from src.strategy.money_flow_index import MoneyFlowIndexStrategy
 from src.strategy.trend_strength_index import TrendStrengthIndexStrategy
-from src.strategy.klinger_oscillator import KlingerOscillatorStrategy
-from src.strategy.price_oscillator import PriceOscillatorStrategy
-from src.strategy.detrended_price_osc import DetrendedPriceOscStrategy
-from src.strategy.schaff_trend_cycle import SchaffTrendCycleStrategy
-from src.strategy.vortex_indicator import VortexIndicatorStrategy
-from src.strategy.linear_reg_channel import LinearRegChannelStrategy
 from src.strategy.wavetrend_osc import WaveTrendOscStrategy
 from src.strategy.cyber_cycle import CyberCycleStrategy
 from src.strategy.gaussian_channel import GaussianChannelStrategy
@@ -356,7 +308,6 @@ from src.strategy.adaptive_cycle import AdaptiveCycleStrategy
 from src.strategy.demarker import DeMarkerStrategy
 from src.strategy.trend_exhaustion import TrendExhaustionStrategy
 from src.strategy.high_low_channel import HighLowChannelStrategy
-from src.strategy.pivot_band import PivotBandStrategy
 from src.strategy.trend_intensity_index import TrendIntensityIndexV2Strategy
 from src.strategy.price_cycle_detector import PriceCycleDetectorStrategy
 from src.strategy.momentum_quality import MomentumQualityStrategy
@@ -375,13 +326,11 @@ from src.strategy.micro_trend import MicroTrendStrategy
 from src.strategy.ema_dynamic_band import EMADynamicBandStrategy
 from src.strategy.oscillator_band import OscillatorBandStrategy
 from src.strategy.price_action_filter import PriceActionFilterStrategy
-from src.strategy.price_pattern_recog import PricePatternRecogStrategy
 from src.strategy.trend_momentum_blend import TrendMomentumBlendStrategy
 from src.strategy.ema_cloud import EMACloudStrategy
 from src.strategy.trend_strength_composite import TrendStrengthCompositeStrategy
 from src.strategy.tick_volume import TickVolumeStrategy
 from src.strategy.market_breadth_proxy import MarketBreadthProxyStrategy
-from src.strategy.harmonic_pattern import HarmonicPatternStrategy
 from src.strategy.divergence_confirmation import DivergenceConfirmationStrategy
 from src.strategy.dual_momentum import DualMomentumStrategy
 from src.strategy.carry_strategy import CarryStrategy
@@ -395,8 +344,6 @@ from src.strategy.price_velocity_filter import PriceVelocityFilterStrategy
 from src.strategy.momentum_quality_v2 import MomentumQualityV2Strategy
 from src.strategy.multi_timeframe_momentum import MultiTimeframeMomentumStrategy
 from src.strategy.smart_beta import SmartBetaStrategy
-from src.strategy.high_low_reversal import HighLowReversalStrategy
-from src.strategy.trend_filtered_mean_rev import TrendFilteredMeanRevStrategy
 from src.strategy.adaptive_trend import AdaptiveTrendStrategy
 from src.strategy.price_compression_signal import PriceCompressionSignalStrategy
 from src.strategy.keltner_channel_v2 import KeltnerChannelV2Strategy
@@ -435,12 +382,9 @@ from src.strategy.price_divergence_index import PriceDivergenceIndexStrategy
 from src.strategy.trend_momentum_score import TrendMomentumScoreStrategy
 from src.strategy.impulse_system import ImpulseSystemStrategy
 from src.strategy.colored_candles import ColoredCandlesStrategy
-from src.strategy.heikin_ashi_trend import HeikinAshiTrendStrategy
-from src.strategy.volume_weighted_rsi_v2 import VolumeWeightedRSIV2Strategy
 from src.strategy.trend_break_confirm import TrendBreakConfirmStrategy
 from src.strategy.momentum_mean_rev import MomentumMeanRevStrategy
 from src.strategy.spread_momentum import SpreadMomentumStrategy
-from src.strategy.trend_exhaustion_signal import TrendExhaustionSignalStrategy
 from src.strategy.higher_high_momentum import HigherHighMomentumStrategy
 from src.strategy.mean_rev_bounce import MeanRevBounceStrategy
 
@@ -487,7 +431,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "keltner_channel": KeltnerChannelStrategy,
     "price_channel": PriceChannelStrategy,
     "pivot_points": PivotPointsStrategy,
-    "elder_ray": ElderRayStrategy,
     "vortex": VortexStrategy,
     "dpo": DPOStrategy,
     "stc": STCStrategy,
@@ -498,10 +441,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "coppock": CoppockStrategy,
     "fisher_transform": FisherTransformStrategy,
     "ppo": PPOStrategy,
-    "klinger": KlingerStrategy,
     "cmo": CMOStrategy,
     "chande_momentum": ChandeMomentumStrategy,
-    "ultimate_oscillator": UltimateOscillatorStrategy,
     "zlema_cross": ZLEMACrossStrategy,
     "mcginley": McGinleyStrategy,
     "roc": ROCStrategy,
@@ -510,7 +451,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "demarker": DeMarkerStrategy,
     "linear_regression": LinearRegressionStrategy,
     "williams_fractal": WilliamsFractalStrategy,
-    "mass_index": MassIndexStrategy,
     "smi": SMIStrategy,
     "trima": TRIMAStrategy,
     "choppiness": ChoppinessStrategy,
@@ -520,19 +460,15 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "pmo": PMOStrategy,
     "rvi": RVIStrategy,
     "disparity_index": DisparityIndexStrategy,
-    "psychological_line": PsychologicalLineStrategy,
     "tsi": TSIStrategy,
     "bop": BOPStrategy,
-    "volatility_breakout_lw": VolatilityBreakoutLWStrategy,
     "volatility_breakout": VolatilityBreakoutStrategy,
     "ichimoku_advanced": IchimokuAdvancedStrategy,
     "ichimoku_cloud_pos": IchimokuCloudPosStrategy,
-    "consecutive_candles": ConsecutiveCandlesStrategy,
     "guppy": GuppyStrategy,
     "apo": APOStrategy,
     "zscore_mean_reversion": ZScoreMeanReversionStrategy,
     "median_price": MedianPriceStrategy,
-    "nr7": NR7Strategy,
     "inside_bar": InsideBarStrategy,
     "gap_strategy": GapStrategy,
     "star_pattern": StarPatternStrategy,
@@ -543,9 +479,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "vwap_cross": VWAPCrossStrategy,
     "ease_of_movement": EaseOfMovementStrategy,
     "harami": HaramiStrategy,
-    "cloud_cover": CloudCoverStrategy,
     "sr_breakout": SRBreakoutStrategy,
-    "trend_channel": TrendChannelStrategy,
     "hhll_channel": HHLLChannelStrategy,
     "vpt": VPTStrategy,
     "adl": ADLStrategy,
@@ -553,7 +487,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "marubozu": MarubozuStrategy,
     "spinning_top": SpinningTopStrategy,
     "proc_trend": PRoCTrendStrategy,
-    "dual_thrust": DualThrustStrategy,
     "r_squared": RSquaredStrategy,
     "body_momentum": BodyMomentumStrategy,
     "turtle_trading": TurtleTradingStrategy,
@@ -565,7 +498,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "opening_range_breakout": OpeningRangeBreakoutStrategy,
     "session_high_low": SessionHighLowStrategy,
     "cci_breakout": CCIBreakoutStrategy,
-    "squeeze_momentum": SqueezeMomentumStrategy,
     "frama": FRAMAStrategy,
     "vw_macd": VWMACDStrategy,
     "elder_impulse": ElderImpulseStrategy,
@@ -575,7 +507,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "rsi_momentum_div": RSIMomentumDivStrategy,
     "dpo_cross": DPOCrossStrategy,
     "ha_trend": HATrendStrategy,
-    "engulfing": EngulfingStrategy,
     "trend_strength": TrendStrengthStrategy,
     "vpt_signal": VPTSignalStrategy,
     "chandelier_exit": ChandelierExitStrategy,
@@ -593,34 +524,27 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_stack": EMAStackStrategy,
     "supertrend_rsi": SupertrendRSIStrategy,
     "bb_bandwidth": BBBandwidthStrategy,
-    "volume_surge": VolumeSurgeStrategy,
     "price_velocity": PriceVelocityStrategy,
     "multi_score": MultiScoreStrategy,
     "adx_regime": ADXRegimeStrategy,
     "obv_divergence": OBVDivergenceStrategy,
-    "rsi_ob_os": RSIOBOSStrategy,
     "lr_channel": LRChannelStrategy,
     "momentum_reversal": MomentumReversalStrategy,
     "cup_handle": CupHandleStrategy,
-    "flag_pennant": FlagPennantStrategy,
     "relative_volume": RelativeVolumeStrategy,
     "pmo_strategy": PriceMomentumOscillator,
     "fib_retracement": FibRetracementStrategy,
-    "stoch_divergence": StochDivergenceStrategy,
     "ha_smoothed": HeikinAshiSmoothedStrategy,
     "keltner_rsi": KeltnerRSIStrategy,
     "chaikin_osc": ChaikinOscillatorStrategy,
     "alligator": AlligatorStrategy,
     "anchored_vwap": AnchoredVWAPStrategy,
-    "volatility_regime": VolatilityRegimeStrategy,
     "zlmacd": ZeroLagMACDStrategy,
     "adaptive_stop": AdaptiveStopStrategy,
     "engulfing_zone": BullishEngulfingZoneStrategy,
-    "three_bar_reversal": ThreeBarReversalStrategy,
     "tii_strategy": TrendIntensityIndexStrategy,
     "htf_ema": HigherTimeframeEMAStrategy,
     "donchian_midline": DonchianMidlineStrategy,
-    "triple_screen": TripleScreenStrategy,
     "price_deviation": PriceDeviationStrategy,
     "acceleration_band": AccelerationBandStrategy,
     "poc_strategy": POCStrategy,
@@ -629,7 +553,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "narrow_range": NarrowRangeStrategy,
     "gann_swing": GannSwingStrategy,
     "elder_force": ElderForceIndexStrategy,
-    "parabolic_move": ParabolicMoveStrategy,
     "failed_breakout": FailedBreakoutStrategy,
     "coppock_enhanced": CoppockEnhancedStrategy,
     "vwrsi": VolumeWeightedRSIStrategy,
@@ -637,7 +560,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "entropy_strategy": ApproximateEntropyStrategy,
     "sr_bounce": SRBounceStrategy,
     "candle_score": CandleScoreStrategy,
-    "trend_quality": TrendQualityStrategy,
     "momentum_div": MomentumDivergenceStrategy,
     "roc_ma_cross": ROCMACrossStrategy,
     "vpt_confirm": VolumePriceTrendConfirmStrategy,
@@ -649,55 +571,37 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "macd_slope": MACDSlopeStrategy,
     "ema_ribbon": EMARibbonStrategy,
     "price_channel_break": PriceChannelBreakStrategy,
-    "pivot_bounce": PivotBounceStrategy,
-    "momentum_score": MomentumScoreStrategy,
-    "mean_rev_band": MeanReversionBandStrategy,
-    "trend_continuation": TrendContinuationStrategy,
     "bb_keltner_squeeze": BBKeltnerSqueezeStrategy,
     "rsi_trend_filter": RSITrendFilterStrategy,
-    "volume_climax": VolumeClimaxStrategy,
-    "key_reversal": KeyReversalStrategy,
-    "atr_expansion": ATRExpansionStrategy,
-    "inside_bar_breakout": InsideBarBreakoutStrategy,
     "vol_adj_trend": VolAdjustedTrendStrategy,
-    "trend_reversal": TrendReversalPatternStrategy,
     "dual_ema_cross": DualEMACrossStrategy,
     "breakout_confirm": BreakoutConfirmationStrategy,
-    "exhaustion_bar": ExhaustionBarStrategy,
     "linear_channel_rev": LinearChannelReversionStrategy,
-    "consolidation_breakout": ConsolidationBreakoutStrategy,
     "price_rsi_div": PriceRSIDivergenceStrategy,
     "momentum_accel": MomentumAccelerationStrategy,
     "swing_point": SwingPointStrategy,
     "confluence_zone": ConfluenceZoneStrategy,
     "adaptive_ma_cross": AdaptiveMACrossStrategy,
-    "range_bound": RangeBoundStrategy,
-    "pre_breakout": PreBreakoutStrategy,
     "bull_bear_power": BullBearPowerStrategy,
     "absolute_strength_hist": AbsoluteStrengthHistStrategy,
     "overextension": OverextensionStrategy,
-    "order_block": OrderBlockStrategy,
     "fvg_strategy": FairValueGapStrategy,
     "gartley_pattern": SimplifiedGartleyStrategy,
     "price_cluster": PriceClusterStrategy,
     "liquidity_sweep": LiquiditySweepStrategy,
     "market_maker_sig": MarketMakerStrategy,
-    "pa_confirm": PriceActionConfirmStrategy,
     "ema_dynamic_support": EMADynamicSupportStrategy,
     "autocorr_strategy": AutoCorrelationStrategy,
     "adaptive_rsi_thresh": AdaptiveRSIThresholdStrategy,
     "mr_entry": MeanReversionEntryStrategy,
-    "vol_mean_rev": VolatilityMeanReversionStrategy,
     "kijun_bounce": KijunBounceStrategy,
     "vol_price_confirm": VolumePriceConfirmStrategy,
     "trend_strength_filter": TrendStrengthFilterStrategy,
     "vol_spread_analysis": VolSpreadAnalysisStrategy,
-    "wedge_pattern": WedgePatternStrategy,
     "crossover_confluence": CrossoverConfluenceStrategy,
     "breakout_retest": BreakoutRetestStrategy,
     "volatility_expansion": VolatilityExpansionStrategy,
     "cci_divergence": CCIDivergenceStrategy,
-    "dynamic_pivot_channel": DynamicPivotChannelStrategy,
     "hybrid_trend_rev": HybridTrendReversionStrategy,
     "multi_factor": MultiFactorScoreStrategy,
     "stoch_momentum": StochasticMomentumStrategy,
@@ -720,7 +624,6 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "momentum_persistence": MomentumPersistenceStrategy,
     "fractal_break": FractalBreakStrategy,
     "market_structure_break": MarketStructureBreakStrategy,
-    "price_action_quality": PriceActionQualityStrategy,
     "regime_filter": RegimeFilterStrategy,
     "candle_pattern_score": CandlePatternScoreStrategy,
     "multi_tf_trend": MultiTFTrendStrategy,
@@ -741,23 +644,15 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "balance_of_power": BalanceOfPowerStrategy,
     "money_flow_index": MoneyFlowIndexStrategy,
     "trend_strength_index": TrendStrengthIndexStrategy,
-    "klinger_oscillator": KlingerOscillatorStrategy,
-    "price_oscillator": PriceOscillatorStrategy,
-    "detrended_price_osc": DetrendedPriceOscStrategy,
-    "schaff_trend_cycle": SchaffTrendCycleStrategy,
-    "vortex_indicator": VortexIndicatorStrategy,
-    "linear_reg_channel": LinearRegChannelStrategy,
     "wavetrend_osc": WaveTrendOscStrategy,
     "cyber_cycle": CyberCycleStrategy,
     "laguerre_rsi": LaguerreRSIStrategy,
-    "zero_lag_ema": ZeroLagEMAStrategy,
     "gaussian_channel": GaussianChannelStrategy,
     "ehlers_fisher": EhlersFisherStrategy,
     "sine_wave": SineWaveStrategy,
     "adaptive_cycle": AdaptiveCycleStrategy,
     "trend_exhaustion": TrendExhaustionStrategy,
     "high_low_channel": HighLowChannelStrategy,
-    "pivot_band": PivotBandStrategy,
     "trend_intensity_index": TrendIntensityIndexV2Strategy,
     "price_cycle_detector": PriceCycleDetectorStrategy,
     "momentum_quality": MomentumQualityStrategy,
@@ -779,11 +674,9 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "ema_dynamic_band": EMADynamicBandStrategy,
     "oscillator_band": OscillatorBandStrategy,
     "price_action_filter": PriceActionFilterStrategy,
-    "price_pattern_recog": PricePatternRecogStrategy,
     "trend_momentum_blend": TrendMomentumBlendStrategy,
     "tick_volume": TickVolumeStrategy,
     "market_breadth_proxy": MarketBreadthProxyStrategy,
-    "harmonic_pattern": HarmonicPatternStrategy,
     "divergence_confirmation": DivergenceConfirmationStrategy,
     "parabolic_momentum": ParabolicMomentumStrategy,
     "exhaustion_reversal": ExhaustionReversalStrategy,
@@ -800,13 +693,10 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_consistency": TrendConsistencyStrategy,
     "volume_weighted_momentum": VolumeWeightedMomentumStrategy,
     "pivot_point": PivotPointStrategy,
-    "night_star": NightStarStrategy,
     "price_range_breakout": PriceRangeBreakoutStrategy,
     "volume_oscillator_v2": VolumeOscillatorV2Strategy,
     "multi_timeframe_momentum": MultiTimeframeMomentumStrategy,
     "smart_beta": SmartBetaStrategy,
-    "high_low_reversal": HighLowReversalStrategy,
-    "trend_filtered_mean_rev": TrendFilteredMeanRevStrategy,
     "keltner_channel_v2": KeltnerChannelV2Strategy,
     "rsi_band": RSIBandStrategy,
     "breakout_pullback": BreakoutPullbackStrategy,
@@ -851,12 +741,9 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "trend_momentum_score": TrendMomentumScoreStrategy,
     "impulse_system": ImpulseSystemStrategy,
     "colored_candles": ColoredCandlesStrategy,
-    "heikin_ashi_trend": HeikinAshiTrendStrategy,
-    "volume_weighted_rsi_v2": VolumeWeightedRSIV2Strategy,
     "trend_break_confirm": TrendBreakConfirmStrategy,
     "momentum_mean_rev": MomentumMeanRevStrategy,
     "spread_momentum": SpreadMomentumStrategy,
-    "trend_exhaustion_signal": TrendExhaustionSignalStrategy,
     "higher_high_momentum": HigherHighMomentumStrategy,
     "mean_rev_bounce": MeanRevBounceStrategy,
 }
