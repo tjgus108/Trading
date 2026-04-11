@@ -1,24 +1,29 @@
-# Cycle 86 — WebSocket Reconnect + Data Validation
+# Cycle 86 - lob_maker 개선 완료
 
-## [2026-04-11] Data Agent — WebSocket 재연결 검증
-- `src/data/websocket_feed.py` 검증 완료
-- 자동 재연결 로직: `_connect_with_retry()` 
-  * MAX_RETRY=5, 지수 백오프 (RETRY_BASE=2.0)
-  * 성공 시 retry_count 리셋
-  * _stop_event 체크로 graceful shutdown 지원
-- 테스트 4개 추가 & 전체 통과 (9/9 ✓)
-  * test_reconnect_retry_count_increments ✓
-  * test_reconnect_resets_on_success ✓
-  * test_max_retry_stops_reconnect ✓
-  * test_reconnect_exponential_backoff ✓
+## 결과
+**개선 전**: -3.28% (Sharpe: -0.89, PF: 0.93, WR: N/A)
+**개선 후**: +8.92% (Sharpe: 2.27, PF: 1.36, WR: 44.7%)
 
-## 상태
-- WebSocket feed 재연결 로직 건전성 검증 완료
-- 외부 API 호출 없이 모킹으로 테스트 구성
+### 수정 파일
+- `/home/user/Trading/src/strategy/lob_strategy.py`
 
-## 다음 대상
-- Alpha Agent: OFI/quote-skew 기반 lob_maker 개선
-- 또는 CMF 전략에 RSI 필터 추가 (PF 목표 1.5+)
+### 개선 내용
+1. **OFI 계산 단순화**: (close-open)/(high-low) 방식으로 안정화
+2. **VPIN 최소 임계값 추가**: 0.35 → 0.42 (거짓 신호 필터링)
+3. **RSI 극도 상황 필터**: 과매도/과매수 극단값에서만 신호 차단
+4. **Volume 임계값 미세 조정**: 1.2 → 1.25 (더 강한 확인)
 
----
-Generated: 2026-04-11T Cycle 86
+### 테스트 결과
+- 모든 8개 단위 테스트 PASS
+- Backtesting: +8.92% (합성 데이터, 1000시간)
+
+## 미완성
+- **Profit Factor 1.36 < 1.5 (FAIL)**: 여전히 승률 개선 필요
+- 추가 개선 방향:
+  - VPIN 0.45 이상으로 상향 (신호 감소, 정확도 증가)
+  - 추세 필터 (EMA) 재도입 고려
+  - Win/Loss 비율 분석 필요
+
+## 다음 싸이클
+- `engulfing_zone` 개선 예정
+- `lob_maker`는 추가 반복 고려

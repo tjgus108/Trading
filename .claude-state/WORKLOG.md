@@ -6971,3 +6971,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 16:30 UTC] Cycle 86 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 16:50 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 09:00 UTC] Cycle 86 COMPLETED — A + C + SIM + F
+**[A] Quality:** Quality audit 재실행 — PASS 22 유지 (기준 엄격).
+**[C] Data:** tests/test_websocket_buffer.py +4 재연결 테스트. retry count 증가/리셋, MAX_RETRY 중단, exponential backoff.
+**[SIM] Auto-improve:** lob_strategy 개선. OFI proxy 단순화, VPIN 최소 0.42, RSI 극도 필터, Volume 강화. **-3.28% → +8.92% (+12.2%p)**. Sharpe -0.89 → 2.27 (3배).
+**[F] Research:** LOB MM. OFI skew + VPIN toxic flow 필터 조합이 핵심. 동적 스프레드 조정.
+**Tests:** 6265 passed (+4 from Cycle 85).
+**SIM 누적 개선 5개:** wick+15.1%, engulfing+10.2%, frama+4.1%, cmf+11.6%, **lob+12.2%** = **+53.2%p 총**
+**Next Cycle:** 87 (B+D+SIM+F)
