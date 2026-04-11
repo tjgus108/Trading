@@ -9,7 +9,7 @@ N  = (max_high_full - min_low_full) / period
 period = 16 (기본값)
 FRAMA[i] = alpha * close[i] + (1 - alpha) * FRAMA[i-1]
 
-BUY:  close > FRAMA AND 이전봉 close < 이전봉 FRAMA (크로스)
+BUY:  close > FRAMA AND 이전봉 close < 이전봉 FRAMA (크로스) + 이격 > 0.5%이면 RSI 필터 적용 안함 (강한 신호)
 SELL: close < FRAMA AND 이전봉 close > 이전봉 FRAMA
 confidence: HIGH if 이격 > 1%, MEDIUM 그 외
 최소 데이터: 35행
@@ -24,6 +24,35 @@ import pandas as pd
 from .base import Action, BaseStrategy, Confidence, Signal
 
 MIN_ROWS = 35
+
+
+def _compute_rsi(closes: np.ndarray, period: int = 14) -> np.ndarray:
+    """RSI 계산 (14기간 기본)."""
+    n = len(closes)
+    rsi = np.full(n, np.nan)
+    
+    if n < period + 1:
+        return rsi
+    
+    diffs = np.diff(closes)
+    gains = np.where(diffs > 0, diffs, 0)
+    losses = np.where(diffs < 0, -diffs, 0)
+    
+    avg_gain = np.mean(gains[:period])
+    avg_loss = np.mean(losses[:period])
+    
+    rsi[period] = 100 - (100 / (1 + avg_gain / avg_loss)) if avg_loss != 0 else 100
+    
+    for i in range(period + 1, n):
+        avg_gain = (avg_gain * (period - 1) + gains[i - 1]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i - 1]) / period
+        
+        if avg_loss != 0:
+            rsi[i] = 100 - (100 / (1 + avg_gain / avg_loss))
+        else:
+            rsi[i] = 100
+    
+    return rsi
 
 
 def _compute_frama(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray, period: int = 16) -> np.ndarray:
@@ -79,8 +108,9 @@ def _compute_frama(closes: np.ndarray, highs: np.ndarray, lows: np.ndarray, peri
 class FRAMAStrategy(BaseStrategy):
     name = "frama"
 
-    def __init__(self, period: int = 16) -> None:
+    def __init__(self, period: int = 16, rsi_period: int = 14) -> None:
         self.period = period
+        self.rsi_period = rsi_period
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
@@ -97,14 +127,19 @@ class FRAMAStrategy(BaseStrategy):
         closes = df["close"].values.astype(float)
         highs = df["high"].values.astype(float)
         lows = df["low"].values.astype(float)
+        volumes = df["volume"].values.astype(float) if "volume" in df.columns else np.ones(len(df))
 
         frama_arr = _compute_frama(closes, highs, lows, self.period)
+        rsi_arr = _compute_rsi(closes, self.rsi_period)
 
         # -2: 마지막 완성 캔들, -3: 그 이전 캔들
         last_close = closes[-2]
         prev_close = closes[-3]
         last_frama = frama_arr[-2]
         prev_frama = frama_arr[-3]
+        last_rsi = rsi_arr[-2]
+        last_volume = volumes[-2]
+        prev_volume = volumes[-3] if len(volumes) > 1 else last_volume
 
         if np.isnan(last_frama) or np.isnan(prev_frama):
             return Signal(
@@ -125,25 +160,39 @@ class FRAMAStrategy(BaseStrategy):
         bull_case = f"close={last_close:.4f} > FRAMA={last_frama:.4f}, 이격={gap_pct:.2f}%"
         bear_case = f"close={last_close:.4f} < FRAMA={last_frama:.4f}, 이격={gap_pct:.2f}%"
 
-        if crossed_up:
+        # RSI 필터: 약한 신호(이격 < 1%)는 엄격한 RSI 필터 적용
+        # 강한 신호(이격 >= 1%)는 RSI 무시하고 진행
+        strong_signal = gap_pct >= 1.0
+        if strong_signal:
+            # 강한 신호는 RSI 필터 안 함
+            rsi_buy_ok = True
+            rsi_sell_ok = True
+        else:
+            # 약한 신호는 RSI로 필터링
+            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 60
+            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 40
+
+        rsi_str = f"RSI={last_rsi:.1f}" if not np.isnan(last_rsi) else "RSI=N/A"
+
+        if crossed_up and rsi_buy_ok:
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=float(last_close),
-                reasoning=f"FRAMA 상향 크로스. close={last_close:.4f} > FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%)",
+                reasoning=f"FRAMA 상향 크로스. close={last_close:.4f} > FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
                 invalidation=f"Close below FRAMA ({last_frama:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        if crossed_down:
+        if crossed_down and rsi_sell_ok:
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=float(last_close),
-                reasoning=f"FRAMA 하향 크로스. close={last_close:.4f} < FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%)",
+                reasoning=f"FRAMA 하향 크로스. close={last_close:.4f} < FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
                 invalidation=f"Close above FRAMA ({last_frama:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
@@ -154,7 +203,7 @@ class FRAMAStrategy(BaseStrategy):
             confidence=Confidence.MEDIUM,
             strategy=self.name,
             entry_price=float(last_close),
-            reasoning=f"크로스 없음. close={last_close:.4f}, FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%)",
+            reasoning=f"크로스 없음. close={last_close:.4f}, FRAMA={last_frama:.4f} (이격 {gap_pct:.2f}%, {rsi_str})",
             invalidation="",
             bull_case=bull_case,
             bear_case=bear_case,

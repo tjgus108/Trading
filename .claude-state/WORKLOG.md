@@ -6849,3 +6849,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 16:06 UTC] Cycle 84 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 16:17 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 08:00 UTC] Cycle 84 COMPLETED — C + B + SIM + F
+**[C] Data:** tests/test_feed_parallel.py TestFetchMultipleStress +5. 10개 심볼 동시, max_workers 스케일링, 캐시 일관성.
+**[B] Risk:** tests/test_orchestrator.py +2 DD halt 복귀. recovery_pct 자동 복귀 vs FORCE_LIQUIDATE 수동.
+**[SIM] Auto-improve:** frama 개선. RSI 14 필터 + 이격 기반 필터링. **-7.89% → -3.77% (+4.12%p)**. Sharpe -1.61 → -0.69. 17 tests 유지.
+**[F] Research:** Funding arb 2024 14.39% / 2025 19.26% 연수익. 청산 리스크 여전, AI 최적화 슬리피지 40% 감소.
+**Tests:** 6257 passed (+7 from Cycle 83).
+**SIM 누적 개선:** wick_reversal(-14.17%→+0.93%), engulfing_zone(-12.74%→-2.53%), frama(-7.89%→-3.77%)
+**Next Cycle:** 85 (D+E+SIM+F)
