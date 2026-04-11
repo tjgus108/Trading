@@ -675,3 +675,32 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** Paper→Live 전환 함정 (오버피팅 90%, 슬리피지, 레짐 변화). 소규모 1~5% live 테스트로 implementation shortfall 실측 권장.
 **Tests:** 5849 passed (+3 from Cycle 10).
 **Next Cycle:** 12 (B+D+F — 3회차)
+
+## [2026-04-11 02:53 UTC] Cycle 12 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:56 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:56:08Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:56 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:56:51Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 05:30 UTC] Cycle 12 COMPLETED — B + D + F
+**[B] Risk:** Correlation Throttle은 이미 구현되어 있었음. tests/test_circuit_breaker.py 헬퍼에서 `_make_tracker_with_high_corr`가 Action.BUY만 반복해서 분산=0 (Pearson NaN) → throttle 미탐지. 혼합 패턴으로 수정. +4 상관관계 관련 테스트 통과.
+**[D] ML CRITICAL:** src/ml/features.py `_compute_labels()` 버그. 레이블 초기값이 0(HOLD)이어서 fwd_ret=NaN인 마지막 forward_n 행이 dropna()를 통과해 훈련 데이터에 가짜 HOLD 레이블로 오염. 초기값 np.nan으로 수정. +3 테스트.
+  - Cycle 11에서 shift/scaler 누수 수정에 이어 또 하나의 피처 누수 발견. ML 파이프라인 전체 재검증 필요성 확인.
+**[F] Research:** 크립토 봇 실시간 모니터링. 롤링 Sharpe/Sortino + MDD 서킷 + Implementation Shortfall + 펀딩 0.05% 돌파/청산 3배/Z-score 거래량 이상치. Isolation Forest + LSTM Autoencoder 검증.
+**Tests:** 5855 passed (+6 from Cycle 11).
+**Next Cycle:** 13 (E+A+F — 3회차)

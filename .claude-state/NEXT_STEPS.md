@@ -1,5 +1,37 @@
 # Next Steps
 
+## Cycle 12 - Category B: Risk Management ✅ COMPLETED
+
+**Task:** Correlation Throttle — 상관관계 급증 시 포지션 자동 축소
+
+**Findings:** `src/risk/circuit_breaker.py`와 `src/analysis/strategy_correlation.py`에 이미 Correlation Throttle 로직이 구현되어 있었음.
+테스트 헬퍼 `_make_tracker_with_high_corr()`의 버그 발견 및 수정.
+
+**Bug Fixed:**
+- `tests/test_circuit_breaker.py` `_make_tracker_with_high_corr()` (line 166-176): 모든 신호를 `Action.BUY`만 반복 → 분산=0 → Pearson 상관계수 NaN → throttle 미탐지.
+  - 수정: 혼합 패턴 `[BUY, BUY, SELL, BUY, HOLD]` 사용으로 분산 확보 → r=1.0 정상 감지.
+
+**Test Results:** 17/17 passed ✅ (기존 2 FAILED → 0 FAILED)
+
+---
+
+## Cycle 12 - Category D: ML & Signals ✅ COMPLETED
+
+**Task:** 피처 누수 단위 테스트 추가 + 레이블 생성 버그 수정
+
+**Bug Fixed:**
+- `src/ml/features.py` `_compute_labels()` (line 154-163): 마지막 `forward_n` 행의 레이블이 NaN 대신 0(HOLD)으로 설정돼 `dropna()`를 통과하는 버그.
+  - 수정: 초기값 `np.nan`으로 변경, `fwd_ret.isna()` 위치만 NaN 유지 → `build()` dropna()가 마지막 forward_n 행 제거
+
+**Tests Added (`tests/test_phase_c_ml.py` +3):**
+1. `test_future_price_change_does_not_affect_past_features` — 미래 행 수정 시 이전 피처 불변 검증
+2. `test_labels_use_future_data_not_features` — 마지막 forward_n 행이 학습 X에서 제외되는지 검증 (버그 탐지 테스트)
+3. `test_rolling_features_use_prior_bars_only` — 중간 행 극단값 삽입 시 이전 rolling 피처 불변 검증
+
+**Test Results:** 28 passed, 7 skipped ✅ (기존 0 regressions)
+
+---
+
 ## Cycle 11 - Category C: Data & Infrastructure ✅ COMPLETED
 
 **Task:** FeatureBuilder 데이터 누출(leakage) 검증 및 수정
@@ -32,18 +64,10 @@
 - test_phase_c_ml.py: 25 passed (신규 1개 포함) ✅
 - Full test suite: 5849 passed ✅
 
-**Key Insights (Cycle 7 연구 반영):**
-- **Look-ahead bias**: rolling/ewm은 현재 바 포함 → shift(1) 필수
-- **Scaler fit 순서**: 전체 데이터 fit ❌ → train만 fit ✅
-- **Walk-forward**: 시계열 순서 유지 + 각 구간별 독립 전처리
-
 ---
-
-## Previous Cycles
-
-[생략: Cycle 1-11 A,B,C 완료 기록]
 
 ## Next Pending Tasks
 
 - Cycle 12: 다른 데이터 소스 견고성 (News/Sentiment/Onchain) 재검증
 - Cycle 13: 모델 성능 검증 (Feature importance bias 확인)
+- 옵션 2: MAR (Minimum Acceptable Return) 기반 평가 — Sortino 계산 시 MAR 파라미터 추가

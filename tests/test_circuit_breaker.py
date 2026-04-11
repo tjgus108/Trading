@@ -160,3 +160,74 @@ def test_atr_surge_without_atr_args_no_effect():
     assert result["triggered"] is False
     assert result["volatility_surge"] is False
     assert result["size_multiplier"] == 1.0
+
+
+# ── 상관관계 축소 (Correlation Throttle) ────────────────────
+def _make_tracker_with_high_corr():
+    """상관계수 ≥ 0.7인 두 전략이 포함된 트래커 반환."""
+    from src.analysis.strategy_correlation import SignalCorrelationTracker
+    from src.strategy.base import Action
+
+    tracker = SignalCorrelationTracker(["s1", "s2"])
+    # 혼합 패턴으로 분산 확보 → 완전 양의 상관 (r=1.0)
+    pattern = [Action.BUY, Action.BUY, Action.SELL, Action.BUY, Action.HOLD]
+    for i in range(20):
+        action = pattern[i % len(pattern)]
+        tracker.record("s1", action)
+        tracker.record("s2", action)
+    return tracker
+
+
+def test_corr_throttle_sets_07_multiplier():
+    """상관계수 ≥ 0.7 → triggered=False, correlation_throttle=True, size_multiplier=0.7"""
+    cb = CircuitBreaker(corr_threshold=0.7, correlation_tracker=_make_tracker_with_high_corr())
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is False
+    assert result["correlation_throttle"] is True
+    assert result["size_multiplier"] == 0.7
+    assert "상관관계" in result["reason"]
+
+
+def test_corr_throttle_no_effect_below_threshold():
+    """상관계수가 threshold 미만 → 정상 통과"""
+    from src.analysis.strategy_correlation import SignalCorrelationTracker
+    from src.strategy.base import Action
+
+    tracker = SignalCorrelationTracker(["s1", "s2"])
+    # 교차 신호 → 낮은 상관
+    for i in range(20):
+        tracker.record("s1", Action.BUY if i % 2 == 0 else Action.SELL)
+        tracker.record("s2", Action.SELL if i % 2 == 0 else Action.BUY)
+
+    cb = CircuitBreaker(corr_threshold=0.7, correlation_tracker=tracker)
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["correlation_throttle"] is False
+    assert result["size_multiplier"] == 1.0
+
+
+def test_corr_throttle_and_atr_surge_uses_lower_multiplier():
+    """ATR surge + correlation throttle 동시 → size_multiplier=0.5 (더 보수적)"""
+    cb = CircuitBreaker(
+        atr_surge_multiplier=2.0,
+        corr_threshold=0.7,
+        correlation_tracker=_make_tracker_with_high_corr(),
+    )
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.04,
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is False
+    assert result["volatility_surge"] is True
+    assert result["correlation_throttle"] is True
+    assert result["size_multiplier"] == 0.5

@@ -3,9 +3,12 @@ Circuit Breaker: 다층 자동 거래 중단.
 - 일일 낙폭 / 전체 낙폭
 - 변동성 급등: 현재 ATR이 기준 ATR의 atr_surge_multiplier 배 이상이면 트리거
   (포지션 full-block이 아닌 50% 축소 신호를 반환)
+- 상관관계 급증: 전략 간 상관계수 ≥ corr_threshold → size_multiplier=0.7 축소
 """
 import logging
 from typing import Optional
+
+from src.analysis.strategy_correlation import SignalCorrelationTracker
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +19,14 @@ class CircuitBreaker:
         daily_drawdown_limit: float = 0.05,   # -5% 일일 낙폭
         total_drawdown_limit: float = 0.15,   # -15% 전체 낙폭
         atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
+        corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소
+        correlation_tracker: Optional[SignalCorrelationTracker] = None,
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
         self.total_drawdown_limit = total_drawdown_limit
         self.atr_surge_multiplier = atr_surge_multiplier
+        self.corr_threshold = corr_threshold
+        self._correlation_tracker = correlation_tracker
         self._triggered: bool = False
         self._reason: str = ""
         self._daily_start_balance: float = 0.0
@@ -31,6 +38,7 @@ class CircuitBreaker:
         reason: str,
         drawdown_pct: float,
         volatility_surge: bool = False,
+        correlation_throttle: bool = False,
         size_multiplier: float = 1.0,
     ) -> dict:
         return {
@@ -38,7 +46,8 @@ class CircuitBreaker:
             "reason": reason,
             "drawdown_pct": round(drawdown_pct, 6),
             "volatility_surge": volatility_surge,
-            "size_multiplier": size_multiplier,   # 1.0=정상, 0.5=반축소, 0.0=완전차단
+            "correlation_throttle": correlation_throttle,
+            "size_multiplier": size_multiplier,   # 1.0=정상, 0.7=상관축소, 0.5=반축소, 0.0=완전차단
         }
 
     # ── 메인 체크 ──────────────────────────────────────────────────────────────
@@ -52,15 +61,15 @@ class CircuitBreaker:
     ) -> dict:
         """
         반환:
-          triggered       : bool   — True면 거래 완전 차단
-          reason          : str
-          drawdown_pct    : float
-          volatility_surge: bool   — True면 포지션 50% 축소 권고 (triggered=False일 때만 유효)
-          size_multiplier : float  — 1.0=정상, 0.5=축소, 0.0=차단
+          triggered            : bool   — True면 거래 완전 차단
+          reason               : str
+          drawdown_pct         : float
+          volatility_surge     : bool   — True면 포지션 50% 축소 권고
+          correlation_throttle : bool   — True면 포지션 70% 축소 권고
+          size_multiplier      : float  — 1.0=정상, 0.7=상관축소, 0.5=ATR축소, 0.0=차단
 
-        변동성 급등(ATR surge)은 단독으로 triggered=True를 유발하지 않고
-        size_multiplier=0.5 + volatility_surge=True 를 반환한다.
-        낙폭 조건과 함께 발생하면 triggered=True.
+        ATR surge와 correlation throttle이 동시 발생하면 더 보수적인 값(0.5) 사용.
+        낙폭 조건은 항상 우선 — triggered=True, size_multiplier=0.0.
         """
         if daily_start_balance <= 0 or peak_balance <= 0:
             return self._make_result(False, "", 0.0)
@@ -90,8 +99,11 @@ class CircuitBreaker:
             logger.warning("CircuitBreaker TRIGGERED: %s", self._reason)
             return self._make_result(True, self._reason, total_dd, size_multiplier=0.0)
 
-        # ── ATR 변동성 급등 체크 ──────────────────────────────────────────────
         worst = max(daily_dd, total_dd)
+
+        # ── ATR 변동성 급등 체크 ──────────────────────────────────────────────
+        atr_surge = False
+        atr_reason = ""
         if (
             current_atr is not None
             and baseline_atr is not None
@@ -99,15 +111,56 @@ class CircuitBreaker:
             and current_atr >= baseline_atr * self.atr_surge_multiplier
         ):
             surge_ratio = current_atr / baseline_atr
-            reason = (
+            atr_reason = (
                 f"ATR 급등 {surge_ratio:.2f}x "
                 f"(현재 {current_atr:.4f} ≥ 기준 {baseline_atr:.4f} × {self.atr_surge_multiplier})"
             )
-            logger.warning("CircuitBreaker VOLATILITY SURGE: %s — 포지션 50%% 축소", reason)
+            atr_surge = True
+            logger.warning("CircuitBreaker VOLATILITY SURGE: %s — 포지션 50%% 축소", atr_reason)
+
+        # ── 상관관계 급증 체크 ────────────────────────────────────────────────
+        corr_throttle = False
+        corr_reason = ""
+        if self._correlation_tracker is not None:
+            # 양의 상관만 throttle (전략 중복 케이스); 음의 상관은 헤지 효과
+            high_pairs = [
+                (a, b, r)
+                for a, b, r in self._correlation_tracker.high_correlation_pairs(
+                    threshold=self.corr_threshold
+                )
+                if r >= self.corr_threshold
+            ]
+            if high_pairs:
+                top_a, top_b, top_r = high_pairs[0]
+                corr_reason = (
+                    f"상관관계 급증 {top_a}↔{top_b} r={top_r:+.3f} ≥ {self.corr_threshold}"
+                )
+                corr_throttle = True
+                logger.warning(
+                    "CircuitBreaker CORRELATION THROTTLE: %s — 포지션 70%% 축소", corr_reason
+                )
+
+        # ── 복합 판정 ─────────────────────────────────────────────────────────
+        if atr_surge and corr_throttle:
+            # ATR surge가 더 보수적
+            combined_reason = f"{atr_reason} | {corr_reason}"
             return self._make_result(
-                False, reason, worst,
+                False, combined_reason, worst,
+                volatility_surge=True,
+                correlation_throttle=True,
+                size_multiplier=0.5,
+            )
+        if atr_surge:
+            return self._make_result(
+                False, atr_reason, worst,
                 volatility_surge=True,
                 size_multiplier=0.5,
+            )
+        if corr_throttle:
+            return self._make_result(
+                False, corr_reason, worst,
+                correlation_throttle=True,
+                size_multiplier=0.7,
             )
 
         return self._make_result(False, "", worst)

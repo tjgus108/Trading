@@ -118,7 +118,7 @@ class TestFeatureBuilder:
     def test_no_lookahead_bias_in_features(self):
         """
         EMA/rolling 계산이 이전 바만 사용하는지 확인 (현재 바 제외).
-        
+
         검증:
         1. RSI z-score: 이전 20바 기준
         2. Volatility: 이전 20바 기준
@@ -128,20 +128,122 @@ class TestFeatureBuilder:
         df = _make_df(200)
         fb = FeatureBuilder()
         X, _ = fb.build(df)
-        
+
         # Feature가 존재하는지 확인
-        required_features = ["rsi_zscore", "volatility_20", "ema_ratio", 
+        required_features = ["rsi_zscore", "volatility_20", "ema_ratio",
                             "price_vs_ema20", "volume_ratio_20", "donchian_pct"]
         for feat in required_features:
             assert feat in X.columns, f"Feature {feat} missing"
-        
+
         # 모든 feature가 유한 값인지 확인 (inf/nan 없음)
         assert X[required_features].notna().all().all()
         assert np.isfinite(X[required_features]).all().all()
-        
+
         # EMA는 첫 50바 정도는 정규화 과정에서 NaN 처리됨
         # (rolling window warm-up) → 그 이후만 유효
         assert len(X) > 0
+
+    def test_future_price_change_does_not_affect_past_features(self):
+        """
+        미래 가격 변화가 과거 피처에 영향 없음 확인.
+
+        row t의 피처는 t 이전 데이터만 사용해야 함.
+        last row의 close를 10배로 바꾸면 그 row의 피처는 변해도
+        그 이전 rows의 피처는 불변이어야 한다.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+
+        # 원본 피처 (마지막 행 제외한 앞부분)
+        X_orig = fb.build_features_only(df)
+
+        # 마지막 행 close를 10배로 수정
+        df_modified = df.copy()
+        df_modified.iloc[-1, df_modified.columns.get_loc("close")] *= 10.0
+
+        X_mod = fb.build_features_only(df_modified)
+
+        # 공통 인덱스 (마지막 행 제외)
+        common_idx = X_orig.index[:-1].intersection(X_mod.index[:-1])
+        assert len(common_idx) > 50, "비교 가능한 공통 행이 너무 적음"
+
+        # shift(1) 기반 피처: 이전 행까지만 영향 받아야 함
+        # 마지막 행 수정 → 그 이전 행들의 피처는 동일해야 함
+        shifted_features = ["volatility_20", "rsi_zscore", "ema_ratio",
+                            "price_vs_ema20", "price_vs_ema50", "volume_ratio_20"]
+        for feat in shifted_features:
+            if feat in X_orig.columns and feat in X_mod.columns:
+                diff = (X_orig.loc[common_idx, feat] - X_mod.loc[common_idx, feat]).abs().max()
+                assert diff < 1e-9, (
+                    f"피처 '{feat}'가 미래 데이터 영향을 받음 (max_diff={diff:.2e}). "
+                    "look-ahead bias 가능성."
+                )
+
+    def test_labels_use_future_data_not_features(self):
+        """
+        레이블은 미래 데이터(forward_n 이후)를 사용하지만,
+        피처는 그 미래 데이터를 사용하지 않음을 확인.
+
+        같은 시점 t에서:
+        - 피처: t 시점의 close/volume 등 과거 정보만
+        - 레이블: t+forward_n 시점의 close (미래)
+
+        피처와 레이블의 인덱스가 같으며, 피처에 forward shift가 없음을 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder(forward_n=5, threshold=0.003)
+        X, y = fb.build(df)
+
+        # 레이블이 마지막 forward_n 행에서 NaN으로 처리되는지 확인
+        # (build()는 dropna()로 레이블 NaN 제거 → 마지막 5행은 X에 없어야 함)
+        last_ts = df.index[-1]
+        assert last_ts not in X.index, (
+            "마지막 행이 X에 포함됨 — 레이블 forward_n 미적용 가능성"
+        )
+        # 마지막 forward_n 행이 전부 제거됐는지 확인
+        last_n_ts = df.index[-fb.forward_n:]
+        overlap = X.index.intersection(last_n_ts)
+        assert len(overlap) == 0, (
+            f"마지막 {fb.forward_n}행 중 {len(overlap)}개가 X에 남아있음 — "
+            "레이블 누수 가능성"
+        )
+
+    def test_rolling_features_use_prior_bars_only(self):
+        """
+        rolling/ewm 피처가 현재 바 포함 여부 직접 검증.
+
+        중간 row t의 close를 극단값으로 변경 → t+1 row의 shift(1) 기반 피처는
+        영향 받아야 하지만, t-1 이전 피처는 불변이어야 함.
+        """
+        df = _make_df(150)
+        fb = FeatureBuilder()
+
+        # 중간 행 인덱스 (warm-up 이후)
+        mid = 100
+        mid_ts = df.index[mid]
+        prev_ts = df.index[mid - 1]
+
+        # 원본 피처
+        X_orig = fb.build_features_only(df)
+
+        # mid 행의 close를 극단값으로 변경
+        df_mod = df.copy()
+        df_mod.iloc[mid, df_mod.columns.get_loc("close")] = 1_000_000.0
+
+        X_mod = fb.build_features_only(df_mod)
+
+        # mid 이전 행들의 피처는 영향 없어야 함
+        pre_mid_idx = X_orig.index[X_orig.index < mid_ts]
+        pre_mid_idx = pre_mid_idx.intersection(X_mod.index)
+
+        check_feats = ["volatility_20", "ema_ratio", "volume_ratio_20", "donchian_pct"]
+        for feat in check_feats:
+            if feat in X_orig.columns and feat in X_mod.columns:
+                diff = (X_orig.loc[pre_mid_idx, feat] - X_mod.loc[pre_mid_idx, feat]).abs().max()
+                assert diff < 1e-9, (
+                    f"피처 '{feat}'가 미래(mid row) 변경에 영향받음 (max_diff={diff:.2e}). "
+                    "look-ahead bias."
+                )
 
 
 

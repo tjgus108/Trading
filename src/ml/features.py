@@ -153,10 +153,12 @@ class FeatureBuilder:
         """forward_n 캔들 후 수익률 기반 레이블."""
         close = df["close"]
         fwd_ret = close.shift(-self.forward_n) / close - 1.0
-        label = pd.Series(0, index=df.index, name="label", dtype=int)
-        label[fwd_ret > self.threshold] = 1
-        label[fwd_ret < -self.threshold] = -1
-        return label
+        label = pd.Series(np.nan, index=df.index, name="label", dtype=float)
+        label[fwd_ret > self.threshold] = 1.0
+        label[fwd_ret < -self.threshold] = -1.0
+        # 미래 데이터가 없는 마지막 forward_n 행은 NaN → build()의 dropna()에서 제거
+        label[~fwd_ret.isna()] = label[~fwd_ret.isna()].fillna(0.0)
+        return label.astype("Int64")
 
     @property
     def feature_names(self) -> list[str]:

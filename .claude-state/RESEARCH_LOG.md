@@ -290,3 +290,23 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Paper vs Live Trading — Alpaca](https://alpaca.markets/learn/paper-trading-vs-live-trading-a-data-backed-guide-on-when-to-start-trading-real-money)
 - [Overfitting Crypto Strategies — TrendRider](https://trendrider.net/blog/how-to-avoid-overfitting-crypto-trading)
 - [Backtesting with Realistic Costs — Paybis](https://paybis.com/blog/how-to-backtest-crypto-bot/)
+
+
+## [2026-04-11] Cycle 12 — Monitoring Metrics
+
+### 핵심 실시간 지표
+- **Sharpe / Sortino 실시간 롤링**: 30~90일 롤링 윈도우로 전략 성과 열화 조기 감지. Sortino 급락 = 하방 리스크 증가 신호.
+- **최대 낙폭(MDD) 실시간 추적**: 에쿼티 커브 peak-to-trough 연속 계산. 일일 3%, 주간 7% 초과 시 서킷브레이커 트리거.
+- **Profit Factor 누적**: 실시간 총이익/총손실 비율. 1.5 이하로 하락 시 전략 성능 저하 경보.
+- **체결가 vs 백테스트 가격 차이(Implementation Shortfall)**: 주문 접수~체결 간 가격 차이 누적. 슬리피지 예산 초과 여부 판단.
+- **포지션 노출(Gross/Net Exposure)**: 전략별·전체 레버리지 실시간 합산. 상관관계 급증 시 gross 자동 축소 기준으로 사용.
+
+### 크립토 특화 이상 징후
+- **펀딩비 급변**: 8시간 주기 펀딩률이 0.05% 초과 시 한쪽 방향 과매수/과매도 신호. 이 임계치 돌파는 단기 반전 또는 강제 청산 cascade 전조.
+- **청산 급증(Liquidation Spike)**: 대형 레버리지 포지션 동시 청산 → 10~20분 내 10~20% 급락 가능. 청산 볼륨이 일평균 3배 이상 시 봇 즉시 포지션 축소 권장.
+- **거래량/시총 비율 급등**: 단시간 거래량이 시총의 수% 이상 → 펌프·덤프 또는 고래 이탈 패턴. Z-score 기반 이상치 탐지(Isolation Forest, LSTM Autoencoder)가 실용적.
+
+### 참고
+- [AI Trading Bot Metrics — 3Commas](https://3commas.io/blog/ai-trading-bot-performance-analysis)
+- [Crypto Anomaly Detection (Deep Learning + Band Protocol) — Google Cloud](https://medium.com/google-cloud/technical-indicators-calculation-and-anomaly-detection-on-band-protocol-data-6dbf3b9b92c6)
+- [Funding Rate Guide — Bitunix](https://blog.bitunix.com/en/2024/07/15/understanding-crypto-funding-rate/)
