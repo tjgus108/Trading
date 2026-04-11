@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 84 — 2026-04-11T16:06:52.970664Z
+🔄 CYCLE 85 — 2026-04-11T16:19:03.431886Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 83 COMPLETED — E + A + SIM + F** (2026-04-12 07:25 UTC)
-  **[E] Execution:** tests/test_kelly_twap.py TestTWAPSliceSum +2. 슬라이스 합 = total_qty 검증.
-  **[A] Quality:** tests/test_wick_reversal.py +2 추세 필터 회귀. shooting_star trend_down, 패턴 상호배제 (19 tests).
-  **[SIM] Auto-improve:** engulfing_zone 개선. body_ratio 1.1→1.5, S/R ±1.0%→±0.5%, HIGH 임계값 1.5→1.8. **-12.74% → -2.53% (+10.21%p)**. 26→9 거래. Sharpe -5.31 → -1.73.
-  **[F] Research:** FRAMA + Engulfing. 단독 50-70% 부족 → RSI(과매수) + Volume 이중 필터 필요.
+**Cycle 84 COMPLETED — C + B + SIM + F** (2026-04-12 08:00 UTC)
+  **[C] Data:** tests/test_feed_parallel.py TestFetchMultipleStress +5. 10개 심볼 동시, max_workers 스케일링, 캐시 일관성.
+  **[B] Risk:** tests/test_orchestrator.py +2 DD halt 복귀. recovery_pct 자동 복귀 vs FORCE_LIQUIDATE 수동.
+  **[SIM] Auto-improve:** frama 개선. RSI 14 필터 + 이격 기반 필터링. **-7.89% → -3.77% (+4.12%p)**. Sharpe -1.61 → -0.69. 17 tests 유지.
+  **[F] Research:** Funding arb 2024 14.39% / 2025 19.26% 연수익. 청산 리스크 여전, AI 최적화 슬리피지 40% 감소.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

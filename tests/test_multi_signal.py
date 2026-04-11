@@ -215,3 +215,30 @@ def test_tie_confidence_low():
     sig = agg.generate(_df())
     assert sig.action == Action.HOLD
     assert sig.confidence == Confidence.LOW
+
+
+# ── 연속 적중/실패 경계 ─────────────────────────────────────────────────────
+
+def test_consecutive_hits_exactly_min_samples_activates():
+    """MIN_PERF_SAMPLES(5)번 연속 적중 → 정확히 acc=1.0, weight=2.0 활성화."""
+    agg = _make_agg(("a", Action.BUY, Confidence.HIGH))
+    # 4번까지는 비활성 (weight=1.0)
+    for _ in range(4):
+        agg.record_outcome("a", 1)
+    assert agg._perf_weight("a") == 1.0  # 아직 min_samples 미달
+    # 5번째 → 활성화
+    agg.record_outcome("a", 1)
+    assert agg._perf_weight("a") == pytest.approx(2.0)
+
+
+def test_consecutive_failures_after_hits_drops_to_min():
+    """연속 적중 후 연속 실패가 window를 채우면 weight=0.5로 하락."""
+    agg = _make_agg(("a", Action.BUY, Confidence.HIGH), perf_window=5)
+    # 5번 적중 → weight=2.0
+    for _ in range(5):
+        agg.record_outcome("a", 1)
+    assert agg._perf_weight("a") == pytest.approx(2.0)
+    # 5번 연속 실패 → 이전 적중 모두 밀려남, weight=0.5
+    for _ in range(5):
+        agg.record_outcome("a", 0)
+    assert agg._perf_weight("a") == pytest.approx(0.5)
