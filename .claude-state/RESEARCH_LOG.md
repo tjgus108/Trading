@@ -641,3 +641,10 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [The Biggest Mistakes I Made Building a Crypto Bot — Medium](https://swaeth.medium.com/the-biggest-mistakes-i-made-building-a-crypto-bot-7d3509883f25)
 - [Common Pitfalls: What Beginners Get Wrong — Coin Bureau](https://coinbureau.com/guides/crypto-trading-bot-mistakes-to-avoid)
 - [Why Most Crypto Trading Bots Fail — DEV Community](https://dev.to/matrixtrak/why-most-crypto-trading-bots-fail-and-how-to-build-one-that-actually-works-257g)
+
+## [2026-04-11] Cycle 32 — 2025 Final Trends
+- 온체인 AI 에이전트 부상: 거래소 API 기반 봇에서 온체인 직접 자산 보유·프로토콜 상호작용 에이전트로 전환. BNB Chain ERC-8004 등 표준 등장
+- LLM 기반 적응형 봇: 고정 규칙 대신 실시간 시장 복잡성을 처리하는 학습·적응형 AI 에이전트가 주류화, AI 관련 토큰 시총 $23B→$50.5B 급증(2024→2025)
+- 인텐트 기반 트레이딩: 사용자 목표를 온체인 액션으로 자동 변환하는 지갑·봇 통합 방식 등장
+- DeFi 자동화 확장: 유동성 공급·수익 최적화 AI 봇이 CEX 중심에서 DEX/DeFi로 확장, 멀티체인 중재 전략 증가
+

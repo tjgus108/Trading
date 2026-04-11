@@ -37,6 +37,11 @@ class FeatureBuilder:
         forward_n: int = DEFAULT_FORWARD_N,
         threshold: float = DEFAULT_THRESHOLD,
     ):
+        """
+        Args:
+            forward_n: 레이블 생성 기준 — N 캔들 후 수익률 참조.
+            threshold: BUY/SELL 판정 최소 수익률 (기본 0.003 = 0.3%).
+        """
         self.forward_n = forward_n
         self.threshold = threshold
 
@@ -150,7 +155,13 @@ class FeatureBuilder:
         return feat
 
     def _compute_labels(self, df: pd.DataFrame) -> pd.Series:
-        """forward_n 캔들 후 수익률 기반 레이블."""
+        """
+        forward_n 캔들 후 수익률 기반 레이블 생성.
+
+        Returns:
+            pd.Series[Int64]: 1(BUY) / -1(SELL) / 0(HOLD). 미래 데이터 부족한
+            마지막 forward_n 행은 NaN으로 반환 → build()의 dropna()에서 제거됨.
+        """
         close = df["close"]
         fwd_ret = close.shift(-self.forward_n) / close - 1.0
         label = pd.Series(np.nan, index=df.index, name="label", dtype=float)
@@ -162,6 +173,7 @@ class FeatureBuilder:
 
     @property
     def feature_names(self) -> list[str]:
+        """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정)."""
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",
             "rsi14", "rsi_zscore",

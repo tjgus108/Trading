@@ -2536,3 +2536,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 개발자 후회 사례. 과적합 백테스트, 수수료 미반영, 리스크 한도 부재 3대 공통 후회. "나중에 추가"로 빠진 것들. Walk-forward + 서킷브레이커는 첫 기능으로 만들어야 함.
 **Tests:** 5998 passed (+3 from Cycle 30).
 **Next Cycle:** 32 (B+D+F)
+
+## [2026-04-11 04:33 UTC] Cycle 32 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:35 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 12:40 UTC] Cycle 32 COMPLETED — B + D + F (문서화)
+**[B] Risk:** src/risk/README.md 135줄 신규. 6개 모듈 정리: DrawdownMonitor 3층, CircuitBreaker 5가지, KellySizer Half-Kelly+DD, RiskManager 처리 순서, VolTargeting, PortfolioOptimizer.
+**[D] ML:** src/ml/features.py + model.py 5곳 docstring 추가. FeatureBuilder.__init__, _compute_labels, feature_names, MLPrediction, _hold. 로직 변경 없음.
+**[F] Research:** 2025 핵심 트렌드. 온체인 AI 에이전트 표준화, LLM 적응형 봇 주류화, 인텐트 기반 트레이딩, DeFi 멀티체인 자동화.
+**Tests:** 5998 passed (변화 없음, 문서화 사이클).
+**Next Cycle:** 33 (E+A+F)

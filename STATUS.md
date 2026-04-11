@@ -38,7 +38,8 @@
 - ✅ Cycle 29 완료 (C+B+F: 병렬 fetch + max_total_exposure + 성공 봇 공통점)
 - ✅ Cycle 30 완료 (D+E+F: rolling_consistency + health check 검증 + 2025 마이크로구조)
 - ✅ Cycle 31 완료 (C+F: feed 에러 로그 강화 + 개발자 후회 리서치, A 스킵)
-- ⏳ **Cycle 32 대기** (B+D+F)
+- ✅ Cycle 32 완료 (B+D+F: risk/README + ml docstring + 2025 트렌드)
+- ⏳ **Cycle 33 대기** (E+A+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
