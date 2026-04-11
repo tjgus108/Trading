@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 74 — 2026-04-11T11:23:52.641386Z
+🔄 CYCLE 75 — 2026-04-11T11:26:36.185861Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 73 COMPLETED — E + A + F** (2026-04-12 03:40 UTC)
-  **[E] Execution BUG FIX:** src/exchange/connector.py wait_for_fill가 timeout 시 partial fill 수량 유실하던 버그 수정. last_order 변수로 마지막 fetch 보존, filled/amount 반환 포함. +2 tests.
-  **[A] Quality:** tests/test_strategy_correlation.py +3. 모든 신호 동일 (+1.0), 완전 반대 (-1.0), 혼합 반대 검증.
-  **[F] Research:** 크립토 옵션 GEX. Positive GEX → 가격 pin mean-revert, Negative GEX → 추세 가속. 기존 gex_strategy.py 이미 구현됨.
-  **Tests:** 6207 passed (+5 from Cycle 72). 9번째 CRITICAL 버그 수정.
+**Cycle 74 COMPLETED — C + B + F** (2026-04-12 04:00 UTC)
+  **[C] Data:** tests/test_onchain_consistency.py 신규 +3. mock 일관성, score 재계산, [-3,+3] 경계 검증.
+  **[B] Risk:** tests/test_circuit_breaker.py +2 reset_all. 연속 손실+쿨다운 초기화, 플래시 크래시 트리거 후 재개 확인.
+  **[F] Research:** ETF Option Bots. BITO(선물) + IBIT(현물) 옵션 체인 활성화. IV rank 기반 strangle 매도, GEX flip 결합 타이밍 정밀도 향상.
+  **Tests:** 6212 passed (+5 from Cycle 73).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

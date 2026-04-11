@@ -351,3 +351,71 @@ class TestTWAPPartialAndTimeout:
         )
         assert isinstance(result.avg_execution_time, float)
         assert result.avg_execution_time >= 0.0
+
+    def test_twap_global_timeout_triggers_on_second_slice(self):
+        """전체 타임아웃(timeout_per_slice * n_slices) 초과 시 두 번째 슬라이스에서 조기 종료."""
+        from unittest.mock import patch
+
+        # start_time=0, 첫 슬라이스 진입 시 elapsed=0 → 통과
+        # 두 번째 슬라이스 진입 시 elapsed=999 → 초과 → break
+        call_count = 0
+        base_times = [0, 0, 0, 999, 999]  # time.time() 호출 순서별 반환값
+
+        def fake_time():
+            nonlocal call_count
+            val = base_times[min(call_count, len(base_times) - 1)]
+            call_count += 1
+            return val
+
+        executor = TWAPExecutor(
+            n_slices=3,
+            interval_seconds=0,
+            dry_run=True,
+            timeout_per_slice=100.0,  # total budget = 300s, elapsed=999 → 초과
+        )
+        with patch("src.exchange.twap.time.time", side_effect=fake_time):
+            result = executor.execute(
+                connector=None,
+                symbol="BTC/USDT",
+                side="buy",
+                total_qty=1.0,
+                price_limit=50_000.0,
+            )
+
+        assert result.timeout_occurred is True
+        assert result.slices_executed < 3, (
+            f"Expected early exit, but got slices_executed={result.slices_executed}"
+        )
+
+    def test_twap_global_timeout_not_triggered_within_budget(self):
+        """elapsed가 budget 이하이면 timeout_occurred=False, 모든 슬라이스 실행."""
+        from unittest.mock import patch
+
+        # 3 슬라이스: 각 슬라이스마다 time.time() 2회 호출 (루프 시작 + _slice_t0)
+        # elapsed는 항상 budget(300s) 이하
+        times = [0, 0, 50, 50, 100, 100, 150, 150]
+        call_count = 0
+
+        def fake_time():
+            nonlocal call_count
+            val = times[min(call_count, len(times) - 1)]
+            call_count += 1
+            return val
+
+        executor = TWAPExecutor(
+            n_slices=3,
+            interval_seconds=0,
+            dry_run=True,
+            timeout_per_slice=200.0,  # total budget = 600s > 100s elapsed
+        )
+        with patch("src.exchange.twap.time.time", side_effect=fake_time):
+            result = executor.execute(
+                connector=None,
+                symbol="BTC/USDT",
+                side="buy",
+                total_qty=1.0,
+                price_limit=50_000.0,
+            )
+
+        assert result.timeout_occurred is False
+        assert result.slices_executed == 3

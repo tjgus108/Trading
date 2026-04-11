@@ -255,7 +255,7 @@ class LSTMSignalGenerator:
             MODELS_DIR.mkdir(exist_ok=True)
             model_path = str(MODELS_DIR / f"{self._model_name}.pt")
             torch.save({"model_state": best_state, "scaler": scaler,
-                        "n_features": X.shape[1], "name": self._model_name}, model_path)
+                        "n_features": seq_X_raw.shape[-1], "name": self._model_name}, model_path)
             logger.info("LSTM model saved: %s (acc=%.3f)", model_path, test_acc)
 
         return {

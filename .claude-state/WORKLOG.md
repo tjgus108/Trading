@@ -6256,3 +6256,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** ETF Option Bots. BITO(선물) + IBIT(현물) 옵션 체인 활성화. IV rank 기반 strangle 매도, GEX flip 결합 타이밍 정밀도 향상.
 **Tests:** 6212 passed (+5 from Cycle 73).
 **Next Cycle:** 75 (D+E+F)
+
+## [2026-04-11 11:26 UTC] Cycle 75 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:28 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 04:20 UTC] Cycle 75 COMPLETED — D + E + F
+**[D] ML BUG FIX:** src/ml/lstm_model.py _train_torch 저장 시 `X` 미정의 변수 참조 버그 수정 (X.shape → seq_X_raw.shape). +2 tests (numpy fallback 검증).
+**[E] Execution:** tests/test_kelly_twap.py +2 TWAP 전역 timeout. time.time 모킹으로 슬라이스 조기 종료, budget 내 정상 완료 검증.
+**[F] Research:** Solana 봇. Jupiter Perps 일평균 $1B/79% 점유율. Telegram 봇(Trojan, BONKbot, Axiom) 주도. Jupiter 라우팅 + Phantom 지갑 표준 패턴.
+**Tests:** 6214 passed (+2 from Cycle 74). 10번째 CRITICAL 버그 수정.
+**Next Cycle:** 76 (A+C+F)
