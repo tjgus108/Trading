@@ -2300,3 +2300,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 자동매매 심리적 실패. in-sample/OOS 상관 0.05 미만 → 숫자 과신 → 과잉 투자 → 패닉 개입. CFTC advisory 인용. 방지: 자본 상한 고정, 개입 금지 룰.
 **Tests:** 5979 passed (+2 from Cycle 26).
 **Next Cycle:** 28 (E+A+F)
+
+## [2026-04-11 04:17 UTC] Cycle 28 Dispatched — E + A + F
+Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:19 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 11:20 UTC] Cycle 28 COMPLETED — E + A + F
+**[E] Execution (via Risk):** src/config.py _validate_config() 추가. risk_per_trade > 0.1 → ValueError 차단, > 0.05 → UserWarning. max_position_size > 0.5 → warning. +3 tests.
+**[A] Quality:** src/backtest/report.py to_markdown에 DSR 필드 추가. Deflated Sharpe Ratio가 마크다운 테이블에 포함되어 과최적화 리스크 명확 표시. +1 test.
+**[F] Research:** AMM/DEX 상호작용. MEV 봇이 LP로부터 연 $500M+ 추출(LVR). Uniswap v3 LP 50%가 단순 보유 대비 손실. CeFi 봇이 DEX 가격 신호 소스로 쓸 때 차익거래 지연 주의.
+**Tests:** 5982 passed (+3 from Cycle 27).
+**Next Cycle:** 29 (C+B+F)

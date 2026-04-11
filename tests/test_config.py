@@ -77,3 +77,74 @@ def test_load_config_defaults(tmp_path):
     assert cfg.risk.max_consecutive_losses == 5  # default
     assert cfg.strategy == "donchian_breakout"   # default
     assert cfg.dry_run is True                   # default
+
+
+def test_risk_per_trade_above_01_raises(tmp_path):
+    """risk_per_trade > 0.1이면 ValueError."""
+    content = textwrap.dedent("""\
+        exchange:
+          name: binance
+          sandbox: true
+        trading:
+          symbol: BTC/USDT
+          timeframe: 1h
+          max_position_size: 0.1
+        risk:
+          max_drawdown: 0.20
+          max_daily_loss: 0.05
+          stop_loss: 1.5
+          take_profit: 3.0
+          risk_per_trade: 0.15
+    """)
+    p = tmp_path / "config.yaml"
+    p.write_text(content)
+    with pytest.raises(ValueError, match="risk_per_trade"):
+        load_config(str(p))
+
+
+def test_risk_per_trade_between_005_and_01_warns(tmp_path):
+    """0.05 < risk_per_trade <= 0.1이면 UserWarning."""
+    content = textwrap.dedent("""\
+        exchange:
+          name: binance
+          sandbox: true
+        trading:
+          symbol: BTC/USDT
+          timeframe: 1h
+          max_position_size: 0.1
+        risk:
+          max_drawdown: 0.20
+          max_daily_loss: 0.05
+          stop_loss: 1.5
+          take_profit: 3.0
+          risk_per_trade: 0.07
+    """)
+    p = tmp_path / "config.yaml"
+    p.write_text(content)
+    with pytest.warns(UserWarning, match="risk_per_trade"):
+        cfg = load_config(str(p))
+    assert cfg.risk.risk_per_trade == 0.07
+
+
+def test_max_position_size_above_05_warns(tmp_path):
+    """max_position_size > 0.5이면 UserWarning."""
+    content = textwrap.dedent("""\
+        exchange:
+          name: binance
+          sandbox: true
+        trading:
+          symbol: BTC/USDT
+          timeframe: 1h
+          max_position_size: 0.8
+        risk:
+          max_drawdown: 0.20
+          max_daily_loss: 0.05
+          stop_loss: 1.5
+          take_profit: 3.0
+          risk_per_trade: 0.01
+    """)
+    p = tmp_path / "config.yaml"
+    p.write_text(content)
+    with pytest.warns(UserWarning, match="max_position_size"):
+        cfg = load_config(str(p))
+    assert cfg.trading.max_position_size == 0.8

@@ -1,24 +1,22 @@
-# Cycle 27 - Risk: Session Filter 통합 완료
+# Cycle 28 - Config Validation 강화 완료
 
 ## 이번 작업 내용
-Cycle 25의 `is_active_session()` 헬퍼를 RiskManager에 통합.
+`load_config()` 호출 시 위험 파라미터 자동 검증 추가.
 
 **수정:**
-1. `src/risk/manager.py`
-   - L12–L15: `datetime`, `Union`, `SessionType`, `is_active_session` import 추가
-   - L111, L119: `__init__`에 `session_filter: bool = False` 파라미터 + 저장
-   - L178: `evaluate()`에 `timestamp: Union[datetime, None] = None` 파라미터 추가
-   - L226–L240: 세션 필터 블록 — REDUCED+평일 → 50%, REDUCED+주말 → 30% 축소
+1. `src/config.py`
+   - L7: `import warnings` 추가
+   - L67-84: `_validate_config()` 함수 신규 추가
+     - `risk_per_trade > 0.1` → `ValueError`
+     - `risk_per_trade > 0.05` → `UserWarning`
+     - `max_position_size > 0.5` → `UserWarning`
+   - L131: `_validate_config(cfg)` 호출
 
-2. `tests/test_risk_manager.py`
-   - L255–L285: `test_session_filter_reduced_asia_halves_position` (평일 아시아)
-   - L286–L300: `test_session_filter_weekend_scales_to_30_pct` (주말)
+2. `tests/test_config.py`
+   - L82-134: 검증 테스트 3개 추가
 
-## 설계 결정
-- 기본값 `session_filter=False` → 기존 코드 동작 변경 없음 (opt-in)
-- 주말 판단: `timestamp.weekday() >= 5` (is_active_session 내부와 동일 로직)
-- 포지션 축소는 jitter 적용 이후 — 순서: 기본 사이징 → 클램프 → jitter → 세션 축소
+## 테스트 결과
+6/6 passed (test_config.py)
 
 ## 다음 단계
-- `config/config.yaml`에 `session_filter: true/false` 연결 가능
-- FORCE_LIQUIDATE 테스트 통합 강화 (옵션 2) 미완료
+- Cycle 29: connector retry 로직 검증 또는 새 전략 작업

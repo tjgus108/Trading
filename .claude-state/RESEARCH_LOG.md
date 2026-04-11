@@ -570,3 +570,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Do Trading Bots Fail? — Finance Monthly](https://www.finance-monthly.com/2024/01/do-trading-bots-fail/)
 - [How to Avoid Overfitting in Crypto Trading Bots — DEV Community](https://dev.to/trendrider/how-to-avoid-overfitting-in-crypto-trading-bots-lessons-from-10000-backtested-trades-2oci)
 - [AI Trading Bots Advisory — CFTC](https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AITradingBots.html)
+
+## [2026-04-11] Cycle 28 — AMM/DEX Interaction
+
+### 봇-LP 상호작용
+- MEV 봇(샌드위치 공격, 차익거래)은 유동성 제공자(LP)로부터 연간 $500M 이상을 추출. 이를 Loss-versus-Rebalancing(LVR)이라 부름
+- AMM은 가격이 시장 가격보다 낮을 때 차익거래 봇이 먼저 거래하여 LP가 손실을 입는 구조적 취약점 존재
+- 일반 CeFi 봇은 DEX와 직접 상호작용 시 MEV 봇에 샌드위치 당할 위험이 있음 — 슬리피지 설정 필수
+- Uniswap v3 집중 유동성(concentrated liquidity) LP 중 약 50%가 단순 보유(hold) 대비 음수 수익 기록
+
+### 주의점
+- CeFi 봇이 DEX 호가를 참고할 때, AMM 가격은 차익거래 봇이 정리하기 전까지 시장 가격에 지연됨 — 신호 오염 가능성
+- LP 포지션을 봇 전략의 일부로 사용하면 변동성 급등 시 임펄스 손실(IL)이 일반 봇 손실보다 훨씬 커질 수 있음
+
+### 참고
+- [AMMs: Toward More Profitable Liquidity Provisioning](https://arxiv.org/html/2501.07828v1)
+- [Bots fleece DeFi LPs for $500m/year — DL News](https://www.dlnews.com/articles/defi/new-cow-swap-amm-will-stop-mev-bots-and-save-users-millions/)
+- [CoW DAO MEV-Capturing AMM](https://cow.fi/learn/cow-dao-launches-the-first-mev-capturing-amm)

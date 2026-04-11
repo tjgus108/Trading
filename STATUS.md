@@ -34,7 +34,8 @@
 - ✅ Cycle 25 완료 (D+E+F: 세션 필터 + **UnboundLocalError CRITICAL** + AI 에이전트 리서치)
 - ✅ Cycle 26 완료 (A+C+F: 테스트 22% 속도 개선 + liquidation_feed 견고성 + 규제 리서치)
 - ✅ Cycle 27 완료 (B+D+F: 세션 필터 리스크 통합 + RF calibration + 심리 실패 리서치)
-- ⏳ **Cycle 28 대기** (E+A+F)
+- ✅ Cycle 28 완료 (E+A+F: config validation + DSR 마크다운 + AMM/DEX 리서치)
+- ⏳ **Cycle 29 대기** (C+B+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -43,7 +44,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,979개** |
+| ✅ 통과 테스트 | **5,982개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

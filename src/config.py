@@ -4,6 +4,7 @@ Config 로더: config.yaml → dataclass.
 """
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -61,6 +62,32 @@ class AppConfig:
     telegram: Optional[TelegramConfig] = None
 
 
+def _validate_config(cfg: AppConfig) -> None:
+    """위험 파라미터 검증. 임계값 초과 시 경고 또는 에러."""
+    rpt = cfg.risk.risk_per_trade
+    if rpt > 0.1:
+        raise ValueError(
+            f"risk_per_trade={rpt} exceeds maximum allowed 0.1 (10%). "
+            "Set a safer value."
+        )
+    if rpt > 0.05:
+        warnings.warn(
+            f"risk_per_trade={rpt} is above 0.05 (5%). "
+            "Consider reducing to limit per-trade exposure.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+    mps = cfg.trading.max_position_size
+    if mps > 0.5:
+        warnings.warn(
+            f"max_position_size={mps} exceeds 0.5 (50%). "
+            "High concentration risk.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def load_config(path: str = "config/config.yaml") -> AppConfig:
     load_dotenv()
 
@@ -88,7 +115,7 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
             chat_id=os.environ.get("TELEGRAM_CHAT_ID", tg.get("chat_id", "")),
         )
 
-    return AppConfig(
+    cfg = AppConfig(
         exchange=ExchangeConfig(
             name=exc["name"],
             sandbox=exc.get("sandbox", True),
@@ -116,3 +143,6 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
         dry_run=raw.get("dry_run", True),
         telegram=telegram_cfg,
     )
+
+    _validate_config(cfg)
+    return cfg

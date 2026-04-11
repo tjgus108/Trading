@@ -139,6 +139,7 @@ class BacktestReport:
             f"| Total Return | {self.total_return:+.2%} |\n"
             f"| Ann. Return | {self.ann_return:+.2%} |\n"
             f"| Sharpe Ratio | {self.sharpe_ratio:.3f} |\n"
+            f"| Deflated Sharpe Ratio | {self.deflated_sharpe_ratio:.3f} |\n"
             f"| Sortino Ratio | {self.sortino_ratio:.3f} |\n"
             f"| Max Drawdown | {self.max_drawdown:.2%} |\n"
             f"| Win Rate | {self.win_rate:.1%} |\n"

@@ -83,6 +83,7 @@ def test_backtest_report_to_markdown():
     assert "| Metric | Value |" in markdown
     assert "Total Return" in markdown
     assert "Sharpe Ratio" in markdown
+    assert "Deflated Sharpe Ratio" in markdown
     assert "Total Trades | 3 |" in markdown
 
 
