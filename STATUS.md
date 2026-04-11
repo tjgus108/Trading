@@ -51,7 +51,8 @@
 - ✅ Cycle 43 완료 (E+A+F: PaperTrader 경계 + audit_summary + LSTM vs Transformer)
 - ✅ Cycle 44 완료 (C+B+F: Sentiment +11 + VolTarget 경계 + Volume Profile)
 - ✅ Cycle 45 완료 (D+E+F: Signal metadata + Mock overdraft + Sub-second latency)
-- ⏳ **Cycle 46 대기** (A+C+F)
+- ✅ Cycle 46 완료 (A+C+F: 경고 6→0 + TTL 경계 + 세금 이슈)
+- ⏳ **Cycle 47 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -60,7 +61,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,070개** |
+| ✅ 통과 테스트 | **6,072개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
