@@ -165,10 +165,13 @@ def _render_html(data: dict) -> str:
     tournament_winner = data.get("last_tournament_winner") or "—"
     regime_color_map = {"bull": "#4caf50", "bear": "#f44336", "sideways": "#ff9800"}
     regime_color = regime_color_map.get(regime, "#aaa")
+    daily_summary = data.get("daily_summary", "")
     sf_raw = data.get("impl_shortfall_avg_bps")
     sf_str = f"{sf_raw:+.2f} bps" if sf_raw is not None else "—"
-    sf_color = "#f44336" if (sf_raw or 0) > 5 else ("#ff9800" if (sf_raw or 0) > 1 else "#4caf50")
+    sf_color = "#aaa" if sf_raw is None else ("#f44336" if sf_raw > 5 else ("#ff9800" if sf_raw > 1 else "#4caf50"))
 
+    daily_summary_html = (f'<p style="color:#aaa;font-size:13px">{daily_summary}</p>'
+                          if daily_summary else "")
     # 멀티 봇 섹션
     bots_html = ""
     for bot in data.get("bots", []):
@@ -223,7 +226,7 @@ def _render_html(data: dict) -> str:
     <div class="value" style="color:{sf_color}">{sf_str}</div></div>
 </div>
 
-<h2>Open Positions</h2>
+{daily_summary_html}<h2>Open Positions</h2>
 <table>
   <tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Size</th>
       <th>Stop Loss</th><th>Take Profit</th><th>Opened</th></tr>
@@ -260,4 +263,5 @@ class Dashboard:
     def stop(self) -> None:
         if self._server:
             self._server.shutdown()
+            self._server = None
             logger.info("Dashboard stopped")
