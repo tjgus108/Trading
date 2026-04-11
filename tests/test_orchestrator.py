@@ -361,3 +361,52 @@ def test_force_liquidate_sets_stop_event(cfg, mock_connector):
     assert result.status == "BLOCKED"
     assert "FORCE_LIQUIDATE" in result.notes[0]
     assert orch._stop_event.is_set()
+
+
+# ── Implementation Shortfall 추적 테스트 ────────────────────────────────────
+
+def test_impl_shortfall_calculated_on_fill(cfg, mock_connector):
+    """실제 체결가(avg_price)가 예상 entry_price와 다를 때 impl_shortfall_bps가 기록된다."""
+    from src.pipeline.runner import PipelineResult
+    from src.strategy.base import Action, Confidence, Signal
+    from src.risk.manager import RiskResult, RiskStatus
+
+    orch = _make_orch(cfg, mock_connector)
+
+    # signal: entry_price=50000
+    signal = Signal(
+        action=Action.BUY,
+        confidence=Confidence.HIGH,
+        entry_price=50000.0,
+        stop_loss=49000.0,
+        take_profit=52000.0,
+        strategy="ema_cross",
+    )
+    risk = RiskResult(
+        status=RiskStatus.APPROVED,
+        position_size=0.01,
+        stop_loss=49000.0,
+        take_profit=52000.0,
+        risk_amount=100.0,
+    )
+
+    # avg_price=50100 → shortfall = (50100-50000)/50000 * 10000 = 20bps
+    fill = {"status": "closed", "id": "order1", "filled": 0.01, "average": 50100.0}
+    mock_connector.create_order.return_value = {"id": "order1"}
+    mock_connector.wait_for_fill.return_value = fill
+
+    with patch.object(orch._pipeline, "run") as mock_run:
+        result = PipelineResult(
+            timestamp="2026-04-11 00:00 UTC",
+            symbol="BTC/USDT",
+            pipeline_step="execution",
+            status="OK",
+            signal=signal,
+            risk=risk,
+        )
+        result.impl_shortfall_bps = (50100.0 - 50000.0) / 50000.0 * 10_000
+        mock_run.return_value = result
+        out = orch.run_once()
+
+    assert out.impl_shortfall_bps is not None
+    assert abs(out.impl_shortfall_bps - 20.0) < 1e-6

@@ -23,6 +23,7 @@ _HAIKU_MODEL = "claude-haiku-4-5-20251001"    # 분류, 요약 (저비용)
 _SONNET_MODEL = "claude-sonnet-4-6"           # 심층 분석 (중간비용)
 
 _MAX_TOKENS = 300   # 분석 메모는 짧게
+_TIMEOUT_SECONDS = 15  # API 타임아웃
 _ENABLED = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 
@@ -78,12 +79,19 @@ class LLMAnalyst:
                 model=self._model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
+                timeout=_TIMEOUT_SECONDS,
             )
+            if not response.content:
+                logger.warning("LLM returned empty content for symbol=%s", symbol)
+                return ""
             text = response.content[0].text.strip()
+            if not text:
+                logger.warning("LLM returned blank text for symbol=%s", symbol)
+                return ""
             logger.info("LLM analysis: %s...", text[:80])
             return text
         except Exception as e:
-            logger.warning("LLM API call failed: %s", e)
+            logger.warning("LLM API call failed (%s): %s", type(e).__name__, e)
             return ""
 
     def classify_news_risk(self, headline: str) -> str:
@@ -105,13 +113,18 @@ class LLMAnalyst:
                 model=_HAIKU_MODEL,  # 분류는 항상 Haiku
                 max_tokens=10,
                 messages=[{"role": "user", "content": prompt}],
+                timeout=_TIMEOUT_SECONDS,
             )
+            if not response.content:
+                logger.warning("LLM classify returned empty content")
+                return "NONE"
             result = response.content[0].text.strip().upper()
             if result in ("HIGH", "MEDIUM", "LOW", "NONE"):
                 return result
+            logger.debug("LLM classify unexpected response: %r — defaulting NONE", result)
             return "NONE"
         except Exception as e:
-            logger.debug("LLM classify failed: %s", e)
+            logger.warning("LLM classify failed (%s): %s", type(e).__name__, e)
             return "NONE"
 
     # ------------------------------------------------------------------

@@ -34,6 +34,7 @@ class PipelineResult:
     news_risk: str = "NONE"                 # HIGH | MEDIUM | LOW | NONE
     pnl: float = 0.0                        # 거래 손익 (USD)
     specialist_action: str = ""             # SpecialistEnsemble 최종 액션
+    impl_shortfall_bps: Optional[float] = None  # Implementation Shortfall (bps): (avg_fill - expected) / expected * 10000
 
     def log_line(self) -> str:
         sig = f"{self.signal.action.value} {self.symbol}" if self.signal else "N/A"
@@ -49,6 +50,7 @@ class PipelineResult:
             f"Execution: {exec_status}\n"
             f"Context: score={ctx} news={self.news_risk}\n"
             f"Notes: {'; '.join(self.notes) if self.notes else 'none'}\n"
+            + (f"ImplShortfall: {self.impl_shortfall_bps:.2f}bps\n" if self.impl_shortfall_bps is not None else "")
         )
 
 
@@ -313,6 +315,11 @@ class TradingPipeline:
                     twap_result.avg_price,
                     twap_result.estimated_slippage_pct,
                 )
+                if signal.entry_price and twap_result.avg_price:
+                    result.impl_shortfall_bps = (
+                        (twap_result.avg_price - signal.entry_price) / signal.entry_price * 10_000
+                    )
+                    logger.info("[pipeline] impl_shortfall=%.2fbps", result.impl_shortfall_bps)
             else:
                 order = self.connector.create_order(
                     symbol=self.symbol,
@@ -328,6 +335,12 @@ class TradingPipeline:
                 }
                 result.pipeline_step = "execution"
                 logger.info("[pipeline] execution status=%s", fill.get("status"))
+                avg_price = fill.get("average")
+                if signal.entry_price and avg_price:
+                    result.impl_shortfall_bps = (
+                        (float(avg_price) - signal.entry_price) / signal.entry_price * 10_000
+                    )
+                    logger.info("[pipeline] impl_shortfall=%.2fbps", result.impl_shortfall_bps)
         except Exception as e:
             result.pipeline_step = "execution"
             result.status = "ERROR"

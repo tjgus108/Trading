@@ -742,3 +742,6 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** MEV 샌드위치 공격 2025 $289.8M (51.6%). 단일 봇 1건 $800k. **우리 봇(CEX/ccxt)은 직접 노출 없음.** DEX 확장 시 슬리피지 엄격화 필수.
 **Tests:** 5862 passed, 27 skipped (+2 from Cycle 13).
 **Next Cycle:** 15 (D+E+F — 3회차)
+
+## [2026-04-11 03:10 UTC] Cycle 15 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md

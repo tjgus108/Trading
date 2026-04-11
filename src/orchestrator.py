@@ -1300,6 +1300,8 @@ class BotOrchestrator:
                       f"  TP={result.risk.take_profit}")
         if result.execution:
             print(f"EXEC:     {result.execution.get('status')}")
+        if result.impl_shortfall_bps is not None:
+            print(f"IMPL_SF:  {result.impl_shortfall_bps:+.2f}bps")
         if result.notes:
             print(f"NOTES:    {' | '.join(result.notes)}")
         if result.error:

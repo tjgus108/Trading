@@ -346,3 +346,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Sandwiched and Silent (arxiv 2512.17602)](https://arxiv.org/html/2512.17602v1)
 - [Flashbots Protect RPC](https://docs.flashbots.net/flashbots-protect/overview)
 - [Solana MEV 현황 — Solana Compass](https://solanacompass.com/learn/accelerate-25/scale-or-die-at-accelerate-2025-the-state-of-solana-mev)
+
+
+## [2026-04-11] Cycle 15 — Recent Bot Failures (H2 2025)
+
+### 신규 사례
+- **Nova Trading Platform 보안 침해 (2025-09-16)**: $500k 탈취. 피해자 지갑이 Jupiter·Axiom·Photon·Nova 4개 플랫폼과 연결된 상태에서 "수동 드레인" 방식으로 실행. 프라이빗 키를 서드파티 봇 플랫폼에 위임한 구조 자체가 단일 장애점(SPOF). 다수 사용자가 동시 피해 → 플랫폼 레벨 시스템 취약점 의심.
+- **XRP 예측 시장 AMM 봇 착취 (2025-12~2026-01)**: 익명 트레이더 a4385가 15분 인터벌 예측 시장의 AMM 봇·쿼트 모델을 48시간 동안 체계적으로 공략해 $280k 수익. 피해 봇 0x8dxd는 2025-12부터 $740k 누적 이익을 쌓은 "거의 완벽한" 커브를 기록했으나 단 한 번의 공략으로 전체 수익 소멸. 봇 행동 패턴의 예측 가능성(rigid/predictable behavior)이 역이용됨.
+- **AI 봇 Flash Crash 가속 (2025-05)**: 정상 시장 조건용 AI 봇들이 갑작스러운 변동성에 $2B 매도 집행. Cycle 1에서 May 2025를 언급했으나 메커니즘 세부 확인: 레짐 감지 로직 완전 부재가 직접 원인.
+
+### 공통 패턴
+- **예측 가능한 행동 패턴이 역이용됨**: AMM/쿼트 봇의 고정 인터벌·규칙 기반 응답이 공격자에게 착취 벡터 제공. 봇 로직의 무작위성(jitter) 또는 파라미터 동적 변경 부재가 근본 원인.
+- **서드파티 플랫폼 키 위임 리스크**: 프라이빗 키를 외부 봇 서비스에 맡기는 구조는 해당 플랫폼이 단일 장애점이 됨. CEX API Key 권한 최소화(출금 권한 제거) + 화이트리스트 IP 제한이 필수.
+
+### 참고
+- [Nova Trading Platform Breach — Cyber Defense Magazine](https://www.cyberdefensemagazine.com/nova-trading-platform-security-breach-half-a-million-dollars-drained-in-manual-attack/)
+- [XRP AMM Bot Exploit — MEXC Blog](https://blog.mexc.com/news/mystery-trader-nets-280k-outsmarting-quant-bots/)
+- [Bot Failures 2025 — Crypto Reporter](https://www.crypto-reporter.com/press-releases/most-crypto-trading-bots-promised-easy-money-the-market-killed-them-here-is-what-the-survivors-built-instead-123004/)

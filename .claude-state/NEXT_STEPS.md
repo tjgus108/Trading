@@ -84,6 +84,27 @@
 
 ---
 
+## Cycle 15 - Category D: ML & Signals - LLMAnalyst Robustness ✅ COMPLETED
+
+**Task:** LLM API 실패 처리 강화 (타임아웃, 빈 응답, 예상 외 텍스트)
+
+**Changes:**
+1. `src/alpha/llm_analyst.py` lines 17, 82-91, 104-115
+   - `_TIMEOUT_SECONDS = 15` 상수 추가
+   - `messages.create()` 호출에 `timeout=_TIMEOUT_SECONDS` 적용 (analyze_signal, classify_news_risk 둘 다)
+   - `response.content` 빈 리스트 guard 추가 (IndexError 방지)
+   - 빈 문자열 반환 시 warning 로깅
+   - 예외 로그에 `type(e).__name__` 포함 (디버깅 향상)
+   - `classify_news_risk` 예상 외 텍스트 debug→warning 으로 격상
+
+2. `tests/test_llm_analyst.py` (신규, 10개 테스트)
+   - analyze_signal: 성공/API예외/빈content/빈텍스트/disabled 5케이스
+   - classify_news_risk: 정상분류/API예외/빈content/예상외텍스트/disabled 5케이스
+
+**Test Results:** 10/10 passed ✅
+
+---
+
 ## Cycle 14 - Category B: Risk Management - VaR/CVaR 검증 ✅ COMPLETED
 
 **Task:** portfolio_optimizer.py VaR/CVaR 정확도 검증 + 경계 조건 테스트
