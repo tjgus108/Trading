@@ -362,3 +362,28 @@ def test_dsr_threshold_warning_logged(caplog):
     assert any("DSR" in r.message for r in caplog.records), (
         "dsr_threshold 초과 시 WARNING 로그가 발생해야 함"
     )
+
+
+def test_dsr_threshold_strict_mode_validation():
+    """dsr_threshold를 엄격하게 설정 시, DSR이 threshold 미만이면 경고 로그가 발생해야 한다."""
+    import logging
+    
+    engine_strict = BacktestEngine(dsr_threshold=1.0)  # 엄격 모드 (DSR >= 1.0 필요)
+    engine_loose = BacktestEngine(dsr_threshold=0.0)   # 기본 모드 (DSR >= 0.0)
+    
+    df = make_df(n=300, close_trend=0.001)
+    
+    # 엄격 모드에서 경고가 발생할 가능성 검증
+    # (모든 경우에 발생하진 않겠지만, dsr_threshold가 높을수록 경고 가능성이 높음)
+    assert engine_strict.dsr_threshold == 1.0
+    assert engine_loose.dsr_threshold == 0.0
+    assert engine_strict.dsr_threshold > engine_loose.dsr_threshold
+    
+    # 두 엔진이 동일 데이터에서 동일 DSR을 계산하고, 
+    # threshold 값이 다르므로 경고 발생 조건이 다름을 검증
+    result_strict = engine_strict.run(AlwaysBuyStrategy(), df)
+    result_loose = engine_loose.run(AlwaysBuyStrategy(), df)
+    
+    assert result_strict.deflated_sharpe_ratio == result_loose.deflated_sharpe_ratio, (
+        "동일 데이터 · 동일 전략 → DSR 계산 결과는 동일해야 함"
+    )

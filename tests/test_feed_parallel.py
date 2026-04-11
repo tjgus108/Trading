@@ -144,6 +144,55 @@ class TestFeedParallel:
         assert "donchian_high" in btc_summary.indicators
         assert "vwap" in btc_summary.indicators
 
+    def test_cache_key_no_collision_multi_symbol(self):
+        """서로 다른 심볼/타임프레임 동시 페치 시 캐시 키 (symbol, timeframe, limit) 튜플 충돌 없음."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = [
+            # BTC/USDT 1h
+            [[1704067200000, 42000, 42500, 41800, 42300, 100]],
+            # ETH/USDT 1h
+            [[1704067200000, 2500, 2600, 2450, 2550, 500]],
+            # BTC/USDT 4h
+            [[1704067200000, 41000, 43000, 40800, 42100, 150]],
+            # ETH/USDT 4h
+            [[1704067200000, 2400, 2700, 2350, 2480, 600]],
+        ]
+
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 다양한 심볼과 타임프레임 조합 페치
+        btc_1h = feed.fetch("BTC/USDT", "1h", limit=500)
+        eth_1h = feed.fetch("ETH/USDT", "1h", limit=500)
+        btc_4h = feed.fetch("BTC/USDT", "4h", limit=500)
+        eth_4h = feed.fetch("ETH/USDT", "4h", limit=500)
+
+        # 각 캐시 키가 서로 다른지 검증
+        assert btc_1h.symbol == "BTC/USDT" and btc_1h.timeframe == "1h"
+        assert eth_1h.symbol == "ETH/USDT" and eth_1h.timeframe == "1h"
+        assert btc_4h.symbol == "BTC/USDT" and btc_4h.timeframe == "4h"
+        assert eth_4h.symbol == "ETH/USDT" and eth_4h.timeframe == "4h"
+
+        # 캐시 통계: 4개 심볼/타임프레임 조합 → 4개 미스
+        stats = feed.cache_stats()
+        assert stats['miss_count'] == 4, "4개 모두 캐시 미스 (서로 다른 키)"
+        assert stats['cached_keys'] == 4, "4개의 서로 다른 캐시 키 생성"
+        assert connector.fetch_ohlcv.call_count == 4, "API 호출 4회"
+
+        # 같은 조합 다시 페치 → 캐시 히트 확인
+        btc_1h_again = feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        stats_after_hit = feed.cache_stats()
+        assert stats_after_hit['hit_count'] == 1, "캐시 히트 1회"
+        assert stats_after_hit['cached_keys'] == 4, "캐시 키 개수 변화 없음"
+        assert connector.fetch_ohlcv.call_count == 4, "API 호출 증가 없음"
+        
+        # 히트된 데이터가 원래 데이터와 동일한지 검증
+        assert btc_1h_again.symbol == btc_1h.symbol
+        assert btc_1h_again.timeframe == btc_1h.timeframe
+        assert btc_1h_again.candles == btc_1h.candles
+
+
+
     def test_fetch_with_retry_logging(self):
         """Fetch retry 시 에러 로그에 symbol, timeframe, attempt 정보 포함."""
         connector = MagicMock()

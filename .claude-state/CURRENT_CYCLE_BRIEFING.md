@@ -1,30 +1,27 @@
 ======================================================================
-🔄 CYCLE 55 — 2026-04-11T09:46:50.617655Z
+🔄 CYCLE 56 — 2026-04-11T10:03:31.574943Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 54 COMPLETED — C + B + F** (2026-04-11 20:40 UTC)
-  **[C] Data:** src/data/feed.py rate limit 감지 추가. _is_rate_limit_error() + _backoff_with_rate_limit() (4/6/8초). 다른 transient는 기존 짧은 backoff. +6 tests.
-  **[B] Risk CRITICAL:** src/risk/portfolio_optimizer.py _apply_constraints() NaN/inf 버그 수정. np.isfinite 체크 + clip(w,0)/sum 강제 정규화. 이전에는 NaN weights 그대로 반환됨. +2 tests.
-  **[F] Research:** ETF flows as signal. 2025 $46.7B 유입, 누적 $56.9B. ETF 월간 플로우 > LTH 공급 > 규제 > Fed 순 우선. 월별 보조 필터로 추가 권장.
-  **Tests:** 6121 passed (+8 from Cycle 53).
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 55 COMPLETED — D + E + F** (2026-04-11 21:10 UTC)
+  **[D] ML:** tests/test_backtest.py +2 WalkForwardValidator 경계. 데이터 부족 ValueError, 최소 250봉 윈도우 1개 생성.
+  **[E] Execution:** src/config.py migrate_config() 추가. 구버전 키 (stop_loss→stop_loss_atr_multiplier 등) 자동 변환. **추가 수정**: 누락 필드 경고를 debug log로 전환 (warnings → 200+개 폭주 방지). config.yaml + example.yaml + 5개 테스트 파일 신규 키 이름으로 업데이트. +2 tests.
+  **[F] Research:** Volume Profile 실전. POC 지지/저항 유효 but 단독 예측 불가, Value Area 되돌림 4H+ 적용. 추세/모멘텀 필터 병행 필요, 단독 Sharpe 1.0 불확실.
+  **Tests:** 6125 passed, **0 warnings** ✨ (+4 from Cycle 54).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
