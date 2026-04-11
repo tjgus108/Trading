@@ -202,7 +202,6 @@ class LSTMSignalGenerator:
         te_loader = make_loader(seq_X_te_scaled, seq_y[va_e:], False)
 
         model = self._build_torch_model(seq_X_raw.shape[-1])
-        model = self._build_torch_model(X.shape[1])
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
         criterion = nn.CrossEntropyLoss()
 
