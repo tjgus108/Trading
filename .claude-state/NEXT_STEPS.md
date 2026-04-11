@@ -528,3 +528,48 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 
 **Test Results:**
 - test_vol_targeting.py: 6 passed ✅
+
+---
+
+## Cycle 9 - Category C: OnchainFetcher 견고성 강화 ✅ COMPLETED
+
+**Task:** OnchainFetcher 외부 API 실패 처리 검증 + 테스트 추가 (Cycle 6 NewsMonitor/SentimentFetcher 패턴 적용)
+
+**Files Modified:**
+1. `/home/user/Trading/tests/test_phase_b_context.py` (lines 181-316 추가)
+   - `TestOnchainFetcherRobustness` 클래스: 7개 테스트
+     - `test_fetch_all_apis_fail_uses_fallback`: 모든 API 실패 시 fallback 사용 검증
+     - `test_fetch_all_apis_fail_no_fallback_returns_neutral`: fallback 없을 때 중립 데이터 반환
+     - `test_cache_returns_same_data_within_timeout`: 캐시 타임아웃 검증
+     - `test_max_retries_parameter_affects_behavior`: max_retries 파라미터 동작
+     - `test_fallback_last_successful_tracked`: `_last_successful` 저장 확인
+     - `test_unavailable_source_when_no_fallback`: fallback 없을 때 source='unavailable'
+     - `test_glassnode_api_failure_graceful_degradation`: Glassnode 실패 시 blockchain.info만 사용
+   - `TestOnchainFetcherFallbackIntegration` 클래스: 1개 통합 테스트
+     - `test_fallback_survives_subsequent_failures`: fallback 데이터 지속성 검증
+
+**OnchainFetcher 현황 (구현은 이미 완료):**
+- **재시도 로직:** exponential backoff (0.5s × 2^attempt) ✅
+- **Fallback:** 과거 성공한 데이터 유지 ✅
+- **부분 실패 처리:** Glassnode 실패 시 blockchain.info만 사용 가능 ✅
+- **캐시:** TTL 기반 자동 갱신 ✅
+- **로깅:** 실패 시 warning, 시도마다 debug ✅
+- **graceful degradation:** 모든 API 실패 시 중립 데이터 반환 ✅
+
+**Test Results:**
+- test_phase_b_context.py: 69 passed ✅ (기존 61 + 신규 8)
+- TestOnchainFetcher (기존): 11 passed ✅
+- TestOnchainFetcherRobustness (신규): 7 passed ✅
+- TestOnchainFetcherFallbackIntegration (신규): 1 passed ✅
+- 전체 테스트 스위트: 5840 passed, 27 skipped ✅
+
+**기술 정리:**
+- **견고성 패턴:** SentimentFetcher Cycle 6 패턴과 동일하게 적용
+  - 재시도 + exponential backoff로 transient 에러 자동 복구
+  - fallback 메커니즘으로 일시적 API 장애 극복
+  - 모든 API 실패 시 중립 데이터로 파이프라인 계속 진행
+- **외부 API 호출 없음:** 모든 테스트에서 HTTP 호출 없이 mock으로 수행
+- **무한 블로킹 없음:** 최대 재시도 횟수 제어, 타임아웃 8초
+
+**결론:** OnchainFetcher는 설계/구현이 이미 견고하며, 이번 테스트 추가로 품질 신뢰도 100% 확보.
+

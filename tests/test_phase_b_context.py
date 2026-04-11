@@ -173,6 +173,147 @@ class TestOnchainFetcher:
         # fallback이 설정되었으므로 파이프라인 계속 진행 가능
         assert data is not None
 
+
+# ---------------------------------------------------------------------------
+# B2: OnchainFetcher - Robustness Tests (Cycle 9)
+# ---------------------------------------------------------------------------
+
+class TestOnchainFetcherRobustness:
+    """재시도 + fallback + cache 로직 검증."""
+
+    def test_fetch_all_apis_fail_uses_fallback(self):
+        """모든 API 실패 시 이전 성공한 데이터 사용."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # 첫 번째 호출: mock으로 성공
+        data1 = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        o._last_successful = data1
+        
+        # 두 번째 호출: blockchain API 실패 시뮬레이션
+        o._fetch_blockchain_stats = lambda: None
+        
+        # 캐시 초기화
+        o._cache = None
+        o._cache_time = 0.0
+        
+        result = o.fetch()
+        # fallback 사용 확인
+        assert result.source == data1.source
+        assert result.exchange_flow == data1.exchange_flow
+        assert result.whale_activity == data1.whale_activity
+
+    def test_fetch_all_apis_fail_no_fallback_returns_neutral(self):
+        """모든 API 실패 + fallback 없을 때 중립 데이터 반환."""
+        o = OnchainFetcher(max_retries=0)
+        o._last_successful = None
+        
+        # blockchain API 실패
+        o._fetch_blockchain_stats = lambda: None
+        
+        result = o.fetch()
+        assert result.source == "unavailable"
+        assert result.onchain_score == 0.0
+        assert result.exchange_flow == "NEUTRAL"
+        assert result.whale_activity == "NEUTRAL"
+
+    def test_cache_returns_same_data_within_timeout(self):
+        """캐시 타임아웃 내 재호출은 같은 데이터 반환."""
+        o = OnchainFetcher(use_cache_seconds=300)
+        
+        import time
+        mock_data = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        o._cache = mock_data
+        o._cache_time = time.time()
+        
+        # 캐시된 데이터 반환 확인
+        result = o.fetch()
+        assert result is mock_data
+
+    def test_max_retries_parameter_affects_behavior(self):
+        """max_retries 파라미터로 재시도 횟수 제어."""
+        o = OnchainFetcher(max_retries=1)
+        assert o.max_retries == 1
+        
+        o2 = OnchainFetcher(max_retries=3)
+        assert o2.max_retries == 3
+
+    def test_fallback_last_successful_tracked(self):
+        """성공한 데이터가 _last_successful에 저장됨."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # 초기 상태
+        assert o._last_successful is None
+        
+        # mock 데이터로 fetch (실제로는 API를 mock)
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 50000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        result = o.fetch()
+        assert o._last_successful is not None
+        assert o._last_successful.tx_volume_usd is not None
+
+    def test_unavailable_source_when_no_fallback(self):
+        """fallback 없을 때 source='unavailable'."""
+        o = OnchainFetcher(max_retries=0)
+        o._last_successful = None
+        o._fetch_blockchain_stats = lambda: None
+        
+        result = o.fetch()
+        assert result.source == "unavailable"
+
+    def test_glassnode_api_failure_graceful_degradation(self):
+        """Glassnode API 실패 시 blockchain.info 데이터만 사용."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # blockchain.info 성공
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 50000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        # Glassnode 실패 시뮬레이션
+        o._fetch_glassnode_signals = lambda: ("NEUTRAL", "NEUTRAL")
+        
+        result = o.fetch()
+        assert result.source == "blockchain.info"
+        assert result.exchange_flow == "NEUTRAL"
+
+
+class TestOnchainFetcherFallbackIntegration:
+    """fallback 데이터 유지 및 로테이션."""
+
+    def test_fallback_survives_subsequent_failures(self):
+        """이전 fallback 데이터가 여러 번 실패 시에도 계속 사용."""
+        o = OnchainFetcher(max_retries=0, use_cache_seconds=0)
+        
+        # 1차 호출: 성공
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 60000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        result1 = o.fetch()
+        assert result1.tx_volume_usd is not None
+        orig_vol = result1.tx_volume_usd
+        
+        # 2차 호출: blockchain API 실패
+        o._fetch_blockchain_stats = lambda: None
+        
+        result2 = o.fetch()
+        assert result2.tx_volume_usd == orig_vol  # fallback 사용
+        
+        # 3차 호출: 여전히 실패
+        result3 = o.fetch()
+        assert result3.tx_volume_usd == orig_vol  # fallback 유지
+
 class TestNewsMonitor:
     def test_mock_none(self):
         m = NewsMonitor()

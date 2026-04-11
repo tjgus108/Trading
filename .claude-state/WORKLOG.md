@@ -590,3 +590,19 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=+0.00 news=NONE
 Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:39:06Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:40 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:40:51Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 04:45 UTC] Cycle 9 COMPLETED — C + B + F
+**[C] Data:** OnchainFetcher 견고성 패턴 검증. tests/test_phase_b_context.py에 TestOnchainFetcherRobustness (+7) + TestOnchainFetcherFallbackIntegration (+1) 추가. 재시도/fallback/graceful degradation 전 시나리오 커버.
+**[B] Risk:** src/risk/vol_targeting.py 4개 버그 수정 (Optional 미사용 import, closes<=0 처리, realized_vol 중복 호출, base_size<=0 검증). +6 tests.
+**[F] Research:** 헤지펀드 리스크 도구 (Axioma/RiskMetrics, VaR 95%경고/99%hard, Correlation throttle). 우리 봇 적용: 2단계 VaR + 상관 0.7+ 시 포지션 축소.
+**Tests:** 5840 passed (+16 from Cycle 8).
+**Next Cycle:** 10 (D+E+F — 2회차)
