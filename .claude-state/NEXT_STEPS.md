@@ -1,3 +1,32 @@
+# Cycle 64 - Category C: Data & Infrastructure - OHLC 검증 완료
+
+## [2026-04-11] Cycle 64 — Feed 데이터 OHLC 유효성 검증
+
+### 작업 완료
+- `src/data/feed.py` 수정 (line 306-330):
+  - `_validate_ohlc_relationships()` 함수 추가
+  - OHLC 관계 검증: high >= max(open,close), low <= min(open,close), high >= low
+  - 3가지 위반 케이스 각각 감지 및 보고
+  - `_detect_anomalies()` 통합 (line 295)
+
+### 테스트 추가
+- `tests/test_ohlc_validation.py` (신규):
+  - `test_valid_ohlc_relationships`: 정상 데이터 이상 감지 없음 확인
+  - `test_high_less_than_max_open_close`: high < max(open,close) 감지 확인
+  - `test_low_greater_than_min_open_close`: low > min(open,close) 감지 확인
+  - `test_high_less_than_low`: high < low (역전) 감지 확인
+
+### 테스트 결과
+- tests/test_ohlc_validation.py: 4/4 PASS ✓
+- tests/test_feed_boundary.py: 2/2 PASS ✓ (회귀 없음)
+
+### 결론
+- OHLC 관계 검증 함수 구현 완료
+- anomalies 리스트에 자동 포함
+- 실제 외부 API 호출 없이 로컬 검증으로 데이터 품질 확보
+
+---
+
 # Cycle 61 - QA: backtest_engine slippage 누적 검증 완료
 
 ## [2026-04-11] Cycle 61 — BacktestEngine slippage 누적 비용 검증

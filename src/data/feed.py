@@ -291,10 +291,8 @@ class DataFeed:
 
     def _detect_anomalies(self, df: pd.DataFrame) -> list[str]:
         anomalies = []
-        # 캔들 내 고/저 역전
-        inverted = df[df["high"] < df["low"]]
-        if not inverted.empty:
-            anomalies.append(f"high<low at {inverted.index[0]}")
+        # OHLC 관계 검증
+        anomalies.extend(self._validate_ohlc_relationships(df))
         # 종가 0 이하
         if (df["close"] <= 0).any():
             anomalies.append("close <= 0 detected")
@@ -304,6 +302,32 @@ class DataFeed:
         if not spikes.empty:
             anomalies.append(f"price spike >10% at {spikes.index[0]}")
         return anomalies
+
+    def _validate_ohlc_relationships(self, df: pd.DataFrame) -> list[str]:
+        """
+        OHLC 관계 검증: high >= max(open,close), low <= min(open,close)
+        
+        Returns:
+            이상 감지 목록 (문제 없으면 빈 리스트)
+        """
+        issues = []
+        
+        # high >= max(open, close) 확인
+        invalid_high = df[df["high"] < df[["open", "close"]].max(axis=1)]
+        if not invalid_high.empty:
+            issues.append(f"high < max(open,close) at {invalid_high.index[0]}")
+        
+        # low <= min(open, close) 확인
+        invalid_low = df[df["low"] > df[["open", "close"]].min(axis=1)]
+        if not invalid_low.empty:
+            issues.append(f"low > min(open,close) at {invalid_low.index[0]}")
+        
+        # high >= low 확인 (기존 로직)
+        inverted = df[df["high"] < df["low"]]
+        if not inverted.empty:
+            issues.append(f"high < low at {inverted.index[0]}")
+        
+        return issues
 
     def _add_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         close = df["close"]

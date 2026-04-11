@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 63 — 2026-04-11T10:24:08.057346Z
+🔄 CYCLE 64 — 2026-04-11T10:26:38.306867Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 62 COMPLETED — B + D + F** (2026-04-12 00:00 UTC)
-  **[B] Risk:** tests/test_drawdown_monitor.py +2 극단 시나리오. 일일+주간 동시 시 주간 HALT 우선, FORCE_LIQUIDATE는 reset_daily로 해제 불가.
-  **[D] ML:** LLMAnalyst fallback 완전 확인. 수정 없음. API 키 없으면 _mock_analysis, disabled 시 NONE, 예외/빈 응답 시 "" 반환.
-  **[F] Research:** 2026 알트코인. 거래량 65% 자동화. 멀티 전략 + DEX 연동 + 변동성 적응 필수. CEX 전용 봇 경쟁력 약화.
-  **Tests:** 6158 passed (+2 from Cycle 61).
+**Cycle 63 COMPLETED — E + A + F** (2026-04-12 00:20 UTC)
+  **[E] Execution:** tests/test_paper_trader.py +2 multi-symbol. BTC/ETH/SOL 동시 매수 balance 보존, BTC 매도가 ETH 포지션 간섭하지 않음.
+  **[A] Quality:** 중복 테스트 이름 410개 발견 (여러 전략 파일에서 동일 test_buy_signal 등 사용). 전체 작동 정상, 정리는 향후 숙제.
+  **[F] Research:** 거래소 수수료 2026. Bybit 선물 maker 0.020%/taker 0.055%. Binance taker 0.05% 소폭 낮음. Bybit MM 리베이트 -0.015% (기관). 봇은 maker 우선 권장.
+  **Tests:** 6160 passed (+2 from Cycle 62).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

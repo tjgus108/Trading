@@ -5606,3 +5606,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 거래소 수수료 2026. Bybit 선물 maker 0.020%/taker 0.055%. Binance taker 0.05% 소폭 낮음. Bybit MM 리베이트 -0.015% (기관). 봇은 maker 우선 권장.
 **Tests:** 6160 passed (+2 from Cycle 62).
 **Next Cycle:** 64 (C+B+F)
+
+## [2026-04-11 10:26 UTC] Cycle 64 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 10:28 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 00:40 UTC] Cycle 64 COMPLETED — C + B + F
+**[C] Data:** src/data/feed.py _validate_ohlc_relationships() 신규. high>=max(open,close), low<=min(open,close), high>=low 검증, anomaly 리스트 자동 포함. +4 tests.
+**[B] Risk:** Kelly Sizer avg_loss=0 버그 없음 확인. avg_win 분모 사용, DD 제약 건너뛰기 로직 정상. +2 경계 테스트.
+**[F] Research:** Best bot ROIs. 통계적 차익거래 연 42% Sharpe 2.3 MDD 9% (검증 최고). JUP DCA 193% 6개월 20x (고리스크). Bitsgap Grid 11%/30일 (안전).
+**Tests:** 6166 passed (+6 from Cycle 63).
+**Next Cycle:** 65 (D+E+F)

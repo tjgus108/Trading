@@ -151,3 +151,18 @@ def test_dd_constraint_none_no_effect():
         win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100
     )
     assert abs(qty_d - qty_n) < 1e-9
+
+
+# ── avg_loss = 0 경계 테스트 ─────────────────────────────────────────────────
+
+def test_avg_loss_zero_no_division_error():
+    """avg_loss=0 시 ZeroDivisionError 없이 양수 반환 (all-win 기록)."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.10)
+    qty = sizer.compute(win_rate=1.0, avg_win=0.05, avg_loss=0.0, capital=10000, price=100)
+    assert qty > 0  # kelly_f = 1.0 → fractional=0.5 → clipped at 0.10
+
+def test_from_trade_history_all_wins_no_error():
+    """손실 거래 없는 기록 → avg_loss=0 → 정상 수량 반환."""
+    trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 50}]
+    qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
+    assert qty >= 0
