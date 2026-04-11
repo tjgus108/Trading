@@ -383,3 +383,90 @@ def test_integration_boundary_circuit_and_exposure_blocked():
     assert "Circuit breaker" in result.reason
     assert "daily_loss" in result.reason
     assert result.position_size is None
+
+
+def test_integration_drawdown_session_exposure_near_limits_approved():
+    """통합: 드로다운·세션·exposure 모두 한계 근처이지만 미초과 → APPROVED + 포지션 축소 확인."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    # 드로다운 4.9% (한도 5% 미만)
+    cb._peak_balance = 10000
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    df = _make_df_with_vol(0.45)  # 중변동 → adaptive multiplier 1.5
+
+    # 총 노출 29% (한도 30% 미만)
+    open_positions = [{"size": 0.056, "price": 50000}]  # 0.056*50000=2800, ~29.4% of 9510
+
+    # 아시아 세션 평일 (REDUCED → 50% 축소)
+    ts = datetime(2026, 4, 13, 9, 0, 0, tzinfo=timezone.utc)  # Monday 09:00 UTC
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9510,          # peak 10000 대비 4.9% 드로다운
+        last_candle_pct_change=0.03,   # 플래시크래시 기준 10% 미만
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.APPROVED
+    assert result.position_size > 0
+
+    # 세션 50% 축소 + max_position_size 클램프 반영된 포지션이어야 함
+    # max_size = 9510 * 0.10 / 50000 = 0.01902, then *0.5 = 0.00951
+    expected_max = (9510 * 0.10 / 50000) * 0.50
+    assert result.position_size <= expected_max + 1e-9
+    assert result.stop_loss < 50000
+    assert result.take_profit > 50000
+
+
+def test_integration_kelly_constrained_exposure_blocked():
+    """Risk-Constrained Kelly 시나리오: 고승률이라도 exposure 한도 초과 시 BLOCKED."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    # Kelly 기법으로 risk_per_trade를 높게 설정 (승률 60%, R:R 2 → Kelly=0.20)
+    # 그러나 max_total_exposure 한도(20%)가 이미 채워진 상황
+    rm = RiskManager(
+        risk_per_trade=0.20,          # Kelly fraction (공격적)
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.20,       # Kelly 반영한 상한
+        circuit_breaker=cb,
+        jitter_pct=0.0,
+        session_filter=False,
+        max_total_exposure=0.20,      # 보수적 총 노출 한도 20%
+    )
+
+    # 기존 포지션이 이미 노출 20% 정확히 채움 → 추가 진입 BLOCKED
+    open_positions = [{"size": 0.04, "price": 50000}]  # 0.04*50000=2000, 20%
+
+    ts = datetime(2026, 4, 14, 14, 0, 0, tzinfo=timezone.utc)
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.BLOCKED
+    assert "Total exposure limit" in result.reason
+    assert "total_exposure" in result.reason
+    assert result.position_size is None

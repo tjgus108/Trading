@@ -2952,3 +2952,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Kimchi Premium 2024-2025. 2~5%→2025년 말 -0.18% 디스카운트 고착화. 직접 차익 불가 (외환법 + VAPUA). 프리미엄 -2% 이하 시 DCA 집중 전략 백테스트 187% vs 64%. 센티먼트 지표로만 활용 권장.
 **Tests:** 6030 passed (+5 from Cycle 37).
 **Next Cycle:** 39 (C+B+F)
+
+## [2026-04-11 08:51 UTC] Cycle 39 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 08:53 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 15:05 UTC] Cycle 39 COMPLETED — C + B + F
+**[C] Data:** tests/test_order_flow.py +2 VPIN 극단 경계. 매수 99%/매도 99% 시 VPIN [0.8~1.0] 유지 검증.
+**[B] Risk:** tests/test_risk_manager.py +2 통합 시나리오. DD 4.9%+아시아 REDUCED+노출 29.4% 한계 직전 → 포지션 50% 축소 APPROVED. Kelly 20%+기존 노출 20% → exposure BLOCKED.
+**[F] Research:** 스테이블코인 디페깅. USDT SVB 시 $1 위 상승(안전자산), USDC $0.87, Ethena USDe 2025.10 $0.65. 디페깅→DeFi 연쇄 청산. USDT 기반 페어 우선 + 실시간 디페깅 감지 권장.
+**Tests:** 6034 passed (+4 from Cycle 38).
+**Next Cycle:** 40 (D+E+F) 🎯

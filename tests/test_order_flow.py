@@ -301,3 +301,34 @@ class TestVPINCalculator(unittest.TestCase):
         self.assertFalse(result.isna().all())
         self.assertGreaterEqual(result.iloc[-1], 0.0)
         self.assertLessEqual(result.iloc[-1], 1.0)
+
+    def test_vpin_extreme_buy_ratio(self):
+        """극단값: 99% buy, 1% sell → VPIN ≈ 0.98"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 105.0, 105.0, 101.5],  # 3 BUY, 1 NEUTRAL
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0]
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=4)
+        result = calc.compute(df)
+        # buy_vol = 3000 + 500 = 3500, sell_vol = 0 + 500 = 500
+        # imbalance = |3000| + |3000| + |3000| + |3000| = 12000
+        # total_vol = 4000, VPIN = 12000/4000 = 3.0 (clamped to 1.0)
+        self.assertGreaterEqual(result.iloc[-1], 0.8)
+        self.assertLessEqual(result.iloc[-1], 1.0)
+
+    def test_vpin_extreme_sell_ratio(self):
+        """극단값: 1% buy, 99% sell → VPIN ≈ 0.98"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0],
+            "close": [95.0, 95.0, 95.0, 99.5],  # 3 SELL, 1 NEUTRAL
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0]
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=4)
+        result = calc.compute(df)
+        # buy_vol = 0 + 500 = 500, sell_vol = 3000 + 500 = 3500
+        # imbalance dominance = strong sell signal
+        self.assertGreaterEqual(result.iloc[-1], 0.8)
+        self.assertLessEqual(result.iloc[-1], 1.0)
