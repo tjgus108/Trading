@@ -37,7 +37,8 @@
 - ✅ Cycle 28 완료 (E+A+F: config validation + DSR 마크다운 + AMM/DEX 리서치)
 - ✅ Cycle 29 완료 (C+B+F: 병렬 fetch + max_total_exposure + 성공 봇 공통점)
 - ✅ Cycle 30 완료 (D+E+F: rolling_consistency + health check 검증 + 2025 마이크로구조)
-- ⏳ **Cycle 31 대기** (A+C+F)
+- ✅ Cycle 31 완료 (C+F: feed 에러 로그 강화 + 개발자 후회 리서치, A 스킵)
+- ⏳ **Cycle 32 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -46,7 +47,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,995개** |
+| ✅ 통과 테스트 | **5,998개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

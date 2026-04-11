@@ -2480,3 +2480,59 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 04:25 UTC] Cycle 31 Dispatched — A + C + F
 Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:32 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 12:25 UTC] Cycle 31 COMPLETED — C + F (A 스킵)
+**[A] Quality:** 품질 감사 재실행 시도했으나 에이전트가 실제 작업 미완료. 다음 사이클에서 재시도.
+**[C] Data:** src/data/feed.py _fetch_with_retry() 에러 로그 강화. 기존 단순 포맷 → symbol/timeframe/limit/max_retries/error_type/message 풍부한 컨텍스트. +1 test (test_fetch_error_log_includes_context).
+**[F] Research:** 개발자 후회 사례. 과적합 백테스트, 수수료 미반영, 리스크 한도 부재 3대 공통 후회. "나중에 추가"로 빠진 것들. Walk-forward + 서킷브레이커는 첫 기능으로 만들어야 함.
+**Tests:** 5998 passed (+3 from Cycle 30).
+**Next Cycle:** 32 (B+D+F)
