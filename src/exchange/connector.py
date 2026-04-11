@@ -126,6 +126,8 @@ class ExchangeConnector:
     def fetch_ticker(self, symbol: str) -> dict:
         return self.exchange.fetch_ticker(symbol)
 
+    _RETRYABLE = (ccxt.NetworkError, ccxt.RequestTimeout)
+
     def create_order(
         self,
         symbol: str,
@@ -133,6 +135,7 @@ class ExchangeConnector:
         amount: float,
         order_type: str = "market",
         price: Optional[float] = None,
+        max_retries: int = 2,
     ) -> dict:
         logger.info(
             "Submitting %s %s order: %s %.6f @ %s",
@@ -142,16 +145,28 @@ class ExchangeConnector:
             amount,
             price or "market",
         )
-        if order_type == "market":
-            order = self.exchange.create_market_order(symbol, side, amount)
-        elif order_type == "limit":
-            if price is None:
-                raise ValueError("price required for limit order")
-            order = self.exchange.create_limit_order(symbol, side, amount, price)
-        else:
-            raise ValueError(f"Unsupported order_type: {order_type}")
-        logger.info("Order submitted: %s", order.get("id"))
-        return order
+        last_exc: Exception = RuntimeError("max_retries must be >= 1")
+        for attempt in range(1, max_retries + 1):
+            try:
+                if order_type == "market":
+                    order = self.exchange.create_market_order(symbol, side, amount)
+                elif order_type == "limit":
+                    if price is None:
+                        raise ValueError("price required for limit order")
+                    order = self.exchange.create_limit_order(symbol, side, amount, price)
+                else:
+                    raise ValueError(f"Unsupported order_type: {order_type}")
+                logger.info("Order submitted: %s", order.get("id"))
+                return order
+            except self._RETRYABLE as exc:
+                last_exc = exc
+                logger.warning(
+                    "create_order attempt %d/%d failed (%s): %s",
+                    attempt, max_retries, type(exc).__name__, exc,
+                )
+                if attempt < max_retries:
+                    time.sleep(1)
+        raise last_exc
 
     def fetch_order(self, order_id: str, symbol: str) -> dict:
         return self.exchange.fetch_order(order_id, symbol)

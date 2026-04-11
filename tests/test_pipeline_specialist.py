@@ -267,3 +267,155 @@ def test_pipeline_vol_targeting():
     assert result.status == "OK"
     assert any("VolTarget size" in n for n in result.notes)
     mock_vol_targeting.adjust.assert_called_once()
+
+
+# ------------------------------------------------------------------
+# Full Pipeline Integration Tests (Specialist + Risk + Execution)
+# ------------------------------------------------------------------
+
+def test_full_pipeline_specialist_ensemble_with_risk_and_twap():
+    """
+    통합 테스트: SpecialistEnsemble + RiskManager + TWAP 실행기
+    완전한 파이프라인 흐름을 검증하면서 specialist voting 결과를 반영.
+    """
+    from src.exchange.twap import TWAPExecutor, TWAPResult
+    
+    pipeline = _make_pipeline(dry_run=False)
+    
+    # 1. SpecialistEnsemble 설정 — technical agent가 SELL, sentiment가 HOLD → consensus BUY
+    mock_ensemble = MagicMock()
+    mock_ensemble.analyze.return_value = SpecialistVote(
+        agent_name="ensemble_consensus",
+        action="BUY",      # strategy와 일치
+        confidence=0.85,
+        reasoning="3/3 agents agree BUY; strong technical + positive sentiment",
+    )
+    pipeline.specialist_ensemble = mock_ensemble
+    
+    # 2. TWAP Executor 설정
+    mock_twap = MagicMock(spec=TWAPExecutor)
+    mock_twap.execute.return_value = TWAPResult(
+        slices_executed=4,
+        avg_price=50150.0,
+        total_qty=0.01,
+        filled_qty=0.01,
+        estimated_slippage_pct=0.1,
+        dry_run=False,
+    )
+    pipeline.twap_executor = mock_twap
+    
+    # 3. Pipeline 실행
+    result = pipeline.run()
+    
+    # 4. Assertions: 전체 파이프라인이 execution까지 도달
+    assert result.status == "OK"
+    assert result.pipeline_step == "execution"
+    assert result.signal is not None
+    assert result.signal.action == Action.BUY
+    assert result.specialist_action == "BUY"
+    assert result.execution is not None
+    assert result.execution["status"] == "TWAP_COMPLETE"
+    assert result.execution["slices"] == 4
+    assert result.execution["avg_price"] == 50150.0
+    # impl_shortfall = (50150 - 50100) / 50100 * 10000 ≈ 9.98 bps
+    assert result.impl_shortfall_bps is not None
+    assert 9.0 < result.impl_shortfall_bps < 11.0
+    
+    # TWAP executor가 호출되었는지 확인
+    mock_twap.execute.assert_called_once()
+    mock_ensemble.analyze.assert_called_once()
+
+
+def test_full_pipeline_specialist_conflict_blocks_at_alpha():
+    """
+    통합 테스트: SpecialistEnsemble 강한 반대가 신호를 HOLD로 블록
+    파이프라인이 alpha 단계에서 멈추고 risk/execution은 건너뛰는지 확인.
+    """
+    pipeline = _make_pipeline(dry_run=False)
+    
+    # Strategy는 BUY 신호 반환
+    # SpecialistEnsemble이 강한 SELL 합의로 반대
+    mock_ensemble = MagicMock()
+    mock_ensemble.analyze.return_value = SpecialistVote(
+        agent_name="ensemble_consensus",
+        action="SELL",     # strategy 신호와 반대
+        confidence=0.92,   # >= 0.7 → 블록 조건 만족
+        reasoning="Bearish consensus: all 3 agents see weakness; technical breakdown detected",
+    )
+    pipeline.specialist_ensemble = mock_ensemble
+    
+    # Risk manager를 어떻게 설정하든 호출되지 않아야 함
+    risk_call_count = 0
+    def track_risk_calls(*args, **kwargs):
+        nonlocal risk_call_count
+        risk_call_count += 1
+        from src.risk.manager import RiskResult, RiskStatus
+        return RiskResult(
+            status=RiskStatus.APPROVED,
+            position_size=0.01,
+            stop_loss=49500.0,
+            take_profit=51000.0,
+            reason="",
+            risk_amount=100.0,
+            portfolio_exposure=0.01,
+        )
+    
+    pipeline.risk_manager.evaluate.side_effect = track_risk_calls
+    
+    # Pipeline 실행
+    result = pipeline.run()
+    
+    # Assertions: HOLD로 전환되고 alpha에서 멈춤
+    assert result.status == "OK"
+    assert result.pipeline_step == "alpha"
+    assert result.signal is not None
+    assert result.signal.action == Action.HOLD
+    assert "SpecialistEnsemble 충돌" in result.signal.reasoning
+    assert "SPECIALIST conflict" in str(result.notes)
+    
+    # Risk manager가 호출되지 않았음을 확인
+    assert risk_call_count == 0
+    pipeline.connector.create_order.assert_not_called()
+
+
+def test_full_pipeline_kelly_sizer_and_vol_targeting_together():
+    """
+    통합 테스트: Kelly Sizer + VolTargeting 조합 동작
+    risk manager의 position_size가 두 개의 사이저에 의해 순차적으로 조정되는지 확인.
+    """
+    from src.risk.kelly_sizer import KellySizer
+    from src.risk.vol_targeting import VolTargeting
+    
+    pipeline = _make_pipeline()
+    
+    # Trade history 충분히 구성
+    pipeline._trade_history = [
+        {"pnl": 50 + (i * 10), "entry": 50000 + i * 10, "exit": 50050 + i * 10}
+        for i in range(15)
+    ]
+    
+    # Mock Kelly Sizer
+    mock_kelly = MagicMock(spec=KellySizer)
+    mock_kelly.from_trade_history = MagicMock(return_value=0.015)  # Kelly says 0.015
+    pipeline.kelly_sizer = mock_kelly
+    
+    # Mock VolTargeting
+    mock_vol = MagicMock(spec=VolTargeting)
+    mock_vol.adjust.return_value = 0.012  # VolTarget further adjusts to 0.012
+    pipeline.vol_targeting = mock_vol
+    
+    # Pipeline 실행 (dry_run=True)
+    result = pipeline.run()
+    
+    # Assertions
+    assert result.status == "OK"
+    assert result.pipeline_step == "execution"
+    assert result.signal is not None
+    assert result.signal.action == Action.BUY
+    
+    # Kelly sizer가 호출되었는지 확인 (trade_history >= 10)
+    assert any("Kelly size" in n for n in result.notes)
+    
+    # Vol targeting이 호출되었는지 확인
+    assert any("VolTarget size" in n for n in result.notes)
+    mock_vol.adjust.assert_called_once()

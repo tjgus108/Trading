@@ -1,3 +1,22 @@
+# Cycle 53 - Category A: Quality Assurance — Pipeline 통합 테스트 완료
+
+## [2026-04-11] Cycle 53 — Pipeline end-to-end 통합 테스트 확장
+
+### 작업 완료
+- `tests/test_pipeline_specialist.py`: 2개 실전 시나리오 통합 테스트 추가
+  - `test_full_pipeline_specialist_ensemble_with_risk_and_twap`: SpecialistEnsemble 합의(BUY) + RiskManager approval + TWAP 실행 완전 흐름
+  - `test_full_pipeline_specialist_conflict_blocks_at_alpha`: SpecialistEnsemble 강한 반대(SELL conf=0.92) → alpha에서 HOLD 블록, risk/execution 건너뜀
+  - `test_full_pipeline_kelly_sizer_and_vol_targeting_together`: Kelly Sizer + VolTargeting 순차 조정 검증
+
+### 파일 변경
+- `tests/test_pipeline_specialist.py`: 3개 통합 테스트 추가 (~150줄)
+
+### 테스트 결과
+- tests/test_pipeline_specialist.py: 13/13 PASS ✓
+  - 기존 10개 테스트 + 신규 3개 통합 테스트
+
+---
+
 # Cycle 52 - Category D: ML & Signals — specialist_agents voting edge cases 완료
 
 ## [2026-04-11] Cycle 52 — SpecialistEnsemble voting edge case 테스트 추가
@@ -11,63 +30,5 @@
 
 ### 테스트 결과
 - tests/test_specialist_agents.py: 22/22 PASS
-
----
-
-# Cycle 51 - Category A: Quality Assurance — 완료
-
-## [2026-04-11] Cycle 51 — Backtest summary() 포맷 개선
-
-### 작업 완료
-- `src/backtest/report.py`: `summary()` 메서드 개선
-  - 섹션별 분류: PERFORMANCE, RISK-ADJUSTED METRICS, TRADE STATISTICS
-  - 우측 정렬: 숫자 컬럼 일관성 (`:>7.3f` 등)
-  - 콤마 포맷: Total Trades에 수천 단위 분리 (예: `1,234`)
-  - NaN/무한대 처리: safe_format() 헬퍼 추가
-
-### 파일 변경
-- `src/backtest/report.py`: summary() 메서드 (~35줄 개선)
-
-### 테스트 결과
-- tests/test_backtest.py: 6/6 PASS ✓
-  - test_backtest_report_to_markdown
-  - test_backtest_report_markdown_vs_summary
-  - 나머지 4개 기존 테스트
-
----
-
-# Cycle 51 - Category C: Data & Infrastructure
-
-## [2026-04-11] Cycle 51 — ExchangeConnector health_check 메서드 추가
-
-### 작업 완료
-- `src/exchange/connector.py`: `health_check()` 메서드 추가
-  - 반환값: `{connected, exchange, sandbox, markets_loaded, last_tick}`
-  - 미연결 상태: 안전하게 `connected=False` 반환
-  - 연결 상태: 시장 로드 여부 확인, 예외 처리
-  - 로깅: DEBUG(정상), WARNING(예외)
-
-- `tests/test_connector.py`: 4개 health_check 테스트 추가
-  - `test_health_check_not_connected`: 미연결 상태 검증
-  - `test_health_check_connected`: 정상 연결 상태
-  - `test_health_check_no_symbols`: 시장 미로드
-  - `test_health_check_exception_handling`: 예외 처리
-
-### 파일 변경
-- `src/exchange/connector.py`: health_check() 추가 (~45줄)
-- `tests/test_connector.py`: 4개 테스트 추가
-
-### 테스트 결과
-- tests/test_connector.py: 9/9 PASS ✓
-
----
-
-# Cycle 50 - Category D: ML & Signals — LLM retry wrapper 완료
-
-## [2026-04-11] Cycle 50 — LLMAnalyst + Ensemble retry wrapper
-- `src/alpha/llm_analyst.py`: `_with_retry()` 추가, `analyze_signal`에 적용
-- `src/alpha/ensemble.py`: 동일 `_with_retry()` 추가, `_ask_claude`/`_ask_openai`에 적용
-- `tests/test_llm_analyst.py`: `TestWithRetry` 클래스 4개 테스트 추가
-- tests/test_llm_analyst.py: 17/17 PASS ✓
 
 ---

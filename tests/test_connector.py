@@ -143,3 +143,31 @@ def test_health_check_exception_handling():
     
     assert result["connected"] is False
     assert result["exchange"] == "binance"
+
+
+# ── create_order 재시도 테스트 ─────────────────────────────────────────────
+
+def test_create_order_retries_on_network_error():
+    """NetworkError 1회 후 성공 → 재시도 후 정상 반환."""
+    conn = _make_connector()
+    fake_order = {"id": "123", "status": "open"}
+    conn._exchange.create_market_order.side_effect = [
+        ccxt.NetworkError("timeout"),
+        fake_order,
+    ]
+
+    result = conn.create_order("BTC/USDT", "buy", 0.01)
+
+    assert result == fake_order
+    assert conn._exchange.create_market_order.call_count == 2
+
+
+def test_create_order_raises_after_max_retries():
+    """NetworkError가 max_retries(2)번 계속되면 예외 전파."""
+    conn = _make_connector()
+    conn._exchange.create_market_order.side_effect = ccxt.NetworkError("persistent")
+
+    with pytest.raises(ccxt.NetworkError):
+        conn.create_order("BTC/USDT", "buy", 0.01, max_retries=2)
+
+    assert conn._exchange.create_market_order.call_count == 2
