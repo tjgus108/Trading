@@ -6315,3 +6315,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Solana 봇. Jupiter Perps 일평균 $1B/79% 점유율. Telegram 봇(Trojan, BONKbot, Axiom) 주도. Jupiter 라우팅 + Phantom 지갑 표준 패턴.
 **Tests:** 6214 passed (+2 from Cycle 74). 10번째 CRITICAL 버그 수정.
 **Next Cycle:** 76 (A+C+F)
+
+## [2026-04-11 11:29 UTC] Cycle 76 Dispatched — A + C + F
+Categories: A + C + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 11:30 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 04:40 UTC] Cycle 76 COMPLETED — A + C + F
+**[A] Quality:** tests/test_lstm_strategy.py +2 회귀 테스트 (Cycle 75 NameError 수정 검증). model_path 유효성, n_features 저장 검증.
+**[C] Data:** tests/test_gex_cme.py +5 경계 조건. 빈 result, 누락 키, 0 price, 0 items 처리.
+**[F] Research:** Top 5 지표. EMA, RSI, MACD, Bollinger, Stochastic이 프로 봇 주류. 2025 비후행 지표(StochRSI, Fisher Transform) 주목.
+**Tests:** 6221 passed (+7 from Cycle 75).
+**Next Cycle:** 77 (B+D+F)

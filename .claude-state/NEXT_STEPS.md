@@ -2,8 +2,9 @@
 
 ## 완료
 - Cycle 75: TWAP 타임아웃 경계 테스트 2개 추가
-  - test_twap_global_timeout_triggers_on_second_slice: elapsed > budget → 조기 종료
-  - test_twap_global_timeout_not_triggered_within_budget: elapsed < budget → 정상 완료
+- Cycle 76: LSTM numpy fallback 회귀 테스트 추가
+  - test_train_torch_save_path_is_valid: model_path 유효성 검증
+  - test_train_torch_saved_data_contains_n_features: n_features=seq_X_raw.shape[-1] 검증
 
 ## 남은 작업
 - TWAP per-slice 타임아웃(dry_run=False 경로) 추가 커버리지 고려

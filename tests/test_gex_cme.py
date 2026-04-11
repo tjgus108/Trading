@@ -256,3 +256,57 @@ def test_cme_max_retries_parameter():
     """CMEBasisFeed max_retries 파라미터 설정 확인."""
     feed = CMEBasisFeed(max_retries=1)
     assert feed.max_retries == 1
+
+
+# ---------------------------------------------------------------------------
+# 11. Boundary conditions: Empty/malformed responses
+# ---------------------------------------------------------------------------
+
+def test_gex_parse_empty_result():
+    """GEX 응답이 빈 result[] → net_gex=0, score=0."""
+    feed = GEXFeed()
+    data = {"result": []}
+    result = feed._parse_gex(data)
+    assert result["net_gex"] == 0.0
+    assert result["score"] == 0.0
+    assert result["positive"] is True
+
+
+def test_gex_parse_missing_result_key():
+    """GEX 응답에 'result' 키 없음 → net_gex=0, score=0."""
+    feed = GEXFeed()
+    data = {}  # no 'result' key
+    result = feed._parse_gex(data)
+    assert result["net_gex"] == 0.0
+    assert result["score"] == 0.0
+
+
+def test_cme_parse_zero_index_price():
+    """CME index_price=0 → None 반환 (division guard)."""
+    feed = CMEBasisFeed()
+    data = {"markPrice": "50000.0", "indexPrice": "0.0"}
+    result = feed._parse_basis(data)
+    assert result is None
+
+
+def test_cme_parse_missing_keys():
+    """CME 응답에 markPrice/indexPrice 없음 → 0.0으로 처리."""
+    feed = CMEBasisFeed()
+    data = {}  # missing both keys
+    result = feed._parse_basis(data)
+    assert result is None  # index_price 기본값 0.0
+
+
+def test_gex_parse_items_with_zero_values():
+    """GEX 아이템들이 gamma/oi/spot=0 → 모두 skip, net_gex=0."""
+    feed = GEXFeed()
+    data = {
+        "result": [
+            {"instrument_name": "BTC-C", "gamma": 0.0, "open_interest": 100.0, "mark_price": 50000.0},
+            {"instrument_name": "BTC-P", "gamma": 0.001, "open_interest": 0.0, "mark_price": 50000.0},
+            {"instrument_name": "BTC-C", "gamma": 0.001, "open_interest": 100.0, "mark_price": 0.0},
+        ]
+    }
+    result = feed._parse_gex(data)
+    assert result["net_gex"] == 0.0
+    assert result["score"] == 0.0

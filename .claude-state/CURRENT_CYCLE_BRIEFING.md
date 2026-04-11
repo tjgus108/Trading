@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 75 — 2026-04-11T11:26:36.185861Z
+🔄 CYCLE 76 — 2026-04-11T11:29:26.669433Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 74 COMPLETED — C + B + F** (2026-04-12 04:00 UTC)
-  **[C] Data:** tests/test_onchain_consistency.py 신규 +3. mock 일관성, score 재계산, [-3,+3] 경계 검증.
-  **[B] Risk:** tests/test_circuit_breaker.py +2 reset_all. 연속 손실+쿨다운 초기화, 플래시 크래시 트리거 후 재개 확인.
-  **[F] Research:** ETF Option Bots. BITO(선물) + IBIT(현물) 옵션 체인 활성화. IV rank 기반 strangle 매도, GEX flip 결합 타이밍 정밀도 향상.
-  **Tests:** 6212 passed (+5 from Cycle 73).
+**Cycle 75 COMPLETED — D + E + F** (2026-04-12 04:20 UTC)
+  **[D] ML BUG FIX:** src/ml/lstm_model.py _train_torch 저장 시 `X` 미정의 변수 참조 버그 수정 (X.shape → seq_X_raw.shape). +2 tests (numpy fallback 검증).
+  **[E] Execution:** tests/test_kelly_twap.py +2 TWAP 전역 timeout. time.time 모킹으로 슬라이스 조기 종료, budget 내 정상 완료 검증.
+  **[F] Research:** Solana 봇. Jupiter Perps 일평균 $1B/79% 점유율. Telegram 봇(Trojan, BONKbot, Axiom) 주도. Jupiter 라우팅 + Phantom 지갑 표준 패턴.
+  **Tests:** 6214 passed (+2 from Cycle 74). 10번째 CRITICAL 버그 수정.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

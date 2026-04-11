@@ -81,7 +81,8 @@
 - ✅ Cycle 73 완료 (E+A+F: **wait_for_fill 부분체결 유실 CRITICAL** + correlation edge + Options GEX)
 - ✅ Cycle 74 완료 (C+B+F: Onchain 일관성 + CB reset_all + ETF Option bots)
 - ✅ Cycle 75 완료 (D+E+F: **LSTM save NameError CRITICAL** + TWAP timeout + Solana bots)
-- ⏳ **Cycle 76 대기** (A+C+F)
+- ✅ Cycle 76 완료 (A+C+F: LSTM 회귀 + GEX 경계 + Top 5 지표)
+- ⏳ **Cycle 77 대기** (B+D+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -90,7 +91,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,214개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,221개** (0 warnings ✨) |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
