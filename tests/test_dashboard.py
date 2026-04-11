@@ -153,3 +153,39 @@ def test_dashboard_stop_is_idempotent(mock_provider):
     time.sleep(0.05)
     d.stop()
     d.stop()  # 두 번 호출해도 에러 없음
+
+
+def test_render_html_cycle50_milestone():
+    """cycle_count >= 50 이면 CYCLE 50 MILESTONE 배지가 표시된다."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 50,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 234.56,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 50 MILESTONE" in html
+    assert "+234.56" in html
+
+
+def test_render_html_no_milestone_below_50():
+    """cycle_count < 50 이면 마일스톤 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 49,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": -10.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 50 MILESTONE" not in html
+    assert "-10.00" in html

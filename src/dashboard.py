@@ -146,7 +146,7 @@ def _render_html(data: dict) -> str:
     cycles = data.get("cycle_count", 0)
     cumulative_pnl = data.get("cumulative_pnl", 0)
     cum_pnl_color = "green" if cumulative_pnl >= 0 else "red"
-    milestone_html = (" <span class="badge" style="background:#c8a800;color:#111">CYCLE 50 MILESTONE</span>"
+    milestone_html = (" <span class='badge' style='background:#c8a800;color:#111'>CYCLE 50 MILESTONE</span>"
                       if cycles >= 50 else "")
     dry_run = data.get("dry_run", True)
     mode_badge = "DRY RUN" if dry_run else "LIVE"
