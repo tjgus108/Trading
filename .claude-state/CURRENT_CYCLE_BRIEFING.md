@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 69 — 2026-04-11T10:40:21.779746Z
+🔄 CYCLE 70 — 2026-04-11T10:43:05.573932Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 68 COMPLETED — E + A + F** (2026-04-12 02:00 UTC)
-  **[E] Execution:** cancel_order 이미 존재. +2 경계 테스트 (정상 취소, 미연결 RuntimeError).
-  **[A] Quality:** Monte Carlo seed 재현성 철저 검증 +1. 3회 실행 시 final_returns, sharpes, max_drawdowns, percentiles 모두 일치. 코드 수정 불필요.
-  **[F] Research:** DeFi Yield Bot 2026. AI 자동화 APY 27% 향상 (auto-compound + 가스 타이밍). Aave v3 4.05%, Beefy 8-40%. 2026 $37.3B 시장 예상. 별도 모듈 분리 권장.
-  **Tests:** 6180 passed (+3 from Cycle 67).
+**Cycle 69 COMPLETED — C + B + F** (2026-04-12 02:20 UTC)
+  **[C] Data:** tests/test_liquidation_cascade.py +2 형식 검증. get_recent() list[dict] 필수 필드, compute_pressure() 필드 범위 [-3,+3].
+  **[B] Risk:** tests/test_risk.py +2 config 의존성. kelly_fraction=risk_per_trade 매핑, max_fraction=max_position_size 매핑 확인.
+  **[F] Research:** MEV Defense. Flashbots Protect 2.1M 계정 $43B 보호 98.5% 성공률. 이더리움 80% 보호 RPC. TEE 2025 핵심. slippage+분할+private RPC 표준.
+  **Tests:** 6184 passed (+4 from Cycle 68).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
