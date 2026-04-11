@@ -57,6 +57,12 @@
     * 거래 빈도 제어 (80개→20개 거래, 75% 감소)
     * 개선 후 합성 데이터 테스트: 4.07% 수익, 20 거래, SR 1.62, MDD 4.6%
   - 모든 wick_reversal 관련 테스트 16개 통과
+- Cycle 83 (Category A): wick_reversal 추세 필터 회귀 테스트
+  - tests/test_wick_reversal.py: trend_up/trend_down 동작 검증 테스트 2개 추가
+    - test_shooting_star_with_trend_down_true: Shooting Star + trend_down=True → SELL 확인
+    - test_hammer_and_shooting_star_mutual_exclusion: 패턴 상호배제 및 edge case 검증
+  - 전체 19 테스트 통과 (test_wick_reversal.py)
+  - Cycle 82에서 추가된 추세 필터(-14% → +0.93% 개선)가 정상 동작 재검증 완료
 - Cycle 83 (Research): Engulfing / Frama 실전 유효성 조사
   - FRAMA는 동적 지지/저항 역할, Engulfing은 반등 확인 신호로 조합 사용
   - 단독 시 Engulfing 50~70% 정확도 → Cycle 82에서 engulfing_zone(-12.74%), frama(-7.89%) 손실

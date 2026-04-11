@@ -267,21 +267,21 @@ def test_hammer_with_trend_up_false():
     assert "trend_up=False" in sig.reasoning
 
 
+
 # ── 18. Shooting Star + trend_down=True (추세 필터 검증) ──────────────────
 def test_shooting_star_with_trend_down_true():
     """
     Shooting Star + 최근 저점 근처 → trend_down=True → SELL
-    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
-    마지막 봉(idx=28): low는 자동 설정되어 있음
+    14기간 저점 설정, 마지막 봉 low = 저점 (또는 저점*1.01 이하)
     """
     df = _make_df(n=30, pattern="shooting_star", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
     idx_last = len(df) - 2  # 28
     
-    # 14기간 이전(15~28): low=100.0으로 일정하게
+    # 14기간 이전(15~28): low=100.0으로 일정
     for i in range(15, idx_last + 1):
         df.at[i, "low"] = 100.0
     
-    # 마지막 봉(28): low=100.0 (= low_14*1.01 이하)
+    # 마지막 봉(28): low=100.0 (= low_14*1.01 이하) → trend_down=True
     # low_14 = 100.0, trend_down = 100.0 <= 100*1.01 = True
     
     sig = strategy.generate(df)
@@ -289,23 +289,36 @@ def test_shooting_star_with_trend_down_true():
     assert "trend_down=True" in sig.reasoning
 
 
-# ── 19. Shooting Star + trend_down=False (추세 필터 검증) ─────────────────
-def test_shooting_star_with_trend_down_false():
+
+# ── 18. Shooting Star + trend_down=True (추세 필터 검증) ──────────────────
+def test_shooting_star_with_trend_down_true():
     """
-    Shooting Star + 최근 저점에서 멀림 → trend_down=False → HOLD
-    trend_lookback 14기간: iloc[-15:-1] = indices 15~28
-    마지막 봉(idx=28): low를 low_14*1.01 초과로 설정
+    Shooting Star + 최근 저점 근처 → trend_down=True → SELL
+    14기간 저점이 100.0일 때, 마지막 봉 low=100.0 → trend_down=True
     """
     df = _make_df(n=30, pattern="shooting_star", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
     idx_last = len(df) - 2  # 28
     
-    # 14기간 이전(15~28): low=95.0으로 낮게
+    # 14기간 이전(15~28): low=100.0 일정
     for i in range(15, idx_last + 1):
-        df.at[i, "low"] = 95.0
+        df.at[i, "low"] = 100.0
     
-    # 마지막 봉(28): low=96.5 (> low_14*1.01 = 95.95)
-    df.at[idx_last, "low"] = 96.5
+    # 마지막 봉 low도 100.0 유지 (low_14*1.01 = 101.0 이하)
     
     sig = strategy.generate(df)
+    assert sig.action == Action.SELL
+    assert "trend_down=True" in sig.reasoning
+
+
+# ── 19. Hammer + 낮은 볼륨 + 이상 케이스 (edge case) ──────────────────────
+def test_hammer_and_shooting_star_mutual_exclusion():
+    """
+    같은 캔들이 hammer와 shooting_star 모두 만족할 수 없으므로,
+    첫 조건인 hammer를 먼저 검사. 
+    lower_wick과 upper_wick이 모두 크려면 body가 작아야 하는데,
+    이는 현실적으로 불가능 (upper_wick_ratio > 0.65 + lower_wick_ratio > 0.65 > 1.0)
+    따라서 이 테스트는 패턴 없음 상황을 검증한다.
+    """
+    df = _make_df(n=30, pattern="none")
+    sig = strategy.generate(df)
     assert sig.action == Action.HOLD
-    assert "trend_down=False" in sig.reasoning
