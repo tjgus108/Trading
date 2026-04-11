@@ -14,9 +14,27 @@ C2. LLMAnalyst: Claude API를 호출해 시장 분석 메모를 생성.
 
 import logging
 import os
+import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+_RETRY_ATTEMPTS = 3
+_RETRY_BACKOFF = [0.5, 1.0]   # seconds between attempt 1→2, 2→3
+
+
+def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: list[float] = _RETRY_BACKOFF):
+    """Simple retry wrapper for transient API errors."""
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            if i < len(backoff):
+                time.sleep(backoff[i])
+            logger.debug("_with_retry attempt %d/%d failed: %s", i + 1, attempts, e)
+    raise last_exc
 
 # 비용 최적화 모델 라우팅 (ROADMAP C2 참조)
 _HAIKU_MODEL = "claude-haiku-4-5-20251001"    # 분류, 요약 (저비용)
@@ -81,12 +99,12 @@ class LLMAnalyst:
         )
 
         try:
-            response = self._client.messages.create(
+            response = _with_retry(lambda: self._client.messages.create(
                 model=self._model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=_TIMEOUT_SECONDS,
-            )
+            ))
             if not response.content:
                 logger.warning("LLM returned empty content for symbol=%s", symbol)
                 return ""

@@ -4043,3 +4043,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** Bybit 2025 사건. Feb 21 Lazarus $1.5B 해킹 (역대 최대). 멀티시그 강화, API 보안 오버홀. Aug 2025 기관 rate limit 도입, 일반 perp 400 req/s 유지. **우리 봇: API 키 2FA 필수**.
 **Tests:** 6093 passed (+9 from Cycle 48).
 **Next Cycle:** 50 🎯 (D+E+F) — 50 사이클 마일스톤
+
+## [2026-04-11 09:30 UTC] Cycle 50 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md

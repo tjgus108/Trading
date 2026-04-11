@@ -1,8 +1,8 @@
-"""Tests for LLMAnalyst robustness: timeout, empty response, unexpected text."""
+"""Tests for LLMAnalyst robustness: timeout, empty response, unexpected text, retry."""
 
 import pytest
-from unittest.mock import MagicMock, patch
-from src.alpha.llm_analyst import LLMAnalyst
+from unittest.mock import MagicMock, patch, call
+from src.alpha.llm_analyst import LLMAnalyst, _with_retry
 
 
 # ---------------------------------------------------------------------------
@@ -132,3 +132,42 @@ class TestClassifyNewsRisk:
     def test_disabled_returns_none(self):
         analyst = LLMAnalyst(enabled=False)
         assert analyst.classify_news_risk("Any headline") == "NONE"
+
+
+# ---------------------------------------------------------------------------
+# _with_retry
+# ---------------------------------------------------------------------------
+
+class TestWithRetry:
+    def test_succeeds_on_first_attempt(self):
+        fn = MagicMock(return_value="ok")
+        result = _with_retry(fn, attempts=3, backoff=[])
+        assert result == "ok"
+        assert fn.call_count == 1
+
+    def test_retries_on_transient_error_then_succeeds(self):
+        fn = MagicMock(side_effect=[Exception("transient"), "ok"])
+        result = _with_retry(fn, attempts=3, backoff=[0])
+        assert result == "ok"
+        assert fn.call_count == 2
+
+    def test_raises_after_all_attempts_exhausted(self):
+        fn = MagicMock(side_effect=Exception("always fails"))
+        with pytest.raises(Exception, match="always fails"):
+            _with_retry(fn, attempts=3, backoff=[0, 0])
+        assert fn.call_count == 3
+
+    def test_analyze_signal_retries_before_giving_up(self):
+        """analyze_signal returns "" only after retry wrapper exhausts all attempts."""
+        analyst = LLMAnalyst(enabled=False)
+        analyst._enabled = True
+        analyst._client = MagicMock()
+        analyst._client.messages.create.side_effect = [
+            Exception("flaky"),
+            Exception("flaky"),
+            Exception("flaky"),
+        ]
+        with patch("src.alpha.llm_analyst._RETRY_BACKOFF", [0, 0]):
+            result = analyst.analyze_signal("BTC/USDT", "BUY", "RSI oversold")
+        assert result == ""
+        assert analyst._client.messages.create.call_count == 3

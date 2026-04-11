@@ -1,3 +1,27 @@
+# Cycle 50 - Category D: ML & Signals — LLM retry wrapper 완료
+
+## [2026-04-11] Cycle 50 — LLMAnalyst + Ensemble retry wrapper
+
+### 작업 완료
+- `src/alpha/llm_analyst.py`: `_with_retry()` 추가, `analyze_signal`에 적용 (3회, backoff 0.5/1.0s)
+- `src/alpha/ensemble.py`: 동일 `_with_retry()` 추가, `_ask_claude`/`_ask_openai`에 적용
+- `tests/test_llm_analyst.py`: `TestWithRetry` 클래스 4개 테스트 추가
+
+### 테스트 결과
+- tests/test_llm_analyst.py: 17/17 PASS
+
+---
+
+# Cycle 50 - Category F: Research — 50 사이클 마일스톤
+
+## [2026-04-11] Cycle 50 — Top 3 Successful Bots 2025
+- **CryptoRobotics**: 공개 성과 테이블. 상위 봇 월 수익률 60~266%. 신호 기반 멀티 전략.
+- **Stoic**: 시장 중립 Meta 전략 ~45% APY, 헤지 캐리 Fixed Income 10~20% APY. 검증된 실적.
+- **Pionex**: 월 거래량 $60B, 사용자 500만. Grid/DCA/Arbitrage 내장. 연 15~50% 차익 봇.
+- 공통 키 특징: 24/7 자동화 + 리스크 관리 + 다중 전략 조합 + 실적 공개 투명성.
+
+---
+
 # Cycle 49 - Category C: Data & Infrastructure 완료
 
 ## [2026-04-11] Cycle 49 — NewsMonitor 중복 감지 추가

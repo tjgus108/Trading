@@ -56,6 +56,7 @@ class OrchestratorStatusProvider(StatusProvider):
             "timeframe": orch.cfg.trading.timeframe,
             "dry_run": getattr(orch, "_dry_run", True),
             "cycle_count": orch._cycle_count,
+            "cumulative_pnl": sum(t.pnl for t in tracker._history),
             "open_positions": open_positions,
             "today_pnl": tracker.today_pnl(),
             "daily_summary": tracker.daily_summary(),
@@ -143,6 +144,10 @@ def _render_html(data: dict) -> str:
     pnl = data.get("today_pnl", 0)
     pnl_color = "green" if pnl >= 0 else "red"
     cycles = data.get("cycle_count", 0)
+    cumulative_pnl = data.get("cumulative_pnl", 0)
+    cum_pnl_color = "green" if cumulative_pnl >= 0 else "red"
+    milestone_html = (" <span class="badge" style="background:#c8a800;color:#111">CYCLE 50 MILESTONE</span>"
+                      if cycles >= 50 else "")
     dry_run = data.get("dry_run", True)
     mode_badge = "DRY RUN" if dry_run else "LIVE"
     mode_color = "gray" if dry_run else "red"
@@ -213,7 +218,9 @@ def _render_html(data: dict) -> str:
   <div class="stat"><div class="label">Symbol</div><div class="value">{symbol}</div></div>
   <div class="stat"><div class="label">Today P&L</div>
     <div class="value" style="color:{pnl_color}">{pnl:+.2f} USDT</div></div>
-  <div class="stat"><div class="label">Cycles</div><div class="value">{cycles}</div></div>
+  <div class="stat"><div class="label">Cycles</div><div class="value">{cycles}{milestone_html}</div></div>
+  <div class="stat"><div class="label">Cumulative P&amp;L</div>
+    <div class="value" style="color:{cum_pnl_color}">{cumulative_pnl:+.2f} USDT</div></div>
   <div class="stat"><div class="label">Daily Loss</div>
     <div class="value">{daily_loss_pct:.1f}%</div></div>
   <div class="stat"><div class="label">Consec Losses</div>

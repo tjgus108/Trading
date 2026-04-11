@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 49 — 2026-04-11T09:27:24.787235Z
+🔄 CYCLE 50 — 2026-04-11T09:30:08.692236Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 48 COMPLETED — E + A + F** (2026-04-11 18:15 UTC)
-  **[E] Execution:** src/exchange/twap.py TWAPResult에 avg_execution_time 필드 추가. 슬라이스별 시간 측정 + 평균. +1 test.
-  **[A] Quality:** tests/conftest.py 신규 (+91줄). sample_df, sample_df_with_ema, _make_df 헬퍼 공통화. 기존 로컬 함수 유지 (100% 호환).
-  **[F] Research:** Bot Backup/DR (직접 기록). 상태 저장(SQLite/Redis), 주문 복구(API + 로컬 동기화), 30초 재시작 + 포지션 검증 표준.
-  **Tests:** 6084 passed (+1 from Cycle 47).
+**Cycle 49 COMPLETED — C + B + F** (2026-04-11 18:35 UTC)
+  **[C] Data:** src/data/news.py 중복 감지 추가. MD5 hash (정규화), 24h 윈도우, 만료 자동 제거. NewsEvent.title_hash 필드. +7 tests.
+  **[B] Risk:** tests/test_risk_manager.py +2 multi-position 경계. 동일 방향 누적 30% 경계, 반대 방향 gross 35% BLOCKED (net 5% 아님).
+  **[F] Research:** Bybit 2025 사건. Feb 21 Lazarus $1.5B 해킹 (역대 최대). 멀티시그 강화, API 보안 오버홀. Aug 2025 기관 rate limit 도입, 일반 perp 400 req/s 유지. **우리 봇: API 키 2FA 필수**.
+  **Tests:** 6093 passed (+9 from Cycle 48).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
