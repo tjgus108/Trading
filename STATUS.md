@@ -18,8 +18,9 @@
 - ✅ Cycle 9 완료 (C+B+F: vol_targeting 4 bugs + Onchain 패턴 + 헤지펀드 리서치)
 - ✅ Cycle 10 완료 (D+E+F: SpecialistEnsemble graceful + FORCE_LIQUIDATE halt + LLM 리서치)
 - ✅ Cycle 11 완료 (A+C+F: **피처 누수 2개 CRITICAL** + to_markdown + Paper→Live 리서치)
-- ✅ Cycle 12 완료 (B+D+F: **레이블 누수 CRITICAL** + corr throttle 테스트 수정 + 모니터링 리서치)
-- ⏳ **Cycle 13 대기** (E+A+F: 3회차)
+- ✅ Cycle 12 완료 (B+D+F: **레이블 누수 CRITICAL** + corr throttle + 모니터링 리서치)
+- ✅ Cycle 13 완료 (E+A+F: volume surge 감지 + 품질 감사 재실행 + 시장구조 리서치)
+- ⏳ **Cycle 14 대기** (C+B+F: 3회차)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -28,7 +29,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,855개** |
+| ✅ 통과 테스트 | **5,860개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

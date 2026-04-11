@@ -707,3 +707,19 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 
 ## [2026-04-11 02:58 UTC] Cycle 13 Dispatched — E + A + F
 Categories: E + A + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 03:06 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T04:06:21Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 05:55 UTC] Cycle 13 COMPLETED — E + A + F
+**[E] Execution (via Risk):** src/monitoring/anomaly_detector.py에 _detect_volume_surge() 추가. rolling window 평균 대비 3배 이상 거래량 → 이상치, 4.5배 이상 → HIGH severity. +5 tests.
+**[A] Quality:** scripts/quality_audit.py 재실행 (ML 피처 누수 수정 + 지표 보강 후). 총 348개 전략 (에러 0, 이전 5). PASS 22개 (6.3%) — Sharpe avg 4.79, MDD avg 3.62%, PF avg 1.95. BACKTEST_REPORT.md + QUALITY_AUDIT.csv 갱신.
+**[F] Research:** 2025 시장 구조 변화. ETF 기관화 (IBIT 60% 독주), 거래소 상위 4개 70%+ 집중. 알고 트레이딩 비중 확대로 $2B/$3.21B 플래시 크래시 발생.
+**Tests:** 5860 passed, 27 skipped (+5 from Cycle 12).
+**Next Cycle:** 14 (C+B+F — 3회차)
