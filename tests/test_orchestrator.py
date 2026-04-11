@@ -624,3 +624,88 @@ def test_drawdown_halt_recovers_via_force_resume(cfg, mock_connector):
     # 이후 run_once가 BLOCKED되지 않아야 하므로 update도 halted=False 반환
     status_after = monitor.update(10000.0)
     assert status_after.halted is False
+
+
+# ── 개별 단계 실패 시 다음 사이클 계속 진행 검증 ────────────────────────────
+
+def test_drawdown_check_exception_is_non_fatal(cfg):
+    """DrawdownMonitor.update()가 예외를 던져도 run_once는 pipeline을 계속 실행한다."""
+    orch = BotOrchestrator(cfg)
+    orch._ready = True
+    orch._dry_run = True
+
+    orch._update_funding_rates = MagicMock()
+    orch._drawdown_monitor = MagicMock()
+    orch._drawdown_monitor.update.side_effect = RuntimeError("balance fetch error")
+    orch._notifier = MagicMock()
+    orch._risk_manager = None
+    orch._data_feed = MagicMock()
+    orch._data_feed._cache = {}
+    orch._data_feed.fetch = MagicMock()
+
+    from src.data.health_check import DataHealthCheck, DataFeedsHealthCheck
+    fake_report = DataHealthCheck(
+        feeds={}, live_count=1, fallback_count=0,
+        disconnected_count=0, total_feeds=1, anomalies=[],
+    )
+    orch._health_checker = MagicMock(spec=DataFeedsHealthCheck)
+    orch._health_checker.check_all.return_value = fake_report
+
+    fake_result = PipelineResult(
+        timestamp="2026-04-11 00:00 UTC", symbol="BTC/USDT",
+        pipeline_step="order", status="NO_ACTION", notes=[],
+    )
+    orch._pipeline = MagicMock()
+    orch._pipeline.run.return_value = fake_result
+    orch._pipeline._fetch_balance_usd = MagicMock(return_value=10000.0)
+    orch._handle_result = MagicMock()
+    orch._update_position_from_result = MagicMock()
+
+    result = orch.run_once()
+
+    # DrawdownMonitor 예외에도 pipeline은 실행되어야 한다
+    orch._pipeline.run.assert_called_once()
+    assert result.status == "NO_ACTION"
+
+
+def test_regime_detection_exception_is_non_fatal(cfg):
+    """SimpleRegimeDetector.detect()가 예외를 던져도 run_once는 pipeline을 계속 실행한다."""
+    orch = BotOrchestrator(cfg)
+    orch._ready = True
+    orch._dry_run = True
+
+    orch._update_funding_rates = MagicMock()
+    orch._drawdown_monitor = MagicMock()
+    orch._drawdown_monitor.update.return_value = MagicMock(halted=False)
+    orch._notifier = MagicMock()
+    orch._risk_manager = None
+
+    orch._data_feed = MagicMock()
+    orch._data_feed._cache = {}
+    # fetch 자체는 성공하지만 detect에서 예외 발생
+    orch._data_feed.fetch.return_value = MagicMock(df=MagicMock())
+
+    from src.data.health_check import DataHealthCheck, DataFeedsHealthCheck
+    fake_report = DataHealthCheck(
+        feeds={}, live_count=1, fallback_count=0,
+        disconnected_count=0, total_feeds=1, anomalies=[],
+    )
+    orch._health_checker = MagicMock(spec=DataFeedsHealthCheck)
+    orch._health_checker.check_all.return_value = fake_report
+
+    fake_result = PipelineResult(
+        timestamp="2026-04-11 00:00 UTC", symbol="BTC/USDT",
+        pipeline_step="order", status="NO_ACTION", notes=[],
+    )
+    orch._pipeline = MagicMock()
+    orch._pipeline.run.return_value = fake_result
+    orch._pipeline._fetch_balance_usd = MagicMock(return_value=10000.0)
+    orch._handle_result = MagicMock()
+    orch._update_position_from_result = MagicMock()
+
+    with patch("src.orchestrator.SimpleRegimeDetector.detect", side_effect=ValueError("bad data")):
+        result = orch.run_once()
+
+    # regime detection 실패에도 pipeline은 실행되어야 한다
+    orch._pipeline.run.assert_called_once()
+    assert result.status == "NO_ACTION"

@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 92 — 2026-04-11T18:04:04.130376Z
+🔄 CYCLE 93 — 2026-04-11T18:14:29.255374Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 91 COMPLETED — A + C + SIM + F** (2026-04-12 11:40 UTC)
-  **[A] Quality:** 8개 SIM 개선 전략 회귀 체크 — 7 pass, narrow_range 테스트 파일 없음 (별도 추가 필요).
-  **[C] Data:** tests/test_sentiment.py +2. 단일 소스 실패 시 graceful, 전체 실패 시 중립 반환.
-  **[SIM] No-op:** roc_ma_cross 3가지 개선 시도했으나 원본이 이미 최적화 (Sharpe 2.985 PASS). 추가 조정 시 오히려 저하.
-  **[F] Research:** Q2 2026. AI 모멘텀 + 리스크 관리 필수. 레짐 감지 + 전략 전환 구조.
+**Cycle 92 COMPLETED — B + D + SIM + F** (2026-04-12 12:15 UTC)
+  **[B] Risk:** tests/test_drawdown_monitor.py +2 월간 기준 단독, reset 전체 기간 초기화.
+  **[D] ML:** tests/test_ensemble_conflicts.py +5 _compute_consensus. 둘 다 N/A, 한쪽 실패+반대 등.
+  **[SIM] Auto-improve:** acceleration_band 개선. 변동성 필터 완화 + 추세 OR 로직. **0.00% → +2.77%**. 거래 0→58.
+  **[F] Research:** AI 봇 ROI 실사용자. 연 10-34% 평균, 장기 10%+ 유지 어려움. 193% 광고는 레버리지 포함.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
