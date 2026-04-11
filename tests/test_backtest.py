@@ -102,3 +102,4 @@ def test_backtest_report_markdown_vs_summary():
     
     assert markdown_lines < summary_lines
     assert markdown.count('|') >= 16  # 최소 header + separators + 8 rows
+

@@ -223,3 +223,56 @@ class TestInterruptibleSleep:
         CandleScheduler._interruptible_sleep(0, stop_event)
         elapsed = time.monotonic() - start
         assert elapsed < 0.5
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 연속 에러 → graceful shutdown 테스트
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TestConsecutiveErrors:
+    """연속 실패 시 stop_event 가 set 되고 루프가 종료되는지 검증."""
+
+    def test_stop_after_max_consecutive_errors(self):
+        """
+        pipeline_fn 이 계속 예외를 던지면 max_consecutive_errors 도달 시
+        stop_event 가 set 되고 루프가 종료되어야 한다.
+        """
+        scheduler = CandleScheduler()
+        stop_event = threading.Event()
+        call_count = [0]
+
+        def always_fail():
+            call_count[0] += 1
+            raise RuntimeError("persistent error")
+
+        with patch.object(CandleScheduler, "_interruptible_sleep"):
+            scheduler.run_loop(always_fail, "1h", stop_event, max_consecutive_errors=3)
+
+        assert stop_event.is_set(), "stop_event 가 set 되어야 함"
+        assert call_count[0] == 3, f"정확히 3번 호출 후 종료 예상, 실제: {call_count[0]}"
+
+    def test_error_counter_resets_on_success(self):
+        """
+        성공 후에는 연속 에러 카운터가 리셋되어 이후 실패가 다시 카운트되어야 한다.
+        패턴: fail, fail, success, fail, fail → 종료 없이 총 5회 호출 후 stop_event 로 종료.
+        """
+        scheduler = CandleScheduler()
+        stop_event = threading.Event()
+        call_count = [0]
+        # 호출 순서: fail, fail, success, fail, fail, stop
+        responses = [True, True, False, True, True]
+
+        def sometimes_fail():
+            idx = call_count[0]
+            call_count[0] += 1
+            if idx < len(responses) and responses[idx]:
+                raise RuntimeError("planned error")
+            if idx >= len(responses):
+                stop_event.set()
+
+        with patch.object(CandleScheduler, "_interruptible_sleep"):
+            scheduler.run_loop(sometimes_fail, "1h", stop_event, max_consecutive_errors=3)
+
+        assert call_count[0] >= 5, f"5회 이상 호출 예상, 실제: {call_count[0]}"
+        # 중간에 성공이 있었으므로 카운터가 3에 달하지 않아 stop_event 는 외부 set
+        assert stop_event.is_set()

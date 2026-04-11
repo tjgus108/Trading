@@ -484,3 +484,19 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [The Deflated Sharpe Ratio — Bailey & Lopez de Prado](https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf)
 - [Probability of Backtest Overfitting — Bailey et al.](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf)
 - [pypbo: PBO in Python — GitHub](https://github.com/esvhd/pypbo)
+
+## [2026-04-11] Cycle 23 — 2025 Performance Benchmark
+
+### 수익률 분포
+- 상위 10% (기관급 AI봇): 연간 40%+ 수익률, Profit Factor 4.0+, Sharpe 1.8+ (Tickeron FLM 기준 PF 4.4 기록)
+- 중위 50% (일반 알고봇): 연간 15~25% 수익률, 알고 전략 평균 Sharpe 1.8 vs 재량 트레이딩 1.1
+- 하위 90% 경계선: 크립토 HFT 마켓메이킹 8~12%, 플랫폼 상위봇 연간 12~25% 범위 분포
+
+### 생존율
+- 공개된 신뢰할 수 있는 12개월 생존율 통계 없음 (마케팅 수치만 존재)
+- 업계 통설: 소매 알고봇 80% 이상이 1년 내 수익 미달로 운영 중단 추정 (출처 불명확)
+
+### 참고
+- [Is AI Bot Trading Profitable in 2025? Real Results Revealed](https://agentiveaiq.com/blog/is-ai-bot-trading-profitable-the-2025-reality-check)
+- [78 Algorithmic Trading Statistics Every Trader Should Know in 2025](https://medium.com/@algorithmictradingstrategies/78-algorithmic-trading-statistics-every-trader-should-know-in-2025-c7e03c36ee44)
+- [AI Trading Bots - 2025 Performance Benchmarks Revealed](https://redhub.ai/ai-trading-bots-2025/)

@@ -31,6 +31,9 @@ CANDLE_SETTLE_SECONDS = 30
 # stop_event 폴링 간격 (초) — 긴 sleep 중에도 Ctrl+C에 반응하도록 쪼갬
 POLL_INTERVAL = 60
 
+# 연속 실패 허용 횟수 — 초과 시 stop_event 를 set 하고 graceful 종료
+MAX_CONSECUTIVE_ERRORS = 5
+
 
 class CandleScheduler:
     """
@@ -58,6 +61,7 @@ class CandleScheduler:
         pipeline_fn: Callable[[], None],
         timeframe: str,
         stop_event: threading.Event,
+        max_consecutive_errors: int = MAX_CONSECUTIVE_ERRORS,
     ) -> None:
         """
         캔들 완성 시각에 맞춰 pipeline_fn 을 반복 호출한다.
@@ -65,13 +69,17 @@ class CandleScheduler:
         - 각 캔들 완성 후 CANDLE_SETTLE_SECONDS 초 추가 대기
         - stop_event 가 set 되면 다음 sleep 주기에서 루프 종료
         - pipeline_fn 에서 예외가 발생해도 로그만 남기고 계속 실행
+        - 연속 실패가 max_consecutive_errors 에 달하면 stop_event 를 set 하고 graceful 종료
         """
         self._validate_timeframe(timeframe)
         logger.info(
-            "[scheduler] Starting candle scheduler — timeframe=%s settle=%ds",
+            "[scheduler] Starting candle scheduler — timeframe=%s settle=%ds max_consecutive_errors=%d",
             timeframe,
             CANDLE_SETTLE_SECONDS,
+            max_consecutive_errors,
         )
+
+        consecutive_errors = 0
 
         while not stop_event.is_set():
             next_close = self.next_candle_close(timeframe)
@@ -95,12 +103,23 @@ class CandleScheduler:
             logger.info("[scheduler] Candle closed — running pipeline")
             try:
                 pipeline_fn()
+                consecutive_errors = 0  # 성공 시 카운터 리셋
             except Exception as exc:
+                consecutive_errors += 1
                 logger.error(
-                    "[scheduler] pipeline_fn raised an exception (continuing): %s",
+                    "[scheduler] pipeline_fn raised an exception (%d/%d consecutive): %s",
+                    consecutive_errors,
+                    max_consecutive_errors,
                     exc,
                     exc_info=True,
                 )
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.critical(
+                        "[scheduler] %d consecutive errors — triggering graceful shutdown",
+                        consecutive_errors,
+                    )
+                    stop_event.set()
+                    break
 
         logger.info("[scheduler] Scheduler stopped (stop_event set)")
 

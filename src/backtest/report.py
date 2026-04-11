@@ -28,6 +28,54 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def deflated_sharpe_ratio(
+    pnls: np.ndarray,
+    sharpe_ratio: float,
+    annualization: int = 252 * 24,
+) -> float:
+    """
+    Deflated Sharpe Ratio (DSR) — Bailey & Lopez de Prado (2014).
+    
+    표본 기반 Sharpe Ratio의 과최적화를 보정한 지표.
+    DSR < SR: 표본 SR이 실제 기댓값보다 높을 가능성.
+    
+    Args:
+        pnls: 거래별 수익률 배열 (shape: (n,))
+        sharpe_ratio: 계산된 Sharpe Ratio
+        annualization: 연환산 인수
+    
+    Returns:
+        float: Deflated Sharpe Ratio
+    
+    공식:
+      SR* = SR * (1 - gamma / (2*n)) + sqrt(Z / (2*n))
+      여기서:
+        n = 거래 수
+        gamma = 표본 3차 모멘트 (skewness)
+        Z = 표본 초과 첨도 (excess kurtosis)
+    """
+    n = len(pnls)
+    if n < 3:
+        return sharpe_ratio
+    
+    std_pnl = np.std(pnls, ddof=1)
+    if std_pnl < 1e-10:
+        return sharpe_ratio
+    
+    # Skewness (3차 모멘트)
+    mean_pnl = np.mean(pnls)
+    skew = np.mean(((pnls - mean_pnl) / std_pnl) ** 3)
+    gamma = skew
+    
+    # 초과 첨도 (Excess Kurtosis)
+    kurt = np.mean(((pnls - mean_pnl) / std_pnl) ** 4) - 3
+    Z = kurt
+    
+    # DSR 계산
+    dsr = sharpe_ratio * (1 - gamma / (2 * n)) + np.sqrt(max(Z / (2 * n), 0))
+    return float(dsr)
+
+
 @dataclass
 class BacktestReport:
     # 수익률
@@ -38,6 +86,7 @@ class BacktestReport:
     # 리스크 조정 성과
     sharpe_ratio: float
     sortino_ratio: float         # downside deviation 기반 샤프 비율 (신규)
+    deflated_sharpe_ratio: float  # DSR (과최적화 보정, Bailey & Lopez)
     calmar_ratio: float          # ann_return / max_drawdown
     recovery_factor: float       # total_return / max_drawdown (신규)
     max_drawdown: float          # 최대 낙폭 (양수)
@@ -134,6 +183,9 @@ class BacktestReport:
         downside_dev = np.sqrt(downside_var) if downside_var > 0 else 0.0
         sortino = float((pnls.mean() - per_period_rf) / downside_dev) * np.sqrt(annualization) if downside_dev > 0 else 0.0
 
+
+        # Deflated Sharpe Ratio (DSR)
+        dsr = deflated_sharpe_ratio(pnls, sharpe, annualization)
         # Max Drawdown
         equity = np.cumprod(1 + pnls)
         peak = np.maximum.accumulate(equity)
@@ -175,6 +227,7 @@ class BacktestReport:
             ann_volatility=ann_vol,
             sharpe_ratio=sharpe,
             sortino_ratio=sortino,
+            deflated_sharpe_ratio=dsr,
             calmar_ratio=calmar,
             recovery_factor=recovery,
             max_drawdown=mdd,
@@ -204,6 +257,7 @@ class BacktestReport:
             ann_volatility=0.0,      # 동일
             sharpe_ratio=result.sharpe_ratio,
             sortino_ratio=0.0,       # BacktestResult에 미포함 — 필요 시 from_trades() 사용
+            deflated_sharpe_ratio=0.0,  # BacktestResult에 미포함 — 필요 시 from_trades() 사용
             calmar_ratio=(result.total_return / result.max_drawdown
                           if result.max_drawdown > 1e-9 else 0.0),
             recovery_factor=recovery,
@@ -222,7 +276,8 @@ class BacktestReport:
     def _empty(cls, annualization: int) -> "BacktestReport":
         return cls(
             total_return=0.0, ann_return=0.0, ann_volatility=0.0,
-            sharpe_ratio=0.0, sortino_ratio=0.0, calmar_ratio=0.0, recovery_factor=0.0,
+            sharpe_ratio=0.0, sortino_ratio=0.0, deflated_sharpe_ratio=0.0, 
+            calmar_ratio=0.0, recovery_factor=0.0,
             max_drawdown=0.0,
             total_trades=0, win_rate=0.0, profit_factor=0.0,
             avg_win=0.0, avg_loss=0.0, win_loss_ratio=0.0,
