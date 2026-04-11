@@ -7778,3 +7778,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 18:48 UTC] Cycle 96 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 19:14 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:30 UTC] Cycle 96 COMPLETED — A + C + SIM + F
+**[A] Quality:** 13 SIM 회귀 138/138 PASS 확인.
+**[C] Data:** src/data/news.py 중복 감지 공백/대소문자 정규화. +2 tests.
+**[SIM] No-op:** dema_cross 5가지 필터 시도 모두 실패 (PF 1.38 → 1.22/1.32 악화). 구조적 한계 확인, 원본 복원.
+**[F] Research:** Kelly 실전. 풀 켈리는 백테스트 전용, 실전은 Half/Quarter Kelly 또는 Fixed Fractional 1-2%. Kelly-Lite가 균형점.
+**Tests:** 6301 passed (+1 from Cycle 95).
+**Next Cycle:** 97 (B+D+SIM+F)
