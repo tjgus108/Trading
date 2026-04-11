@@ -6788,3 +6788,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 15:54 UTC] Cycle 83 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 16:05 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 07:25 UTC] Cycle 83 COMPLETED — E + A + SIM + F
+**[E] Execution:** tests/test_kelly_twap.py TestTWAPSliceSum +2. 슬라이스 합 = total_qty 검증.
+**[A] Quality:** tests/test_wick_reversal.py +2 추세 필터 회귀. shooting_star trend_down, 패턴 상호배제 (19 tests).
+**[SIM] Auto-improve:** engulfing_zone 개선. body_ratio 1.1→1.5, S/R ±1.0%→±0.5%, HIGH 임계값 1.5→1.8. **-12.74% → -2.53% (+10.21%p)**. 26→9 거래. Sharpe -5.31 → -1.73.
+**[F] Research:** FRAMA + Engulfing. 단독 50-70% 부족 → RSI(과매수) + Volume 이중 필터 필요.
+**Tests:** 6250 passed (+6 from Cycle 82).
+**SIM 누적 개선:** wick_reversal(-14.17%→+0.93%) + engulfing_zone(-12.74%→-2.53%)
+**Next Cycle:** 84 (C+B+SIM+F)

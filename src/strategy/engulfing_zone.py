@@ -1,5 +1,6 @@
 """
 BullishEngulfingZoneStrategy: 지지/저항 존 근처의 Engulfing 패턴 전략.
+IMPROVED: Stricter body ratio (1.5 instead of 1.1) and tighter zone tolerance (0.5% instead of 1%)
 """
 
 from typing import List, Optional
@@ -46,8 +47,9 @@ def _find_pivots(df: pd.DataFrame, window: int = 20, side: int = 3):
     return pivot_lows, pivot_highs
 
 
-def _near_level(price: float, levels: List[float], pct: float = 0.01) -> Optional[float]:
-    """price가 levels 중 하나의 ±pct 내에 있으면 해당 level 반환, 없으면 None."""
+def _near_level(price: float, levels: List[float], pct: float = 0.005) -> Optional[float]:
+    """price가 levels 중 하나의 ±pct 내에 있으면 해당 level 반환, 없으면 None.
+    IMPROVED: 기본값을 0.5%로 축소 (지지/저항 근처를 더 엄격하게 정의)."""
     for level in levels:
         if level > 0 and abs(price - level) / level <= pct:
             return level
@@ -88,30 +90,30 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         pivot_lows, pivot_highs = _find_pivots(df, window=20, side=3)
 
         # ── Bullish Engulfing ─────────────────────────────────────────────
-        # 이전봉 음봉, 현재봉 양봉, body 비율 > 1.1, close 근처 support
+        # 이전봉 음봉, 현재봉 양봉, body 비율 > 1.5 (IMPROVED: 1.1 → 1.5), support 근처
         is_bearish_prev = close_prev < open_prev
         is_bullish_curr = close_curr > open_curr
         ratio_bull = (body_curr / body_prev) if body_prev > 0 else 0.0
-        support_level = _near_level(close_curr, pivot_lows, pct=0.01)
+        support_level = _near_level(close_curr, pivot_lows, pct=0.005)  # ±0.5% (IMPROVED)
 
         is_bullish_engulfing = (
             is_bearish_prev
             and is_bullish_curr
-            and ratio_bull > 1.1
+            and ratio_bull > 1.5  # IMPROVED: stricter threshold
             and support_level is not None
         )
 
         # ── Bearish Engulfing ─────────────────────────────────────────────
-        # 이전봉 양봉, 현재봉 음봉, body 비율 > 1.1, close 근처 resistance
+        # 이전봉 양봉, 현재봉 음봉, body 비율 > 1.5 (IMPROVED: 1.1 → 1.5), resistance 근처
         is_bullish_prev = close_prev > open_prev
         is_bearish_curr = close_curr < open_curr
         ratio_bear = (body_curr / body_prev) if body_prev > 0 else 0.0
-        resistance_level = _near_level(close_curr, pivot_highs, pct=0.01)
+        resistance_level = _near_level(close_curr, pivot_highs, pct=0.005)  # ±0.5% (IMPROVED)
 
         is_bearish_engulfing = (
             is_bullish_prev
             and is_bearish_curr
-            and ratio_bear > 1.1
+            and ratio_bear > 1.5  # IMPROVED: stricter threshold
             and resistance_level is not None
         )
 
@@ -121,9 +123,8 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
             return 1.0  # 존 두께는 항상 1% (±0.5% zone으로 정의)
 
         def _get_confidence(ratio: float, level: float) -> Confidence:
-            # engulfing ratio > 1.5 AND 존 두께 < 0.5% (여기서는 ±0.25% 이내) → HIGH
-            # 실용적으로: ratio > 1.5 이면 HIGH (존은 항상 ±1% 이내)
-            if ratio > 1.5:
+            # engulfing ratio > 1.8 이면 HIGH
+            if ratio > 1.8:
                 return Confidence.HIGH
             return Confidence.MEDIUM
 
