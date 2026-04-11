@@ -646,3 +646,32 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=+0.00 news=NONE
 Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:48:23Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:51 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:51:10Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:52 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:52:24Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 05:15 UTC] Cycle 11 COMPLETED — A + C + F
+**[A] Quality:** src/backtest/report.py to_markdown() 메서드 추가 (8개 핵심 지표). +2 tests.
+**[C] Data (CRITICAL!):** src/ml/features.py + src/ml/lstm_model.py에서 **피처 누수(leakage) 2개 발견 및 수정**:
+  1. Look-ahead bias: rolling/EMA features에 shift(1) 누락 → 현재 바 포함하여 미래 데이터 노출. RSI z-score, Volatility, EMA, Volume MA, Donchian 전부 수정.
+  2. Scaler fit leakage: StandardScaler가 전체 데이터로 fit → train 기간에 미래 통계 누수. train 시퀀스로만 fit 후 val/test에 transform.
+  - Cycle 7 리서치(shift 누락 + scaler fit)가 정확히 들어맞음. 
+  - +1 test.
+**[F] Research:** Paper→Live 전환 함정 (오버피팅 90%, 슬리피지, 레짐 변화). 소규모 1~5% live 테스트로 implementation shortfall 실측 권장.
+**Tests:** 5849 passed (+3 from Cycle 10).
+**Next Cycle:** 12 (B+D+F — 3회차)
