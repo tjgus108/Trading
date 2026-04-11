@@ -73,6 +73,17 @@ def _make_orch(cfg, connector=None):
     return orch
 
 
+def _mock_wf_stable():
+    """Walk-Forward validator가 항상 STABLE 반환하도록 mock.
+    orchestrator.py가 함수 내부에서 import하므로 원 모듈을 패치한다."""
+    wf_result = MagicMock()
+    wf_result.consistency_score = 1.0  # stable
+    wf_result.windows = 3
+    validator = MagicMock()
+    validator.validate.return_value = wf_result
+    return patch("src.backtest.walk_forward.WalkForwardValidator", return_value=validator)
+
+
 def test_tournament_returns_result(cfg):
     orch = _make_orch(cfg)
     results = {
@@ -80,7 +91,8 @@ def test_tournament_returns_result(cfg):
         "donchian_breakout": _make_backtest_result("donchian_breakout", 1.2, True),
     }
     with patch.object(orch, "_run_backtest", side_effect=lambda s: results[s.name]):
-        result = orch.run_tournament()
+        with _mock_wf_stable():
+            result = orch.run_tournament()
 
     assert isinstance(result, TournamentResult)
     assert result.winner == "ema_cross"  # Sharpe 1.5 > 1.2
@@ -95,7 +107,8 @@ def test_tournament_winner_becomes_active_strategy(cfg):
         "donchian_breakout": _make_backtest_result("donchian_breakout", 1.8, True),
     }
     with patch.object(orch, "_run_backtest", side_effect=lambda s: results[s.name]):
-        result = orch.run_tournament()
+        with _mock_wf_stable():
+            result = orch.run_tournament()
 
     assert result.winner == "donchian_breakout"
     assert orch._strategy.name == "donchian_breakout"
@@ -110,7 +123,8 @@ def test_tournament_pass_beats_fail_regardless_of_sharpe(cfg):
     }
     # 실제로는 passed=True인 donchian이 passed=False인 ema보다 우선
     with patch.object(orch, "_run_backtest", side_effect=lambda s: results[s.name]):
-        result = orch.run_tournament()
+        with _mock_wf_stable():
+            result = orch.run_tournament()
     assert result.winner == "donchian_breakout"
 
 

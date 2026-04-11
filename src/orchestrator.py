@@ -758,6 +758,8 @@ class TournamentResult:
     winner: str                          # 전략 이름
     winner_sharpe: float
     rankings: list[dict]                 # [{name, sharpe, passed, fail_reasons}]
+    wf_stable: Optional[bool] = None    # Walk-Forward 안정성 (None=미실행)
+    wf_fallback: bool = False            # True면 1위 불안정 → 2위로 fallback
 
     def summary(self) -> str:
         lines = ["TOURNAMENT RESULT:"]
@@ -767,7 +769,12 @@ class TournamentResult:
                 f"  #{i} {r['name']:25s}  Sharpe={r['sharpe']:.3f}  {verdict}"
                 + (f"  fail={r['fail_reasons']}" if r["fail_reasons"] else "")
             )
-        lines.append(f"  WINNER → {self.winner} (Sharpe={self.winner_sharpe:.3f})")
+        wf_tag = ""
+        if self.wf_stable is not None:
+            wf_tag = f"  WF={'STABLE' if self.wf_stable else 'UNSTABLE'}"
+        if self.wf_fallback:
+            wf_tag += "  (fallback to #2)"
+        lines.append(f"  WINNER → {self.winner} (Sharpe={self.winner_sharpe:.3f}){wf_tag}")
         return "\n".join(lines)
 
 
@@ -1004,22 +1011,73 @@ class BotOrchestrator:
             for name, r in ranked
         ]
 
+        # Walk-Forward 검증: 1위 전략의 안정성 확인, 불안정하면 2위로 fallback
+        wf_stable: Optional[bool] = None
+        wf_fallback = False
+        final_winner_name = winner_name
+        final_winner_result = winner_result
+
+        try:
+            from src.backtest.walk_forward import WalkForwardValidator
+            wf_data = self._data_feed.fetch(
+                self.cfg.trading.symbol, self.cfg.trading.timeframe, limit=1000
+            )
+            if len(wf_data.df) >= 250:
+                wf_validator = WalkForwardValidator(
+                    train_window=200, test_window=50, step_size=50
+                )
+                wf_result = wf_validator.validate(wf_data.df, STRATEGY_REGISTRY[winner_name]())
+                wf_stable = wf_result.consistency_score >= 0.5
+                logger.info(
+                    "WalkForward [%s]: consistency=%.2f windows=%d → %s",
+                    winner_name,
+                    wf_result.consistency_score,
+                    wf_result.windows,
+                    "STABLE" if wf_stable else "UNSTABLE",
+                )
+                if not wf_stable and len(ranked) >= 2:
+                    fallback_name, fallback_result = ranked[1]
+                    logger.warning(
+                        "WalkForward: winner '%s' is UNSTABLE → falling back to '%s'",
+                        winner_name, fallback_name,
+                    )
+                    final_winner_name = fallback_name
+                    final_winner_result = fallback_result
+                    wf_fallback = True
+            else:
+                logger.debug(
+                    "WalkForward skipped: insufficient data (%d < 250)", len(wf_data.df)
+                )
+        except Exception as _wf_err:
+            logger.warning("WalkForward validation failed (non-fatal): %s", _wf_err)
+
         tournament = TournamentResult(
-            winner=winner_name,
-            winner_sharpe=winner_result.sharpe_ratio,
+            winner=final_winner_name,
+            winner_sharpe=final_winner_result.sharpe_ratio,
             rankings=rankings,
+            wf_stable=wf_stable,
+            wf_fallback=wf_fallback,
         )
 
         # 상위 3개 전략 신호 상관관계 체크 (백테스트 결과의 신호 분포로 추정)
         self._check_top3_correlation(ranked[:3])
 
         # 승자 전략으로 파이프라인 재구성
-        self._last_tournament_winner = winner_name
-        self._strategy = STRATEGY_REGISTRY[winner_name]()
+        self._last_tournament_winner = final_winner_name
+        self._strategy = STRATEGY_REGISTRY[final_winner_name]()
         self._build_pipeline()
-        logger.info("Tournament winner: %s (Sharpe=%.3f)", winner_name, winner_result.sharpe_ratio)
+        logger.info(
+            "Tournament winner: %s (Sharpe=%.3f)%s",
+            final_winner_name,
+            final_winner_result.sharpe_ratio,
+            " [WF-fallback]" if wf_fallback else "",
+        )
 
-        msg = f"Tournament winner: {winner_name} (Sharpe={winner_result.sharpe_ratio:.3f})"
+        msg = (
+            f"Tournament winner: {final_winner_name}"
+            f" (Sharpe={final_winner_result.sharpe_ratio:.3f})"
+            + (" [WF-fallback]" if wf_fallback else "")
+        )
         self._notifier.notify_error(f"[Tournament] {msg}")  # notify_info 없으므로 재사용
 
         return tournament

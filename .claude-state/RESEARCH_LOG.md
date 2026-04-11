@@ -57,3 +57,42 @@
 - https://www.researchgate.net/publication/388448293_Algorithmic_Trading_Bot_Using_Artificial_Intelligence_Supertrend_Strategy
 - https://3commas.io/blog/ai-trading-bot-risk-management-guide-2025
 - https://www.luxalgo.com/blog/risk-management-strategies-for-algo-trading/
+
+---
+
+## [2026-04-11] Cycle 2 — Risk Management Deep Dive
+
+### 드로다운 관리 기법
+
+- 프로 퀀트 펀드 표준: soft limit = 연간 변동성의 1배(포지션 축소), hard limit = 1.5배(트레이딩 중단). 2단계 에스컬레이션 구조.
+- 프랍 펌 실무(2025): 일일 3~5% / MDD 6~10%가 가장 보편적. QT Prime은 일일 4% / MDD 10%, QT Instant는 일일 3%로 더 타이트.
+- Equity Protector 개념: 단일 트레이드 부동손실 1.5% 초과 시 모든 포지션 자동 청산 — 포지션 레벨 안전장치.
+- Apex 방식(EOD trailing drawdown): 일별 한도 없이 누적 하이워터마크 기준 trailing MDD 통제 — 단기 변동성은 허용하되 누적 손실만 제한.
+- **우리 봇 적용 가능**: `src/risk/` 에 일/주/월 3단계 DD 한도 + 자동 포지션 축소 로직 추가. Cycle 1에서 다층 서킷브레이커를 개선점으로 식별했고, 이번 리서치로 구체적 수치(일 3~5%, MDD 6~10%) 근거 확보.
+
+### ATR 변동성 스케일링
+
+- 기본 공식: `포지션 크기 = (계좌 자산 × 위험%) / (ATR × 멀티플라이어)`. ATR 상승 = 포지션 자동 축소.
+- **함정 1 — ATR 절대값 오해**: ATR $5는 $100 주식에서 5% 변동성이지만 $500 주식에서는 1%. 반드시 `ATR / 현재가` 비율로 정규화해야 함. 크립토 자산 간 비교 시 특히 중요.
+- **함정 2 — 방향성 혼동**: ATR은 방향 지표가 아님. ATR 상승 = 변동성 확대일 뿐, 매수/매도 신호 아님. 방향성 지표와 반드시 결합해야 하며, 2025년 백테스트에서 조합 전략이 단독 대비 수익성 34% 향상.
+- **함정 3 — 극단 변동성 시 파라미터 고정**: ATR(14) 단기 파라미터는 극단 구간에서 과민 반응. 고변동성 레짐 진입 시 ATR(20~30)으로 전환 필요.
+- **함정 4 — 손절과 사이징 불일치**: 포지션 크기와 손절 위치를 ATR로 동시 계산해야 정합성 유지. 손절만 ATR 기반이고 사이징은 고정이면 실제 리스크가 계획과 달라짐.
+
+### Kelly Criterion 함정
+
+- **Full Kelly 실전 위험**: 승률/손익비 추정 오차가 조금만 있어도 MDD 50% 초과 빈발. 이론 최적이지만 실전에서는 파산 경로.
+- **Half Kelly 권장**: 성장률을 Full Kelly의 약 75% 수준으로 유지하면서 변동성/파산위험 대폭 감소. 추정 불확실성에 대한 버퍼 역할. 학계와 실무 모두 Half Kelly 이하를 표준으로 채택.
+- **바이너리 아웃컴 가정의 한계**: Kelly 원식은 이기거나 지거나 2가지만 가정하지만, 실제 트레이딩은 부분 청산/슬리피지/연속 손실 등 연속 분포 아웃컴. 이 가정 위반 시 Kelly가 과대 베팅 유도.
+- **2024~2025 실전 권장**: Risk-Constrained Kelly(이분법 알고리즘으로 최대 DD 제약 조건 추가) 또는 Bayesian 업데이팅 방식이 주목받음. 실무에서는 Quarter Kelly(×0.25) 또는 고정 분수(포트폴리오 1~2%)가 더 안전. 추정 불확실성이 클수록 분수를 줄일 것.
+
+### 참고 자료
+
+- [Drawdown Management — QuantifiedStrategies](https://www.quantifiedstrategies.com/drawdown/)
+- [Legacy Evaluation Rules — Apex Trader Funding](https://support.apextraderfunding.com/hc/en-us/articles/31519769997083-Legacy-Evaluation-Rules)
+- [QT Prime Rules 2025 — FundedTrading](https://fundedtrading.com/qt-prime-trading-challenge-rules/)
+- [ATR Position Sizing — ChartingPark](https://chartingpark.com/articles/volatility-based-position-sizing-atr/)
+- [Volatility-Based Position Sizing — QuantifiedStrategies](https://www.quantifiedstrategies.com/volatility-based-position-sizing/)
+- [ATR Strategy Guide 2025 — QuantStrategy.io](https://quantstrategy.io/blog/using-atr-to-adjust-position-size-volatility-based-risk/)
+- [Kelly Criterion in Algo-Trading — ALGOGENE](https://algogene.com/community/post/175)
+- [Risk-Constrained Kelly Criterion — QuantInsti](https://blog.quantinsti.com/risk-constrained-kelly-criterion/)
+- [Fractional Kelly & Uncertainty — Matthew Downey](https://matthewdowney.github.io/uncertainty-kelly-criterion-optimal-bet-size.html)

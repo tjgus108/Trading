@@ -166,3 +166,158 @@ def test_notifier_disabled_without_telegram_config(cfg, mock_connector):
     orch = _make_orch(cfg, mock_connector)
     assert orch._notifier is not None
     assert orch._notifier._enabled is False
+
+
+# ── Walk-Forward 토너먼트 통합 테스트 ────────────────────────────────────
+
+def _make_backtest_result(sharpe: float, passed: bool = True):
+    r = MagicMock()
+    r.sharpe_ratio = sharpe
+    r.passed = passed
+    r.fail_reasons = []
+    r.total_return = 0.05
+    r.win_rate = 0.55
+    r.max_drawdown = 0.05
+    r.total_trades = 10
+    return r
+
+
+def test_tournament_wf_stable_winner_keeps_first(cfg, mock_connector):
+    """WF 안정적이면 1위 전략 그대로 유지."""
+    orch = _make_orch(cfg, mock_connector)
+
+    from src.backtest.walk_forward import WalkForwardValidationResult
+
+    wf_result = WalkForwardValidationResult(
+        windows=5,
+        mean_return=0.03,
+        std_return=0.01,
+        win_rate=0.8,
+        consistency_score=0.8,  # >= 0.5 → STABLE
+        results=[],
+    )
+
+    ranked = [
+        ("ema_cross", _make_backtest_result(1.5)),
+        ("donchian_breakout", _make_backtest_result(1.2)),
+    ]
+
+    import pandas as pd, numpy as np
+    n = 300
+    df = pd.DataFrame({
+        "open": np.ones(n) * 50000,
+        "high": np.ones(n) * 50200,
+        "low": np.ones(n) * 49800,
+        "close": np.ones(n) * 50100,
+        "volume": np.ones(n) * 10.0,
+    })
+    mock_feed_result = MagicMock()
+    mock_feed_result.df = df
+
+    with patch.object(orch, "_run_backtest", side_effect=lambda s: _make_backtest_result(1.5)):
+        with patch("src.backtest.walk_forward.WalkForwardValidator") as MockWFV:
+            MockWFV.return_value.validate.return_value = wf_result
+            with patch.object(orch._data_feed, "fetch", return_value=mock_feed_result):
+                result = orch.run_tournament(candidates=["ema_cross"])
+
+    assert result.wf_stable is True
+    assert result.wf_fallback is False
+    assert result.winner == "ema_cross"
+
+
+def test_tournament_wf_unstable_falls_back_to_second(cfg, mock_connector):
+    """WF 불안정하면 2위 전략으로 fallback."""
+    orch = _make_orch(cfg, mock_connector)
+
+    from src.backtest.walk_forward import WalkForwardValidationResult
+
+    wf_result = WalkForwardValidationResult(
+        windows=5,
+        mean_return=-0.01,
+        std_return=0.05,
+        win_rate=0.2,
+        consistency_score=0.2,  # < 0.5 → UNSTABLE
+        results=[],
+    )
+
+    backtest_map = {
+        "ema_cross": _make_backtest_result(1.5),
+        "donchian_breakout": _make_backtest_result(1.2),
+    }
+
+    def fake_run_backtest(strategy):
+        return backtest_map.get(strategy.name, _make_backtest_result(0.5))
+
+    import pandas as pd, numpy as np
+    n = 300
+    df = pd.DataFrame({
+        "open": np.ones(n) * 50000,
+        "high": np.ones(n) * 50200,
+        "low": np.ones(n) * 49800,
+        "close": np.ones(n) * 50100,
+        "volume": np.ones(n) * 10.0,
+    })
+    mock_feed_result = MagicMock()
+    mock_feed_result.df = df
+
+    with patch.object(orch, "_run_backtest", side_effect=fake_run_backtest):
+        with patch("src.backtest.walk_forward.WalkForwardValidator") as MockWFV:
+            MockWFV.return_value.validate.return_value = wf_result
+            with patch.object(orch._data_feed, "fetch", return_value=mock_feed_result):
+                result = orch.run_tournament(candidates=["ema_cross", "donchian_breakout"])
+
+    assert result.wf_stable is False
+    assert result.wf_fallback is True
+    assert result.winner == "donchian_breakout"
+
+
+def test_tournament_wf_skipped_when_insufficient_data(cfg, mock_connector):
+    """WF 데이터 < 250봉이면 wf_stable=None, 1위 전략 그대로 유지."""
+    orch = _make_orch(cfg, mock_connector)
+
+    import pandas as pd, numpy as np
+    n = 100  # 250 미만 → WF 건너뜀
+    df = pd.DataFrame({
+        "open": np.ones(n) * 50000,
+        "high": np.ones(n) * 50200,
+        "low": np.ones(n) * 49800,
+        "close": np.ones(n) * 50100,
+        "volume": np.ones(n) * 10.0,
+    })
+    mock_feed_result = MagicMock()
+    mock_feed_result.df = df
+
+    with patch.object(orch, "_run_backtest", return_value=_make_backtest_result(1.5)):
+        with patch.object(orch._data_feed, "fetch", return_value=mock_feed_result):
+            result = orch.run_tournament(candidates=["ema_cross"])
+
+    assert result.wf_stable is None      # WF 미실행
+    assert result.wf_fallback is False
+    assert result.winner == "ema_cross"
+
+
+def test_tournament_wf_exception_is_non_fatal(cfg, mock_connector):
+    """WF 검증 중 예외 발생 시 1위 전략 그대로 유지하고 tournament 정상 완료."""
+    orch = _make_orch(cfg, mock_connector)
+
+    import pandas as pd, numpy as np
+    n = 300
+    df = pd.DataFrame({
+        "open": np.ones(n) * 50000,
+        "high": np.ones(n) * 50200,
+        "low": np.ones(n) * 49800,
+        "close": np.ones(n) * 50100,
+        "volume": np.ones(n) * 10.0,
+    })
+    mock_feed_result = MagicMock()
+    mock_feed_result.df = df
+
+    with patch.object(orch, "_run_backtest", return_value=_make_backtest_result(1.5)):
+        with patch("src.backtest.walk_forward.WalkForwardValidator") as MockWFV:
+            MockWFV.return_value.validate.side_effect = RuntimeError("WF crash")
+            with patch.object(orch._data_feed, "fetch", return_value=mock_feed_result):
+                result = orch.run_tournament(candidates=["ema_cross"])
+
+    # WF 예외여도 토너먼트 결과 반환, 1위 유지
+    assert result.winner == "ema_cross"
+    assert result.wf_fallback is False
