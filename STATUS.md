@@ -54,7 +54,8 @@
 - ✅ Cycle 46 완료 (A+C+F: 경고 6→0 + TTL 경계 + 세금 이슈)
 - ✅ Cycle 47 완료 (B+D+F: Kelly 경계 + conflicts_with edge + CPCV 리서치)
 - ✅ Cycle 48 완료 (E+A+F: TWAP avg_time + conftest 공통화 + Backup/DR)
-- ⏳ **Cycle 49 대기** (C+B+F)
+- ✅ Cycle 49 완료 (C+B+F: News 중복 감지 + Risk multi-pos + Bybit 2025)
+- ⏳ **Cycle 50 대기** 🎯 50 마일스톤 (D+E+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -63,7 +64,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,084개** |
+| ✅ 통과 테스트 | **6,093개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

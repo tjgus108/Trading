@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 48 — 2026-04-11T09:24:21.302445Z
+🔄 CYCLE 49 — 2026-04-11T09:27:24.787235Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 47 COMPLETED — B + D + F** (2026-04-11 17:55 UTC)
-  **[B] Risk:** tests/test_kelly_twap.py +2 경계. half_kelly > max_dd_constrained 시 제약 적용, 경계 동일값 시 변화 없음.
-  **[D] ML:** tests/test_ensemble_conflicts.py 신규 +9. conflicts_with() action=HOLD 시 None 안전 처리, confidence 경계 0.7 정확 동작.
-  **[F] Research:** 과적합 검증 신기법. CPCV(Combinatorial Purged CV)가 PBO/DSR 대비 OOS 우위. White's Reality Check는 열위. PBO+DSR 유지 + CPCV 보완 권장.
-  **Tests:** 6083 passed (+11 from Cycle 46).
+**Cycle 48 COMPLETED — E + A + F** (2026-04-11 18:15 UTC)
+  **[E] Execution:** src/exchange/twap.py TWAPResult에 avg_execution_time 필드 추가. 슬라이스별 시간 측정 + 평균. +1 test.
+  **[A] Quality:** tests/conftest.py 신규 (+91줄). sample_df, sample_df_with_ema, _make_df 헬퍼 공통화. 기존 로컬 함수 유지 (100% 호환).
+  **[F] Research:** Bot Backup/DR (직접 기록). 상태 저장(SQLite/Redis), 주문 복구(API + 로컬 동기화), 30초 재시작 + 포지션 검증 표준.
+  **Tests:** 6084 passed (+1 from Cycle 47).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

@@ -1,3 +1,30 @@
+# Cycle 49 - Category C: Data & Infrastructure 완료
+
+## [2026-04-11] Cycle 49 — NewsMonitor 중복 감지 추가
+
+### 작업 완료
+- `src/data/news.py` 중복 감지 로직 추가
+  - `_get_title_hash(title)`: MD5 기반 제목 hash (대소문자/공백 정규화)
+  - `_is_duplicate(title_hash)`: 시간 윈도우 내 중복 확인
+  - `_cleanup_old_hashes(now)`: 윈도우 외 오래된 hash 제거
+  - `title_hash` 필드를 NewsEvent에 추가
+  - `duplicate_window_hours` 파라미터 (기본 24시간)
+
+- `tests/test_news_duplicate.py` 신규 생성 (7개 테스트)
+  - title_hash 대소문자/공백 정규화
+  - 동일/다른 헤드라인 중복 감지
+  - 윈도우 외 만료 시간 처리
+  - hash 정합성
+
+### 파일 변경
+- `src/data/news.py`: 중복 감지 로직 추가 (~290줄)
+- `tests/test_news_duplicate.py`: 신규 생성 (7개 테스트)
+
+### 테스트 결과
+- tests/test_news_duplicate.py: 7/7 PASS ✓
+
+---
+
 # Cycle 48 - Category A: Quality Assurance — Test Fixtures 공통화 완료
 
 ## [2026-04-11] Cycle 48 — conftest.py 생성 및 테스트 Fixture 공통화
@@ -19,75 +46,4 @@
 - tests/test_velocity_entry.py: 16/16 PASS ✓
 
 ---
-
-# Cycle 47 - Category F: Research 완료
-
-## [2026-04-11] Cycle 47 — Overfitting Detection Methods
-- 2024 핵심 신기법: CPCV(Combinatorial Purged CV) — PBO·DSR 대비 우위, Bagged/Adaptive 변형 등장
-- ML 시대 과제: 비정상성·레짐 시프트 대응, 합성 통제 환경에서 OOS 테스트 방법 비교
-- 실용 결론: PBO+DSR 기본 유지, CPCV로 보완 가능
-
----
-
-# Cycle 47 - Category D: ML & Signals 완료
-
-## [2026-04-11] Cycle 47 — EnsembleSignal.conflicts_with() 엣지 케이스 테스트
-
-### 작업 완료
-- `tests/test_ensemble_conflicts.py` 신규 생성 (9개 테스트)
-  - 동일 action(BUY vs BUY, SELL vs SELL) → False
-  - action=HOLD, consensus=HOLD → opposites에 없으므로 항상 False
-  - confidence 경계값: 0.70(>=임계값) → True, 0.69 → False
-  - NEUTRAL consensus → False
-
-### 파일 변경
-- `tests/test_ensemble_conflicts.py`: 신규 생성 (9개)
-
-### 테스트 결과
-- 9/9 PASS
-
----
-
-# Cycle 46 - Category C: Data & Infrastructure 완료
-
-## [2026-04-11] Cycle 46 — DataFeed 캐시 expire on miss 검증
-
-### 작업 완료
-- `src/data/feed.py` 캐시 hit/miss 로직 경계 조건 2개 테스트 추가
-  - **test_cache_ttl_boundary_before_expiry**: TTL 만료 직전 (59초) → 캐시 히트 확인
-  - **test_cache_ttl_boundary_exactly_expired**: TTL 정확히 만료 (60초) → 캐시 미스 확인
-- 조건식 `now - ts < self._cache_ttl` 정확성 검증 완료
-
-### 파일 변경
-- `tests/test_feed_parallel.py`: 20→22개 (2개 추가)
-
-### 테스트 결과
-- tests/test_feed_parallel.py: 22/22 PASS ✓
-
----
-
-# Cycle 45 - Category F: Research 완료
-
-## [2026-04-11] Cycle 45 — Sub-second Latency Reality
-- 소매 한계: 최고 브로커도 40~60ms 평균, 인터넷 RTT 기준 대륙 간 최소 ~55ms
-- 기관 수준: Equinix 코로케이션+파이버 크로스커넥트로 0.3ms, FPGA 100~150ns 파이프라인
-- Python 전략 결론: sub-second 실질 의미는 수백ms 단위이며 알고리즘보다 실행 레이어가 병목
-
----
-
-# Cycle 45 - Category D: ML & Signals 완료
-
-## [2026-04-11] Cycle 45 — Signal metadata 필드 추가
-
-### 작업 완료
-- `src/strategy/base.py`: Signal dataclass에 `metadata: Optional[Dict[str, Any]] = None` 추가
-- 기본값 None으로 기존 전략 코드 무변경, 하위호환 유지
-- `tests/test_strategy.py`: `test_signal_metadata_optional` 테스트 추가
-
-### 파일 변경
-- `src/strategy/base.py`: metadata 필드 추가, import에 `field`, `Any`, `Dict` 추가
-- `tests/test_strategy.py`: 테스트 1개 추가
-
-### 테스트 결과
-- 5/5 PASS
 

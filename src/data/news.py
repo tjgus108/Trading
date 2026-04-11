@@ -7,10 +7,12 @@ B3. NewsMonitor: 크립토 뉴스/이벤트 리스크 감지.
   - HIGH 이벤트: 포지션 50% 축소 권고 → orchestrator에 즉시 전파
   - API 실패 시 level=NONE 반환 — 파이프라인 블록 금지
   - 재시도 로직 + fallback으로 일시적 장애 극복
+  - 중복 감지: title hash로 동일 뉴스 이벤트 필터링
 
 news-agent가 이 모듈을 사용한다.
 """
 
+import hashlib
 import json
 import logging
 import time
@@ -43,6 +45,11 @@ MEDIUM_KEYWORDS = [
 ]
 
 
+def _get_title_hash(title: str) -> str:
+    """제목의 hash 값 반환. 중복 감지용."""
+    return hashlib.md5(title.lower().strip().encode()).hexdigest()
+
+
 @dataclass
 class NewsEvent:
     """감지된 뉴스 이벤트."""
@@ -52,6 +59,7 @@ class NewsEvent:
     expires_at: str         # UTC 시각 (ISO 8601)
     keywords_matched: list[str]
     source: str = "live"    # "live" | "fallback" | "unavailable"
+    title_hash: str = ""    # 중복 감지용
 
     def is_high_risk(self) -> bool:
         return self.level == "HIGH"
@@ -70,14 +78,17 @@ class NewsMonitor:
     fetch()로 최신 24h 뉴스 리스크 반환.
     HIGH 이벤트 콜백: on_high_risk_callback(event) 설정 가능.
     API 실패 시 fallback → neutral 반환으로 graceful degradation.
+    중복 감지: title hash로 동일 이벤트 필터링.
     """
 
-    def __init__(self, use_cache_seconds: int = 300, max_retries: int = 2):
+    def __init__(self, use_cache_seconds: int = 300, max_retries: int = 2, duplicate_window_hours: int = 24):
         self.use_cache_seconds = use_cache_seconds
         self.max_retries = max_retries
+        self.duplicate_window_hours = duplicate_window_hours
         self._cache: Optional[NewsEvent] = None
         self._cache_time: float = 0.0
         self._last_successful: Optional[NewsEvent] = None  # fallback 데이터
+        self._seen_hashes: dict[str, float] = {}  # title_hash -> timestamp
         self.on_high_risk_callback = None  # orchestrator가 설정
 
     def fetch(self) -> NewsEvent:
@@ -94,6 +105,16 @@ class NewsMonitor:
         except Exception as e:
             logger.warning("_classify failed: %s, using fallback", e)
             event = self._get_fallback_or_neutral()
+
+        # 중복 확인
+        if event.source == "live" and self._is_duplicate(event.title_hash):
+            logger.debug(f"Duplicate news detected: {event.event[:50]}... Using fallback")
+            event = self._get_fallback_or_neutral()
+        else:
+            # 새로운 해시 기록
+            if event.source == "live":
+                self._seen_hashes[event.title_hash] = now
+                self._cleanup_old_hashes(now)
 
         # 성공한 live 데이터만 저장 (fallback 제외)
         if event.source == "live":
@@ -119,6 +140,7 @@ class NewsMonitor:
             "NONE": "NONE",
         }
         expires = self._expires_utc(hours=4 if level == "HIGH" else 2)
+        title_hash = _get_title_hash(event_text) if event_text else ""
         return NewsEvent(
             level=level,
             event=event_text or ("none" if level == "NONE" else "mock event"),
@@ -126,6 +148,7 @@ class NewsMonitor:
             expires_at=expires,
             keywords_matched=[],
             source="live",
+            title_hash=title_hash,
         )
 
     # ------------------------------------------------------------------
@@ -162,7 +185,7 @@ class NewsMonitor:
             return NewsEvent(
                 level="NONE", event="none",
                 action="NONE", expires_at=self._expires_utc(hours=1),
-                keywords_matched=[], source="live",
+                keywords_matched=[], source="live", title_hash="",
             )
 
         all_text = " ".join(headlines).lower()
@@ -179,6 +202,7 @@ class NewsMonitor:
                 expires_at=self._expires_utc(hours=6),
                 keywords_matched=high_hits[:5],
                 source="live",
+                title_hash=_get_title_hash(best),
             )
 
         # MEDIUM 이벤트
@@ -191,16 +215,19 @@ class NewsMonitor:
                 expires_at=self._expires_utc(hours=3),
                 keywords_matched=medium_hits[:5],
                 source="live",
+                title_hash=_get_title_hash(best),
             )
 
         # 뉴스 있지만 분류 안 됨
+        headline = headlines[0][:150] if headlines else "general news"
         return NewsEvent(
             level="LOW",
-            event=headlines[0][:150] if headlines else "general news",
+            event=headline,
             action="MONITOR",
             expires_at=self._expires_utc(hours=1),
             keywords_matched=[],
             source="live",
+            title_hash=_get_title_hash(headlines[0]) if headlines else "",
         )
 
     def _get_fallback_or_neutral(self) -> NewsEvent:
@@ -215,6 +242,7 @@ class NewsMonitor:
                 expires_at=self._last_successful.expires_at,
                 keywords_matched=self._last_successful.keywords_matched[:],
                 source="fallback",
+                title_hash=self._last_successful.title_hash,
             )
             return fb
         
@@ -227,7 +255,25 @@ class NewsMonitor:
             expires_at=self._expires_utc(hours=1),
             keywords_matched=[],
             source="unavailable",
+            title_hash="",
         )
+
+    def _is_duplicate(self, title_hash: str) -> bool:
+        """Title hash가 최근 윈도우에 있으면 중복."""
+        if not title_hash:
+            return False
+        now = time.time()
+        window_secs = self.duplicate_window_hours * 3600
+        return title_hash in self._seen_hashes and (now - self._seen_hashes[title_hash]) < window_secs
+
+    def _cleanup_old_hashes(self, now: float):
+        """오래된 hash 제거."""
+        window_secs = self.duplicate_window_hours * 3600
+        expired = [h for h, ts in self._seen_hashes.items() if (now - ts) >= window_secs]
+        for h in expired:
+            del self._seen_hashes[h]
+        if expired:
+            logger.debug(f"Cleaned up {len(expired)} old news hashes")
 
     def _best_headline(self, headlines: list[str], keywords: list[str]) -> str:
         """키워드 가장 많이 포함된 헤드라인 반환."""

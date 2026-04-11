@@ -470,3 +470,103 @@ def test_integration_kelly_constrained_exposure_blocked():
     assert "Total exposure limit" in result.reason
     assert "total_exposure" in result.reason
     assert result.position_size is None
+
+
+# ── Multi-Position Boundary Scenarios ────────────────────────────────────────
+
+def test_same_direction_multi_position_boundary_approved_then_blocked():
+    """동일 방향(BUY) 포지션 누적: 한도 직전 APPROVED, 초과 시 BLOCKED."""
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        max_total_exposure=0.30,
+    )
+
+    # 경우 1: 기존 BUY 포지션 2개, 총 노출 29.9% → 한도 미만 → APPROVED
+    open_positions_under = [
+        {"size": 0.02, "price": 50000},  # 1000 = 10%
+        {"size": 0.0199, "price": 50000},  # 995 = 9.95%  → 합 19.95%
+        {"size": 0.02, "price": 50000},  # 1000 = 10%  → 합 29.95%
+    ]
+    # 총 노출: (0.02+0.0199+0.02)*50000 = 2995 / 10000 = 29.95% < 30% → APPROVED
+    result_under = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_under,
+    )
+    assert result_under.status == RiskStatus.APPROVED, (
+        f"Expected APPROVED but got BLOCKED: {result_under.reason}"
+    )
+
+    # 경우 2: 기존 포지션 총 노출 정확히 30% → 한도 도달(>=) → BLOCKED
+    open_positions_at = [
+        {"size": 0.02, "price": 50000},  # 10%
+        {"size": 0.02, "price": 50000},  # 10%
+        {"size": 0.02, "price": 50000},  # 10%  → 합 30%
+    ]
+    result_at = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_at,
+    )
+    assert result_at.status == RiskStatus.BLOCKED
+    assert "total_exposure" in result_at.reason
+
+
+def test_mixed_direction_positions_total_exposure_is_gross_not_net():
+    """반대 방향 포지션 혼합: check_total_exposure는 net이 아닌 gross 합산 → 한도 초과 시 BLOCKED.
+
+    BUY 포지션 20% + SELL 포지션 15% = gross 35% > 30% 한도 → BLOCKED.
+    net 기준이라면 5%로 통과할 수 있으나, 현재 구현은 gross 합산 방식이어야 한다.
+    """
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        max_total_exposure=0.30,
+    )
+
+    # BUY 포지션 20% + SELL 포지션 15% → gross 35% > 30%
+    open_positions_mixed = [
+        {"size": 0.04, "price": 50000},   # 2000 = 20%  (long)
+        {"size": 0.03, "price": 50000},   # 1500 = 15%  (short, size는 양수로 전달)
+    ]
+    # gross total: (0.04+0.03)*50000 = 3500 / 10000 = 35% ≥ 30% → BLOCKED
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_mixed,
+    )
+    assert result.status == RiskStatus.BLOCKED
+    assert "total_exposure" in result.reason
+
+    # 반대: net이 낮아도 gross가 한도 미만이면 APPROVED
+    open_positions_small = [
+        {"size": 0.02, "price": 50000},   # 10%
+        {"size": 0.015, "price": 50000},  # 7.5%  → gross 17.5% < 30%
+    ]
+    result_small = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_small,
+    )
+    assert result_small.status == RiskStatus.APPROVED

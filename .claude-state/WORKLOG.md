@@ -3984,3 +3984,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** Bot Backup/DR (직접 기록). 상태 저장(SQLite/Redis), 주문 복구(API + 로컬 동기화), 30초 재시작 + 포지션 검증 표준.
 **Tests:** 6084 passed (+1 from Cycle 47).
 **Next Cycle:** 49 (C+B+F)
+
+## [2026-04-11 09:27 UTC] Cycle 49 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 09:29 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 18:35 UTC] Cycle 49 COMPLETED — C + B + F
+**[C] Data:** src/data/news.py 중복 감지 추가. MD5 hash (정규화), 24h 윈도우, 만료 자동 제거. NewsEvent.title_hash 필드. +7 tests.
+**[B] Risk:** tests/test_risk_manager.py +2 multi-position 경계. 동일 방향 누적 30% 경계, 반대 방향 gross 35% BLOCKED (net 5% 아님).
+**[F] Research:** Bybit 2025 사건. Feb 21 Lazarus $1.5B 해킹 (역대 최대). 멀티시그 강화, API 보안 오버홀. Aug 2025 기관 rate limit 도입, 일반 perp 400 req/s 유지. **우리 봇: API 키 2FA 필수**.
+**Tests:** 6093 passed (+9 from Cycle 48).
+**Next Cycle:** 50 🎯 (D+E+F) — 50 사이클 마일스톤
