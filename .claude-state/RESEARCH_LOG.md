@@ -433,3 +433,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [ScienceDirect — Risk and Return of Funding Rate Arbitrage (CEX/DEX)](https://www.sciencedirect.com/science/article/pii/S2096720925000818)
 - [Gate.io — Perpetual Contract Funding Rate Arbitrage 2025](https://www.gate.com/learn/articles/perpetual-contract-funding-rate-arbitrage/2166)
 - [Amberdata — Ultimate Guide to Funding Rate Arbitrage](https://blog.amberdata.io/the-ultimate-guide-to-funding-rate-arbitrage-amberdata)
+
+## [2026-04-11] Cycle 20 — Leveraged Tokens
+
+### 구조와 함정
+- 레버리지 토큰(예: BTC3L)은 매일 3x 레버리지를 자동 리밸런싱으로 유지. 수익 시 재투자, 손실 시 포지션 축소.
+- **변동성 감쇠(Volatility Decay)**: 기초자산이 +10%→-9.09% 복귀 시 3x 토큰은 +30%→-27.27% = 순 손실. 지수가 제자리여도 토큰은 손실 발생.
+- 연간 변동성 50% 환경에서 리밸런싱만으로 10~15% 연간 가치 잠식. 횡보 또는 고변동 구간에서 피해 극대화.
+- 플랫폼별 리밸런싱 트리거 범위 상이(Gate: Long 2.25x~4.125x 유지). 급변동 시 강제 즉시 리밸런싱 발동.
+
+### 봇 활용 시 주의
+- 레버리지 토큰은 **단기(당일) 방향성 베팅 전용**. 봇이 다중 사이클 또는 횡보 구간에서 보유 유지 시 decay 누적으로 전략 수익 잠식.
+- 리밸런싱 타이밍에 봇 진입이 겹치면 "고점 매수·저점 매도" 구조적 패턴에 편승하는 셈 — 진입 조건에 레짐 필터 및 보유 시간 상한 필수.
+
+### 참고
+- [All You Need to Know About Leveraged Tokens in 2025 — 3Commas](https://3commas.io/blog/leveraged-tokens)
+- [4 Pitfalls of Trading Leveraged Tokens — Binance Blog](https://www.binance.com/en/blog/all/4-pitfalls-of-trading-leveraged-tokens-and-how-to-avoid-them-421499824684900885)
+- [3x Leveraged ETFs Guide — Bitget Academy](https://www.bitget.com/academy/3x-leveraged-etfs)

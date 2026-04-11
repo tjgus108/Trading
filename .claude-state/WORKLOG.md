@@ -1155,3 +1155,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** 펀딩비 아비트라지 실전. 2024 연 14%, 2025 연 19% 수익이나 참가자 증가로 40%만 수수료 후 수익. 우리 funding_rate 전략에 중립/약세 필터 + 펀딩 급변 서킷브레이커 필요.
 **Tests:** 5908 passed (+10 from Cycle 18).
 **Next Cycle:** 20 (D+E+F)
+
+## [2026-04-11 03:35 UTC] Cycle 20 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md

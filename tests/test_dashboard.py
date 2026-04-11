@@ -110,6 +110,42 @@ def test_render_html_contains_key_fields():
     assert "-50.00" in html
 
 
+
+def test_render_html_impl_shortfall():
+    """impl_shortfall_avg_bps 가 HTML에 표시되는지 확인."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 5,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+        "impl_shortfall_avg_bps": 3.75,
+    }
+    html = _render_html(data)
+    assert "Impl Shortfall" in html
+    assert "+3.75 bps" in html
+
+
+def test_render_html_impl_shortfall_none():
+    """impl_shortfall 없으면 '—' 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 0,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "Impl Shortfall" in html
+    # value should be em-dash when no data
+    assert "—" in html
+
 def test_dashboard_stop_is_idempotent(mock_provider):
     port = _free_port()
     d = Dashboard(mock_provider, host="127.0.0.1", port=port)

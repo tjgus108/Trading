@@ -136,6 +136,33 @@ class TestFundingRateStrategy:
         assert signal.action == Action.SELL
         assert signal.confidence == Confidence.MEDIUM
 
+    def test_bearish_mean_filter_suppresses_buy(self):
+        """평균 펀딩비가 bearish_mean_threshold 미만이면 숏 과밀 BUY를 HOLD로 억제."""
+        strategy = FundingRateStrategy(bearish_mean_threshold=-0.00003)
+        # 히스토리에 지속적 음수 펀딩비 적재
+        for rate in [-0.0001, -0.0001, -0.0001, -0.0002]:
+            strategy.update_funding_rate(rate)
+        df = _make_df()
+        # 현재 펀딩비도 숏 과밀 수준(-0.0002)
+        strategy._funding_rate = -0.0002
+        signal = strategy.generate(df)
+        assert signal.action == Action.HOLD
+        assert "약세 필터" in signal.reasoning
+
+    def test_spike_circuit_breaker_returns_hold(self):
+        """펀딩비 Z-score가 임계값 이상이면 HOLD (급변 서킷)."""
+        strategy = FundingRateStrategy(spike_zscore_threshold=2.0)
+        # 안정적인 히스토리 (std 작게)
+        for rate in [0.0001, 0.0001, 0.0001, 0.0001, 0.0001]:
+            strategy.update_funding_rate(rate)
+        # 갑작스러운 급변 펀딩비 주입 (히스토리 mean=0.0001, std≈0 → z 매우 큼)
+        strategy._funding_rate = 0.01  # 극단적 급변
+        strategy._funding_rate_history.append(0.01)
+        df = _make_df()
+        signal = strategy.generate(df)
+        assert signal.action == Action.HOLD
+        assert "spike" in signal.reasoning.lower() or "Z=" in signal.reasoning
+
 
 # ---------------------------------------------------------------------------
 # A2: ResidualMeanReversionStrategy

@@ -69,6 +69,11 @@ class OrchestratorStatusProvider(StatusProvider):
             },
             "regime": getattr(orch, "_last_regime", None),
             "last_tournament_winner": getattr(orch, "_last_tournament_winner", None),
+            "impl_shortfall_avg_bps": (
+                sum(orch._impl_shortfall_samples) / len(orch._impl_shortfall_samples)
+                if getattr(orch, "_impl_shortfall_samples", None)
+                else None
+            ),
         }
 
 
@@ -160,6 +165,9 @@ def _render_html(data: dict) -> str:
     tournament_winner = data.get("last_tournament_winner") or "—"
     regime_color_map = {"bull": "#4caf50", "bear": "#f44336", "sideways": "#ff9800"}
     regime_color = regime_color_map.get(regime, "#aaa")
+    sf_raw = data.get("impl_shortfall_avg_bps")
+    sf_str = f"{sf_raw:+.2f} bps" if sf_raw is not None else "—"
+    sf_color = "#f44336" if (sf_raw or 0) > 5 else ("#ff9800" if (sf_raw or 0) > 1 else "#4caf50")
 
     # 멀티 봇 섹션
     bots_html = ""
@@ -211,6 +219,8 @@ def _render_html(data: dict) -> str:
     <div class="value" style="color:{regime_color}">{regime}</div></div>
   <div class="stat"><div class="label">Tournament Winner</div>
     <div class="value">{tournament_winner}</div></div>
+  <div class="stat"><div class="label">Impl Shortfall (avg)</div>
+    <div class="value" style="color:{sf_color}">{sf_str}</div></div>
 </div>
 
 <h2>Open Positions</h2>

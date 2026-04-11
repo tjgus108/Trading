@@ -1,33 +1,29 @@
-# Cycle 19 - 진행 상황
+# Cycle 20 - 진행 상황
 
-## 완료: Category C - Options Feed 견고성 개선 (15분)
+## 완료: Dashboard Impl Shortfall 표시 연동
 
 ### 작업 내용
-1. `src/data/options_feed.py` - GEXFeed/CMEBasisFeed 개선
-   - Cycle 6 패턴 적용: 재시도(exponential backoff 0.5/1/2s) + fallback
-   - max_retries 파라미터화 (기본값: 2회)
-   - _last_successful 캐시로 API 실패 시 이전 성공 데이터 사용
-   - fallback도 없으면 중립 데이터(score=0) 반환
-   - 파이프라인 블록 방지 (예외 전파 금지)
+`src/dashboard.py` — Implementation Shortfall 메트릭 대시보드 연동
 
-2. `tests/test_gex_cme.py` - 새 테스트 6개 추가 (총 22개)
-   - test_gex_fallback_after_failure: fallback 데이터 검증
-   - test_gex_neutral_without_fallback: fallback 없을 때 중립값
-   - test_gex_max_retries_parameter: max_retries 파라미터화 확인
-   - test_cme_fallback_after_failure: CME fallback 테스트
-   - test_cme_neutral_without_fallback: CME 중립값 테스트
-   - test_cme_max_retries_parameter: CME max_retries 확인
+1. **`OrchestratorStatusProvider.get_status()`** (line 72-76)
+   - `impl_shortfall_avg_bps` 필드 추가
+   - `orch._impl_shortfall_samples` 평균값 계산해 반환
+   - 샘플 없으면 `None`
 
-### 변경 사항
-- src/data/options_feed.py (라인 1-206) - 재시도/fallback 로직 추가
-- tests/test_gex_cme.py (라인 198-260) - 6개 테스트 추가
+2. **`_render_html()`** (line 165-167, 218-219)
+   - `sf_str`, `sf_color` 변수 추출
+   - 5bps 초과 → 빨강, 1bps 초과 → 주황, 이하 → 초록
+   - "Impl Shortfall (avg)" stat 블록 HTML 추가
+
+### 변경 파일
+- `src/dashboard.py` — lines 72-76, 165-167, 218-219
+- `tests/test_dashboard.py` — `test_render_html_impl_shortfall`, `test_render_html_impl_shortfall_none` 2개 추가
 
 ### 테스트 결과
 ```
-22 passed in 7.16s
-- 기존 16개 테스트 모두 통과
-- 새 6개 테스트 모두 통과
+8 passed in 3.02s (test_dashboard.py 전체)
 ```
 
 ## 다음 단계
-Cycle 19 Category C 완료. 다음 사이클/카테고리 대기.
+- Telegram notifier 포맷 개선 (옵션 2)
+- heston_lstm 테스트 커버리지 보강
