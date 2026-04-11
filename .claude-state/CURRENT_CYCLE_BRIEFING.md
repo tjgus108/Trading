@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 67 — 2026-04-11T10:34:56.664444Z
+🔄 CYCLE 68 — 2026-04-11T10:37:44.451210Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 66 COMPLETED — A + C + F** (2026-04-12 01:20 UTC)
-  **[A] Quality:** src/backtest/report.py to_json() 추가. dataclass.asdict + inf/nan → 문자열 변환. +1 test.
-  **[C] Data:** DataFeed 캐시 정상 확인 (코드 수정 없음). 연속 호출 시 API 호출 0회 추가, hit_rate 정확 계산 검증.
-  **[F] Research:** 2026 시장 전망. BTC $150K-250K (Standard Chartered, Tom Lee), ETH $7K-20K 와이드. 기관 ETF $15-40B 유입 예상. Fed 금리+규제가 리스크.
-  **Tests:** 6175 passed (+1 from Cycle 65).
+**Cycle 67 COMPLETED — B + D + F** (2026-04-12 01:40 UTC)
+  **[B] Risk:** tests/test_circuit_breaker.py +1 통합. 5 조건 (flash, daily DD, total DD, consecutive loss cooldown, ATR surge) 각각 독립 검증.
+  **[D] ML:** src/alpha/context.py composite_score에 math.isnan() 가드. NaN 점수 → 0 처리. +1 test.
+  **[F] Research:** F&G Index 유효성. 극단 매수/매도 역발상 2023-2025 연 15-20% 초과수익. 1일~1주 예측력 유의미. 최근 예측력 저하 — 매크로 필터 병행 권장.
+  **Tests:** 6177 passed (+2 from Cycle 66).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

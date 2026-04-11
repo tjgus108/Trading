@@ -176,3 +176,31 @@ def test_monte_carlo_run_with_many_nans_resulting_empty():
     assert len(result.final_returns) == 30
     assert len(result.sharpes) == 30
     assert len(result.max_drawdowns) == 30
+
+
+
+def test_monte_carlo_seed_reproducibility_comprehensive():
+    """seed 고정 시 전체 결과(final_returns, sharpes, mdds) 재현 가능 검증."""
+    returns = pd.Series(np.random.RandomState(123).randn(300) * 0.001 + 0.0002)
+    
+    # 동일 seed로 3회 실행
+    results = []
+    for _ in range(3):
+        mc = MonteCarlo(n_simulations=150, block_size=15, seed=999, risk_free_rate=0.04)
+        results.append(mc.run(returns))
+    
+    # 모든 메트릭 일치 검증
+    for i in range(1, 3):
+        np.testing.assert_array_equal(results[0].final_returns, results[i].final_returns,
+                                       err_msg=f"Run {i}: final_returns differ")
+        np.testing.assert_array_equal(results[0].sharpes, results[i].sharpes,
+                                       err_msg=f"Run {i}: sharpes differ")
+        np.testing.assert_array_equal(results[0].max_drawdowns, results[i].max_drawdowns,
+                                       err_msg=f"Run {i}: max_drawdowns differ")
+    
+    # percentile도 동일
+    assert results[0].p5_return == results[1].p5_return
+    assert results[0].p50_return == results[2].p50_return
+    assert results[0].p5_sharpe == results[2].p5_sharpe
+    assert results[0].median_mdd == results[1].median_mdd
+    assert results[0].p95_mdd == results[2].p95_mdd

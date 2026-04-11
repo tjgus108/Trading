@@ -197,3 +197,26 @@ def test_fetch_balance_exception(caplog):
 
     assert result == {"total": {}, "free": {}, "used": {}}
     assert any("fetch_balance failed" in r.message for r in caplog.records)
+
+
+# ── cancel_order 경계 테스트 ───────────────────────────────────────────────
+
+def test_cancel_order_success():
+    """정상 취소 → exchange.cancel_order 1회 호출, 결과 그대로 반환."""
+    conn = _make_connector()
+    fake_result = {"id": "ord-99", "status": "canceled", "symbol": "BTC/USDT"}
+    conn._exchange.cancel_order.return_value = fake_result
+
+    result = conn.cancel_order("ord-99", "BTC/USDT")
+
+    conn._exchange.cancel_order.assert_called_once_with("ord-99", "BTC/USDT")
+    assert result == fake_result
+
+
+def test_cancel_order_not_connected():
+    """미연결 상태에서 cancel_order 호출 → RuntimeError."""
+    conn = ExchangeConnector(exchange_name="binance", sandbox=True)
+    # _exchange 미설정
+
+    with pytest.raises(RuntimeError, match="connect()"):
+        conn.cancel_order("ord-99", "BTC/USDT")

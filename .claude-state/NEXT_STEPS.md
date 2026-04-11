@@ -1,17 +1,23 @@
-# Cycle 67 - Category D: ML & Signals
+# Cycle 68 - Category A: Quality Assurance
 ## Status: COMPLETE
 
 ### What was done
-- Found: `composite_score` in `MarketContext` propagated NaN if `sentiment_score` or `onchain_score` was NaN
-- Fixed: Added `math.isnan()` guard in `composite_score` — NaN scores treated as 0 (neutral)
-- Added boundary test `TestMarketContextNaN::test_composite_score_nan_sentiment_treated_as_zero`
+Monte Carlo simulation reproducibility verification with fixed seeds:
+- Verified: `seed` parameter in MonteCarlo works correctly (uses `np.random.default_rng(seed)`)
+- Existing test `test_monte_carlo_seed_reproducibility` already validates final_returns reproducibility
+- Added: `test_monte_carlo_seed_reproducibility_comprehensive` — validates all metrics (final_returns, sharpes, max_drawdowns) and percentiles (p5, p50, p95) across 3 runs with same seed=999
 
 ### Files Modified
-- `/home/user/Trading/src/alpha/context.py` — NaN guard in composite_score, added math import
-- `/home/user/Trading/tests/test_phase_b_context.py` — Added NaN boundary test class
+- `/home/user/Trading/tests/test_monte_carlo.py` — Added comprehensive reproducibility test
 
 ### Test Results
-74 passed (full context suite)
+- All 14 tests pass (13 existing + 1 new)
+- Both reproducibility tests confirm: seed=fixed → identical results every time
+
+### Key Findings
+- No code changes needed in monte_carlo.py — implementation is correct
+- `np.random.default_rng(seed)` properly initializes deterministic RNG
+- Block bootstrap sampling is fully reproducible with seed control
 
 ### Next Steps
-Continue with remaining Cycle 67 tasks
+Continue with remaining Cycle 68 tasks
