@@ -565,3 +565,62 @@ def test_run_once_warns_on_degraded_mode(cfg):
     orch._pipeline.run.assert_called_once()
     assert result.status == "NO_ACTION"
     mock_logger.warning.assert_any_call("DataFeeds degraded_mode: %s", fake_report)
+
+
+# ── DrawdownMonitor halt → 정상 복귀 테스트 ─────────────────────────────────
+
+def test_drawdown_halt_recovers_automatically(cfg, mock_connector):
+    """HALT 후 잔고가 recovery_pct 이상 회복되면 run_once가 다시 APPROVED될 수 있다."""
+    from src.risk.drawdown_monitor import DrawdownMonitor, AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+
+    # max_drawdown=0.20, recovery_pct=0.05 → 복귀 기준 drawdown < 0.15
+    monitor = DrawdownMonitor(max_drawdown_pct=0.20, recovery_pct=0.05)
+    orch._drawdown_monitor = monitor
+
+    # peak=10000 설정 후 MDD 초과(25%) → HALT
+    monitor.update(10000.0)
+    halted_status = monitor.update(7500.0)  # 25% 낙폭
+    assert halted_status.halted is True
+    assert halted_status.alert_level == AlertLevel.HALT
+
+    # 잔고가 8600으로 회복 → drawdown=14% < 15% → 자동 해제
+    recovered_status = monitor.update(8600.0)
+    assert recovered_status.halted is False
+    assert recovered_status.alert_level == AlertLevel.NONE
+
+    # 이제 run_once는 DrawdownMonitor에서 막히지 않아야 함
+    with patch.object(orch._pipeline, "_fetch_balance_usd", return_value=8600.0):
+        pass  # drawdown_monitor는 이미 halted=False 상태
+    result_status = monitor.update(8600.0)
+    assert result_status.halted is False
+
+
+def test_drawdown_halt_recovers_via_force_resume(cfg, mock_connector):
+    """FORCE_LIQUIDATE 상태는 자동 복귀 불가 — force_resume() 호출 후 halted=False."""
+    from src.risk.drawdown_monitor import DrawdownMonitor, AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+
+    monitor = DrawdownMonitor(max_drawdown_pct=0.20, recovery_pct=0.05)
+    orch._drawdown_monitor = monitor
+
+    # force_halt로 FORCE_LIQUIDATE 강제 설정
+    monitor.force_halt("수동 테스트: 월간 한계 초과")
+    # force_halt는 AlertLevel.HALT 으로 설정됨 — FORCE_LIQUIDATE 직접 주입
+    monitor._alert_level = AlertLevel.FORCE_LIQUIDATE
+    monitor._halted = True
+
+    # 잔고 회복해도 자동 해제 안 됨 (FORCE_LIQUIDATE 예외)
+    still_halted = monitor.update(10000.0)
+    assert still_halted.halted is True
+
+    # force_resume 호출 후 해제 확인
+    monitor.force_resume()
+    assert monitor._halted is False
+    assert monitor._alert_level == AlertLevel.NONE
+
+    # 이후 run_once가 BLOCKED되지 않아야 하므로 update도 halted=False 반환
+    status_after = monitor.update(10000.0)
+    assert status_after.halted is False

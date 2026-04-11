@@ -577,3 +577,127 @@ class TestErrorClassification:
         assert stats['total'] == 3
         assert stats['hit_rate'] == 1/3
         assert len(results) == 2
+
+
+class TestFetchMultipleStress:
+    """fetch_multiple 병렬성 스트레스 테스트."""
+
+    def test_fetch_multiple_many_symbols_stress(self):
+        """많은 심볼(10개)을 동시 페치 — 전체 완료 확인."""
+        connector = MagicMock()
+        
+        # 10개 심볼에 대한 mock 데이터
+        symbols = [f"ALT{i}/USDT" for i in range(10)]
+        connector.fetch_ohlcv.side_effect = [
+            [[1704067200000 + i*1000, 100+i, 110+i, 90+i, 105+i, 50]]
+            for i in range(10)
+        ]
+        
+        feed = DataFeed(connector)
+        results = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        # 모든 심볼 완료 확인
+        assert len(results) == 10, f"Expected 10 results, got {len(results)}"
+        for symbol in symbols:
+            assert symbol in results, f"Symbol {symbol} missing from results"
+            assert results[symbol].symbol == symbol
+            assert results[symbol].candles == 1
+        
+        # 모든 API 호출 실행 확인
+        assert connector.fetch_ohlcv.call_count == 10
+
+    def test_fetch_multiple_mixed_success_failure_stress(self):
+        """10개 중 일부 실패 시 성공한 것만 반환."""
+        connector = MagicMock()
+        
+        symbols = [f"ALT{i}/USDT" for i in range(10)]
+        
+        # 5개 성공, 5개 실패
+        side_effects = []
+        for i in range(10):
+            if i % 2 == 0:
+                side_effects.append(Exception(f"API error for ALT{i}"))
+            else:
+                side_effects.append([[1704067200000 + i*1000, 100+i, 110+i, 90+i, 105+i, 50]])
+        
+        connector.fetch_ohlcv.side_effect = side_effects
+        
+        feed = DataFeed(connector)
+        results = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        # 5개만 성공
+        assert len(results) == 5, f"Expected 5 results, got {len(results)}"
+        
+        # 성공한 것들 확인 (홀수 인덱스)
+        for i in range(1, 10, 2):
+            symbol = f"ALT{i}/USDT"
+            assert symbol in results, f"Symbol {symbol} should be in results"
+
+    def test_fetch_multiple_max_workers_scaling(self):
+        """max_workers 5개로 20개 심볼 페치."""
+        connector = MagicMock()
+        
+        symbols = [f"SYM{i}/USDT" for i in range(20)]
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 1000, 1100, 900, 1050, 100]
+        ]
+        
+        feed = DataFeed(connector)
+        results = feed.fetch_multiple(symbols, "1h", limit=500, max_workers=5)
+        
+        # 모든 심볼 처리
+        assert len(results) == 20
+        assert connector.fetch_ohlcv.call_count == 20
+
+    def test_fetch_multiple_concurrent_cache_behavior(self):
+        """동시 페치 시 캐시가 올바르게 작동하는지 확인."""
+        connector = MagicMock()
+        
+        symbols = ["BTC/USDT", "ETH/USDT", "ADA/USDT", "SOL/USDT", "XRP/USDT"]
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 50000, 51000, 49000, 50500, 200]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 첫 번째 fetch_multiple: 5개 심볼 → 5개 미스
+        results1 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_first = feed.cache_stats()
+        assert stats_after_first['miss_count'] == 5
+        assert stats_after_first['hit_count'] == 0
+        assert stats_after_first['cached_keys'] == 5
+        
+        # 두 번째 fetch_multiple: 같은 5개 → 5개 히트
+        results2 = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_after_second = feed.cache_stats()
+        assert stats_after_second['miss_count'] == 5, "미스 수 증가 안 함"
+        assert stats_after_second['hit_count'] == 5, "히트 5개"
+        assert stats_after_second['hit_rate'] == 0.5
+        assert connector.fetch_ohlcv.call_count == 5, "API 호출은 1회만"
+
+    def test_fetch_multiple_large_batch_partial_overlap(self):
+        """대량 심볼(8개) 페치에서 일부만 캐시된 상태."""
+        connector = MagicMock()
+        
+        symbols = [f"T{i}/USDT" for i in range(8)]
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 100, 110, 90, 105, 50]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # 처음 4개만 캐시
+        feed.fetch_multiple(symbols[:4], "1h", limit=500)
+        stats1 = feed.cache_stats()
+        assert stats1['miss_count'] == 4
+        
+        # 전체 8개 페치 (4개 히트 + 4개 미스)
+        results = feed.fetch_multiple(symbols, "1h", limit=500)
+        
+        stats_final = feed.cache_stats()
+        assert stats_final['hit_count'] == 4, "처음 4개는 히트"
+        assert stats_final['miss_count'] == 8, "뒤의 4개는 미스"
+        assert len(results) == 8
+        assert connector.fetch_ohlcv.call_count == 8, "API 호출 4(첫 배치) + 4(두 번째 배치 신규)"

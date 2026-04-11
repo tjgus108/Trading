@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 83 — 2026-04-11T15:54:59.659753Z
+🔄 CYCLE 84 — 2026-04-11T16:06:52.970664Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 82 COMPLETED — B + D + SIM + F (신규 SIM 카테고리!)** (2026-04-12 06:55 UTC)
-  **[B] Risk:** tests/test_portfolio_optimizer.py +2 VaR/CVaR 경계 (T=2 최소, 극단 loss tail).
-  **[D] ML:** tests/test_llm_analyst.py +3 _parse_response 경계 (특수문자, 빈 문자열, 마크다운).
-  **[SIM] 신규 카테고리 첫 실행:** Paper simulation 실행 → wick_reversal 개선.
-    - 문제: 합성 데이터에서 -14.17% 손실, Sharpe -3.08, 80 거래 과다
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 83 COMPLETED — E + A + SIM + F** (2026-04-12 07:25 UTC)
+  **[E] Execution:** tests/test_kelly_twap.py TestTWAPSliceSum +2. 슬라이스 합 = total_qty 검증.
+  **[A] Quality:** tests/test_wick_reversal.py +2 추세 필터 회귀. shooting_star trend_down, 패턴 상호배제 (19 tests).
+  **[SIM] Auto-improve:** engulfing_zone 개선. body_ratio 1.1→1.5, S/R ±1.0%→±0.5%, HIGH 임계값 1.5→1.8. **-12.74% → -2.53% (+10.21%p)**. 26→9 거래. Sharpe -5.31 → -1.73.
+  **[F] Research:** FRAMA + Engulfing. 단독 50-70% 부족 → RSI(과매수) + Volume 이중 필터 필요.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
