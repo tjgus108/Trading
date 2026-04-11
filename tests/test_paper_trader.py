@@ -392,3 +392,61 @@ def test_exact_balance_buy_succeeds():
                                strategy="s", confidence="H")
     assert result["status"] == "filled"
     assert abs(pt.account.balance) < 1e-6  # 잔액 거의 0
+
+
+# ── Multi-symbol 밸런스 관리 검증 (Cycle 63) ─────────────────────
+
+def test_multi_symbol_balance_conservation():
+    """여러 심볼 동시 거래 시 잔액 = 초기잔액 - 총매수비용 보존"""
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.001, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+
+    symbols = [
+        ("BTC/USDT", 1000.0, 3.0),
+        ("ETH/USDT", 200.0, 10.0),
+        ("SOL/USDT", 50.0, 20.0),
+    ]
+    total_cost = 0.0
+    for sym, price, qty in symbols:
+        cost = price * qty * (1 + 0.001)
+        total_cost += cost
+        pt.execute_signal(sym, "BUY", price=price, quantity=qty,
+                          strategy="s", confidence="H")
+
+    expected_balance = 100000.0 - total_cost
+    assert abs(pt.account.balance - expected_balance) < 1e-4
+
+    # 각 심볼 포지션 독립 확인
+    assert pt.account.positions["BTC/USDT"] == 3.0
+    assert pt.account.positions["ETH/USDT"] == 10.0
+    assert pt.account.positions["SOL/USDT"] == 20.0
+
+
+def test_multi_symbol_sell_does_not_affect_other_positions():
+    """심볼 A 매도가 심볼 B 포지션과 잔액에 간섭하지 않음"""
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("ETH/USDT", "BUY", price=500.0, quantity=4.0,
+                      strategy="s", confidence="H")
+
+    balance_before_sell = pt.account.balance
+
+    # BTC만 전량 매도
+    result = pt.execute_signal("BTC/USDT", "SELL", price=1200.0, quantity=2.0,
+                               strategy="s", confidence="H")
+
+    assert result["status"] == "filled"
+    assert result["pnl"] == 400.0  # (1200-1000)*2
+
+    # ETH 포지션 영향 없음
+    assert pt.account.positions.get("ETH/USDT") == 4.0
+    assert pt.account.avg_entry.get("ETH/USDT") == 500.0
+
+    # 잔액 증가분 = BTC 매도 proceeds
+    assert pt.account.balance == balance_before_sell + 1200.0 * 2.0
+
+    # BTC 포지션 소멸
+    assert "BTC/USDT" not in pt.account.positions
