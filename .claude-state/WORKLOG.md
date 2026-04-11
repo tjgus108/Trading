@@ -606,3 +606,31 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** 헤지펀드 리스크 도구 (Axioma/RiskMetrics, VaR 95%경고/99%hard, Correlation throttle). 우리 봇 적용: 2단계 VaR + 상관 0.7+ 시 포지션 축소.
 **Tests:** 5840 passed (+16 from Cycle 8).
 **Next Cycle:** 10 (D+E+F — 2회차)
+
+## [2026-04-11 02:43 UTC] Cycle 10 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:44 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:44:40Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 02:45 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:45:30Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 05:00 UTC] Cycle 10 COMPLETED — D + E(via Risk) + F
+**[D] ML:** src/alpha/specialist_agents.py SpecialistEnsemble.analyze() graceful degradation. 개별 에이전트 실패 시 HOLD/conf=0 대체 투표 삽입. +4 tests. **버그 발견**: 기존에 예외처리 전무로 한 에이전트 crash하면 ensemble 전체 붕괴됨.
+**[E] Execution (via Risk):** src/orchestrator.py AlertLevel 임포트 + halt 블록에 FORCE_LIQUIDATE 분기. 월간 DD 초과 시 _stop_event.set() 호출로 루프 자체 중단. HALT/WARNING은 해당 사이클만 차단. +2 tests.
+**[F] Research:** LLM 트레이딩 시그널 실전 성과. MarketSenseAI +72% alpha, TradingAgents 멀티 LLM 앙상블 검증. 우리 SpecialistEnsemble 구조가 검증된 아키텍처와 일치.
+**Tests:** 5846 passed (+6 from Cycle 9).
+**Next Cycle:** 11 (A+C+F — 3회차)

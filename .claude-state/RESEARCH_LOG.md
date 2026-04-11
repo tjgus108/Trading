@@ -246,3 +246,20 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Axioma Risk for Hedge Funds — SimCorp](https://www.axioma.com/solutions/hedge-fund-manager/)
 - [RiskMetrics for Hedge Funds — MSCI](https://www.msci.com/documents/10199/3cdaaa94-43a6-4fb9-be62-f159ed624f19)
 - [Quant Hedge Fund Due Diligence 2026 — Resonanz Capital](https://resonanzcapital.com/insights/quant-hedge-funds-in-2026-a-due-diligence-framework-by-strategy-type)
+
+## [2026-04-11] Cycle 10 — LLM Trading Signals
+
+### 실전 사례 2024-2025
+- **MarketSenseAI (GPT-4 기반)**: S&P 100 15개월 테스트에서 excess alpha 10~30%, 누적 수익 최대 72%. CoT + ICL로 뉴스·펀더멘털·매크로 통합 분석.
+- **Multi-LLM 크립토 봇**: DeepSeek·Claude·GPT-4o·Grok 멀티 LLM 거부권(veto) 시스템 + CNN-LSTM 조합, 2.3년 WFO 테스트 1,842% 수익·Sharpe 6.08. 단, 백테스트 과적합 의심.
+- **실패/한계**: StockBench 연구에서 대부분 LLM 에이전트가 단순 Buy-and-Hold를 하회. 고빈도 거래는 추론 지연으로 LLM 부적합. LLM 행동이 실제 인간 트레이더와 다르다는 실험 결과 존재.
+
+### 우리 봇 LLM 앙상블 유사성
+- TradingAgents 프레임워크(Technical/Sentiment/뉴스 전문 에이전트 분업)가 우리 SpecialistEnsemble과 구조적으로 동일 — 독립 검증된 아키텍처.
+- 멀티 LLM veto 방식은 우리 alpha-agent debate(bull_case/bear_case)와 유사. 단일 LLM 편향 완화 효과 확인됨.
+- 앙상블 접근은 "프로덕션 미검증" 단계이나 학술 성과는 긍정적 — 일간 시그널 기반 운영 시 실용성 있음.
+
+### 참고
+- [MarketSenseAI — Springer Nature](https://link.springer.com/article/10.1007/s00521-024-10613-4)
+- [TradingAgents Multi-Agent Framework](https://tradingagents-ai.github.io/)
+- [LLM Agents vs Human Traders — arXiv](https://arxiv.org/html/2502.15800v3)

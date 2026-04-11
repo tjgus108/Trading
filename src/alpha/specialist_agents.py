@@ -232,12 +232,40 @@ class SpecialistEnsemble:
         1. 3개 중 2개 이상 동일 방향 → 해당 방향, confidence = 평균
         2. 모두 다른 방향 → HOLD confidence 0.35
         3. 1개만 비HOLD → 해당 방향 confidence * 0.7
+        에이전트 개별 실패 시 HOLD로 대체 (graceful degradation).
         """
-        votes = [
-            self.technical.analyze(df),
-            self.sentiment.analyze(df, sentiment_score),
-            self.onchain.analyze(df, onchain_score),
+        agent_calls = [
+            (self.technical, "analyze", (df,), {}),
+            (self.sentiment, "analyze", (df,), {"sentiment_score": sentiment_score}),
+            (self.onchain, "analyze", (df,), {"onchain_score": onchain_score}),
         ]
+        votes: list[SpecialistVote] = []
+        for agent, method, args, kwargs in agent_calls:
+            try:
+                vote = getattr(agent, method)(*args, **kwargs)
+                votes.append(vote)
+            except Exception as e:
+                logger.warning(
+                    "Agent %s failed, substituting HOLD: %s",
+                    getattr(agent, "name", "unknown"),
+                    e,
+                )
+                votes.append(
+                    SpecialistVote(
+                        agent_name=getattr(agent, "name", "unknown"),
+                        action="HOLD",
+                        confidence=0.0,
+                        reasoning=f"agent error: {e}",
+                    )
+                )
+
+        if not votes:
+            return SpecialistVote(
+                agent_name="ensemble",
+                action="HOLD",
+                confidence=0.0,
+                reasoning="no votes collected",
+            )
         return self._compute_consensus(votes)
 
     def _compute_consensus(self, votes: list[SpecialistVote]) -> SpecialistVote:

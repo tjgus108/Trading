@@ -219,3 +219,60 @@ def test_specialist_vote_confidence_range():
         assert 0.0 <= vote.confidence <= 1.0, (
             f"{vote.agent_name} confidence={vote.confidence} out of range"
         )
+
+
+# ------------------------------------------------------------------
+# Graceful degradation
+# ------------------------------------------------------------------
+
+def test_technical_agent_empty_df_returns_hold():
+    """빈 DataFrame → TechnicalAnalystAgent는 HOLD를 반환해야 한다."""
+    agent = TechnicalAnalystAgent()
+    vote = agent.analyze(pd.DataFrame())
+    assert vote.action == "HOLD"
+    assert 0.0 <= vote.confidence <= 1.0
+
+
+def test_technical_agent_missing_columns_returns_hold():
+    """필요 컬럼 없는 DataFrame → HOLD."""
+    agent = TechnicalAnalystAgent()
+    df = pd.DataFrame({"close": [100.0, 101.0]})  # rsi14, ema20, ema50 없음
+    vote = agent.analyze(df)
+    assert vote.action == "HOLD"
+    assert 0.0 <= vote.confidence <= 1.0
+
+
+def test_ensemble_agent_failure_graceful_degradation():
+    """한 에이전트가 예외를 던져도 ensemble이 HOLD로 대체하고 결과를 반환해야 한다."""
+    from unittest.mock import patch
+
+    ensemble = SpecialistEnsemble()
+    df = _make_df(rsi14=25.0, close=102.0, ema20=100.0, ema50=95.0)
+
+    # OnchainAnalystAgent.analyze가 예외를 던지도록 패치
+    with patch.object(ensemble.onchain, "analyze", side_effect=RuntimeError("onchain API down")):
+        vote = ensemble.analyze(df, sentiment_score=2.0, onchain_score=2.0)
+
+    # 예외에도 불구하고 유효한 SpecialistVote가 반환돼야 한다
+    assert isinstance(vote, SpecialistVote)
+    assert vote.action in ("BUY", "SELL", "HOLD")
+    assert 0.0 <= vote.confidence <= 1.0
+    assert vote.agent_name == "ensemble"
+
+
+def test_ensemble_all_agents_fail_returns_hold():
+    """모든 에이전트가 실패하면 ensemble은 HOLD confidence=0을 반환해야 한다."""
+    from unittest.mock import patch
+
+    ensemble = SpecialistEnsemble()
+    df = _make_df()
+
+    with patch.object(ensemble.technical, "analyze", side_effect=RuntimeError("fail")), \
+         patch.object(ensemble.sentiment, "analyze", side_effect=RuntimeError("fail")), \
+         patch.object(ensemble.onchain, "analyze", side_effect=RuntimeError("fail")):
+        vote = ensemble.analyze(df)
+
+    assert isinstance(vote, SpecialistVote)
+    # 모두 HOLD(confidence=0)이면 합의 실패 → HOLD
+    assert vote.action == "HOLD"
+    assert vote.agent_name == "ensemble"

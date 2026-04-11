@@ -573,3 +573,44 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 
 **결론:** OnchainFetcher는 설계/구현이 이미 견고하며, 이번 테스트 추가로 품질 신뢰도 100% 확보.
 
+
+---
+
+## Cycle 10 - Category D: ML & Signals ✅ COMPLETED
+
+**Task:** SpecialistEnsemble 검토 및 테스트 추가
+
+**Bug Fixed:**
+- `src/alpha/specialist_agents.py` — `SpecialistEnsemble.analyze()` 에이전트 개별 실패 시 전체 크래시 문제 수정
+  - 각 에이전트 호출을 try/except로 감싸고 실패 시 `HOLD confidence=0` SpecialistVote로 대체
+  - `votes` 리스트가 비어있을 경우 방어 처리 추가
+
+**Tests Added (tests/test_specialist_agents.py, lines 225~278):**
+- `test_technical_agent_empty_df_returns_hold`: 빈 DataFrame → HOLD
+- `test_technical_agent_missing_columns_returns_hold`: 필요 컬럼 없음 → HOLD
+- `test_ensemble_agent_failure_graceful_degradation`: 1개 에이전트 예외 시 ensemble 정상 동작
+- `test_ensemble_all_agents_fail_returns_hold`: 전체 에이전트 실패 → HOLD confidence=0
+
+**Test Results:**
+- test_specialist_agents.py: 19 passed ✅ (기존 15 + 신규 4)
+
+---
+
+## Cycle 10 - Orchestrator Emergency Halt 강화 ✅ COMPLETED
+
+**Task:** DrawdownMonitor AlertLevel(FORCE_LIQUIDATE) 연동으로 emergency halt 강화
+
+**Files Modified:**
+1. `/home/user/Trading/src/orchestrator.py` (line 201, lines 863-882)
+   - `AlertLevel` import 추가
+   - halt 블록에 `FORCE_LIQUIDATE` 분기 추가: `_stop_event.set()` + critical 로그
+   - `HALT`/`WARNING`은 기존대로 BLOCKED 반환만, `FORCE_LIQUIDATE`는 봇 루프까지 정지
+   - notes 메시지에 `alert_level.value` 포함
+
+2. `/home/user/Trading/tests/test_orchestrator.py` (lines 325-360)
+   - `test_drawdown_halt_blocks_run_once`: HALT 레벨 → BLOCKED 반환, stop_event 미세팅
+   - `test_force_liquidate_sets_stop_event`: FORCE_LIQUIDATE → BLOCKED + stop_event 세팅
+
+**Test Results:**
+- 신규 2개 PASSED
+- 전체 test_orchestrator.py: 14 passed ✅

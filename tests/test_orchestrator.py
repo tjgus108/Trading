@@ -321,3 +321,43 @@ def test_tournament_wf_exception_is_non_fatal(cfg, mock_connector):
     # WF 예외여도 토너먼트 결과 반환, 1위 유지
     assert result.winner == "ema_cross"
     assert result.wf_fallback is False
+
+
+# ── DrawdownMonitor AlertLevel 연동 테스트 ──────────────────────────────────
+
+def test_drawdown_halt_blocks_run_once(cfg, mock_connector):
+    """DrawdownMonitor가 HALT 상태이면 run_once가 BLOCKED PipelineResult를 반환한다."""
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+
+    halted_status = MagicMock()
+    halted_status.halted = True
+    halted_status.alert_level = AlertLevel.HALT
+    halted_status.reason = "주간 낙폭 7.5% ≥ 한계 7.0% — 거래 중단"
+
+    with patch.object(orch._drawdown_monitor, "update", return_value=halted_status):
+        result = orch.run_once()
+
+    assert result.status == "BLOCKED"
+    assert "HALT" in result.notes[0]
+    assert not orch._stop_event.is_set()
+
+
+def test_force_liquidate_sets_stop_event(cfg, mock_connector):
+    """FORCE_LIQUIDATE 레벨이면 run_once가 BLOCKED + _stop_event를 세팅한다."""
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+
+    fl_status = MagicMock()
+    fl_status.halted = True
+    fl_status.alert_level = AlertLevel.FORCE_LIQUIDATE
+    fl_status.reason = "월간 낙폭 16.0% ≥ 한계 15.0% — 강제 청산"
+
+    with patch.object(orch._drawdown_monitor, "update", return_value=fl_status):
+        result = orch.run_once()
+
+    assert result.status == "BLOCKED"
+    assert "FORCE_LIQUIDATE" in result.notes[0]
+    assert orch._stop_event.is_set()

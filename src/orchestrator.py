@@ -198,7 +198,7 @@ from src.strategy.poc_strategy import POCStrategy
 from src.strategy.bid_ask_imbalance import BidAskImbalanceStrategy
 from src.strategy.gann_swing import GannSwingStrategy
 from src.strategy.elder_force import ElderForceIndexStrategy
-from src.risk.drawdown_monitor import DrawdownMonitor
+from src.risk.drawdown_monitor import AlertLevel, DrawdownMonitor
 from src.strategy.price_deviation import PriceDeviationStrategy
 from src.strategy.acceleration_band import AccelerationBandStrategy
 from src.strategy.supertrend_multi import SupertrendMultiStrategy
@@ -864,12 +864,22 @@ class BotOrchestrator:
                 from src.pipeline.runner import PipelineResult
                 from datetime import datetime, timezone
                 ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-                logger.warning("DrawdownMonitor HALT: %s", dd_status.reason)
-                self._notifier.notify_error(f"[DRAWDOWN HALT] {dd_status.reason}")
+                if dd_status.alert_level == AlertLevel.FORCE_LIQUIDATE:
+                    logger.critical(
+                        "DrawdownMonitor FORCE_LIQUIDATE: %s — stopping bot loop",
+                        dd_status.reason,
+                    )
+                    self._notifier.notify_error(
+                        f"[FORCE_LIQUIDATE] {dd_status.reason} — 봇 루프 정지"
+                    )
+                    self._stop_event.set()
+                else:
+                    logger.warning("DrawdownMonitor HALT: %s", dd_status.reason)
+                    self._notifier.notify_error(f"[DRAWDOWN HALT] {dd_status.reason}")
                 return PipelineResult(
                     timestamp=ts, symbol=self.cfg.trading.symbol,
                     pipeline_step="drawdown_check", status="BLOCKED",
-                    notes=[f"DrawdownMonitor halted: {dd_status.reason}"],
+                    notes=[f"DrawdownMonitor halted [{dd_status.alert_level.value}]: {dd_status.reason}"],
                 )
         except Exception as e:
             logger.debug("DrawdownMonitor check failed (non-fatal): %s", e)
