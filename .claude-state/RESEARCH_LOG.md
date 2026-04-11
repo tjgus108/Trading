@@ -606,3 +606,19 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Why AI Trading Bots Fail — Amplework](https://www.amplework.com/blog/ai-trading-bots-failures-how-to-build-profitable-bot/)
 - [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
 - [AI Bot Trading Profitable 2025? — AgentiveAIQ](https://agentiveaiq.com/blog/is-ai-bot-trading-profitable-the-2025-reality-check)
+
+## [2026-04-11] Cycle 30 — Market Microstructure 2025
+
+### 주요 변화
+- Binance CEX 스팟 점유율 2025년 40%대 → 2026 Q1 32%로 하락. CEX 전체 거래량 Q1 2026 기준 전기 대비 48% 감소
+- Hyperliquid, 2025년 perp DEX 시장의 최대 80% 점유 후 경쟁자(Aster 등) 등장으로 38%대로 축소. Perp DEX 전체 점유율은 파생상품 시장의 26%(전년 한 자릿수 → 급성장)
+- 기관 자금: 비트코인 스팟 ETF 2025년 순유입 $26B, 기관+기업 합산 $70B+ 유입(전년 $30B 대비 2배+). 비트코인이 기관 포트폴리오 정식 편입
+
+### 봇 영향
+- DEX 유동성 분산(CEX→DEX 이동)으로 CEX 기반 호가/체결 데이터의 대표성 약화. 주요 페어는 Hyperliquid 오더북 병행 모니터링 필요
+- 기관 유입으로 변동성 패턴 변화: 과거 리테일 주도의 급등락 감소, 트렌드 지속성 증가 가능성 → 추세추종 전략 유리 환경
+
+### 참고
+- [DEXs Hit Record Market Share — CoinDesk](https://www.coindesk.com/markets/2025/07/21/decentralized-crypto-exchanges-hit-record-market-share-in-q2-volume-coingecko-report)
+- [Hyperliquid chips away at Binance — The Block](https://www.theblock.co/post/368674/hyperliquid-captures-80-of-decentralized-perps-market-chipping-away-at-binance)
+- [Institutional Crypto Adoption 2025 — Grayscale](https://research.grayscale.com/reports/2026-digital-asset-outlook-dawn-of-the-institutional-era)

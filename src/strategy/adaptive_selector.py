@@ -93,6 +93,36 @@ class AdaptiveStrategySelector:
     def strategy_names(self) -> list[str]:
         return list(self._strategies.keys())
 
+    def rolling_consistency(self, strategy_name: str, window: int = 30) -> float:
+        """
+        최근 ``window`` 거래의 신호 방향 일관성 점수 (0.0~1.0).
+
+        - PnL > 0 → 긍정(+1), PnL < 0 → 부정(-1), 0 → 중립(0)
+        - 점수 = 가장 빈번한 방향의 비율 (다수결 일치도)
+        - 데이터 부족(< MIN_SAMPLES) 시 0.0 반환
+
+        Args:
+            strategy_name: 전략 이름
+            window: 최근 캔들/거래 수 (30 또는 90 권장)
+
+        Returns:
+            float: 0.0(무작위) ~ 1.0(완전 일치)
+        """
+        hist = list(self._pnl_history.get(strategy_name, []))
+        if len(hist) < self.MIN_SAMPLES:
+            return 0.0
+        recent = hist[-window:]
+        if not recent:
+            return 0.0
+        signs = np.sign(np.array(recent, dtype=float))
+        counts = {v: float(np.sum(signs == v)) for v in (1.0, -1.0, 0.0)}
+        dominant = max(counts.values())
+        return dominant / len(recent)
+
+    def consistency_summary(self, window: int = 30) -> dict[str, float]:
+        """전략별 rolling 일관성 점수 dict 반환."""
+        return {k: self.rolling_consistency(k, window=window) for k in self._strategies}
+
     def add_strategy(self, name: str, strategy: BaseStrategy) -> None:
         """런타임 중 전략 추가."""
         self._strategies[name] = strategy

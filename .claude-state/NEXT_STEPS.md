@@ -1,27 +1,22 @@
-# Cycle 29 - Data & Infrastructure: DataFeed 병렬 fetch 확장
+# Cycle 30 - DataFeedsHealthCheck Orchestrator 검증
 
 ## 이번 작업 내용
-`src/data/feed.py`에 `fetch_multiple()` 메서드 추가로 여러 심볼 동시 fetch 지원.
+DataFeedsHealthCheck가 orchestrator에 실제로 연동되어 있는지 검증.
 
-### 수정 파일
-1. **src/data/feed.py** (L7-99)
-   - L8: `from concurrent.futures import ThreadPoolExecutor, as_completed` import 추가
-   - L51-99: `fetch_multiple()` 메서드 신규 추가
-     - ThreadPoolExecutor로 병렬 fetch
-     - 기존 fetch() 캐싱 로직 동일 적용
-     - 부분 실패 처리: 일부 심볼 오류 시 다른 심볼 계속 처리
-     - max_workers 자동 조절 (min(len(symbols)+4, 32))
+### 확인 결과 (이미 완성된 상태)
+1. **src/orchestrator.py**
+   - L27: `DataFeedsHealthCheck` import
+   - L816: `__init__`에서 `self._health_checker = DataFeedsHealthCheck()` 초기화
+   - L891-908: `run_once()`에서 매 실행마다 `check_all()` 호출
+     - `all_feeds_disconnected` → BLOCKED 반환, pipeline 스킵
+     - `operating_in_degraded_mode` → WARNING 로그 후 계속 실행
 
-2. **tests/test_feed_parallel.py** (신규)
-   - 7개 테스트 추가
-   - 기본 병렬 fetch, 캐싱, 부분 실패, 지표 포함 검증
+2. **tests/test_orchestrator.py** (L480-567)
+   - `test_run_once_blocks_when_all_feeds_disconnected` — 이미 존재
+   - `test_run_once_warns_on_degraded_mode` — 이미 존재
 
-### 검증사항
-- `websocket_feed.py` L73: 이미 `deque(maxlen=MAX_CANDLES)` 무한 버퍼 방지 됨
-- 하위 호환성: 기존 `fetch()` 동작 100% 유지
-
-## 테스트 결과
-7/7 passed (test_feed_parallel.py)
+### 테스트 결과
+19/19 passed (test_orchestrator.py 2개 + test_data_health_check.py 17개)
 
 ## 다음 단계
-- Cycle 30: strategy 강화 또는 risk 최적화
+- Cycle 31: Notifier에 cycle N 컨텍스트 추가, 또는 risk 최적화

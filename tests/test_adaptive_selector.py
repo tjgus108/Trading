@@ -122,6 +122,39 @@ def test_add_strategy():
     sel.record_pnl("new_strat", 5.0)  # 에러 없어야 함
 
 
+# ── rolling_consistency ───────────────────────────────────────────────────
+
+def test_rolling_consistency_all_positive():
+    sel = _make_selector()
+    for p in [5, 10, 8, 12, 6, 9, 11, 7, 10, 8]:
+        sel.record_pnl("ema_cross", p)
+    score = sel.rolling_consistency("ema_cross", window=30)
+    assert score == 1.0, "모두 양수 → 일관성 1.0"
+
+
+def test_rolling_consistency_mixed():
+    sel = _make_selector()
+    # 8 양수 + 2 음수 → dominant=8/10=0.8
+    for p in [5, 10, -3, 8, 6, -1, 9, 7, 10, 8]:
+        sel.record_pnl("ema_cross", p)
+    score = sel.rolling_consistency("ema_cross", window=10)
+    assert abs(score - 0.8) < 1e-9, f"expected 0.8, got {score}"
+
+
+def test_rolling_consistency_insufficient_data():
+    sel = _make_selector()
+    for p in [1, 2, 3]:  # MIN_SAMPLES=5 미만
+        sel.record_pnl("ema_cross", p)
+    assert sel.rolling_consistency("ema_cross") == 0.0
+
+
+def test_consistency_summary_keys():
+    sel = _make_selector()
+    result = sel.consistency_summary(window=30)
+    assert set(result.keys()) == {"ema_cross", "rsi_div", "funding"}
+    assert all(0.0 <= v <= 1.0 for v in result.values())
+
+
 def test_window_cap():
     """window=5 초과 기록 시 오래된 데이터 버림."""
     strats = {"a": _make_strategy("a")}

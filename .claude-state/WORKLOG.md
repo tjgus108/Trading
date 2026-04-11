@@ -2418,3 +2418,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 성공 봇 공통점. 단순 전략 + 포지션 크기/일일 손실/상관 모니터링 3종. MDD 15-20% 목표. 실패 원인: 수동 오버라이드 68% 손실, set-and-forget 73% 6개월 내 실패. 롤링 일관성 평가 필수.
 **Tests:** 5991 passed (+9 from Cycle 28).
 **Next Cycle:** 30 (D+E+F)
+
+## [2026-04-11 04:22 UTC] Cycle 30 Dispatched — D + E + F
+Categories: D + E + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 04:24 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-11 12:05 UTC] Cycle 30 COMPLETED — D + E + F
+**[D] ML:** src/strategy/adaptive_selector.py에 rolling_consistency() + consistency_summary() 추가. 최근 30/90 거래 PnL 부호 기반 다수결 일치도. Cycle 29 리서치 반영. +4 tests.
+**[E] Execution (via Risk):** DataFeedsHealthCheck는 이미 orchestrator에 완전 통합되어 있음 (Cycle 24/25 작업). 검증만 수행. run_once() 매 실행시 check_all() → all_feeds_disconnected 시 BLOCKED, degraded_mode 시 경고. 19/19 tests pass.
+**[F] Research:** 2025 시장 마이크로구조. Binance CEX 점유율 32%로 하락, Hyperliquid 등 Perp DEX 파생 26% 장악. 기관 $70B+ 유입. 추세추종이 기관 주도 환경에서 유리.
+**Tests:** 5995 passed (+4 from Cycle 29).
+**Next Cycle:** 31 (A+C+F)
