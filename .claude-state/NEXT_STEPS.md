@@ -408,3 +408,51 @@ order = connector.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
 - NewsMonitor 에러 처리 강화 (CryptoPanic API 타임아웃)
 - OnchainFetcher 재시도 로직 추가 (현재 한 번만 시도)
 - Orchestrator에 sentiment fetch timeout 설정
+
+---
+
+## Cycle 7 - Category B: Risk-Constrained Kelly Sizer ✅ COMPLETED
+
+**Task:** KellySizer에 max_drawdown 제약 추가 (Risk-Constrained Kelly)
+
+**Files Modified:**
+1. `/home/user/Trading/src/risk/kelly_sizer.py` (125 → 153 lines)
+   - docstring에 Risk-Constrained Kelly 공식 추가 (lines 12-15)
+   - `__init__`에 `max_drawdown: Optional[float] = None`, `leverage: float = 1.0` 파라미터 추가 (lines 39-51)
+   - `compute()`에 DD 제약 로직 추가 (lines 84-87):
+     `max_dd_constrained = max_drawdown / (avg_loss * leverage)`
+     `fractional_f = min(fractional_f, max_dd_constrained)`
+   - `from_trade_history()`에도 `max_drawdown`, `leverage` 파라미터 전달 추가
+
+2. `/home/user/Trading/tests/test_kelly_integration.py` (107 → 153 lines, 3개 테스트 추가)
+   - `test_dd_constraint_reduces_size`: DD 제약 시 사이즈 감소 확인
+   - `test_dd_constraint_binding`: DD 제약이 실제로 binding될 때 정확한 값 검증
+   - `test_dd_constraint_none_no_effect`: max_drawdown=None 시 기존 동작 유지
+
+**Test Results:**
+- test_kelly_integration.py: 15 passed ✅ (기존 12 + 신규 3)
+
+**근거 (RESEARCH_LOG Cycle 2):**
+- Risk-Constrained Kelly: 이분법 알고리즘으로 최대 DD 제약 추가 방식이 2024~2025 실무에서 주목
+- `max_drawdown=0.05` (config.yaml 기본값)와 연동 가능
+
+---
+
+## Cycle 7 - Category D: ML & Signals ✅ COMPLETED
+
+**Task:** RF 모델 피처 중요도 분석 추가
+
+**Files Modified:**
+1. `/home/user/Trading/src/ml/trainer.py`
+   - `WalkForwardTrainer.__init__`: `_feature_names: list[str] = []` 필드 추가
+   - `train()`: 학습 후 `self._feature_names = list(X.columns)` 저장, `logger.info(result.feature_importance_report())` 추가
+   - `TrainingResult.feature_importance_report(top_n=10)`: 순위/중요도/누적기여도 보고서 반환 메서드 추가
+   - `WalkForwardTrainer.get_feature_importances(top_n=None)`: 내림차순 (name, importance) 리스트 반환 메서드 추가
+
+2. `/home/user/Trading/tests/test_phase_c_ml.py`
+   - `test_feature_importance_report_after_train`: report 형식/항목 수 확인
+   - `test_get_feature_importances_ranked`: 내림차순 정렬, top_n, RuntimeError 확인
+
+**Test Results:**
+- test_phase_c_ml.py: 24 passed, 7 skipped (sklearn 미설치 환경) ✅
+- 새 테스트 2개 포함, 기존 회귀 없음

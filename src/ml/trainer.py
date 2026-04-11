@@ -68,6 +68,34 @@ class TrainingResult:
                 lines.append(f"    {fname}: {imp:.3f}")
         return "\n".join(lines)
 
+    def feature_importance_report(self, top_n: int = 10) -> str:
+        """
+        피처 중요도 순위 보고서 반환.
+
+        Args:
+            top_n: 상위 N개 피처 출력 (기본 10)
+
+        Returns:
+            str: 순위별 피처명 + 중요도 + 누적 기여도
+        """
+        if not self.feature_importances:
+            return "FEATURE_IMPORTANCE: (no data)"
+
+        ranked = sorted(
+            self.feature_importances.items(), key=lambda x: x[1], reverse=True
+        )
+        total = sum(v for _, v in ranked)
+        cutoff = min(top_n, len(ranked))
+        lines = [f"FEATURE_IMPORTANCE_REPORT (top {cutoff} / {len(ranked)}):"]
+        cumulative = 0.0
+        for rank, (fname, imp) in enumerate(ranked[:cutoff], start=1):
+            pct = imp / total * 100 if total > 0 else 0.0
+            cumulative += pct
+            lines.append(
+                f"  {rank:2d}. {fname:<22s} {imp:.4f}  ({pct:5.1f}%)  cumul={cumulative:5.1f}%"
+            )
+        return "\n".join(lines)
+
 
 class WalkForwardTrainer:
     """
@@ -91,6 +119,7 @@ class WalkForwardTrainer:
         self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
         self._trained_model = None
         self._class_order: Optional[list[int]] = None
+        self._feature_names: list[str] = []
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
@@ -162,6 +191,7 @@ class WalkForwardTrainer:
 
         self._trained_model = clf
         self._class_order = list(clf.classes_)
+        self._feature_names = list(X.columns)
         model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
 
         result = TrainingResult(
@@ -176,7 +206,31 @@ class WalkForwardTrainer:
             fail_reasons=fail_reasons,
         )
         logger.info(result.summary())
+        logger.info(result.feature_importance_report())
         return result
+
+    def get_feature_importances(self, top_n: Optional[int] = None) -> list[tuple[str, float]]:
+        """
+        학습된 모델의 피처 중요도를 내림차순으로 반환.
+
+        Args:
+            top_n: 상위 N개만 반환. None이면 전체.
+
+        Returns:
+            list of (feature_name, importance) �ples, 내림차순.
+
+        Raises:
+            RuntimeError: 모델이 학습되지 않은 경우.
+        """
+        if self._trained_model is None:
+            raise RuntimeError("모델이 학습되지 않음 — train() 먼저 호출")
+
+        importances = self._trained_model.feature_importances_
+        names = getattr(self, "_feature_names", [f"f{i}" for i in range(len(importances))])
+        ranked = sorted(zip(names, importances), key=lambda x: x[1], reverse=True)
+        if top_n is not None:
+            ranked = ranked[:top_n]
+        return ranked
 
     def save(self, path: Optional[str] = None) -> str:
         """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""

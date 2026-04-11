@@ -180,3 +180,25 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Regime Switching Forecasting for Cryptos — Springer Digital Finance](https://link.springer.com/article/10.1007/s42521-024-00123-2)
 - [HMM Market Regime Pitfalls — QuantifiedStrategies](https://www.quantifiedstrategies.com/hidden-markov-model-market-regimes-how-hmm-detects-market-regimes-in-trading-strategies/)
 - [Bitcoin HMM Analysis 2024-2026 — Preprints.org](https://www.preprints.org/manuscript/202603.0831)
+
+
+## [2026-04-11] Cycle 7 — Feature Importance Pitfalls
+
+### 피처 중요도 함정
+
+- **Gini Importance 편향**: RF의 기본 Gini 중요도는 고유값 수가 많은 피처(가격, 거래량 등 연속형)를 과대평가. 크립토에서 price/volume 피처가 항상 상위에 나타나는 이유 — 실제 예측력이 아닌 수치적 아티팩트.
+- **다중공선성 분산**: 상관 피처들(EMA5/EMA10/EMA20 등)이 있으면 RF/XGBoost가 중요도를 임의로 쪼개서 배분 → 어떤 피처가 진짜 중요한지 판단 불가. SHAP은 Shapley 값으로 공정하게 분배하지만 계산 비용이 큼.
+- **제거 검증 필수**: 상위 중요도 피처를 실제로 제거했을 때 성능이 오히려 오르면 피처 누수 의심. 진짜 중요 피처는 제거 시 성능이 유의미하게 하락해야 함.
+- **SHAP 실전 한계**: 트리 SHAP은 빠르지만, 피처 상호작용이 복잡한 크립토 시계열에서 인과관계가 아닌 상관관계를 설명한다는 점 주의. SHAP 높다 ≠ 인과 피처.
+
+### 크립토 피처 누수 주의
+
+- **Look-ahead bias**: 이동평균·RSI 등을 `shift()`없이 계산하면 당일 종가가 당일 신호에 사용됨. 반드시 `df['feature'].shift(1)`로 하루 지연 처리.
+- **스케일러/인코더 전체 데이터 fit 금지**: 전체 데이터로 StandardScaler fit 후 train/test 분리 → 미래 통계가 과거 학습에 누수. 반드시 train 구간에서만 fit, test에는 transform만 적용.
+- **Purged Cross-Validation**: 일반 K-Fold는 시계열에서 인접 샘플 간 누수 발생. 크립토처럼 자기상관이 강한 데이터에서는 시간 기반 분리 + embargo 기간(예: 5바) 설정 필수.
+
+### 참고
+
+- [Backtesting AI Crypto Safely — Blockchain Council](https://www.blockchain-council.org/cryptocurrency/backtesting-ai-crypto-trading-strategies-avoiding-overfitting-lookahead-bias-data-leakage/)
+- [Look-Ahead Bias in ML Trading — MarketCalls](https://www.marketcalls.in/machine-learning/understanding-look-ahead-bias-and-how-to-avoid-it-in-trading-strategies.html)
+- [Purged Cross-Validation — Wikipedia](https://en.wikipedia.org/wiki/Purged_cross-validation)

@@ -531,3 +531,22 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** 레짐 감지 함정 리서치 (HMM lag, 크립토 Markov 가정 붕괴). RESEARCH_LOG.md에 추가.
 **Tests:** 5817 passed, 25 skipped, 0 warnings ✨ (+19 from Cycle 5)
 **Next Cycle:** 7 (B+D+F — 리스크+ML+리서치 두번째 순회)
+
+## [2026-04-11 02:29 UTC] Cycle 7 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 02:31 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-11T03:31:34Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-11 04:00 UTC] Cycle 7 COMPLETED — B + D + F
+**[B] Risk:** src/risk/kelly_sizer.py Risk-Constrained Kelly 추가. max_drawdown 제약으로 half_kelly와 min() 비교. 하위 호환성 유지 (None 기본값). +3 tests.
+**[D] ML:** src/ml/trainer.py feature_importance_report() + get_feature_importances() 추가. 훈련 직후 자동 로깅. +2 tests.
+**[F] Research:** 피처 중요도 함정 (Gini가 연속형 피처 과대평가) + 크립토 누수 주의점 (shift 누락, scaler fit). RESEARCH_LOG.md 업데이트.
+**Tests:** 5820 passed, 27 skipped (+3).
+**Next Cycle:** 8 (E+A+F — 2회차)

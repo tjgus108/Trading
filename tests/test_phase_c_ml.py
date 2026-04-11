@@ -203,6 +203,38 @@ class TestWalkForwardTrainer:
         assert "train_accuracy" in s
         assert "test_accuracy" in s
 
+    def test_feature_importance_report_after_train(self):
+        """학습 후 feature_importance_report() 형식 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        report = result.feature_importance_report(top_n=5)
+        assert "FEATURE_IMPORTANCE_REPORT" in report
+        assert "cumul=" in report
+        # 5개 항목
+        lines = [l for l in report.splitlines() if l.strip().startswith(("1.", "2.", "3.", "4.", "5."))]
+        assert len(lines) == 5
+
+    def test_get_feature_importances_ranked(self):
+        """get_feature_importances() 내림차순 정렬 + top_n 동작 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+        ranked = trainer.get_feature_importances(top_n=3)
+        assert len(ranked) == 3
+        assert ranked[0][1] >= ranked[1][1] >= ranked[2][1]
+        # 전체 반환
+        all_feats = trainer.get_feature_importances()
+        assert len(all_feats) > 3
+        # RuntimeError before training
+        trainer2 = WalkForwardTrainer()
+        with pytest.raises(RuntimeError):
+            trainer2.get_feature_importances()
+
     def test_save_requires_trained_model(self, tmp_path):
         """학습 전 save() → RuntimeError."""
         from src.ml.trainer import WalkForwardTrainer

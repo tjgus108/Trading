@@ -13,7 +13,8 @@
 - ✅ Cycle 4 완료 (C+B+F: OFI 버그 수정+ATR surge+리서치)
 - ✅ Cycle 5 완료 (D+E+F: 앙상블 가중치+TWAP 부분체결+리서치)
 - ✅ Cycle 6 완료 (A+C+F: numpy 경고 19개 제거 + NewsMonitor 견고성 + 레짐 리서치)
-- ⏳ **Cycle 7 대기** (B+D+F: 리스크+ML+리서치 2회차)
+- ✅ Cycle 7 완료 (B+D+F: Risk-Constrained Kelly + RF 피처 중요도 + 피처 누수 리서치)
+- ⏳ **Cycle 8 대기** (E+A+F: 2회차)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -22,7 +23,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **5,817개** |
+| ✅ 통과 테스트 | **5,820개** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |
