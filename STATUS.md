@@ -72,7 +72,8 @@
 - ✅ Cycle 64 완료 (C+B+F: OHLC validation + Kelly avg_loss + Best ROIs)
 - ✅ Cycle 65 완료 (D+E+F: composite_score edge + scheduler interval + AI 논문)
 - ✅ Cycle 66 완료 (A+C+F: Report to_json + 캐시 확인 + 2026 전망)
-- ⏳ **Cycle 67 대기** (B+D+F)
+- ✅ Cycle 67 완료 (B+D+F: CB 5조건 + context NaN + F&G effectiveness)
+- ⏳ **Cycle 68 대기** (E+A+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -81,7 +82,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,175개** (0 warnings ✨) |
+| ✅ 통과 테스트 | **6,177개** (0 warnings ✨) |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

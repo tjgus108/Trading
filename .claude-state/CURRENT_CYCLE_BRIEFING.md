@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 66 — 2026-04-11T10:32:37.713398Z
+🔄 CYCLE 67 — 2026-04-11T10:34:56.664444Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 65 COMPLETED — D + E + F** (2026-04-12 01:00 UTC)
-  **[D] ML:** tests/test_phase_b_context.py TestCompositeScoreEdge +2. 극단 bullish → +3.0, 극단 bearish → -3.0 clamp 검증.
-  **[E] Execution:** tests/test_scheduler.py +2 비정상 interval (0, -1m, 999999h, 빈, 0m) ValueError 검증.
-  **[F] Research:** AI agent trading 논문 2025. Trading-R1 (arXiv 2509.11420) LLM+RL 3단계 커리큘럼, Agent Trading Arena LLM 수치 추론 취약성 발견, TradingAgents 멀티에이전트 debate. 현 SpecialistEnsemble 구조와 일치.
-  **Tests:** 6174 passed (+8 from Cycle 64).
+**Cycle 66 COMPLETED — A + C + F** (2026-04-12 01:20 UTC)
+  **[A] Quality:** src/backtest/report.py to_json() 추가. dataclass.asdict + inf/nan → 문자열 변환. +1 test.
+  **[C] Data:** DataFeed 캐시 정상 확인 (코드 수정 없음). 연속 호출 시 API 호출 0회 추가, hit_rate 정확 계산 검증.
+  **[F] Research:** 2026 시장 전망. BTC $150K-250K (Standard Chartered, Tom Lee), ETH $7K-20K 와이드. 기관 ETF $15-40B 유입 예상. Fed 금리+규제가 리스크.
+  **Tests:** 6175 passed (+1 from Cycle 65).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

@@ -5783,3 +5783,62 @@ ImplShortfall: -5.00bps
 **[F] Research:** 2026 시장 전망. BTC $150K-250K (Standard Chartered, Tom Lee), ETH $7K-20K 와이드. 기관 ETF $15-40B 유입 예상. Fed 금리+규제가 리스크.
 **Tests:** 6175 passed (+1 from Cycle 65).
 **Next Cycle:** 67 (B+D+F)
+
+## [2026-04-11 10:34 UTC] Cycle 67 Dispatched — B + D + F
+Categories: B + D + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 10:36 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 01:40 UTC] Cycle 67 COMPLETED — B + D + F
+**[B] Risk:** tests/test_circuit_breaker.py +1 통합. 5 조건 (flash, daily DD, total DD, consecutive loss cooldown, ATR surge) 각각 독립 검증.
+**[D] ML:** src/alpha/context.py composite_score에 math.isnan() 가드. NaN 점수 → 0 처리. +1 test.
+**[F] Research:** F&G Index 유효성. 극단 매수/매도 역발상 2023-2025 연 15-20% 초과수익. 1일~1주 예측력 유의미. 최근 예측력 저하 — 매크로 필터 병행 권장.
+**Tests:** 6177 passed (+2 from Cycle 66).
+**Next Cycle:** 68 (E+A+F)

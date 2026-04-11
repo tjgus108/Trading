@@ -12,6 +12,7 @@ HIGH 이벤트 발생 시 포지션 축소를 권고한다.
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -36,9 +37,13 @@ class MarketContext:
         score = 0.0
         weight_s, weight_o = 0.6, 0.4  # 감성 60%, 온체인 40%
         if self.sentiment:
-            score += self.sentiment.sentiment_score * weight_s
+            s = self.sentiment.sentiment_score
+            if not math.isnan(s):
+                score += s * weight_s
         if self.onchain:
-            score += self.onchain.onchain_score * weight_o
+            o = self.onchain.onchain_score
+            if not math.isnan(o):
+                score += o * weight_o
         return max(-3.0, min(3.0, score))
 
     @property

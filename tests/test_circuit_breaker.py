@@ -402,3 +402,79 @@ def test_drawdown_takes_priority_over_cooldown_and_atr_surge():
     assert "일일" in result["reason"], f"reason={result['reason']}"
     # ATR surge는 낙폭에 묻혀 표현되지 않음
     assert "플래시 크래시" not in result["reason"]
+
+
+# ── 통합: 5가지 조건 전부 순차 검증 ───────────────────────────────
+def test_all_five_conditions_integration():
+    """
+    통합 검증: 5가지 서킷 조건이 각각 독립적으로 정상 작동하는지 순서대로 확인.
+    1) 플래시 크래시  → triggered=True, reason='플래시 크래시'
+    2) 일일 낙폭 초과 → triggered=True, reason='일일'
+    3) 전체 낙폭 초과 → triggered=True, reason='전체'
+    4) 연속 손실 쿨다운 → triggered=True, reason='쿨다운'
+    5) ATR surge     → triggered=False, volatility_surge=True, size_multiplier=0.5
+    """
+    BASE = dict(peak_balance=10000.0)
+
+    # ── 조건 1: 플래시 크래시 ───────────────────────────────────────
+    cb1 = CircuitBreaker(flash_crash_pct=0.10)
+    r1 = cb1.check(
+        current_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=50000.0,
+        candle_close=44000.0,   # -12%
+        **BASE,
+    )
+    assert r1["triggered"] is True, "조건1 실패: 플래시 크래시 미감지"
+    assert r1["size_multiplier"] == 0.0
+    assert "플래시 크래시" in r1["reason"]
+
+    # ── 조건 2: 일일 낙폭 ───────────────────────────────────────────
+    cb2 = CircuitBreaker(daily_drawdown_limit=0.05)
+    r2 = cb2.check(
+        current_balance=9490.0,  # -5.1% daily
+        daily_start_balance=10000.0,
+        **BASE,
+    )
+    assert r2["triggered"] is True, "조건2 실패: 일일 낙폭 미감지"
+    assert "일일" in r2["reason"]
+    assert r2["size_multiplier"] == 0.0
+
+    # ── 조건 3: 전체 낙폭 ───────────────────────────────────────────
+    cb3 = CircuitBreaker(daily_drawdown_limit=0.05, total_drawdown_limit=0.15)
+    r3 = cb3.check(
+        current_balance=8490.0,  # total dd ≈16% > 15%; daily_start 근접이므로 daily dd <5%
+        daily_start_balance=8500.0,
+        **BASE,
+    )
+    assert r3["triggered"] is True, "조건3 실패: 전체 낙폭 미감지"
+    assert "전체" in r3["reason"]
+    assert r3["size_multiplier"] == 0.0
+
+    # ── 조건 4: 연속 손실 쿨다운 ────────────────────────────────────
+    cb4 = CircuitBreaker(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(5):
+        cb4.record_trade_result(is_loss=True)
+    r4 = cb4.check(
+        current_balance=9900.0,
+        daily_start_balance=10000.0,
+        **BASE,
+    )
+    assert r4["triggered"] is True, "조건4 실패: 쿨다운 미감지"
+    assert "쿨다운" in r4["reason"]
+    assert cb4.cooldown_remaining == 3
+    assert r4["size_multiplier"] == 0.0
+
+    # ── 조건 5: ATR 변동성 급등 (차단 아님, 축소만) ─────────────────
+    cb5 = CircuitBreaker(atr_surge_multiplier=2.0)
+    r5 = cb5.check(
+        current_balance=9900.0,
+        daily_start_balance=10000.0,
+        current_atr=0.05,    # 기준 2%의 2.5배 → surge
+        baseline_atr=0.02,
+        **BASE,
+    )
+    assert r5["triggered"] is False, "조건5 실패: ATR surge가 완전 차단해선 안 됨"
+    assert r5["volatility_surge"] is True
+    assert r5["size_multiplier"] == 0.5
+    assert "ATR 급등" in r5["reason"]

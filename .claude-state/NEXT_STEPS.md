@@ -1,17 +1,17 @@
-# Cycle 66 - Category A: Quality Assurance
+# Cycle 67 - Category D: ML & Signals
 ## Status: COMPLETE
 
 ### What was done
-- Added `to_json()` method to BacktestReport class
-- Handles special values (inf, nan) with string conversion for JSON compatibility
-- Created unit test `test_backtest_report_to_json` with full validation
+- Found: `composite_score` in `MarketContext` propagated NaN if `sentiment_score` or `onchain_score` was NaN
+- Fixed: Added `math.isnan()` guard in `composite_score` — NaN scores treated as 0 (neutral)
+- Added boundary test `TestMarketContextNaN::test_composite_score_nan_sentiment_treated_as_zero`
 
 ### Files Modified
-- `/home/user/Trading/src/backtest/report.py` — Added json import and to_json() method
-- `/home/user/Trading/tests/test_backtest.py` — Added test case
+- `/home/user/Trading/src/alpha/context.py` — NaN guard in composite_score, added math import
+- `/home/user/Trading/tests/test_phase_b_context.py` — Added NaN boundary test class
 
 ### Test Results
-✓ All 9 tests passed (including new to_json test)
+74 passed (full context suite)
 
 ### Next Steps
-Continue with remaining Cycle 66 tasks
+Continue with remaining Cycle 67 tasks

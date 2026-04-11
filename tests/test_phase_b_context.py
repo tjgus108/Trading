@@ -479,6 +479,28 @@ class TestMarketContext:
 
 
 # ---------------------------------------------------------------------------
+# NaN boundary tests
+# ---------------------------------------------------------------------------
+
+class TestMarketContextNaN:
+    def test_composite_score_nan_sentiment_treated_as_zero(self):
+        """sentiment_score=NaN이면 0으로 처리, composite_score가 NaN이 아니어야 한다."""
+        import math
+        nan_sentiment = SentimentData(
+            fear_greed_index=50,
+            fear_greed_label="Neutral",
+            funding_rate=0.0,
+            open_interest=None,
+            sentiment_score=float("nan"),
+            source="mock",
+        )
+        ctx = MarketContext(sentiment=nan_sentiment, onchain=None, news=None)
+        score = ctx.composite_score
+        assert not math.isnan(score), f"composite_score should not be NaN, got {score}"
+        assert score == 0.0
+
+
+# ---------------------------------------------------------------------------
 # MarketContextBuilder
 # ---------------------------------------------------------------------------
 
