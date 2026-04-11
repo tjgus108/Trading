@@ -1,22 +1,18 @@
-# Cycle 90 Summary
+# Cycle 91 Summary - Data Agent
 
 ## 완료 항목
-1. ✅ Paper simulation 실행
-2. ✅ narrow_range 전략 개선
-3. ✅ 재시뮬 완료
+1. ✅ SentimentFetcher 경계 테스트 추가
+   - F&G 실패 + funding/OI 성공 시나리오
+   - 모든 소스 실패 + 중립 반환 시나리오
 
-## narrow_range 개선 상세
-- **변경 파일**: `src/strategy/narrow_range.py`
-- **개선 내용**:
-  - ATR 축소 필터 추가 (평균의 85% 이하)
-  - 거래량 검증 추가 (20봉 평균의 1.2배 이상)
-  - MIN_ROWS 25로 확대 (정확도 향상)
-  - confidence 개선 (NR4+NR7+volume spike → HIGH)
+## 수정 파일
+- `tests/test_sentiment.py`: TestSentimentBoundaryLive 클래스 추가 (2개 테스트)
 
-## 성과
-- **개선 전**: -0.36% return, 64 trades, Sharpe 0.06
-- **개선 후**: +14.90% return, 13 trades, Sharpe 5.82
-- **순위**: 3위 (TOP 3 진입)
+## 테스트 결과
+- 전체 13개 테스트 모두 PASS
+- Live 경계 상황:
+  1. F&G API timeout → funding rate로 partial sentiment 계산 (-2.0 극단적 롱)
+  2. 모든 소스 fail → 중립 반환 (score=0, source=unavailable)
 
 ## 다음 마일스톤
-- Cycle 91: 나머지 전략들 개선 시작 (engulfing_zone, frama 등)
+- Cycle 92: 전략 성능 최적화 (frama, engulfing_zone 개선)

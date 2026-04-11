@@ -260,3 +260,57 @@ class TestSentimentAllSourcesFailure(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestSentimentBoundaryLive(unittest.TestCase):
+    """Live 상황 경계 테스트: F&G 실패 + funding/OI 성공"""
+
+    def setUp(self):
+        self.fetcher = SentimentFetcher(symbol="BTC/USDT", use_cache_seconds=0, max_retries=0)
+
+    @patch('urllib.request.urlopen')
+    def test_fear_greed_fail_funding_success_partial_data(self, mock_urlopen):
+        """F&G 실패 + funding/OI 성공 → partial sentiment 데이터"""
+        def side_effect(req, timeout=None):
+            if "fng" in req.full_url:
+                raise ConnectionError("F&G API timeout (live)")
+            elif "premiumIndex" in req.full_url:
+                resp = MagicMock()
+                resp.read.return_value = json.dumps({"lastFundingRate": 0.0005}).encode()
+                resp.__enter__.return_value = resp
+                resp.__exit__.return_value = None
+                return resp
+            else:  # openInterest
+                resp = MagicMock()
+                resp.read.return_value = json.dumps({"openInterest": "50000000"}).encode()
+                resp.__enter__.return_value = resp
+                resp.__exit__.return_value = None
+                return resp
+        
+        mock_urlopen.side_effect = side_effect
+        result = self.fetcher.fetch()
+        
+        # F&G는 None, funding은 성공
+        self.assertIsNone(result.fear_greed_index)
+        self.assertEqual(result.fear_greed_label, "N/A")
+        self.assertEqual(result.funding_rate, 0.0005)
+        self.assertEqual(result.open_interest, 50000000.0)
+        # funding rate만으로 score 계산 (극단적 롱 과밀)
+        self.assertEqual(result.sentiment_score, -2.0)
+        self.assertEqual(result.source, "binance_futures")
+
+    @patch('urllib.request.urlopen')
+    def test_all_sources_fail_social_none_returns_neutral(self, mock_urlopen):
+        """모든 소스 실패 (social 포함) → 중립 score 반환"""
+        mock_urlopen.side_effect = ConnectionError("All sources timeout")
+        
+        result = self.fetcher.fetch()
+        
+        # 모든 필드 None/0
+        self.assertIsNone(result.fear_greed_index)
+        self.assertIsNone(result.funding_rate)
+        self.assertIsNone(result.open_interest)
+        self.assertEqual(result.sentiment_score, 0.0)
+        self.assertEqual(result.source, "unavailable")
+        # extreme_fear/greed 헬퍼 호출해도 안전
+        self.assertFalse(result.is_extreme_fear())
+        self.assertFalse(result.is_extreme_greed())

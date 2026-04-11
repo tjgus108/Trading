@@ -7371,3 +7371,6 @@ ImplShortfall: -5.00bps
 **SIM 누적 8개:** +wick, engulf, frama, cmf, lob, htf, vol_br, **narrow_range**. 총 개선 **+72.5%p**
 **🎉 90 사이클 완료 (this session).**
 **Next Cycle:** 91 (A+C+SIM+F)
+
+## [2026-04-11 17:52 UTC] Cycle 91 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
