@@ -370,6 +370,62 @@ class TestFeedParallel:
         assert stats['hit_rate'] == 1/3
         assert len(results) == 2
 
+    def test_cache_ttl_boundary_before_expiry(self):
+        """TTL 만료 직전: 캐시 히트 (now - ts < ttl)."""
+        from unittest.mock import MagicMock, patch
+        
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # Mock time을 사용해 정확한 경계 조건 제어
+        with patch("src.data.feed.time.time") as mock_time:
+            # 첫 fetch: miss (t=0)
+            mock_time.return_value = 1000.0
+            feed.fetch("BTC/USDT", "1h", limit=500)
+            assert feed.cache_stats()['miss_count'] == 1
+            
+            # TTL 만료 직전 (t=59, 1000 + 59 = 1059, 조건 59 < 60은 참)
+            mock_time.return_value = 1059.0
+            result = feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        assert stats['hit_count'] == 1, "59초 경과 시 캐시 히트"
+        assert stats['miss_count'] == 1, "미스 수 변화 없음"
+        assert connector.fetch_ohlcv.call_count == 1, "API 호출 없음"
+
+    def test_cache_ttl_boundary_exactly_expired(self):
+        """TTL 정확히 만료: 캐시 미스 (now - ts >= ttl)."""
+        import time
+        from unittest.mock import MagicMock, patch
+        
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 42300, 100]
+        ]
+        
+        feed = DataFeed(connector, cache_ttl=60)
+        
+        # Mock time을 사용해 정확한 경계 조건 제어
+        with patch("src.data.feed.time.time") as mock_time:
+            # 첫 fetch: miss (t=0)
+            mock_time.return_value = 1000.0
+            feed.fetch("BTC/USDT", "1h", limit=500)
+            assert feed.cache_stats()['miss_count'] == 1
+            
+            # TTL 정확히 만료 (t=60, 0 + 60 = 60, 조건 60 < 60은 거짓)
+            mock_time.return_value = 1060.0
+            result = feed.fetch("BTC/USDT", "1h", limit=500)
+        
+        stats = feed.cache_stats()
+        assert stats['hit_count'] == 0, "정확히 만료 시 캐시 미스"
+        assert stats['miss_count'] == 2, "새로운 미스 기록"
+        assert connector.fetch_ohlcv.call_count == 2, "API 재호출"
+
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

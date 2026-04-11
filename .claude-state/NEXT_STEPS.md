@@ -1,3 +1,21 @@
+# Cycle 46 - Category C: Data & Infrastructure 완료
+
+## [2026-04-11] Cycle 46 — DataFeed 캐시 expire on miss 검증
+
+### 작업 완료
+- `src/data/feed.py` 캐시 hit/miss 로직 경계 조건 2개 테스트 추가
+  - **test_cache_ttl_boundary_before_expiry**: TTL 만료 직전 (59초) → 캐시 히트 확인
+  - **test_cache_ttl_boundary_exactly_expired**: TTL 정확히 만료 (60초) → 캐시 미스 확인
+- 조건식 `now - ts < self._cache_ttl` 정확성 검증 완료
+
+### 파일 변경
+- `tests/test_feed_parallel.py`: 20→22개 (2개 추가)
+
+### 테스트 결과
+- tests/test_feed_parallel.py: 22/22 PASS ✓
+
+---
+
 # Cycle 45 - Category F: Research 완료
 
 ## [2026-04-11] Cycle 45 — Sub-second Latency Reality

@@ -1,27 +1,27 @@
 ======================================================================
-🔄 CYCLE 45 — 2026-04-11T09:11:23.366866Z
+🔄 CYCLE 46 — 2026-04-11T09:14:13.449596Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 44 COMPLETED — C + B + F** (2026-04-11 16:50 UTC)
-  **[C] Data:** tests/test_sentiment.py 신규 (+11 tests). F&G 일관성, ConnectionError/잘못된 JSON, 펀딩비 타임아웃/필드 누락, OI 다중 API, 전체 실패 fallback.
-  **[B] Risk:** tests/test_vol_targeting.py +3. target > realized → max 2.0 클리핑, target < realized → target/rv 정확, std=0 → divide-by-zero 방어.
-  **[F] Research:** Volume Profile 실전. POC+Value Area 지지/저항, VWAP 밴드 mean-reversion, Anchored VWAP 데이트레이딩. 정량 성과 데이터 희소 — 단독보다 RSI+볼륨 조합이 신뢰도 향상.
-  **Tests:** 6067 passed (+14 from Cycle 43). 1개 flaky 발생 후 재실행 시 통과.
+**Cycle 45 COMPLETED — D + E + F** (2026-04-11 17:10 UTC)
+  **[D] ML:** src/strategy/base.py Signal에 metadata optional dict 필드 추가. 하위호환 유지. +1 test.
+  **[E] Execution:** tests/test_connector.py +2 MockExchangeConnector 오버드래프트 경계 (buy/sell max(0,...) 가드 검증).
+  **[F] Research:** Sub-second latency. 소매 40-60ms, 기관 Equinix 0.3ms, FPGA 100-150ns. Python 봇 현실적 목표 100-500ms. 알고리즘보다 실행 레이어가 병목.
+  **Tests:** 6070 passed (+3 from Cycle 44).
 
 **[!] 감지된 이슈:**
   - FAIL 기록 존재
