@@ -92,7 +92,8 @@
 - ✅ **Cycle 84 완료** (C+B+**SIM**+F: fetch_multiple stress + DD halt recovery + **frama -7.89%→-3.77%**)
 - ✅ **Cycle 85 완료** (D+E+**SIM**+F: MultiSig 경계 + PosHealth 통합 + **cmf -7.31%→+4.28%**)
 - ✅ **Cycle 86 완료** (A+C+**SIM**+F: 품질감사 + WS reconnect + **lob_maker -3.28%→+8.92% Sharpe 2.27**)
-- ⏳ **Cycle 87 대기** (B+D+SIM+F)
+- ✅ **Cycle 87 완료** (B+D+**SIM**+F: jitter 일관성 + regime 전환 + **htf_ema -2.26%→+1.79%**)
+- ⏳ **Cycle 88 대기** (E+A+SIM+F)
 - Cycle 5: D+E+F (ML+실행+리서치)
 
 ---
@@ -101,8 +102,8 @@
 
 | 항목 | 수치 |
 |------|------|
-| ✅ 통과 테스트 | **6,265개** (0 warnings ✨) |
-| 🎯 SIM 누적 개선 5개 | wick+15.1%, engulf+10.2%, frama+4.1%, cmf+11.6%, lob+12.2% = **+53.2%p** |
+| ✅ 통과 테스트 | **6,267개** (0 warnings ✨) |
+| 🎯 SIM 누적 개선 6개 | +wick+engulf+frama+cmf+lob+htf = **+57.3%p** |
 | ⚠️ Warnings | **0** (Cycle 6에서 정리) |
 | ❌ 실패 테스트 | 0 ✅ |
 | ⏭️ 스킵 | 25 |

@@ -7032,3 +7032,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-11 16:53 UTC] Cycle 87 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-11 17:23 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 09:35 UTC] Cycle 87 COMPLETED — B + D + SIM + F
+**[B] Risk:** tests/test_risk_manager.py +2 jitter seed 일관성, jitter=0 불변.
+**[D] ML:** tests/test_regime_adaptive.py +2 레짐 전환 LOW confidence, bull 레짐 SELL 억제.
+**[SIM] Auto-improve:** htf_ema 개선. Cross distance 필터 (range*0.3). **-2.26% → +1.79% (+4.05%p)**. 21 tests 유지.
+**[F] Research:** 단순 전략 보강. ATR 변동성 필터 + HTF 트렌드 정렬 3단 조합이 주류.
+**Tests:** 6267 passed (+2 from Cycle 86).
+**SIM 누적 개선 6개:** wick+15.1%, engulf+10.2%, frama+4.1%, cmf+11.6%, lob+12.2%, **htf_ema+4.1%** = **+57.3%p 총**
+**Next Cycle:** 88 (E+A+SIM+F)
