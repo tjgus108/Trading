@@ -8977,3 +8977,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** Elder Impulse. EMA(13)+MACD 히스토그램 이중 필터. 승률 55-60%, Sharpe ~1.0 추정. 횡보 지연 취약.
 **Tests:** 6336 passed (+6 from Cycle 108).
 **Next Cycle:** 110 (B+D+SIM+F)
+
+## [2026-04-12 11:05 UTC] Cycle 109 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

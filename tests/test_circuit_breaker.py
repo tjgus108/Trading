@@ -512,3 +512,24 @@ def test_all_five_conditions_integration():
     assert r5["volatility_surge"] is True
     assert r5["size_multiplier"] == 0.5
     assert "ATR 급등" in r5["reason"]
+
+
+# ── 직렬화 ──────────────────────────────────────────────────
+def test_to_dict_from_dict_roundtrip():
+    cb = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=2)
+    # 상태 만들기: 연속 손실 3회 → 쿨다운 시작
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+
+    snapshot = cb.to_dict()
+    assert snapshot["consecutive_losses"] == 3
+    assert snapshot["cooldown_remaining"] == 2
+    assert snapshot["triggered"] is False
+
+    # 새 인스턴스에 복원
+    cb2 = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=2)
+    cb2.from_dict(snapshot)
+    assert cb2.consecutive_losses == 3
+    assert cb2.cooldown_remaining == 2
+    assert cb2.is_triggered is False

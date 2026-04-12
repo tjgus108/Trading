@@ -267,3 +267,20 @@ class CircuitBreaker:
     @property
     def cooldown_remaining(self) -> int:
         return self._cooldown_remaining
+
+    # ── 직렬화 ────────────────────────────────────────────────────────────────
+    def to_dict(self) -> dict:
+        """현재 상태를 직렬화 가능한 dict로 반환."""
+        return {
+            "triggered": self._triggered,
+            "reason": self._reason,
+            "consecutive_losses": self._consecutive_losses,
+            "cooldown_remaining": self._cooldown_remaining,
+        }
+
+    def from_dict(self, state: dict) -> None:
+        """to_dict()로 저장한 상태 복원."""
+        self._triggered = bool(state.get("triggered", False))
+        self._reason = str(state.get("reason", ""))
+        self._consecutive_losses = int(state.get("consecutive_losses", 0))
+        self._cooldown_remaining = int(state.get("cooldown_remaining", 0))
