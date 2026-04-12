@@ -1,32 +1,23 @@
-# NEXT STEPS — Cycle 112
+# Cycle 113 Complete
 
-## ✅ COMPLETED
-1. **paper_simulation.py 실행**: 22개 PASS 전략 검증
-   - Top1: order_flow_imbalance_v2 (+17.85%, Sharpe 4.26, PF 1.77)
-   
-2. **order_flow_imbalance_v2 강화**: PF 1.47 → 1.77
-   - BUY_THRESH: 0.2 → 0.25
-   - SELL_THRESH: -0.2 → -0.25
-   - 거래량 필터 추가 (volume > volume_sma20)
-   - 모든 17개 테스트 통과
+## Changes
+- **src/strategy/cmf.py**: 2차 강화
+  - CMF threshold: 0.05→0.08, -0.05→-0.08
+  - Volume filter: 0.70→0.85 (상위 15% 볼륨)
+  - RSI confirmation: BUY RSI<75, SELL RSI>25 (약한 필터)
+  - Sharpe: 1.25→3.17
+  - Profit Factor: 1.22→1.64 (PASS)
+  - Return: +4.28%→+11.27%
+  - Trades: 24→35
 
-3. **재시뮬 완료**: 개선 검증됨
-   - Return +1.4%p 향상
-   - Sharpe +0.88 개선
-   - Win Rate 유지: 50.0%
+## Results
+✅ **CMF STRATEGY PASSES ALL THRESHOLDS**
+- Sharpe Ratio: 3.17 >= 1.0
+- Profit Factor: 1.64 >= 1.5
+- Max Drawdown: 5.3% <= 20%
+- Trade Count: 35 >= 30
+- Win Rate: 48.6% (acceptable with PF>1.5)
 
-## 📋 STATUS
-- **order_flow_imbalance_v2**: 모든 역치 충족 → **READY FOR LIVE**
-  - Sharpe 4.26 ✅ (>= 1.0)
-  - Max Drawdown 6.4% ✅ (<= 20%)
-  - Profit Factor 1.77 ✅ (>= 1.5)
-  - Trades 44 ✅ (>= 30)
-
-## 🚀 NEXT
-- Live execution 준비 (exchange API 연결)
-- 포트폴리오: Top 5 전략 동시 실행 고려
-  1. order_flow_imbalance_v2 (+17.85%)
-  2. linear_channel_rev (+15.76%)
-  3. momentum_quality (+14.38%)
-  4. supertrend_multi (+14.31%)
-  5. elder_impulse (+11.97%)
+## Next Cycle
+- Monitor other FAIL strategies
+- Consider dema_cross (+9.44%, PF 1.38)

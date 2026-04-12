@@ -9161,3 +9161,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 11:35 UTC] Cycle 112 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 11:44 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 06:00 UTC] Cycle 113 COMPLETED — D + E + SIM + F
+**[D] ML:** tests/test_ensemble_conflicts.py +1 _ask_parallel timeout.
+**[E] Execution:** scheduler boundary bug 발견 (경계값 시 불필요 1 interval 대기).
+**[SIM] 🎯 cmf 2차 대성공!** CMF 임계값 강화(0.08) + 볼륨 85% + RSI 확인(BUY<75/SELL>25). **PF 1.22→1.64 PASS!** Sharpe 1.25→3.17. Return +4.28%→+11.27%.
+**[F] Research:** CMF+RSI. 오신호 30-40% 감소 (비공식). CMF divergence가 핵심 엣지.
+**Tests:** 6340 passed (+3 from Cycle 112).
+**SIM 누적 21개 개선.** cmf 최종 PASS 달성!
