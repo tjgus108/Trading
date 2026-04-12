@@ -420,6 +420,26 @@ class TestTWAPPartialAndTimeout:
         assert result.timeout_occurred is False
         assert result.slices_executed == 3
 
+    def test_twap_partial_fill_ratio(self):
+        """부분 체결 비율(filled_qty / total_qty)이 0~1 범위이고 슬라이스 수 대비 정확히 추적되는지 확인."""
+        n_slices = 20
+        executor = TWAPExecutor(n_slices=n_slices, interval_seconds=0, dry_run=True)
+        np.random.seed(7)
+        result = executor.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=10.0,
+            price_limit=30_000.0,
+        )
+        fill_ratio = result.filled_qty / result.total_qty
+        assert 0.0 < fill_ratio <= 1.0, f"fill_ratio out of range: {fill_ratio:.4f}"
+        assert result.partial_fills <= result.slices_executed, (
+            f"partial_fills ({result.partial_fills}) > slices_executed ({result.slices_executed})"
+        )
+        # 20 슬라이스 × 20% 확률 → 기대값 4, 범위 0~20 이내
+        assert 0 <= result.partial_fills <= n_slices
+
 
 # ---------------------------------------------------------------------------
 # TWAP 슬라이스 합계 검증 테스트
@@ -565,3 +585,4 @@ class TestKellyTWAPPipelineIntegration:
             f"filled_qty {result.filled_qty} != reduced_size {reduced_size}"
         )
         assert result.timeout_occurred is False
+
