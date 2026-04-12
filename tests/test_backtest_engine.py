@@ -559,3 +559,25 @@ def test_fee_double_on_buy_sell_cycle():
     assert final_balance < initial_balance or result.total_return < 0 or abs(result.total_fees) > 1e-6, (
         f"수수료 누적 검증 실패: return={result.total_return:.4f}, fees={result.total_fees:.6f}"
     )
+
+
+def test_slippage_pct_param_identical_to_slippage():
+    """slippage_pct 파라미터가 slippage와 동일하게 동작하는지 검증 (slippage_pct=0.001 vs slippage=0.001)."""
+    df = make_df(n=300, close_trend=0.002)
+    strategy = AlwaysBuyStrategy()
+
+    # slippage 파라미터 사용
+    result_slippage = BacktestEngine(slippage=0.001).run(strategy, df)
+    
+    # slippage_pct 파라미터 사용 (slippage_pct이 우선됨)
+    result_slippage_pct = BacktestEngine(slippage_pct=0.001).run(strategy, df)
+    
+    # 동일 값이면 동일한 결과가 나와야 함
+    assert result_slippage.total_return == result_slippage_pct.total_return, (
+        f"slippage와 slippage_pct이 동일 값이면 결과가 같아야 함: "
+        f"slippage={result_slippage.total_return:.6f} vs slippage_pct={result_slippage_pct.total_return:.6f}"
+    )
+    assert result_slippage.total_slippage_cost == result_slippage_pct.total_slippage_cost, (
+        f"slippage_cost도 동일해야 함: "
+        f"slippage={result_slippage.total_slippage_cost:.6f} vs slippage_pct={result_slippage_pct.total_slippage_cost:.6f}"
+    )

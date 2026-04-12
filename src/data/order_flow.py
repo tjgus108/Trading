@@ -128,6 +128,8 @@ class VPINCalculator:
     """
 
     def __init__(self, n_buckets: int = 50):
+        if n_buckets <= 0:
+            raise ValueError(f"n_buckets must be > 0, got {n_buckets}")
         self.n_buckets = n_buckets
 
     def compute(self, df: pd.DataFrame) -> pd.Series:

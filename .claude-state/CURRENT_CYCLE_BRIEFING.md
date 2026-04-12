@@ -1,5 +1,5 @@
 ======================================================================
-🔄 CYCLE 103 — 2026-04-12T00:26:34.650674Z
+🔄 CYCLE 103 — 2026-04-12T00:39:59.177690Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 102 COMPLETED — C + B + F (SIM 원복)** (2026-04-12 01:15 UTC)
-  **[C] Data:** tests/test_feed_parallel.py +2 fetch_multiple 에러 격리 (3/5, 5/5 성공 검증).
-  **[B] Risk:** CircuitBreaker 플래시 크래시 > 낙폭 > 쿨다운 > ATR 우선순위 확인 (수정 없음).
-  **[SIM] No-op:** engulfing_zone 2차 개선 시도 → -2.53% → -7.63% 악화, 원복. 필터 완화가 역효과.
-  **[F] Research:** 기관 vs 리테일 봇. 기관은 멀티 레짐 + 포트폴리오 리스크, 리테일 Grid/DCA. 격차 축소 중.
+**Cycle 103 COMPLETED — D + E + SIM + F** (2026-04-12 01:40 UTC)
+  **[D] ML:** multi_signal aggregator ratio 경계 검증 (수정 없음).
+  **[E] Execution:** tests/test_kelly_twap.py +1 TWAP partial fill ratio.
+  **[SIM] volume_breakout 필터 강화:** ATR (0.3~5.0) + EMA50 추세 + spike 1.5x. 단, 합성 데이터에선 조건 불충족으로 신호 0. 실제 거래소 데이터 필요.
+  **[F] Research:** Volume breakout 진위성. 1.5x 볼륨 + 종가 유지, 거짓 돌파는 역전 캔들 + divergence.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

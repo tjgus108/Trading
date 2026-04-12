@@ -150,6 +150,13 @@ class TestVPINCalculator(unittest.TestCase):
         from src.data.order_flow import VPINCalculator
         self.calc = VPINCalculator(n_buckets=3)
     
+    def test_vpin_zero_bucket_size_raises_error(self):
+        """n_buckets <= 0: ValueError 발생"""
+        from src.data.order_flow import VPINCalculator
+        with self.assertRaises(ValueError) as ctx:
+            VPINCalculator(n_buckets=0)
+        self.assertIn("n_buckets must be > 0", str(ctx.exception))
+    
     def test_vpin_all_neutral_candles(self):
         """close == open: NEUTRAL → low VPIN"""
         import pandas as pd
