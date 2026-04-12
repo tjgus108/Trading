@@ -799,3 +799,59 @@ def test_jitter_zero_no_variation_across_seeds():
         )
 
     assert len(set(results)) == 1, f"jitter=0인데 seed마다 값이 다름: {results}"
+
+
+# ── 버그 회귀 테스트: float division by zero (2026-04-09 로그에서 발견) ──────────
+
+def test_circuit_breaker_zero_balance_no_division_error():
+    """account_balance=0 으로 CircuitBreaker.check() 호출 시 ZeroDivisionError 없어야 함.
+
+    버그: _peak_balance=0 이면 drawdown = x / 0.0 → ZeroDivisionError.
+    수정: _peak_balance <= 0 이면 fallback 1.0 사용 → drawdown=100% 감지(올바른 동작).
+    """
+    cb = _make_cb()
+    # balance=0 이면 drawdown 100% → 서킷 브레이커 발동 (예외 없이)
+    result = cb.check(current_balance=0.0, last_candle_pct_change=0.0)
+    assert result is not None  # ZeroDivisionError 아닌 정상적인 drawdown 트리거
+    assert "drawdown" in result
+
+
+def test_circuit_breaker_zero_balance_repeated_calls():
+    """balance=0 으로 여러 번 호출해도 ZeroDivisionError 없어야 함."""
+    cb = _make_cb()
+    for _ in range(5):
+        try:
+            cb.check(current_balance=0.0, last_candle_pct_change=0.0)
+        except ZeroDivisionError:
+            pytest.fail("ZeroDivisionError raised on balance=0")
+
+
+def test_risk_manager_zero_balance_blocked():
+    """account_balance=0 → RiskStatus.BLOCKED (ZeroDivisionError 아님)."""
+    rm = _make_rm()
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=0.0)
+    assert result.status == RiskStatus.BLOCKED
+    assert "account_balance" in result.reason
+
+
+def test_risk_manager_zero_entry_price_blocked():
+    """entry_price=0 → RiskStatus.BLOCKED (ZeroDivisionError 아님)."""
+    rm = _make_rm()
+    result = rm.evaluate(action="BUY", entry_price=0.0, atr=500, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert "entry_price" in result.reason
+
+
+def test_risk_manager_nan_atr_blocked():
+    """atr=NaN → RiskStatus.BLOCKED (NaN이 atr<=0 체크를 우회하는 버그 방지)."""
+    rm = _make_rm()
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=float("nan"), account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+
+
+def test_risk_manager_zero_balance_with_circuit_breaker():
+    """CircuitBreaker 있고 balance=0 일 때도 ZeroDivisionError 없어야 함."""
+    cb = _make_cb()
+    rm = _make_rm(circuit_breaker=cb)
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=0.0)
+    assert result.status == RiskStatus.BLOCKED

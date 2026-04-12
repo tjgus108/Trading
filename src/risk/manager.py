@@ -71,11 +71,11 @@ class CircuitBreaker:
         last_candle_pct_change: float,
     ) -> Optional[str]:
         """위반 시 사유 문자열 반환, 정상이면 None."""
-        if self._peak_balance == 0:
-            self._peak_balance = current_balance
+        if self._peak_balance <= 0:
+            self._peak_balance = current_balance if current_balance > 0 else 1.0
 
         self._peak_balance = max(self._peak_balance, current_balance)
-        drawdown = (self._peak_balance - current_balance) / self._peak_balance
+        drawdown = (self._peak_balance - current_balance) / self._peak_balance if self._peak_balance > 0 else 0.0
 
         if self._daily_loss >= self.max_daily_loss:
             return f"daily_loss {self._daily_loss:.2%} >= limit {self.max_daily_loss:.2%}"
@@ -245,12 +245,38 @@ class RiskManager:
                     portfolio_exposure=None,
                 )
 
-        # ATR 경계 검증: 0 이하면 SL 계산 불가
-        if atr <= 0:
-            logger.warning("Invalid ATR value: %.6f — BLOCKED", atr)
+        # entry_price 검증: 0 이하면 포지션 사이즈 계산 불가
+        if entry_price <= 0 or not math.isfinite(entry_price):
+            logger.warning("Invalid entry_price: %.6f — BLOCKED", entry_price)
             return RiskResult(
                 status=RiskStatus.BLOCKED,
-                reason=f"Invalid ATR: {atr} (must be > 0)",
+                reason=f"Invalid entry_price: {entry_price} (must be > 0)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
+
+        # account_balance 검증: 0 이하면 노출도 계산 불가
+        if account_balance <= 0:
+            logger.warning("Invalid account_balance: %.2f — BLOCKED", account_balance)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"Invalid account_balance: {account_balance} (must be > 0)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
+
+        # ATR 경증증: 0 이하거나 NaN이면 SL 계산 불가
+        if not (atr > 0) or not math.isfinite(atr):
+            logger.warning("Invalid ATR value: %s — BLOCKED", atr)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"Invalid ATR: {atr} (must be finite and > 0)",
                 position_size=None,
                 stop_loss=None,
                 take_profit=None,

@@ -1024,7 +1024,7 @@ class BotOrchestrator:
 
         # 병렬 백테스트
         results: dict[str, BacktestResult] = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(strategies)) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(strategies), 6)) as pool:
             futures = {pool.submit(self._run_backtest, s): s.name for s in strategies}
             for fut in concurrent.futures.as_completed(futures):
                 name = futures[fut]

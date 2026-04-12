@@ -142,16 +142,17 @@ class TestOnchainFetcher:
 # ---------------------------------------------------------------------------
     def test_fetch_with_fallback_on_api_failure(self):
         """API 실패 시 fallback 데이터 사용 검증."""
+        from unittest.mock import patch
         f = OnchainFetcher(max_retries=1)
-        
+
         # mock으로 성공 데이터 저장 (fallback으로 사용될 데이터)
         initial = f.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
         f._last_successful = initial
-        
-        # fetch() 호출 시 _fetch_blockchain_stats()가 None 반환하면
-        # source="unavailable"로 반환되고, fallback이 있으면 이전 데이터 사용
-        data = f.fetch()
-        
+
+        # _fetch_blockchain_stats()가 None을 반환하도록 강제(API 실패 시뮬레이션)
+        with patch.object(f, "_fetch_blockchain_stats", return_value=None):
+            data = f.fetch()
+
         # fallback이 있으므로 score는 유지되어야 함
         assert f._last_successful is not None
         assert f._last_successful.onchain_score == initial.onchain_score

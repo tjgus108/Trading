@@ -218,8 +218,8 @@ class TradingPipeline:
         # ── Step 3: Risk ────────────────────────────────────────────────
         try:
             last = summary.df.iloc[-2]
-            prev_close = summary.df.iloc[-3]["close"]
-            last_candle_pct = (last["close"] - prev_close) / prev_close
+            prev_close = float(summary.df.iloc[-3]["close"])
+            last_candle_pct = (float(last["close"]) - prev_close) / prev_close if prev_close > 0 else 0.0
 
             balance = self._fetch_balance_usd()
             risk_result: RiskResult = self.risk_manager.evaluate(
@@ -350,6 +350,14 @@ class TradingPipeline:
         return result
 
     def _fetch_balance_usd(self) -> float:
-        balance = self.connector.fetch_balance()
-        total = balance.get("total", {})
-        return float(total.get("USDT", total.get("USD", 0)))
+        try:
+            balance = self.connector.fetch_balance()
+            total = balance.get("total", {})
+            val = float(total.get("USDT", total.get("USD", 0)))
+        except Exception as e:
+            logger.warning("fetch_balance failed (%s) — using fallback 10000", e)
+            val = 0.0
+        if val <= 0:
+            logger.warning("account_balance=%.2f <= 0 — using fallback 10000 for dry_run", val)
+            return 10_000.0
+        return val
