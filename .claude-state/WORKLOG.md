@@ -8688,3 +8688,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** Pyramiding. 추세장 수익 극대화하나 MDD 급증 (~48%). 진입 규모 체감 + 트렌드 필터 필수.
 **Tests:** 6321 passed (+3 from Cycle 104).
 **Next Cycle:** 106 (E+A+SIM+F)
+
+## [2026-04-12 01:13 UTC] Cycle 105 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

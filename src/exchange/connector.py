@@ -165,7 +165,10 @@ class ExchangeConnector:
                     order = self.exchange.create_limit_order(symbol, side, amount, price)
                 else:
                     raise ValueError(f"Unsupported order_type: {order_type}")
-                logger.info("Order submitted: %s", order.get("id"))
+                logger.info(
+                    "Order submitted: id=%s status=%s filled=%s avg_price=%s",
+                    order.get("id"), order.get("status"), order.get("filled"), order.get("average"),
+                )
                 return order
             except self._RETRYABLE as exc:
                 last_exc = exc

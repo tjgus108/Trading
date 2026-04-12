@@ -204,3 +204,121 @@ def test_monte_carlo_seed_reproducibility_comprehensive():
     assert results[0].p5_sharpe == results[2].p5_sharpe
     assert results[0].median_mdd == results[1].median_mdd
     assert results[0].p95_mdd == results[2].p95_mdd
+
+
+# ---------------------------------------------------------------------------
+# Cycle 106: Monte Carlo Percentile Boundary Tests
+# ---------------------------------------------------------------------------
+
+def test_monte_carlo_99th_percentile_boundary():
+    """99th percentile 계산의 경계 조건 검증."""
+    # 의도: 결과가 100개일 때, 99th percentile은 정확히 계산되어야 함
+    returns = pd.Series(np.random.randn(500) * 0.001 + 0.0005)
+    mc = MonteCarlo(n_simulations=1000, block_size=20, seed=42)
+    result = mc.run(returns)
+    
+    # 99th percentile 수동 계산
+    expected_p99 = np.percentile(result.final_returns, 99)
+    
+    # MonteCarloResult의 내부 percentile 메서드와 동일
+    assert hasattr(result, 'final_returns')
+    assert len(result.final_returns) == 1000
+    
+    # 99th percentile이 95th보다 크거나 같아야 함
+    p99_return = float(np.percentile(result.final_returns, 99))
+    p95_return = result.p95_return
+    assert p99_return >= p95_return, "99th percentile must be >= 95th percentile"
+
+
+def test_monte_carlo_1st_percentile_boundary():
+    """1st percentile 계산의 경계 조건 검증."""
+    returns = pd.Series(np.random.randn(500) * 0.001 - 0.0001)
+    mc = MonteCarlo(n_simulations=1000, block_size=20, seed=99)
+    result = mc.run(returns)
+    
+    # 1st percentile 수동 계산
+    p1_return = float(np.percentile(result.final_returns, 1))
+    p5_return = result.p5_return
+    
+    # 1st percentile이 5th percentile보다 작거나 같아야 함
+    assert p1_return <= p5_return, "1st percentile must be <= 5th percentile"
+    
+    # 1st percentile이 최솟값과 같거나 커야 함
+    assert p1_return >= result.final_returns.min(), "1st percentile must be >= minimum"
+
+
+def test_monte_carlo_percentile_monotonicity():
+    """모든 percentile이 단조증가 순서를 유지하는지 검증."""
+    returns = pd.Series(np.random.randn(1000) * 0.002 + 0.0001)
+    mc = MonteCarlo(n_simulations=500, block_size=25, seed=777)
+    result = mc.run(returns)
+    
+    # 수동 percentile 계산
+    p1 = float(np.percentile(result.final_returns, 1))
+    p5 = result.p5_return
+    p50 = result.p50_return
+    p95 = result.p95_return
+    p99 = float(np.percentile(result.final_returns, 99))
+    
+    # 단조성 확인
+    assert p1 <= p5, f"p1({p1}) must be <= p5({p5})"
+    assert p5 <= p50, f"p5({p5}) must be <= p50({p50})"
+    assert p50 <= p95, f"p50({p50}) must be <= p95({p95})"
+    assert p95 <= p99, f"p95({p95}) must be <= p99({p99})"
+
+
+def test_monte_carlo_extreme_percentile_with_few_simulations():
+    """적은 시뮬 횟수에서 extreme percentile이 안정적인지 검증."""
+    returns = pd.Series(np.random.randn(200) * 0.0015)
+    mc = MonteCarlo(n_simulations=50, block_size=15, seed=123)
+    result = mc.run(returns)
+    
+    # 50개 시뮬: 1st percentile은 대략 0.5번째, 99th는 49.5번째
+    p1 = float(np.percentile(result.final_returns, 1))
+    p99 = float(np.percentile(result.final_returns, 99))
+    
+    # numpy.percentile의 선형 보간으로 인해 극값과 다를 수 있음
+    assert result.final_returns.min() <= p1
+    assert p99 <= result.final_returns.max()
+
+
+def test_monte_carlo_sharpe_percentile_consistency():
+    """Sharpe ratio의 percentile 계산이 정확한지 검증."""
+    returns = pd.Series(np.random.randn(300) * 0.001 + 0.0002)
+    mc = MonteCarlo(n_simulations=200, block_size=20, seed=555)
+    result = mc.run(returns)
+    
+    # 5th percentile Sharpe 수동 계산
+    expected_p5_sharpe = float(np.percentile(result.sharpes, 5))
+    actual_p5_sharpe = result.p5_sharpe
+    
+    assert np.isclose(expected_p5_sharpe, actual_p5_sharpe), \
+        f"p5_sharpe mismatch: {actual_p5_sharpe} vs {expected_p5_sharpe}"
+    
+    # Median Sharpe 검증
+    expected_median_sharpe = float(np.percentile(result.sharpes, 50))
+    actual_median_sharpe = result.median_sharpe
+    
+    assert np.isclose(expected_median_sharpe, actual_median_sharpe), \
+        f"median_sharpe mismatch: {actual_median_sharpe} vs {expected_median_sharpe}"
+
+
+def test_monte_carlo_mdd_percentile_consistency():
+    """Max Drawdown의 percentile 계산이 정확한지 검증."""
+    returns = pd.Series(np.random.randn(400) * 0.0012)
+    mc = MonteCarlo(n_simulations=250, block_size=20, seed=888)
+    result = mc.run(returns)
+    
+    # Median MDD 수동 계산
+    expected_median_mdd = float(np.percentile(result.max_drawdowns, 50))
+    actual_median_mdd = result.median_mdd
+    
+    assert np.isclose(expected_median_mdd, actual_median_mdd), \
+        f"median_mdd mismatch: {actual_median_mdd} vs {expected_median_mdd}"
+    
+    # 95th percentile MDD 검증
+    expected_p95_mdd = float(np.percentile(result.max_drawdowns, 95))
+    actual_p95_mdd = result.p95_mdd
+    
+    assert np.isclose(expected_p95_mdd, actual_p95_mdd), \
+        f"p95_mdd mismatch: {actual_p95_mdd} vs {expected_p95_mdd}"

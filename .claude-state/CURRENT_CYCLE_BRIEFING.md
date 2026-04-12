@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 104 — 2026-04-12T00:51:09.971896Z
+🔄 CYCLE 105 — 2026-04-12T01:13:12.067357Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 104 COMPLETED — A + C + SIM + F** (2026-04-12 02:05 UTC)
-  **[A] Quality:** BacktestEngine slippage_pct vs slippage 동일성 검증 +1.
-  **[C] Data:** OrderFlow VPIN n_buckets<=0 ValueError +1.
-  **[SIM] 🎯 engulfing_zone 대성공!** RSI 완화(50→55/45) + body ratio 1.3→1.2 + S/R 신뢰도 부스트. **-2.53% → +9.22% (+11.75%p)**. Sharpe 3.30, PF 1.90. PASS 달성!
-  **[F] Research:** Dev success 2026. LLM 프롬프트 튜닝 + Multi-Agent + 감성 분석 조합이 성공 패턴.
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 105 COMPLETED — B + D + SIM + F** (2026-04-12 02:30 UTC)
+  **[B] Risk:** src/risk/drawdown_monitor.py to_dict/from_dict 상태 직렬화 추가. WARNING/FORCE_LIQUIDATE 복원 검증 +2.
+  **[D] ML:** tests/test_adaptive_selector.py +1 tie-break (동일 Sharpe 시 삽입 순서 보장).
+  **[SIM] No-op:** positional_scaling 3가지 완화 시도 → 모두 성능 악화 또는 미개선. 원복. 구조적 한계 (3-AND 조건).
+  **[F] Research:** Pyramiding. 추세장 수익 극대화하나 MDD 급증 (~48%). 진입 규모 체감 + 트렌드 필터 필수.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
