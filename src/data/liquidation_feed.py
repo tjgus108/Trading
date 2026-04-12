@@ -77,6 +77,15 @@ class LiquidationFetcher:
                            attempt + 1, self.max_retries + 1)
                 return result
             except Exception as e:
+                # 401/403은 인증 필요 — 재시도 무의미, 즉시 fallback
+                err_str = str(e)
+                if "401" in err_str or "403" in err_str or "Unauthorized" in err_str:
+                    logger.warning(
+                        "LiquidationFetcher: auth required for '%s' (401/403). Using fallback.",
+                        self._ccxt_symbol,
+                    )
+                    break  # 재시도 없이 fallback으로
+
                 if attempt < self.max_retries:
                     wait = _RETRY_BACKOFF_SECONDS[attempt]
                     logger.warning(

@@ -7,6 +7,12 @@
 - 새 파일 생성은 꼭 필요할 때만. 기존 파일 수정 우선.
 - `logs/`, `node_modules/`, `__pycache__/`, `.env`, `config/secrets.json`은 읽지 말 것.
 
+## ⛔ 절대 금지 (MUST NOT)
+- **새 전략 파일 생성 금지** — 현재 355+ 전략으로 충분. 더 이상 추가하지 마세요.
+- **`.claude-state/NEXT_STEPS.md` 지시사항 반드시 준수** — 이 파일의 작업 방향을 무시하지 마세요.
+- **`.claude-state/MASTER_PLAN.md` 로테이션 규칙 준수** — 카테고리 로테이션을 따르세요.
+- 기존 테스트를 깨뜨리는 변경 금지.
+
 ## Stack
 - Python 3.11+
 - 거래소 API: ccxt
