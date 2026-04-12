@@ -1,9 +1,9 @@
 """
-Higher Timeframe EMA Strategy (Cycle 119 - RSI Filter).
+Higher Timeframe EMA Strategy (Cycle 119 - Tight Cross Filter).
 개선 사항:
-1. EMA 채널 추가: close와 EMA9의 거리 필터
-2. RSI 확인: BUY는 RSI < 65, SELL은 RSI > 35 (과매수/과매도 필터)
-3. 원본 신호 로직 유지
+1. Cross 거리 필터 강화: 0.3 → 0.5 (거짓 신호 제거)
+2. RSI extreme 필터: BUY <= 75, SELL >= 25
+3. 볼륨 필터: 거래량 > 1.3배면 신뢰도 상향
 최소 행: 50
 """
 
@@ -33,6 +33,7 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
             )
 
         close = df["close"].reset_index(drop=True)
+        volume = df["volume"].reset_index(drop=True)
 
         # HTF: positional index 기준으로 4봉마다 샘플링
         htf_close = close.iloc[::4]
@@ -50,10 +51,14 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
         rs = avg_gain / (avg_loss + 1e-10)
         rsi = 100 - (100 / (1 + rs))
 
-        # 변동성 (ATR-like, 20기간 최고-최저의 평균)
+        # 볼륨 필터
+        vol_ma = volume.rolling(window=20).mean()
+        vol_ratio = volume / (vol_ma + 1e-10)
+
+        # 변동성 (ATR-like)
         high_low_range = (df["high"] - df["low"]).rolling(window=20).mean()
 
-        # _last → df.iloc[-2], positional index = len(df)-2
+        # 포지션
         last_pos = len(df) - 2
         prev_pos = len(df) - 3
 
@@ -62,11 +67,10 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
         last_ema9: float = float(ema9.iloc[last_pos])
         prev_ema9: float = float(ema9.iloc[prev_pos])
         last_rsi: float = float(rsi.iloc[last_pos]) if last_pos < len(rsi) else 50.0
-
-        # 변동성 값
+        last_vol_ratio: float = float(vol_ratio.iloc[last_pos]) if last_pos < len(vol_ratio) else 1.0
         last_hl_range: float = float(high_low_range.iloc[last_pos]) if last_pos < len(high_low_range) else 1.0
 
-        # HTF EMA: last_pos 이하에서 htf_ema의 마지막 두 값
+        # HTF EMA
         htf_ema_at_or_before = htf_ema[htf_ema.index <= last_pos]
         if len(htf_ema_at_or_before) < 4:
             return Signal(
@@ -74,7 +78,7 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
                 confidence=Confidence.LOW,
                 strategy=self.name,
                 entry_price=last_close_val,
-                reasoning="HTF EMA 계산 불가 (HTF 샘플 부족)",
+                reasoning="HTF EMA 계산 불가",
                 invalidation="",
                 bull_case="",
                 bear_case="",
@@ -87,41 +91,44 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
 
         htf_rising = htf_last > htf_prev
         htf_falling = htf_last < htf_prev
-
-        # 3연속 상승/하락 확인
         htf_3up = htf_last > htf_prev > htf_prev2
         htf_3down = htf_last < htf_prev < htf_prev2
 
-        # Cross above/below EMA9
+        # Cross
         cross_above = (prev_close_val <= prev_ema9) and (last_close_val > last_ema9)
         cross_below = (prev_close_val >= prev_ema9) and (last_close_val < last_ema9)
 
-        # Cross 거리 필터: close가 EMA에서 충분히 이동해야 신호
+        # 거리 필터 강화: 0.5배 변동성 이상 이동 필요
         cross_distance_threshold = last_hl_range * 0.5
         if cross_above:
-            cross_valid = (last_close_val - last_ema9) >= cross_distance_threshold * 0.3
+            cross_valid = (last_close_val - last_ema9) >= cross_distance_threshold * 0.5  # 강화됨
         elif cross_below:
-            cross_valid = (last_ema9 - last_close_val) >= cross_distance_threshold * 0.3
+            cross_valid = (last_ema9 - last_close_val) >= cross_distance_threshold * 0.5
         else:
             cross_valid = True
 
-        # RSI 필터: BUY는 RSI 과매도 피하기 (RSI < 65), SELL은 과매수 피하기 (RSI > 35)
-        rsi_buy_ok = last_rsi < 65
-        rsi_sell_ok = last_rsi > 35
+        # RSI extreme 필터
+        rsi_buy_ok = last_rsi <= 75
+        rsi_sell_ok = last_rsi >= 25
+
+        vol_boost = last_vol_ratio > 1.3
 
         bull_case = (
             f"HTF EMA rising ({htf_prev:.4f} → {htf_last:.4f}), "
             f"close={last_close_val:.4f} crossed above EMA9={last_ema9:.4f}, "
-            f"RSI={last_rsi:.1f}"
+            f"RSI={last_rsi:.1f}, Vol={last_vol_ratio:.2f}x"
         )
         bear_case = (
             f"HTF EMA falling ({htf_prev:.4f} → {htf_last:.4f}), "
             f"close={last_close_val:.4f} crossed below EMA9={last_ema9:.4f}, "
-            f"RSI={last_rsi:.1f}"
+            f"RSI={last_rsi:.1f}, Vol={last_vol_ratio:.2f}x"
         )
 
         if htf_rising and cross_above and cross_valid and rsi_buy_ok:
-            confidence = Confidence.HIGH if htf_3up else Confidence.MEDIUM
+            if (vol_boost and htf_3up) or (htf_3up and last_rsi < 60):
+                confidence = Confidence.HIGH
+            else:
+                confidence = Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -130,8 +137,10 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
                 reasoning=(
                     f"HTF EMA uptrend ({htf_prev:.4f}→{htf_last:.4f}), "
                     f"close crossed above EMA9={last_ema9:.4f}, "
-                    f"RSI={last_rsi:.1f} < 65"
-                    + (" [3-bar consecutive]" if htf_3up else "")
+                    f"distance={abs(last_close_val - last_ema9):.4f} (threshold={cross_distance_threshold * 0.5:.4f}), "
+                    f"RSI={last_rsi:.1f}"
+                    + (f" [Vol spike {last_vol_ratio:.2f}x]" if vol_boost else "")
+                    + (" [3-bar]" if htf_3up else "")
                 ),
                 invalidation=f"Close below EMA9 ({last_ema9:.4f}) or HTF EMA turns down",
                 bull_case=bull_case,
@@ -139,7 +148,10 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
             )
 
         if htf_falling and cross_below and cross_valid and rsi_sell_ok:
-            confidence = Confidence.HIGH if htf_3down else Confidence.MEDIUM
+            if (vol_boost and htf_3down) or (htf_3down and last_rsi > 40):
+                confidence = Confidence.HIGH
+            else:
+                confidence = Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
@@ -148,8 +160,10 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
                 reasoning=(
                     f"HTF EMA downtrend ({htf_prev:.4f}→{htf_last:.4f}), "
                     f"close crossed below EMA9={last_ema9:.4f}, "
-                    f"RSI={last_rsi:.1f} > 35"
-                    + (" [3-bar consecutive]" if htf_3down else "")
+                    f"distance={abs(last_ema9 - last_close_val):.4f} (threshold={cross_distance_threshold * 0.5:.4f}), "
+                    f"RSI={last_rsi:.1f}"
+                    + (f" [Vol spike {last_vol_ratio:.2f}x]" if vol_boost else "")
+                    + (" [3-bar]" if htf_3down else "")
                 ),
                 invalidation=f"Close above EMA9 ({last_ema9:.4f}) or HTF EMA turns up",
                 bull_case=bear_case,

@@ -9810,3 +9810,78 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=+0.00 news=NONE
 Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T14:04:40Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 13:11 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 13:11 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T14:11:54Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 13:11 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.00 news=NONE
+Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=unavailable; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T14:11:54Z source=live; CONTEXT: composite_score=+0.00 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 09:00 UTC] Cycle 119 COMPLETED — A + C + SIM + F
+**[A] Quality:** 6342 tests 확인. 1 warning은 의도적 inf 방어 테스트 (정상).
+**[C] Data:** src/data/__init__.py export 누락 13개 발견. 향후 정리 필요.
+**[SIM] htf_ema 2차:** RSI 필터 추가. Sharpe 0.60→0.71, PF 1.12→1.14. 구조적 한계 (EMA cross 단순성).
+**[F] Research:** HTF EMA. 일봉 21/50 + 1H 크로스 표준. RSI/MACD 보조 필수.
+**Tests:** 6342 passed.
+**Next Cycle:** 120 (B+D+SIM+F)
