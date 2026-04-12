@@ -1,6 +1,7 @@
 """
 EMA Cross 전략: EMA20이 EMA50을 상향 돌파 시 BUY, 하향 돌파 시 SELL.
 필터:
+  - ADX 필터: ADX < 20이면 횡보 구간 → HOLD (추세 시장에서만 유효)
   - ATR 필터: atr14 > 최근 20봉 평균 atr의 0.8배 (변동성 최소 확보)
   - VWAP 방향 필터: BUY는 close > vwap, SELL은 close < vwap
 
@@ -15,6 +16,27 @@ import pandas as pd
 from .base import Action, BaseStrategy, Confidence, Signal
 
 
+def _calc_adx(df: pd.DataFrame, idx: int) -> float:
+    tr = pd.concat(
+        [
+            df["high"] - df["low"],
+            (df["high"] - df["close"].shift(1)).abs(),
+            (df["low"] - df["close"].shift(1)).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    atr_raw = tr.ewm(alpha=1 / 14, adjust=False).mean()
+    up_move = df["high"].diff()
+    dn_move = -df["low"].diff()
+    plus_dm = up_move.where((up_move > dn_move) & (up_move > 0), 0.0)
+    minus_dm = dn_move.where((dn_move > up_move) & (dn_move > 0), 0.0)
+    plus_di = 100 * plus_dm.ewm(alpha=1 / 14, adjust=False).mean() / atr_raw.replace(0, 1e-9)
+    minus_di = 100 * minus_dm.ewm(alpha=1 / 14, adjust=False).mean() / atr_raw.replace(0, 1e-9)
+    dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
+    adx = dx.ewm(alpha=1 / 14, adjust=False).mean()
+    return float(adx.iloc[idx])
+
+
 class EmaCrossStrategy(BaseStrategy):
     name = "ema_cross"
 
@@ -22,13 +44,33 @@ class EmaCrossStrategy(BaseStrategy):
         prev = df.iloc[-3]
         last = self._last(df)
 
-        ema20_crossed_up = prev["ema20"] <= prev["ema50"] and last["ema20"] > last["ema50"]
-        ema20_crossed_down = prev["ema20"] >= prev["ema50"] and last["ema20"] < last["ema50"]
+        idx = len(df) - 2
+        adx_val = _calc_adx(df, idx)
 
-        rsi = last["rsi14"]
         entry = last["close"]
+        rsi = last["rsi14"]
         atr = last["atr14"]
         vwap = last["vwap"]
+
+        # ADX 필터: 횡보 구간 필터링
+        if adx_val < 20:
+            bull_case = (
+                f"EMA20 ({last['ema20']:.2f}) vs EMA50 ({last['ema50']:.2f}), "
+                f"ADX={adx_val:.1f}"
+            )
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.HIGH,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"ADX 낮음: 횡보 구간 (ADX={adx_val:.1f} < 20)",
+                invalidation="",
+                bull_case=bull_case,
+                bear_case=bull_case,
+            )
+
+        ema20_crossed_up = prev["ema20"] <= prev["ema50"] and last["ema20"] > last["ema50"]
+        ema20_crossed_down = prev["ema20"] >= prev["ema50"] and last["ema20"] < last["ema50"]
 
         # ATR 필터: 최근 20봉(또는 가용 봉) 평균의 0.8배 이상이어야 진입
         lookback = min(20, len(df) - 1)
@@ -81,14 +123,15 @@ class EmaCrossStrategy(BaseStrategy):
             buy_ok = buy_ok and enhanced_bull_ok
 
         if buy_ok:
+            conf = Confidence.HIGH if adx_val > 30 else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
-                confidence=Confidence.HIGH if rsi > 50 else Confidence.MEDIUM,
+                confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
                     f"EMA20 crossed above EMA50. RSI={rsi:.1f} not overbought. "
-                    f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close above VWAP."
+                    f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close above VWAP. ADX={adx_val:.1f}."
                     + (f" EMA9/21 cross_up confirmed, vol & EMA50 ok." if has_ema9_21 else "")
                 ),
                 invalidation=f"Close below EMA50 ({last['ema50']:.2f})",
@@ -101,14 +144,15 @@ class EmaCrossStrategy(BaseStrategy):
             sell_ok = sell_ok and enhanced_bear_ok
 
         if sell_ok:
+            conf = Confidence.HIGH if adx_val > 30 else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
-                confidence=Confidence.HIGH if rsi < 50 else Confidence.MEDIUM,
+                confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
                     f"EMA20 crossed below EMA50. RSI={rsi:.1f} not oversold. "
-                    f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close below VWAP."
+                    f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close below VWAP. ADX={adx_val:.1f}."
                     + (f" EMA9/21 cross_down confirmed, vol & EMA50 ok." if has_ema9_21 else "")
                 ),
                 invalidation=f"Close above EMA50 ({last['ema50']:.2f})",
