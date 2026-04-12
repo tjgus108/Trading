@@ -9100,3 +9100,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 11:26 UTC] Cycle 111 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 11:33 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 05:35 UTC] Cycle 112 COMPLETED — C + B + SIM + F
+**[C] Data:** retry 로깅 검증 (수정 없음, 구현 정상).
+**[B] Risk:** vol_targeting scalar() 중복 체크 제거 → _scalar_from_rv() 통합.
+**[SIM] 🎯 order_flow_imbalance_v2 대성공!** 임계값 0.20→0.25 + 거래량 필터. **PF 1.47→1.77 PASS 달성!** Sharpe 3.38→4.26 (+26%). Return 16.45%→17.85%.
+**[F] Research:** OFI는 HFT 전용 (50ms~5분). 저빈도 봇 단독 비추천. Hawkes+ML 하이브리드만 OOS 우위.
+**Tests:** 6337 passed.
+**SIM 누적 20개 개선** — Top1 전략까지 PASS 달성!
+**Next Cycle:** 113 (D+E+SIM+F)
