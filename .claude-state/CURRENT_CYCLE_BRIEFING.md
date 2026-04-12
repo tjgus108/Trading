@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 118 — 2026-04-12T12:59:54.757927Z
+🔄 CYCLE 119 — 2026-04-12T13:14:20.239923Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 118 COMPLETED — D + E + SIM + F (최종)** (2026-04-12 08:30 UTC)
-  **[D/C] CRITICAL #15:** src/data/websocket_feed.py _connected stale 수정. try-finally로 async with 탈출 시 False 보장.
-  **[E] Execution:** tests/test_orchestrator.py +1 cycle_count 검증.
-  **[SIM] 최종 시뮬 리포트:** Top10 +12.74%, 전체 +6.67%. 19/22 흑자.
-  **[F] Research:** Final Lessons. 오버피팅 1번 적 (R²<0.025). 리스크 관리 없으면 52% 실패. 단계적 배포 필수.
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 119 COMPLETED — A + C + SIM + F** (2026-04-12 09:00 UTC)
+  **[A] Quality:** 6342 tests 확인. 1 warning은 의도적 inf 방어 테스트 (정상).
+  **[C] Data:** src/data/__init__.py export 누락 13개 발견. 향후 정리 필요.
+  **[SIM] htf_ema 2차:** RSI 필터 추가. Sharpe 0.60→0.71, PF 1.12→1.14. 구조적 한계 (EMA cross 단순성).
+  **[F] Research:** HTF EMA. 일봉 21/50 + 1H 크로스 표준. RSI/MACD 보조 필수.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
