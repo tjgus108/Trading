@@ -11111,3 +11111,338 @@ Notes: SENTIMENT: FG=N/A | FR=N/A | score=+0.0 | src=unavailable; ONCHAIN: flow=
 **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
 **Tests:** 6342 passed.
 **🎯 세션 최종: 119 사이클, 22 SIM, 15 CRITICAL, 6342 tests. 모든 변경 main 동기화.**
+
+## [2026-04-12 14:14 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:14 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0008% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:14:36Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:14 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0008% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:14:36Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:29 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:29 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:29:49Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:29 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:29:49Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:32 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:32 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:32:42Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:32 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:32:42Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:35 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:35 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:35:54Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:35 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:35:54Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:39 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 14:39 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:39:36Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
+
+## [2026-04-12 14:39 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=+0.60 news=NONE
+Notes: SENTIMENT: FG=16(Extreme Fear) | FR=-0.0004% | score=+1.0 | src=alternative.me,binance_futures; ONCHAIN: flow=NEUTRAL whale=NEUTRAL nvt=N/A score=+0.0 src=blockchain.info; NEWS_RISK: level=NONE action=NONE event=none... expires=2026-04-12T15:39:36Z source=live; CONTEXT: composite_score=+0.60 news_risk=NONE; HOLD — no order
