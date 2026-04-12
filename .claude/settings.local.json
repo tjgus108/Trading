@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
     "allow": [
       "WebSearch",
       "WebFetch(domain:tradingagents-ai.github.io)",
@@ -77,7 +76,11 @@
       "Bash(git:*)",
       "Bash(ls src/strategy/*.py)",
       "Bash(ls /Users/seohyunhan/Desktop/AgentTest/Trading/src/strategy/*.py)",
-      "Bash(grep -v \"^base$\\\\|^__init__$\")"
+      "Bash(grep -v \"^base$\\\\|^__init__$\")",
+      "Bash(grep -v \"^base$\\\\|^__init__$\\\\|^adaptive_selector$\\\\|^multi_signal$\")",
+      "Bash(ls /Users/seohyunhan/Desktop/AgentTest/Trading/tests/test_*.py)",
+      "Bash(xargs -I{} basename {} .py)",
+      "Read(//tmp/**)"
     ]
   }
 }
