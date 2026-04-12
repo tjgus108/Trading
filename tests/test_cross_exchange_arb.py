@@ -119,3 +119,43 @@ def test_registry_contains_cross_exchange_arb():
     from src.orchestrator import STRATEGY_REGISTRY
     assert "cross_exchange_arb" in STRATEGY_REGISTRY
     assert STRATEGY_REGISTRY["cross_exchange_arb"] is CrossExchangeArbStrategy
+
+
+# ── 레짐 필터 테스트 ──────────────────────────────────────────────────────────
+
+def _make_df_volatile(close: float, n: int = 30) -> pd.DataFrame:
+    """변동성 높은 DataFrame: 매 캔들 ±6% 진동 → realized_vol > 0.03."""
+    closes = [close * (1 + 0.06 * ((-1) ** i)) for i in range(n)]
+    return pd.DataFrame({"close": closes})
+
+
+def _make_df_large_atr(close: float, n: int = 20) -> pd.DataFrame:
+    """ATR/close > 0.02인 DataFrame: high-low 범위를 close의 5%로 설정."""
+    closes = [close] * n
+    highs = [close * 1.03] * n
+    lows = [close * 0.97] * n   # range = 6% → ATR14 ≈ 6% >> 2%
+    return pd.DataFrame({"close": closes, "high": highs, "low": lows})
+
+
+def test_hold_on_high_volatility_arb():
+    """realized_vol > 0.03 → HOLD (변동성 레짐 필터)"""
+    cex = 50000.0
+    dex = cex * 0.995  # 차익 있어도
+    strategy = CrossExchangeArbStrategy(min_spread_pct=0.3)
+    strategy._feed = DEXPriceFeed.mock("BTC", price=dex)
+    df = _make_df_volatile(cex, n=30)
+    signal = strategy.generate(df)
+    assert signal.action == Action.HOLD
+    assert "vol" in signal.reasoning.lower() or "변동성" in signal.reasoning
+
+
+def test_hold_on_large_atr_arb():
+    """atr14/close > 0.02 → HOLD (ATR 정규화 필터)"""
+    cex = 50000.0
+    dex = cex * 0.995
+    strategy = CrossExchangeArbStrategy(min_spread_pct=0.3)
+    strategy._feed = DEXPriceFeed.mock("BTC", price=dex)
+    df = _make_df_large_atr(cex, n=20)
+    signal = strategy.generate(df)
+    assert signal.action == Action.HOLD
+    assert "atr" in signal.reasoning.lower() or "ATR" in signal.reasoning

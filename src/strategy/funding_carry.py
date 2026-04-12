@@ -55,9 +55,39 @@ class FundingCarryStrategy(BaseStrategy):
 
     def generate(self, df: pd.DataFrame) -> Signal:
         last = self._last(df)
+        idx = len(df) - 2
         entry = last["close"]
         rsi = last.get("rsi14", 50.0)
         atr = last.get("atr14", 0.0)
+
+        # 변동성 레짐 필터
+        vol = df["close"].pct_change().rolling(20, min_periods=1).std().iloc[idx]
+        if vol > 0.03:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"고변동성 레짐 HOLD: realized_vol={vol:.4f} > 0.03",
+                invalidation="vol < 0.03 시 재검토",
+                bull_case="",
+                bear_case="고변동성 구간 캐리 전략 위험",
+            )
+
+        # 추세 강도 필터
+        ema20 = df["close"].ewm(span=20, adjust=False).mean()
+        slope = (ema20.iloc[idx] - ema20.iloc[max(idx - 5, 0)]) / ema20.iloc[max(idx - 5, 0)]
+        if slope < -0.02:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"급락 추세 HOLD: EMA20 기울기={slope:.4f} < -0.02",
+                invalidation="EMA20 기울기 > -0.02 시 재검토",
+                bull_case="",
+                bear_case="급락 구간 캐리 진입 위험",
+            )
 
         # funding_rate 컬럼 유무에 따라 분기
         if "funding_rate" in df.columns:

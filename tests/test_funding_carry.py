@@ -103,3 +103,51 @@ def test_entry_price_is_last_close():
     df = _make_df(n=20, funding_rate=0.0005)
     sig = strat.generate(df)
     assert sig.entry_price == df["close"].iloc[-2]
+
+
+# ── 레짐 필터 테스트 ──────────────────────────────────────────────────────────
+
+def _make_df_high_vol(n=30, funding_rate=0.0005) -> pd.DataFrame:
+    """변동성 높은 DataFrame: close가 큰 폭으로 진동."""
+    import numpy as np
+    rng = list(range(n))
+    # 매 캔들 ±5% 진동 → realized vol >> 0.03
+    close = [100.0 * (1 + 0.06 * ((-1) ** i)) for i in rng]
+    df = pd.DataFrame({
+        "close": close,
+        "rsi14": [50.0] * n,
+        "atr14": [1.0] * n,
+        "funding_rate": [funding_rate] * n,
+    })
+    return df
+
+
+def _make_df_downtrend(n=40, funding_rate=0.0005) -> pd.DataFrame:
+    """급락 추세 DataFrame: EMA20 기울기 << -0.02, vol은 낮게 유지."""
+    # 균일하게 하락 → vol 낮음, EMA 기울기 충분히 음수
+    close = [100.0 - i * 0.8 for i in range(n)]
+    df = pd.DataFrame({
+        "close": close,
+        "rsi14": [50.0] * n,
+        "atr14": [1.0] * n,
+        "funding_rate": [funding_rate] * n,
+    })
+    return df
+
+
+def test_hold_on_high_volatility():
+    """realized_vol > 0.03 → HOLD (변동성 레짐 필터)"""
+    strat = FundingCarryStrategy(entry_threshold=0.0003)
+    df = _make_df_high_vol(funding_rate=0.0005)
+    sig = strat.generate(df)
+    assert sig.action == Action.HOLD
+    assert "변동성" in sig.reasoning or "vol" in sig.reasoning
+
+
+def test_hold_on_downtrend():
+    """EMA20 기울기 < -0.02 → HOLD (추세 강도 필터)"""
+    strat = FundingCarryStrategy(entry_threshold=0.0003)
+    df = _make_df_downtrend(funding_rate=0.0005)
+    sig = strat.generate(df)
+    assert sig.action == Action.HOLD
+    assert "기울기" in sig.reasoning or "slope" in sig.reasoning

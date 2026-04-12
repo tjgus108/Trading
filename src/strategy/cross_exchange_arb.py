@@ -37,6 +37,35 @@ class CrossExchangeArbStrategy(BaseStrategy):
 
     def generate(self, df: pd.DataFrame) -> Signal:
         cex_price = float(df["close"].iloc[-1])
+        idx = len(df) - 1
+
+        # 변동성 레짐 필터
+        vol = df["close"].pct_change().rolling(20, min_periods=1).std().iloc[idx]
+        if vol > 0.03:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=cex_price,
+                reasoning=f"고변동성 레짐 HOLD: realized_vol={vol:.4f} > 0.03 (스프레드 신뢰 불가)",
+                invalidation="vol < 0.03 시 재검토",
+            )
+
+        # ATR 정규화 필터
+        high = df["high"] if "high" in df.columns else df["close"]
+        low = df["low"] if "low" in df.columns else df["close"]
+        tr = (high - low).abs()
+        atr14 = tr.rolling(14, min_periods=1).mean().iloc[idx]
+        if cex_price > 0 and atr14 / cex_price > 0.02:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=cex_price,
+                reasoning=f"ATR 과대 HOLD: atr14/close={atr14/cex_price:.4f} > 0.02",
+                invalidation="atr14/close < 0.02 시 재검토",
+            )
+
         spread_info = self._feed.get_spread(cex_price, self.symbol)
 
         dex_price = spread_info["dex_price"]
