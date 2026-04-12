@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 113 — 2026-04-12T11:46:28.387645Z
+🔄 CYCLE 114 — 2026-04-12T12:00:05.531609Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,14 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 113 COMPLETED — D + E + SIM + F** (2026-04-12 06:00 UTC)
-  **[D] ML:** tests/test_ensemble_conflicts.py +1 _ask_parallel timeout.
-  **[E] Execution:** scheduler boundary bug 발견 (경계값 시 불필요 1 interval 대기).
-  **[SIM] 🎯 cmf 2차 대성공!** CMF 임계값 강화(0.08) + 볼륨 85% + RSI 확인(BUY<75/SELL>25). **PF 1.22→1.64 PASS!** Sharpe 1.25→3.17. Return +4.28%→+11.27%.
-  **[F] Research:** CMF+RSI. 오신호 30-40% 감소 (비공식). CMF divergence가 핵심 엣지.
+**Cycle 114 COMPLETED — A + C + SIM + F (최종 리포트)** (2026-04-12 06:30 UTC)
+  **[A] Quality:** quality_audit 재실행 시도 (결과 미확인).
+  **[C] Data:** DataFeed status 보고 구조 확인 (cache_stats + health_check 조합).
+  **[SIM] 최종 시뮬 리포트:** 전체 22 → 21 흑자 (volatility_cluster SHORT 편향 퇴출 권장).
+    - **포트폴리오 전체 +6.97%**, Top10 **+12.80%**
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
