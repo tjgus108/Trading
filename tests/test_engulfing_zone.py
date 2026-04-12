@@ -30,6 +30,9 @@ def _make_df(rows, volumes=None):
     rs = gain / loss.replace(0, 1e-10)
     df["rsi14"] = 100 - (100 / (1 + rs))
     df["rsi14"] = df["rsi14"].fillna(50.0)
+    # Add volume_sma20 for volume surge filter
+    df["volume_sma20"] = df["volume"].rolling(20).mean()
+    df["volume_sma20"] = df["volume_sma20"].fillna(df["volume"].mean())
     return df
 
 
@@ -41,6 +44,7 @@ def _neutral(n=30, base=100.0):
 def _build_bullish_zone_df(ratio=1.2, near_support=True):
     """
     Pivot low를 만들고 bullish engulfing at support zone 시나리오 생성.
+    - Create downtrending context (RSI < 50) so vol+rsi filters pass
     - pivot low: index 11, low=90.0 (좌우 3봉 low=99보다 확연히 낮음)
     - prev (idx-3): 음봉, open=92, close=90.5, body=1.5
     - curr (idx-2): 양봉, open=90.3, close=90.3+1.5*ratio (body=1.5*ratio)
@@ -49,16 +53,18 @@ def _build_bullish_zone_df(ratio=1.2, near_support=True):
     """
     rows = []
     support = 90.0  # pivot low 가격
-    # 0~9: 평범한 봉 (low=99)
-    for _ in range(10):
-        rows.append((100.0, 102.0, 99.0, 101.0))
+    # 0~9: DOWNTRENDING (high starts 110, decreases) to get RSI < 50
+    for i in range(10):
+        c = 110.0 - i * 1.5
+        rows.append((c, c + 1, c - 1, c - 0.5))
     # 10~12: pivot low (index 11 low=90, 좌우 low=99)
     rows.append((100.0, 102.0, 99.0, 101.0))         # 10
     rows.append((100.0, 101.0, support, 100.5))        # 11 = pivot low
     rows.append((100.0, 102.0, 99.0, 101.0))         # 12
-    # 13~24: 평범한 봉
-    for _ in range(12):
-        rows.append((100.0, 102.0, 99.0, 101.0))
+    # 13~24: downtrending continuation
+    for i in range(12):
+        c = 100.0 - i * 0.5
+        rows.append((c, c + 1, c - 1, c - 0.3))
     # prev (index 25): 음봉, body=1.5
     prev_o = 92.0
     body_prev = 1.5
@@ -82,6 +88,7 @@ def _build_bullish_zone_df(ratio=1.2, near_support=True):
 def _build_bearish_zone_df(ratio=1.2, near_resistance=True):
     """
     Bearish engulfing at resistance zone 시나리오.
+    - Create uptrending context (RSI > 50) so vol+rsi filters pass
     - pivot high: index 11, high=112.0 (좌우 3봉 high=102보다 확연히 높음)
     - prev (idx-3): 양봉, open=108, close=109.5, body=1.5
     - curr (idx-2): 음봉, open=109.8, close=109.8-1.5*ratio (body=1.5*ratio)
@@ -90,16 +97,18 @@ def _build_bearish_zone_df(ratio=1.2, near_resistance=True):
     """
     rows = []
     resistance = 112.0  # pivot high 가격
-    # 0~9: 평범한 봉 (high=102)
-    for _ in range(10):
-        rows.append((100.0, 102.0, 99.0, 101.0))
+    # 0~9: UPTRENDING (low starts 100, increases) to get RSI > 50
+    for i in range(10):
+        c = 100.0 + i * 1.5
+        rows.append((c, c + 1, c - 1, c + 0.5))
     # 10~12: pivot high (index 11 high=112, 좌우 high=102)
     rows.append((100.0, 102.0, 99.0, 101.0))          # 10
     rows.append((111.0, resistance, 110.0, 111.5))     # 11 = pivot high
     rows.append((100.0, 102.0, 99.0, 101.0))          # 12
-    # 13~24: 평범한 봉
-    for _ in range(12):
-        rows.append((100.0, 102.0, 99.0, 101.0))
+    # 13~24: uptrending continuation
+    for i in range(12):
+        c = 100.0 + i * 0.5
+        rows.append((c, c + 1, c - 1, c + 0.3))
     # prev (index 25): 양봉, body=1.5
     prev_o = 108.0
     body_prev = 1.5
@@ -145,7 +154,7 @@ def test_bullish_engulfing_zone_buy():
     assert sig.action == Action.BUY
 
 
-# ── 5. Bullish Engulfing + 지지선 없음 → 그래도 BUY (zone 필터 제거) ─────────
+# ── 5. Bullish Engulfing + 지지선 없음 → 여전히 BUY (vol+RSI 필터 통과) ─────────
 def test_bullish_engulfing_no_zone_buy():
     df = _make_df(_build_bullish_zone_df(ratio=1.5, near_support=False))
     sig = strat.generate(df)
@@ -159,7 +168,7 @@ def test_bearish_engulfing_zone_sell():
     assert sig.action == Action.SELL
 
 
-# ── 7. Bearish Engulfing + 저항선 없음 → 그래도 SELL (zone 필터 제거) ────────
+# ── 7. Bearish Engulfing + 저항선 없음 → 여전히 SELL (vol+RSI 필터 통과) ────────
 def test_bearish_engulfing_no_zone_sell():
     df = _make_df(_build_bearish_zone_df(ratio=1.5, near_resistance=False))
     sig = strat.generate(df)
