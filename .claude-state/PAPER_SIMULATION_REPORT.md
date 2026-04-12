@@ -1,6 +1,6 @@
 # Paper Trading 시뮬레이션 리포트
 
-_Generated: 2026-04-12T01:26:22.707623Z_
+_Generated: 2026-04-12T01:28:30.796935Z_
 _Data Source: Synthetic GBM x1000 (BTC-like)_
 _Initial Balance: $10,000 USDT_
 _Fee: 0.1% | Slippage: 0.05%_

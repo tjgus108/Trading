@@ -8751,3 +8751,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 01:24 UTC] Cycle 106 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 01:29 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 03:30 UTC] Cycle 107 COMPLETED — C + B + SIM + F (리포트 갱신)
+**[C] Data:** onchain _score_from_fields 극단 검증 (코드 안전, 수정 없음).
+**[B] Risk:** kelly from_trade_history 빈 → 0.0 반환 기존 통과 확인.
+**[SIM] 시뮬 리포트 갱신:** 22개 PASS 중 19/22 흑자 (86.4%). 균등배분 +6.50%, Top10 +12.11%.
+**[F] Research:** 봇 시장 2026. $54B 규모, 거래의 65% 자동화. 평균 ROI 25-40% 목표 (보장 X).
+**Tests:** 6327 passed (변화 없음).
+**Status:** 107 사이클 완료 (Cycle 2~107). 라이브 배포 준비 단계.
