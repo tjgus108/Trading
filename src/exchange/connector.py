@@ -26,6 +26,7 @@ class ExchangeConnector:
                 "apiKey": os.environ["EXCHANGE_API_KEY"],
                 "secret": os.environ["EXCHANGE_API_SECRET"],
                 "enableRateLimit": True,
+                "options": {"fetchCurrencies": False},  # 인증 불필요 엔드포인트만 사용
             }
         )
         if self.sandbox:

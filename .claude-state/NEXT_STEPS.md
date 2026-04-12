@@ -2,9 +2,167 @@
 
 _Last updated: 2026-04-10_
 
-## Status: **30 passed** | KeltnerChannelV2 + RSIBand 전략 추가 완료
+## [2026-04-10] PriceActionMomentum + VolatilityBreakout 전략 추가 완료 (40 passed)
+- `price_action_momentum`: body strength(body_abs/total_range>0.5) + ROC5 vs ROC5_MA 복합, BUY/SELL 방향성 확인, HIGH conf: body_strength>0.7 & abs(roc5)>roc5_std20
+- `volatility_breakout`: BB 확장(bb_width>bb_width_ma) + 상/하단 돌파 추세 추종, HIGH conf: bb_width>bb_width_ma*1.3
+- 기존 파일(다른 로직)을 스펙에 맞게 재구현, orchestrator.py에 volatility_breakout 추가 등록
+- 테스트 각 20개 (40 passed), push 완료
 
-## 최근 작업 (2026-04-10) — KeltnerChannelV2 + RSIBand 신규 추가
+## [2026-04-10] VolumeMomentumBreak + PriceStructureAnalysis 전략 추가 완료 (32 passed)
+- `volume_momentum_break`: 거래량 급증(vol_ratio>2) + ROC3 모멘텀 가속(roc3>roc3_ma) 기반, HIGH conf: vol_ratio>3
+- `price_structure_analysis`: Higher High/Lower Low 구조 분석, 5봉 local 고점/저점(shift(3) lookahead 방지), HIGH conf: close > prev_recent_high(BUY) or < prev_recent_low(SELL)
+- 테스트 각 16개 (32 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] SpreadMomentum + TrendExhaustionSignal 전략 추가 완료 (32 passed)
+- `spread_momentum`: EMA8/EMA21 스프레드 변화율(spread_roc) 기반, BUY: spread>0 & roc>0 & roc>roc_ma, SELL: spread<0 & roc<0 & roc<roc_ma, HIGH conf: abs(roc)>roc rolling std
+- `trend_exhaustion_signal`: 최근 20봉 상승봉 비율(trend_bars) + ATR stretch, BUY: trend_bars<=4 & stretch>1.5 & 반등, SELL: trend_bars>=16 & stretch>1.5 & 반락, HIGH conf: tb<=2(BUY) or tb>=18(SELL)
+- 테스트 각 16개 (32 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] HigherHighMomentum + MeanRevBounce 전략 추가 완료 (29 passed)
+- `higher_high_momentum`: HH5/LL5 rolling 구조(shift(5)) + ROC3 모멘텀, BUY: hh5>hh5_prev & ll5>ll5_prev & roc3>0, SELL: ll5<ll5_prev & hh5<hh5_prev & roc3<0, HIGH conf: vol>vol_ma10*1.3
+- `mean_rev_bounce`: Z-score(ma20,std20) 기반 평균 회귀 반등, BUY: z<-1.5 & z_change>0, SELL: z>1.5 & z_change<0, HIGH conf: abs(z)>2.0
+- 테스트 각 14~15개 (29 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] TrendBreakConfirm + MomentumMeanRev 전략 추가 완료 (32 passed)
+- `trend_break_confirm`: EMA20 돌파 후 3봉 rolling 재확인 + EMA20>EMA50 방향 필터 + vol>vol_ma10, HIGH conf: BUY시 close>ema50, SELL시 close<ema50
+- `momentum_mean_rev`: 10봉 모멘텀(mom10_ma) + Z-score 기반 풀백 진입, BUY: mom>0 & -2<z<-0.5, SELL: mom<0 & 0.5<z<2, HIGH conf: abs(z)>1.0 & abs(mom)>mom_std
+- 테스트 각 16개 (32 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+
+
+## [2026-04-10] PriceDivergenceIndex + TrendMomentumScore 전략 추가 완료 (35 passed)
+- `price_divergence_index`: RSI(14) + OBV 기반 divergence 인덱스, bull/bear_div_score>=2 + RSI 필터로 신호 생성, HIGH conf: score==2
+- `trend_momentum_score`: EMA10/20/50 정렬(trend_score 0~3) + ROC5/ROC10(mom_score 0~2) 합산 total_bull 0~5, total_bull>=4 BUY, <=1 SELL, HIGH conf: total_bull==5 or ==0
+- 테스트 각 17/18개 (35 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] ImpulseSystem + ColoredCandles 전략 추가 완료 (28 passed)
+- `impulse_system`: Elder's Impulse System, EMA13 slope + MACD hist slope 기반, 두 지표 모두 양수→BUY, 모두 음수→SELL, HIGH conf: abs(ema_slope) > ema_slope rolling std
+- `colored_candles`: 연속 색깔 캔들 패턴, 4봉 중 3+개 양봉/음봉 + 거래량 증가 + vol>vol_ma, HIGH conf: 4봉 연속
+- 테스트 각 14개 (28 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+
+## [2026-04-10] RangeTrading + TrendAcceleration 전략 추가 완료 (32 passed)
+- `range_trading`: 횡보 구간 rolling(20) 하단/상단 20% + RSI 반전 매매, HIGH conf: rsi<30 or rsi>70
+- `trend_acceleration`: EMA10-EMA20 스프레드 가속도(spread_slope=diff(3)) 기반 추세 추종, HIGH conf: abs(slope)>spread_std
+- 테스트 각 16개 (32 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] AdaptiveVolatility + TrendPersistence 전략 추가 완료 (28 passed)
+- `adaptive_volatility`: ATR 기반 변동성 레짐 감지, 동적 임계값(vol_regime*2.0)으로 momentum 신호 필터링, LOW/HIGH vol에 따라 confidence 조정
+- `trend_persistence`: 자기상관(autocorr > 0.2) 기반 추세 지속성 점수, Hurst-like 지표, HIGH conf: autocorr > 0.5
+- 테스트 각 14개 (28 passed), orchestrator.py STRATEGY_REGISTRY 등록 완료, push 완료
+
+## [2026-04-10] MarketPressure + TrendQualityFilter 전략 추가 완료 (30 passed)
+- `market_pressure`: 매수/매도 압력 비율(buy_ratio - sell_ratio) 기반, pressure_trend vs pressure_ma 방향 확인 + volume 필터
+- `trend_quality_filter`: 20봉 롤링 양/음봉 일관성 + 10봉 모멘텀 기반 추세 품질 평가, HIGH conf: consistency > 0.6
+- 테스트 각 15개 (30 passed), orchestrator.py STRATEGY_REGISTRY 등록, push 완료
+
+## [2026-04-10] BollingerSqueeze + RelativeMomentumIndex 전략 추가 완료 (30 passed)
+- `bollinger_squeeze`: BB 폭 수축 후 모멘텀 방향 돌파 전략, HIGH conf: width < width_ma*0.5
+- `relative_momentum_index`: RMI(momentum_period=3, rmi_period=14) 과매도<30/과매수>70 반전 전략
+- 테스트 각 15개 (30 passed), orchestrator.py STRATEGY_REGISTRY 등록 완료, push 완료
+
+## [2026-04-10] StochasticMomentum + PriceChannelFilter 전략 추가 완료 (32 passed)
+- `stochastic_momentum`: SMI 기반 과매도(-40)/과매수(+40) 시그널 크로스 전략, HIGH conf: ±60
+- `price_channel_filter`: 도나치안 채널 상단(>0.8)/하단(<0.2) 돌파 필터 전략, HIGH conf: >0.95/<0.05
+- 테스트 각 16개 (32 passed), orchestrator.py STRATEGY_REGISTRY 등록 완료
+
+## [2026-04-10] TailRiskFilter + PricePathEfficiency 전략 추가 완료 (30 passed)
+- `tail_risk_filter`: calm z-score 기반 진입 필터, rolling max으로 극단 감지
+- `price_path_efficiency`: Fractal Efficiency Ratio 간소화, lookback=8
+- orchestrator.py STRATEGY_REGISTRY 등록, 테스트 각 15개
+
+## Status: **33 passed** | CyclicMomentum + PriceRhythm 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — CyclicMomentum + PriceRhythm 신규 추가
+
+- src/strategy/cyclic_momentum.py: CyclicMomentumStrategy (name=cyclic_momentum)
+- src/strategy/price_rhythm.py: PriceRhythmStrategy (name=price_rhythm)
+- 테스트 33 passed, orchestrator.py STRATEGY_REGISTRY 등록 완료
+
+---
+
+## Status: **28 passed** | VolumePriceTrendV2 + CumulativeDelta(재구현) 전략 추가 완료
+
+## 최근 작업 (2026-04-10) — VolumePriceTrendV2 + CumulativeDelta 신규/재구현
+
+- `src/strategy/volume_price_trend_v2.py`: `VolumePriceTrendV2Strategy` (name=`volume_price_trend_v2`)
+  - VPT v2 히스토그램 기반 시그널 크로스
+  - BUY: vpt_hist > 0 AND 상승 중 AND vpt > vpt_signal
+  - SELL: vpt_hist < 0 AND 하락 중 AND vpt < vpt_signal
+  - confidence: HIGH if abs(vpt_hist) > rolling(20) std else MEDIUM
+- `src/strategy/cumulative_delta.py`: `CumulativeDeltaStrategy` (name=`cumulative_delta`) 재구현
+  - 누적 매수/매도 불균형 (up_vol - down_vol 방식)
+  - BUY: cum_delta > cum_delta_ma AND cum_delta > 0 AND close > close_ma
+  - SELL: cum_delta < cum_delta_ma AND cum_delta < 0 AND close < close_ma
+  - confidence: HIGH if abs(cum_delta) > rolling(20) std else MEDIUM
+- `tests/test_volume_price_trend_v2.py`, `tests/test_cumulative_delta.py`: 각 14개 테스트 (28 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+
+
+## 최근 작업 (2026-04-10) — TrendFibonacci + MeanReversionScore 신규 추가
+
+- `src/strategy/trend_fibonacci.py`: `TrendFibonacciStrategy` (name=`trend_fibonacci`)
+  - EMA20 방향 추세 + 피보나치 되돌림 레벨 (38.2% / 61.8%) 신호
+  - BUY: 상승추세(ema20 > ema20_prev) + close < fib_382
+  - SELL: 하락추세(ema20 < ema20_prev) + close > fib_618
+  - confidence: HIGH if close가 fib_500 ±5% range else MEDIUM
+- `src/strategy/mean_reversion_score.py`: `MeanReversionScoreStrategy` (name=`mean_reversion_score`)
+  - z_price + z_rsi 합산 평균 회귀 점수 (rev_score)
+  - BUY: rev_score > 1.5 AND vol_z > 0
+  - SELL: rev_score < -1.5 AND vol_z > 0
+  - confidence: HIGH if abs(rev_score) > 2.0 else MEDIUM
+- `tests/test_trend_fibonacci.py`, `tests/test_mean_reversion_score.py`: 각 17개 테스트 (34 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+
+
+## 최근 작업 (2026-04-10) — WickAnalysis + PriceFlowIndex 신규 추가
+
+- `src/strategy/wick_analysis.py`: `WickAnalysisStrategy` (name=`wick_analysis`)
+  - 꼬리(wick) 비율 rolling 분석으로 방향성 신호
+  - BUY: wick_imbalance > 0.2 AND > imbalance_ma AND lower_ratio > 0.3
+  - SELL: wick_imbalance < -0.2 AND < imbalance_ma AND upper_ratio > 0.3
+  - confidence: HIGH if abs(wi) > 0.4 else MEDIUM
+- `src/strategy/price_flow_index.py`: `PriceFlowIndexStrategy` (name=`price_flow_index`)
+  - Money Flow Index 간소화 (pfi)
+  - BUY: pfi < 30 AND rising (과매도 반등)
+  - SELL: pfi > 70 AND falling (과매수 하락)
+  - confidence: HIGH if pfi < 20 (BUY) or pfi > 80 (SELL) else MEDIUM
+- `tests/test_wick_analysis.py`, `tests/test_price_flow_index.py`: 각 16개 테스트 (32 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — CandleBodyFilter + EMAFan 신규 추가
+
+- `src/strategy/candle_body_filter.py`: `CandleBodyFilterStrategy` (name=`candle_body_filter`)
+  - 연속 강한 방향성 봉 + volume 필터
+  - BUY: bull_streak >= 2 AND close > prev_close AND volume > vol_ma
+  - SELL: bear_streak >= 2 AND close < prev_close AND volume > vol_ma
+  - confidence: HIGH if streak == 3 else MEDIUM
+- `src/strategy/ema_fan.py`: `EMAFanStrategy` (name=`ema_fan`)
+  - EMA 5/10/20/50 부채꼴 정렬 + 팬 확대 추세 전략
+  - BUY: bullish_fan AND fan_spread > fan_spread_ma
+  - SELL: bearish_fan AND fan_spread > fan_spread_ma
+  - confidence: HIGH if fan_spread > fan_spread_ma*1.5 else MEDIUM
+- `tests/test_candle_body_filter.py`, `tests/test_ema_fan.py`: 각 15개 테스트 (30 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — EntropyMomentum + FractalDimension 신규 추가
+
+- `src/strategy/entropy_momentum.py`: `EntropyMomentumStrategy` (name=`entropy_momentum`)
+  - 가격 변화 엔트로피 근사 + 모멘텀 결합
+  - BUY: entropy_proxy < entropy_ma*0.7 AND mom > mom_ma AND mom > 0
+  - SELL: entropy_proxy < entropy_ma*0.7 AND mom < mom_ma AND mom < 0
+  - confidence: HIGH if ep < ema*0.5 else MEDIUM
+- `src/strategy/fractal_dimension.py`: `FractalDimensionStrategy` (name=`fractal_dimension`)
+  - Fractal Efficiency Ratio (Kaufman ER) 기반
+  - BUY: er > 0.6 AND er > er_ma AND trend_up
+  - SELL: er > 0.6 AND er > er_ma AND NOT trend_up
+  - confidence: HIGH if er > 0.8 else MEDIUM
+- `tests/test_entropy_momentum.py`, `tests/test_fractal_dimension.py`: 각 17개 테스트 (34 passed)
+- `src/orchestrator.py`: STRATEGY_REGISTRY 등록 완료
+
+## 이전 작업 (2026-04-10) — KeltnerChannelV2 + RSIBand 신규 추가
 
 - `src/strategy/keltner_channel_v2.py`: `KeltnerChannelV2Strategy` (name=`keltner_channel_v2`)
   - EMA 기반 Keltner Channel 평균 회귀 전략

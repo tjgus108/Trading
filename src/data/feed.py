@@ -144,9 +144,9 @@ class DataFeed:
         rs = avg_gain / avg_loss.replace(0, np.nan)
         df["rsi14"] = 100 - (100 / (1 + rs))
 
-        # Donchian Channel (20)
-        df["donchian_high"] = high.rolling(20).max()
-        df["donchian_low"] = low.rolling(20).min()
+        # Donchian Channel (20) — 이전 20봉 기준 (현재 봉 미포함)
+        df["donchian_high"] = high.shift(1).rolling(20).max()
+        df["donchian_low"] = low.shift(1).rolling(20).min()
 
         # VWAP (rolling session)
         typical = (high + low + close) / 3
