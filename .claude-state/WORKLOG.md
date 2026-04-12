@@ -9392,3 +9392,61 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 12:13 UTC] Cycle 115 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 12:25 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 07:30 UTC] Cycle 116 COMPLETED — E + A + SIM + F
+**[E] CRITICAL #14:** src/backtest/walk_forward.py IS<=0 오분류 수정. IS<0+OOS>0 → ratio=1.0(non-overfit). +1 test.
+**[A] Quality:** commission 양방향 검증 (수정 없음, 진입+청산 2회 정확).
+**[SIM] 🎯 relative_volume 2차 PASS!** RVOL 1.5→1.6 + RSI 동적 + VWAP 필수. **PF 1.26→1.66 PASS!** Sharpe 1.86→2.83.
+**[F] Research:** RVOL. 임계 2.0+ 급등 탐지. Donchian 돌파 결합 시너지.
+**Tests:** 6341 passed (+1 from Cycle 115).
+**SIM 누적 22개.** relative_volume 최종 PASS!
+**14번째 CRITICAL 수정 완료.**
