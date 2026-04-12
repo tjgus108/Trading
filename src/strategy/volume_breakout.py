@@ -1,20 +1,20 @@
 """
 Volume Breakout 전략 (개선):
-- 스파이크 기준 2.0x → 1.8x 완화 (거래 빈도 증가)
-- BUY: volume spike(>1.8x 평균) AND 양봉(close>open) AND close > ema20
-- SELL: volume spike(>1.8x 평균) AND 음봉(close<open) AND close < ema20
-- confidence: HIGH(volume > 2.5x 평균), MEDIUM(volume > 1.8x 평균)
-- 최소 데이터: 25행
+- ATR 필터: 변동성이 중간 정도일 때만 진입
+- 추세 필터: EMA50 기준 추세 방향 확인
+- Volume Spike: 1.8x (기존 유지)
 """
 
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
 
-_MIN_ROWS = 25
+_MIN_ROWS = 50  # EMA50 필요
 _VOL_LOOKBACK = 20
-_SPIKE_MULT = 1.8  # 2.0 → 1.8 (거래 증가)
-_HIGH_CONF_MULT = 2.5  # 3.0 → 2.5
+_SPIKE_MULT = 1.8
+_HIGH_CONF_MULT = 2.5
+_ATR_LOW = 0.8  # ATR 최소 (과도하게 낮은 변동성 필터)
+_ATR_HIGH = 3.0  # ATR 최대 (과도하게 높은 변동성 필터)
 
 
 class VolumeBreakoutStrategy(BaseStrategy):
@@ -29,6 +29,8 @@ class VolumeBreakoutStrategy(BaseStrategy):
         open_ = float(last["open"])
         volume = float(last["volume"])
         ema20 = float(last["ema20"])
+        ema50 = float(last.get("ema50", close))  # EMA50 없으면 close 사용
+        atr14 = float(last.get("atr14", 0))
 
         avg_vol = float(df["volume"].iloc[-_VOL_LOOKBACK - 2 : -2].mean())
         spike = volume > avg_vol * _SPIKE_MULT
@@ -36,37 +38,46 @@ class VolumeBreakoutStrategy(BaseStrategy):
         bear_candle = close < open_
         above_ema = close > ema20
         below_ema = close < ema20
+        
+        # ATR 필터: 변동성이 너무 낮거나 높으면 스킵
+        atr_valid = _ATR_LOW <= atr14 <= _ATR_HIGH if atr14 > 0 else True
+        
+        # 추세 필터: EMA20 vs EMA50
+        uptrend = ema20 > ema50
+        downtrend = ema20 < ema50
 
-        bull_case = f"close={close:.2f} open={open_:.2f} ema20={ema20:.2f} vol={volume:.0f} avg_vol={avg_vol:.0f}"
+        bull_case = f"close={close:.2f} open={open_:.2f} ema20={ema20:.2f} ema50={ema50:.2f} vol={volume:.0f} atr={atr14:.2f}"
         bear_case = bull_case
 
-        if spike and bull_candle and above_ema:
+        # BUY: spike + 양봉 + close>ema20 + ATR 유효 + 상승 추세
+        if spike and bull_candle and above_ema and atr_valid and uptrend:
             confidence = Confidence.HIGH if volume > avg_vol * _HIGH_CONF_MULT else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"Volume breakout 상승: vol={volume:.0f} > avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 양봉, close({close:.2f})>ema20({ema20:.2f})",
-                invalidation=f"Close below EMA20 ({ema20:.2f})",
+                reasoning=f"Volume breakout 상승: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 양봉, close({close:.2f})>ema20({ema20:.2f}), uptrend, atr={atr14:.2f}",
+                invalidation=f"Close below EMA20 ({ema20:.2f}) or ATR out of range",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        if spike and bear_candle and below_ema:
+        # SELL: spike + 음봉 + close<ema20 + ATR 유효 + 하락 추세
+        if spike and bear_candle and below_ema and atr_valid and downtrend:
             confidence = Confidence.HIGH if volume > avg_vol * _HIGH_CONF_MULT else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"Volume breakout 하락: vol={volume:.0f} > avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 음봉, close({close:.2f})<ema20({ema20:.2f})",
-                invalidation=f"Close above EMA20 ({ema20:.2f})",
+                reasoning=f"Volume breakout 하락: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 음봉, close({close:.2f})<ema20({ema20:.2f}), downtrend, atr={atr14:.2f}",
+                invalidation=f"Close above EMA20 ({ema20:.2f}) or ATR out of range",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        return self._hold(df, f"No signal: vol={volume:.0f} avg={avg_vol:.0f} spike={spike}", bull_case, bear_case)
+        return self._hold(df, f"No signal: vol={volume:.0f} avg={avg_vol:.0f} spike={spike} atr_valid={atr_valid} trend_aligned={'up' if uptrend else 'down'}", bull_case, bear_case)
 
     def _hold(self, df: pd.DataFrame, reason: str,
               bull_case: str = "", bear_case: str = "") -> Signal:
