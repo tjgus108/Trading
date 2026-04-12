@@ -60,60 +60,86 @@ def fetch_real_data(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int 
 
 
 def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """전략이 사용하는 공통 지표 사전 계산 (quality_audit와 동일)."""
+    """전략이 사용하는 공통 지표 사전 계산 — feed.py와 동일한 방식."""
     df = df.copy()
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
 
-    # ATR 14
-    hl = df["high"] - df["low"]
-    hc = (df["high"] - df["close"].shift(1)).abs()
-    lc = (df["low"] - df["close"].shift(1)).abs()
-    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
-    df["atr14"] = tr.rolling(14).mean()
+    # ATR 14 — Wilder EWM (feed.py와 동일)
+    prev_close = close.shift(1)
+    tr = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
+    df["atr14"] = tr.ewm(alpha=1 / 14, adjust=False).mean()
 
     # EMA / SMA
-    df["ema20"] = df["close"].ewm(span=20).mean()
-    df["ema50"] = df["close"].ewm(span=50).mean()
-    df["sma20"] = df["close"].rolling(20).mean()
-    df["sma50"] = df["close"].rolling(50).mean()
+    df["ema20"] = close.ewm(span=20, adjust=False).mean()
+    df["ema50"] = close.ewm(span=50, adjust=False).mean()
+    df["sma20"] = close.rolling(20, min_periods=1).mean()
+    df["sma50"] = close.rolling(50, min_periods=1).mean()
 
-    # RSI 14
-    delta = df["close"].diff()
-    gain = delta.clip(lower=0).rolling(14).mean()
-    loss = (-delta.clip(upper=0)).rolling(14).mean()
-    rs = gain / loss.replace(0, np.nan)
+    # RSI 14 — Wilder EWM (feed.py와 동일)
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(alpha=1 / 14, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / 14, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
     df["rsi14"] = 100 - (100 / (1 + rs))
 
     # BB
-    df["bb_upper"] = df["sma20"] + 2 * df["close"].rolling(20).std()
-    df["bb_lower"] = df["sma20"] - 2 * df["close"].rolling(20).std()
+    df["bb_upper"] = df["sma20"] + 2 * close.rolling(20, min_periods=1).std()
+    df["bb_lower"] = df["sma20"] - 2 * close.rolling(20, min_periods=1).std()
 
     # MACD
-    df["macd"] = df["close"].ewm(span=12).mean() - df["close"].ewm(span=26).mean()
-    df["macd_signal"] = df["macd"].ewm(span=9).mean()
+    df["macd"] = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
+    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
 
-    # Donchian 20
-    df["donchian_high"] = df["high"].rolling(20).max()
-    df["donchian_low"] = df["low"].rolling(20).min()
+    # Donchian 20 — 이전 20봉 기준 (feed.py와 동일, 현재 봉 미포함)
+    df["donchian_high"] = high.shift(1).rolling(20, min_periods=1).max()
+    df["donchian_low"] = low.shift(1).rolling(20, min_periods=1).min()
 
     # VWAP (cumulative)
-    tp = (df["high"] + df["low"] + df["close"]) / 3
+    tp = (high + low + close) / 3
     df["vwap"] = (tp * df["volume"]).cumsum() / df["volume"].cumsum()
-    df["vwap20"] = (tp * df["volume"]).rolling(20).sum() / df["volume"].rolling(20).sum()
+    df["vwap20"] = (tp * df["volume"]).rolling(20, min_periods=1).sum() / df["volume"].rolling(20, min_periods=1).sum()
 
     # Volume SMA
-    df["volume_sma20"] = df["volume"].rolling(20).mean()
-    df["return_5"] = df["close"].pct_change(5)
+    df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
+    df["return_5"] = close.pct_change(5)
 
     return df
 
 
 def load_pass_strategies() -> list[tuple[str, str]]:
-    """QUALITY_AUDIT.csv에서 PASS 전략 목록 로드."""
-    if not CSV_PATH.exists():
-        return []
-    df = pd.read_csv(CSV_PATH)
-    passed = df[df["passed"]]
-    return list(zip(passed["module"].tolist(), passed["class"].tolist()))
+    """QUALITY_AUDIT.csv PASS 전략 + STRATEGY_REGISTRY 전략 합산 로드."""
+    seen: set[str] = set()
+    result: list[tuple[str, str]] = []
+
+    # 1. QUALITY_AUDIT.csv PASS 전략
+    if CSV_PATH.exists():
+        df = pd.read_csv(CSV_PATH)
+        for _, row in df[df["passed"]].iterrows():
+            key = f"{row['module']}.{row['class']}"
+            if key not in seen:
+                seen.add(key)
+                result.append((row["module"], row["class"]))
+
+    # 2. STRATEGY_REGISTRY에 있는 전략 추가 (CSV 미포함분)
+    try:
+        from src.orchestrator import STRATEGY_REGISTRY
+        for name, cls in STRATEGY_REGISTRY.items():
+            mod_name = cls.__module__.replace("src.strategy.", "")
+            cls_name = cls.__name__
+            key = f"{mod_name}.{cls_name}"
+            if key not in seen:
+                seen.add(key)
+                result.append((mod_name, cls_name))
+    except Exception:
+        pass
+
+    return result
 
 
 def load_strategy_class(module_name: str, class_name: str):
