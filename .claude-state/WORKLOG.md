@@ -9453,3 +9453,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 12:28 UTC] Cycle 116 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 12:49 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 08:00 UTC] Cycle 117 COMPLETED — C + B + SIM + F
+**[C] Data:** websocket _connected stale state 버그 발견 (async with 탈출 시 미업데이트). 15번째 CRITICAL 후보.
+**[B] Risk:** DD 월간 15% → FORCE_LIQUIDATE 1회 정확 검증 (수정 없음).
+**[SIM] price_action_momentum 최적화:** body_strength 0.42, roc5_std*0.45로 Sharpe 1.66 달성. PF 1.32 한계 (구조적).
+**[F] Research:** PA 봇 단독 비권장 (노이즈 70-80% 봇 거래량). 필터 필수.
+**Tests:** 6341 passed.
+**Status:** 116 사이클 완료.

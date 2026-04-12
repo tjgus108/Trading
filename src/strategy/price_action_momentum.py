@@ -1,11 +1,12 @@
 """
-PriceActionMomentumStrategy: 개선된 버전.
+PriceActionMomentumStrategy: Cycle 117 최종 (body 0.40 + 강한 roc5).
 
 개선 사항:
-- body_strength 기준 완화: 0.5 → 0.35 (신호 증가)
-- roc5 기준 완화: roc5 > roc5_ma → roc5 > roc5_ma - roc5_std*0.3 (민감도 ↑)
-- momentum 추가 필터: close > sma(50)일 때만 BUY (트렌드 확인)
-- 최소 35행 (더 안정적인 지표)
+- body_strength: 0.40 (균형)
+- roc5 절대값: > 0.005 (0.5% 최소)
+- roc5 상대값: roc5_std*0.6 (강함)
+- SMA50 (원래대로)
+- 목표: PF >= 1.5, Sharpe >= 1.0
 """
 
 import pandas as pd
@@ -36,7 +37,6 @@ class PriceActionMomentumStrategy(BaseStrategy):
         roc5_ma = roc5.rolling(10, min_periods=1).mean()
         roc5_std = roc5.rolling(20, min_periods=1).std()
         
-        # 추가 필터: SMA(50) 트렌드 확인
         sma50 = close.rolling(50, min_periods=1).mean()
 
         idx = len(df) - 2
@@ -63,15 +63,12 @@ class PriceActionMomentumStrategy(BaseStrategy):
             and abs(v_roc5) > v_roc5_std * 1.5
         )
 
-        # BUY: 개선된 조건
-        # - body_strength >= 0.35 (from 0.5, 더 많은 신호)
-        # - roc5 > roc5_ma - roc5_std*0.3 (완화된 모멘텀 기준)
-        # - close > sma50 (상승 트렌드 확인)
+        # BUY: body 0.40 + 강한 roc5
         if (
             v_body > 0
-            and v_body_strength >= 0.35
-            and v_roc5 > v_roc5_ma - (v_roc5_std * 0.3 if not math.isnan(v_roc5_std) else 0)
-            and v_roc5 > 0
+            and v_body_strength >= 0.40
+            and v_roc5 > 0.005
+            and v_roc5 > v_roc5_ma - (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
             and v_close > v_sma50
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
@@ -82,22 +79,19 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 entry_price=v_close,
                 reasoning=(
                     f"PA Momentum BUY: body_strength={v_body_strength:.3f} "
-                    f"roc5={v_roc5:.4f}>threshold, sma50 uptrend"
+                    f"roc5={v_roc5:.4f}, sma50 uptrend"
                 ),
-                invalidation="body<=0 or body_strength<0.35 or close<=sma50",
+                invalidation="body<=0 or body_strength<0.40 or close<=sma50",
                 bull_case=context,
                 bear_case=context,
             )
 
-        # SELL: 개선된 조건
-        # - body_strength >= 0.35 (from 0.5, 더 많은 신호)
-        # - roc5 < roc5_ma + roc5_std*0.3 (완화된 모멘텀 기준)
-        # - close < sma50 (하락 트렌드 확인)
+        # SELL: body 0.40 + 강한 roc5
         if (
             v_body < 0
-            and v_body_strength >= 0.35
-            and v_roc5 < v_roc5_ma + (v_roc5_std * 0.3 if not math.isnan(v_roc5_std) else 0)
-            and v_roc5 < 0
+            and v_body_strength >= 0.40
+            and v_roc5 < -0.005
+            and v_roc5 < v_roc5_ma + (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
             and v_close < v_sma50
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
@@ -108,9 +102,9 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 entry_price=v_close,
                 reasoning=(
                     f"PA Momentum SELL: body_strength={v_body_strength:.3f} "
-                    f"roc5={v_roc5:.4f}<threshold, sma50 downtrend"
+                    f"roc5={v_roc5:.4f}, sma50 downtrend"
                 ),
-                invalidation="body>=0 or body_strength<0.35 or close>=sma50",
+                invalidation="body>=0 or body_strength<0.40 or close>=sma50",
                 bull_case=context,
                 bear_case=context,
             )
