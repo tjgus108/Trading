@@ -9218,3 +9218,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** CMF+RSI. 오신호 30-40% 감소 (비공식). CMF divergence가 핵심 엣지.
 **Tests:** 6340 passed (+3 from Cycle 112).
 **SIM 누적 21개 개선.** cmf 최종 PASS 달성!
+
+## [2026-04-12 11:46 UTC] Cycle 113 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

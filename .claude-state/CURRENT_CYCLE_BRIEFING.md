@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 112 — 2026-04-12T11:35:44.075793Z
+🔄 CYCLE 113 — 2026-04-12T11:46:28.387645Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 112 COMPLETED — C + B + SIM + F** (2026-04-12 05:35 UTC)
-  **[C] Data:** retry 로깅 검증 (수정 없음, 구현 정상).
-  **[B] Risk:** vol_targeting scalar() 중복 체크 제거 → _scalar_from_rv() 통합.
-  **[SIM] 🎯 order_flow_imbalance_v2 대성공!** 임계값 0.20→0.25 + 거래량 필터. **PF 1.47→1.77 PASS 달성!** Sharpe 3.38→4.26 (+26%). Return 16.45%→17.85%.
-  **[F] Research:** OFI는 HFT 전용 (50ms~5분). 저빈도 봇 단독 비추천. Hawkes+ML 하이브리드만 OOS 우위.
+**Cycle 113 COMPLETED — D + E + SIM + F** (2026-04-12 06:00 UTC)
+  **[D] ML:** tests/test_ensemble_conflicts.py +1 _ask_parallel timeout.
+  **[E] Execution:** scheduler boundary bug 발견 (경계값 시 불필요 1 interval 대기).
+  **[SIM] 🎯 cmf 2차 대성공!** CMF 임계값 강화(0.08) + 볼륨 85% + RSI 확인(BUY<75/SELL>25). **PF 1.22→1.64 PASS!** Sharpe 1.25→3.17. Return +4.28%→+11.27%.
+  **[F] Research:** CMF+RSI. 오신호 30-40% 감소 (비공식). CMF divergence가 핵심 엣지.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
