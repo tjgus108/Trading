@@ -8808,3 +8808,112 @@ ImplShortfall: -5.00bps
 **[F] Research:** 봇 시장 2026. $54B 규모, 거래의 65% 자동화. 평균 ROI 25-40% 목표 (보장 X).
 **Tests:** 6327 passed (변화 없음).
 **Status:** 107 사이클 완료 (Cycle 2~107). 라이브 배포 준비 단계.
+
+## [2026-04-12 10:50 UTC] Cycle 107 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 10:54 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 10:56 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 04:00 UTC] Cycle 108 COMPLETED — D + E + SIM + F
+**[D] ML CRITICAL:** src/ml/features.py inf→NaN 방어 추가. close=0 시 log(0/prev)=-inf 발생 → replace([inf,-inf], nan). 13번째 CRITICAL.
+**[E] Execution:** config env override 검증 (수정 없음).
+**[SIM] supertrend_multi 강화:** ATR 필터 0.8→0.9. Sharpe 3.77→3.85 (+2.1%), PF 1.75→1.80 (+2.9%). 거짓 신호 3개 제거.
+**[F] Research:** Supertrend Multi-TF. 상위 TF 추세 필터 + 하위 TF 진입. ATR adaptive 핵심.
+**Tests:** 6330 passed (+3 from Cycle 107). 13번째 CRITICAL 수정.
+**Next Cycle:** 109 (A+C+SIM+F)

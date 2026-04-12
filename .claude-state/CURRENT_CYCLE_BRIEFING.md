@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 106 — 2026-04-12T01:24:10.835939Z
+🔄 CYCLE 107 — 2026-04-12T10:50:17.678567Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 106 COMPLETED — E + A + SIM + F** (2026-04-12 03:00 UTC)
-  **[E] Execution:** src/exchange/connector.py 주문 로깅 확장 (status+filled+avg_price). +0 tests (로그 변경만).
-  **[A] Quality:** tests/test_monte_carlo.py +6 percentile 경계 (99th/1st, 단조성, 극값, Sharpe/MDD).
-  **[SIM]:** price_cluster 필터 강화 시도 → 거래 67% 감소, 손실 전환. 구조적 한계. roc_ma_cross ROC 부호 + STD_MULT 2.0 수정.
-  **[F] Research:** Price Cluster/Volume Profile POC. POC = 공정가치 기준, 평균회귀 진입. VAH/VAL 결합으로 존 명확화. 승률 70-75%.
+**Cycle 107 COMPLETED — C + B + SIM + F (리포트 갱신)** (2026-04-12 03:30 UTC)
+  **[C] Data:** onchain _score_from_fields 극단 검증 (코드 안전, 수정 없음).
+  **[B] Risk:** kelly from_trade_history 빈 → 0.0 반환 기존 통과 확인.
+  **[SIM] 시뮬 리포트 갱신:** 22개 PASS 중 19/22 흑자 (86.4%). 균등배분 +6.50%, Top10 +12.11%.
+  **[F] Research:** 봇 시장 2026. $54B 규모, 거래의 65% 자동화. 평균 ROI 25-40% 목표 (보장 X).
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

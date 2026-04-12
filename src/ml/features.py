@@ -152,6 +152,9 @@ class FeatureBuilder:
         else:
             feat["price_vs_vwap"] = 0.0
 
+        # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
+        feat = feat.replace([np.inf, -np.inf], np.nan)
+
         return feat
 
     def _compute_labels(self, df: pd.DataFrame) -> pd.Series:
