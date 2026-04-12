@@ -1,25 +1,28 @@
 """
-RelativeVolumeStrategy:
+RelativeVolumeStrategy (Fine-tuned Cycle 116):
 - RVOL = current_volume / avg_volume_20
 - VWAP = 거래량 가중 이동 평균 (rolling 20)
-- BUY: RVOL > 2.0 AND close > open (양봉) AND close > VWAP
-- SELL: RVOL > 2.0 AND close < open (음봉) AND close < VWAP
-- HOLD: RVOL < 1.5
-- confidence: RVOL > 3.0 AND 볼린저 상/하단 조건 → HIGH, 그 외 MEDIUM
+- RSI 14 필터 (과매수/과매도 제외)
+- BUY: RVOL > 1.6 AND close > open AND close > VWAP AND RSI < 68
+- SELL: RVOL > 1.6 AND close < open AND close < VWAP AND RSI > 32
+- HIGH CONF: RVOL > 2.3 AND RSI extreme (< 45 or > 55) AND BB condition
 - 최소 행: 25
 """
 
 import pandas as pd
+import numpy as np
 
 from .base import Action, BaseStrategy, Confidence, Signal
 
 _MIN_ROWS = 25
 _VOL_LOOKBACK = 20
-_RVOL_BUY_SELL = 2.0
-_RVOL_HOLD = 1.5
-_RVOL_HIGH_CONF = 3.0
+_RVOL_BUY_SELL = 1.6  # 최적점: 1.5->1.8의 중간
+_RVOL_HIGH_CONF = 2.3
 _BB_WINDOW = 20
 _BB_STD = 2.0
+_RSI_PERIOD = 14
+_RSI_BUY_MAX = 68  # 약간의 과매수 허용
+_RSI_SELL_MIN = 32  # 약간의 과매도 허용
 
 
 class RelativeVolumeStrategy(BaseStrategy):
@@ -46,49 +49,78 @@ class RelativeVolumeStrategy(BaseStrategy):
         vwap_series = cv / v
         vwap = float(vwap_series.iloc[idx])
 
-        # 볼린저 밴드 (신호 봉 포함 rolling 20)
+        # 볼린저 밴드
         bb_mean = df["close"].rolling(_BB_WINDOW).mean()
         bb_std = df["close"].rolling(_BB_WINDOW).std()
         bb_upper = float(bb_mean.iloc[idx]) + _BB_STD * float(bb_std.iloc[idx])
         bb_lower = float(bb_mean.iloc[idx]) - _BB_STD * float(bb_std.iloc[idx])
 
+        # RSI 14
+        rsi = self._compute_rsi(df, idx, _RSI_PERIOD)
+
         bull_candle = close > open_
         bear_candle = close < open_
 
         info = (
-            f"rvol={rvol:.2f} close={close:.2f} open={open_:.2f} "
-            f"vwap={vwap:.2f} bb_upper={bb_upper:.2f} bb_lower={bb_lower:.2f}"
+            f"rvol={rvol:.2f} close={close:.2f} vwap={vwap:.2f} "
+            f"bb_upper={bb_upper:.2f} bb_lower={bb_lower:.2f} rsi={rsi:.1f}"
         )
 
-        if rvol > _RVOL_BUY_SELL and bull_candle and close > vwap:
-            high_conf = rvol > _RVOL_HIGH_CONF and close > bb_upper
+        # BUY: RVOL > 1.6 + 양봉 + close > VWAP + RSI < 68
+        if (rvol > _RVOL_BUY_SELL and bull_candle and 
+            close > vwap and rsi < _RSI_BUY_MAX):
+            # HIGH CONF: RVOL > 2.3 AND (RSI < 45 OR RSI > 55) AND (close > BB upper)
+            high_conf = (rvol > _RVOL_HIGH_CONF and 
+                        (rsi < 45 or rsi > 55) and close > bb_upper)
             conf = Confidence.HIGH if high_conf else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"RVOL 상승 돌파: {info}",
-                invalidation=f"Close below VWAP ({vwap:.2f})",
+                reasoning=f"RVOL+VWAP 돌파 (RSI {rsi:.1f}<{_RSI_BUY_MAX}): {info}",
+                invalidation=f"Close ≤ VWAP or RSI ≥ {_RSI_BUY_MAX}",
                 bull_case=info,
                 bear_case=info,
             )
 
-        if rvol > _RVOL_BUY_SELL and bear_candle and close < vwap:
-            high_conf = rvol > _RVOL_HIGH_CONF and close < bb_lower
+        # SELL: RVOL > 1.6 + 음봉 + close < VWAP + RSI > 32
+        if (rvol > _RVOL_BUY_SELL and bear_candle and 
+            close < vwap and rsi > _RSI_SELL_MIN):
+            # HIGH CONF: RVOL > 2.3 AND (RSI < 45 OR RSI > 55) AND (close < BB lower)
+            high_conf = (rvol > _RVOL_HIGH_CONF and 
+                        (rsi < 45 or rsi > 55) and close < bb_lower)
             conf = Confidence.HIGH if high_conf else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"RVOL 하락 이탈: {info}",
-                invalidation=f"Close above VWAP ({vwap:.2f})",
+                reasoning=f"RVOL+VWAP 이탈 (RSI {rsi:.1f}>{_RSI_SELL_MIN}): {info}",
+                invalidation=f"Close ≥ VWAP or RSI ≤ {_RSI_SELL_MIN}",
                 bull_case=info,
                 bear_case=info,
             )
 
-        return self._hold_signal(close, f"No signal (rvol={rvol:.2f}): {info}", info, info)
+        return self._hold_signal(close, f"No signal (rvol={rvol:.2f}, rsi={rsi:.1f}): {info}", info, info)
+
+    def _compute_rsi(self, df: pd.DataFrame, idx: int, period: int) -> float:
+        """RSI 계산 (idx 지점)."""
+        if idx < period + 1:
+            return 50.0
+        
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).rolling(period).mean()
+        loss = (-delta.clip(upper=0)).rolling(period).mean()
+        
+        rs = gain / loss.replace(0, np.nan)
+        rsi_series = 100 - (100 / (1 + rs))
+        
+        try:
+            rsi = float(rsi_series.iloc[idx])
+            return rsi if not np.isnan(rsi) else 50.0
+        except:
+            return 50.0
 
     def _hold_signal(self, entry_price: float, reason: str,
                      bull_case: str = "", bear_case: str = "") -> Signal:

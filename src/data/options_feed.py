@@ -14,32 +14,38 @@ CME Basis:
   - 연환산: basis_annual = basis_pct * (365 / days_to_expiry)
   - Binance 선물 API: https://fapi.binance.com/fapi/v1/premiumIndex
 
-두 피드 모두 실패 시 mock 반환 (예외 전파 금지).
+두 피드 모두 API 실패 시 graceful degradation:
+- 재시도(exponential backoff) 후 실패 → fallback(이전 성공 데이터) → 중립 데이터
+- 예외 전파 금지 (파이프라인 블록 금지)
 """
 
+import json
 import logging
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.request import urlopen
-import json
 
 logger = logging.getLogger(__name__)
 
 _GEX_SCORE_SCALE = 3.0  # max abs score
+_FETCH_TIMEOUT = 8
+_MAX_RETRIES = 2  # Cycle 6 패턴
 
 
 class GEXFeed:
-    """Deribit 옵션 데이터로 Net GEX 계산."""
+    """Deribit 옵션 데이터로 Net GEX 계산 (재시도 + fallback)."""
 
     DERIBIT_URL = (
         "https://www.deribit.com/api/v2/public/get_book_summary_by_currency"
         "?currency={symbol}&kind=option"
     )
 
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: int = 10, max_retries: int = _MAX_RETRIES):
         self.timeout = timeout
+        self.max_retries = max_retries
         self._mock_data: Optional[dict] = None
+        self._last_successful: Optional[dict] = None  # fallback 용
 
     # ------------------------------------------------------------------
     # Public
@@ -49,19 +55,25 @@ class GEXFeed:
         """
         Returns:
             {"net_gex": float, "positive": bool, "score": float(-3~+3)}
-        API 실패 시 {"net_gex": 0.0, "positive": True, "score": 0.0}
+        API 성공 시: 실제 데이터 반환
+        API 실패 후 재시도 → fallback(이전 성공) → 중립 데이터 반환
         """
         if self._mock_data is not None:
             return self._mock_data
 
-        try:
-            url = self.DERIBIT_URL.format(symbol=symbol.upper())
-            with urlopen(url, timeout=self.timeout) as resp:
-                data = json.loads(resp.read().decode())
-            return self._parse_gex(data)
-        except Exception as exc:
-            logger.warning("GEXFeed.get_gex failed: %s", exc)
-            return {"net_gex": 0.0, "positive": True, "score": 0.0}
+        result = self._fetch_gex_with_retry(symbol)
+        if result is not None:
+            self._last_successful = result
+            return result
+
+        # 재시도 후에도 실패 → fallback 사용
+        if self._last_successful:
+            logger.warning("GEXFeed.get_gex failed after %d retries, using fallback", self.max_retries + 1)
+            return self._last_successful
+
+        # fallback도 없으면 중립 데이터
+        logger.warning("GEXFeed.get_gex failed and no fallback available, returning neutral")
+        return {"net_gex": 0.0, "positive": True, "score": 0.0}
 
     @classmethod
     def mock(cls, net_gex: float = 1e9, positive: bool = True) -> "GEXFeed":
@@ -80,6 +92,24 @@ class GEXFeed:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _fetch_gex_with_retry(self, symbol: str = "BTC") -> Optional[dict]:
+        """Deribit API 조회 (재시도 + exponential backoff)."""
+        for attempt in range(self.max_retries + 1):
+            try:
+                url = self.DERIBIT_URL.format(symbol=symbol.upper())
+                with urlopen(url, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode())
+                return self._parse_gex(data)
+            except Exception as e:
+                if attempt < self.max_retries:
+                    delay = 0.5 * (2 ** attempt)  # 0.5s, 1s, 2s
+                    logger.debug("GEXFeed attempt %d/%d failed: %s, retrying in %.1fs", 
+                                 attempt + 1, self.max_retries + 1, e, delay)
+                    time.sleep(delay)
+                else:
+                    logger.warning("GEXFeed failed after %d attempts: %s", self.max_retries + 1, e)
+        return None
 
     def _parse_gex(self, data: dict) -> dict:
         summaries = data.get("result", [])
@@ -114,23 +144,22 @@ class GEXFeed:
 
 
 class CMEBasisFeed:
-    """Binance 선물 premiumIndex로 CME basis 추정."""
+    """Binance 선물 premiumIndex로 CME basis 추정 (재시도 + fallback)."""
 
     BINANCE_URL = (
         "https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}"
     )
-    BINANCE_FUTURES_URL = (
-        "https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
-    )
 
     # score 임계값
     HIGH_BASIS_THRESHOLD = 15.0   # annual %
-    LOW_BASIS_THRESHOLD = 3.0
+    LOW_BASIS_THRESHOLD = 5.0
 
-    def __init__(self, timeout: int = 10, days_to_expiry: int = 30):
+    def __init__(self, timeout: int = 10, days_to_expiry: int = 30, max_retries: int = _MAX_RETRIES):
         self.timeout = timeout
         self.days_to_expiry = days_to_expiry
+        self.max_retries = max_retries
         self._mock_data: Optional[dict] = None
+        self._last_successful: Optional[dict] = None  # fallback 용
 
     # ------------------------------------------------------------------
     # Public
@@ -140,20 +169,25 @@ class CMEBasisFeed:
         """
         Returns:
             {"basis_pct": float, "basis_annual": float, "score": float(-3~+3)}
-        score: basis_annual > 15% → +2 (carry 매력), < 5% → -1
-        API 실패 시 {"basis_pct": 0.0, "basis_annual": 0.0, "score": 0.0}
+        API 성공 시: 실제 데이터 반환
+        API 실패 후 재시도 → fallback(이전 성공) → 중립 데이터 반환
         """
         if self._mock_data is not None:
             return self._mock_data
 
-        try:
-            url = self.BINANCE_URL.format(symbol=symbol.upper())
-            with urlopen(url, timeout=self.timeout) as resp:
-                data = json.loads(resp.read().decode())
-            return self._parse_basis(data)
-        except Exception as exc:
-            logger.warning("CMEBasisFeed.get_basis failed: %s", exc)
-            return {"basis_pct": 0.0, "basis_annual": 0.0, "score": 0.0}
+        result = self._fetch_basis_with_retry(symbol)
+        if result is not None:
+            self._last_successful = result
+            return result
+
+        # 재시도 후에도 실패 → fallback 사용
+        if self._last_successful:
+            logger.warning("CMEBasisFeed.get_basis failed after %d retries, using fallback", self.max_retries + 1)
+            return self._last_successful
+
+        # fallback도 없으면 중립 데이터
+        logger.warning("CMEBasisFeed.get_basis failed and no fallback available, returning neutral")
+        return {"basis_pct": 0.0, "basis_annual": 0.0, "score": 0.0}
 
     @classmethod
     def mock(cls, basis_annual: float = 10.0) -> "CMEBasisFeed":
@@ -173,12 +207,30 @@ class CMEBasisFeed:
     # Internal
     # ------------------------------------------------------------------
 
+    def _fetch_basis_with_retry(self, symbol: str = "BTCUSDT") -> Optional[dict]:
+        """Binance API 조회 (재시도 + exponential backoff)."""
+        for attempt in range(self.max_retries + 1):
+            try:
+                url = self.BINANCE_URL.format(symbol=symbol.upper())
+                with urlopen(url, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode())
+                return self._parse_basis(data)
+            except Exception as e:
+                if attempt < self.max_retries:
+                    delay = 0.5 * (2 ** attempt)  # 0.5s, 1s, 2s
+                    logger.debug("CMEBasisFeed attempt %d/%d failed: %s, retrying in %.1fs",
+                                 attempt + 1, self.max_retries + 1, e, delay)
+                    time.sleep(delay)
+                else:
+                    logger.warning("CMEBasisFeed failed after %d attempts: %s", self.max_retries + 1, e)
+        return None
+
     def _parse_basis(self, data: dict) -> dict:
         mark_price = float(data.get("markPrice", 0.0))
         index_price = float(data.get("indexPrice", 0.0))
 
         if index_price == 0.0:
-            return {"basis_pct": 0.0, "basis_annual": 0.0, "score": 0.0}
+            return None
 
         basis_pct = (mark_price - index_price) / index_price * 100.0
         days = max(1, self.days_to_expiry)

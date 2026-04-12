@@ -169,6 +169,41 @@ class TestBacktestReport:
         assert report.total_return == 0.25
         assert abs(report.calmar_ratio - (0.25 / 0.12)) < 1e-9
 
+    def test_sortino_ratio_downside_deviation_based(self):
+        """Sortino Ratio = (mean_return - rf) / downside_dev * sqrt(annualization)."""
+        # 수익: 10개, 손실: 5개 데이터로 다운사이드 계산
+        trades = []
+        for _ in range(10):
+            trades.append({"pnl_pct": 0.01})  # 수익 (다운사이드 기여 안 함)
+        for _ in range(5):
+            trades.append({"pnl_pct": -0.005})  # 손실 (다운사이드 기여)
+        
+        report = BacktestReport.from_trades(trades)
+        # Sortino > Sharpe (손실만 변동성에 반영)
+        assert hasattr(report, "sortino_ratio")
+        assert report.sortino_ratio > 0
+        # 다운사이드가 있으므로 Sortino가 유효한 양수여야 함
+        assert not np.isnan(report.sortino_ratio)
+        assert not np.isinf(report.sortino_ratio)
+
+    def test_recovery_factor_calculation(self):
+        """Recovery Factor = total_return / max_drawdown."""
+        # total_return 계산 가능하고 mdd > 0 인 데이터
+        trades = [
+            {"pnl_pct": 0.02},
+            {"pnl_pct": -0.01},  # 낙폭 발생
+            {"pnl_pct": 0.03},
+            {"pnl_pct": 0.01},
+        ]
+        
+        report = BacktestReport.from_trades(trades)
+        assert hasattr(report, "recovery_factor")
+        assert report.max_drawdown > 0  # 낙폭 존재
+        # Recovery = total_return / mdd
+        expected_recovery = report.total_return / report.max_drawdown
+        assert abs(report.recovery_factor - expected_recovery) < 1e-9
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # J3. SignalCorrelationTracker
@@ -262,3 +297,69 @@ class TestSignalCorrelationTracker:
         for _ in range(20):
             tracker.record("a", Action.BUY)
         assert len(tracker._signals["a"]) <= 5
+
+
+    def test_all_metrics_initialized_from_trades(self):
+        """from_trades()에서 모든 메트릭이 초기화되는지 검증."""
+        trades = [{"pnl_pct": 0.01}, {"pnl_pct": -0.005}, {"pnl_pct": 0.02}]
+        report = BacktestReport.from_trades(trades)
+        
+        # BacktestReport dataclass의 모든 필드 확인
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"
+
+    def test_all_metrics_initialized_from_backtest_result(self):
+        """from_backtest_result()에서 모든 메트릭이 초기화되는지 검증."""
+        from src.backtest.engine import BacktestResult
+        br = BacktestResult(
+            strategy="test",
+            total_trades=30,
+            win_rate=0.6,
+            profit_factor=1.5,
+            sharpe_ratio=1.2,
+            max_drawdown=0.15,
+            total_return=0.3,
+            passed=True,
+            fail_reasons=[],
+        )
+        report = BacktestReport.from_backtest_result(br)
+        
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"
+
+    def test_all_metrics_initialized_empty(self):
+        """_empty()에서 모든 메트릭이 초기화되는지 검증."""
+        report = BacktestReport._empty(252 * 24)
+        
+        required_fields = [
+            "total_return", "ann_return", "ann_volatility",
+            "sharpe_ratio", "sortino_ratio", "deflated_sharpe_ratio",
+            "calmar_ratio", "recovery_factor", "max_drawdown",
+            "total_trades", "win_rate", "profit_factor",
+            "avg_win", "avg_loss", "win_loss_ratio",
+            "max_consecutive_losses", "annualization"
+        ]
+        for field in required_fields:
+            assert hasattr(report, field), f"Missing field: {field}"
+            val = getattr(report, field)
+            assert val is not None, f"Field {field} is None"

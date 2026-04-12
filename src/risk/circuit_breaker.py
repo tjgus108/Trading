@@ -1,8 +1,16 @@
 """
-Circuit Breaker: Drawdown 기반 자동 거래 중단.
-일일 낙폭 -5%, 전체 낙폭 -15% 초과 시 트리거.
+Circuit Breaker: 다층 자동 거래 중단.
+- 일일 낙폭 / 전체 낙폭
+- 변동성 급등: 현재 ATR이 기준 ATR의 atr_surge_multiplier 배 이상이면 트리거
+  (포지션 full-block이 아닌 50% 축소 신호를 반환)
+- 상관관계 급증: 전략 간 상관계수 ≥ corr_threshold → size_multiplier=0.7 축소
+- 플래시 크래시 감지: 단일 캔들 가격 변동 ≥ flash_crash_pct → 즉시 완전 차단
+- 연속 손실 쿨다운: 연속 손실 ≥ max_consecutive_losses → cooldown_periods 동안 거래 차단
 """
 import logging
+from typing import Optional
+
+from src.analysis.strategy_correlation import SignalCorrelationTracker
 
 logger = logging.getLogger(__name__)
 
@@ -12,50 +20,141 @@ class CircuitBreaker:
         self,
         daily_drawdown_limit: float = 0.05,   # -5% 일일 낙폭
         total_drawdown_limit: float = 0.15,   # -15% 전체 낙폭
+        atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
+        corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소
+        flash_crash_pct: float = 0.10,        # 단일 캔들 10% 이상 변동 → 즉시 차단
+        max_consecutive_losses: int = 5,      # 연속 손실 한계
+        cooldown_periods: int = 3,            # 쿨다운 기간 (트레이드 횟수 단위)
+        correlation_tracker: Optional[SignalCorrelationTracker] = None,
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
         self.total_drawdown_limit = total_drawdown_limit
+        self.atr_surge_multiplier = atr_surge_multiplier
+        self.corr_threshold = corr_threshold
+        self.flash_crash_pct = flash_crash_pct
+        self.max_consecutive_losses = max_consecutive_losses
+        self.cooldown_periods = cooldown_periods
+        self._correlation_tracker = correlation_tracker
         self._triggered: bool = False
         self._reason: str = ""
         self._daily_start_balance: float = 0.0
+        self._consecutive_losses: int = 0
+        self._cooldown_remaining: int = 0
 
+    # ── 내부 헬퍼 ──────────────────────────────────────────────────────────────
+    def _make_result(
+        self,
+        triggered: bool,
+        reason: str,
+        drawdown_pct: float,
+        volatility_surge: bool = False,
+        correlation_throttle: bool = False,
+        size_multiplier: float = 1.0,
+    ) -> dict:
+        return {
+            "triggered": triggered,
+            "reason": reason,
+            "drawdown_pct": round(drawdown_pct, 6),
+            "volatility_surge": volatility_surge,
+            "correlation_throttle": correlation_throttle,
+            "size_multiplier": size_multiplier,   # 1.0=정상, 0.7=상관축소, 0.5=반축소, 0.0=완전차단
+        }
+
+    # ── 트레이드 결과 기록 ─────────────────────────────────────────────────────
+    def record_trade_result(self, is_loss: bool) -> None:
+        """트레이드 결과 기록. 손실 시 연속 손실 카운터 증가, 수익 시 초기화.
+        연속 손실이 max_consecutive_losses에 도달하면 쿨다운 시작.
+        """
+        if self._cooldown_remaining > 0:
+            # 쿨다운 중에는 카운터 변경 없음
+            return
+
+        if is_loss:
+            self._consecutive_losses += 1
+            logger.info(
+                "CircuitBreaker: 연속 손실 %d/%d",
+                self._consecutive_losses, self.max_consecutive_losses,
+            )
+            if self._consecutive_losses >= self.max_consecutive_losses:
+                self._cooldown_remaining = self.cooldown_periods
+                logger.warning(
+                    "CircuitBreaker COOLDOWN 시작: 연속 손실 %d회 → %d 기간 대기",
+                    self._consecutive_losses, self.cooldown_periods,
+                )
+        else:
+            if self._consecutive_losses > 0:
+                logger.info(
+                    "CircuitBreaker: 연속 손실 초기화 (이전 %d회)", self._consecutive_losses
+                )
+            self._consecutive_losses = 0
+
+    def tick_cooldown(self) -> None:
+        """쿨다운 카운터를 1 감소. 쿨다운 종료 시 연속 손실 카운터도 초기화."""
+        if self._cooldown_remaining > 0:
+            self._cooldown_remaining -= 1
+            logger.info(
+                "CircuitBreaker: 쿨다운 잔여 %d 기간", self._cooldown_remaining
+            )
+            if self._cooldown_remaining == 0:
+                self._consecutive_losses = 0
+                logger.info("CircuitBreaker: 쿨다운 종료, 연속 손실 초기화")
+
+    # ── 메인 체크 ──────────────────────────────────────────────────────────────
     def check(
         self,
         current_balance: float,
         peak_balance: float,
         daily_start_balance: float,
+        current_atr: Optional[float] = None,
+        baseline_atr: Optional[float] = None,
+        candle_open: Optional[float] = None,
+        candle_close: Optional[float] = None,
     ) -> dict:
         """
-        반환: {"triggered": bool, "reason": str, "drawdown_pct": float}
-        daily_drawdown: (daily_start - current) / daily_start
-        total_drawdown: (peak - current) / peak
+        반환:
+          triggered            : bool   — True면 거래 완전 차단
+          reason               : str
+          drawdown_pct         : float
+          volatility_surge     : bool   — True면 포지션 50% 축소 권고
+          correlation_throttle : bool   — True면 포지션 70% 축소 권고
+          size_multiplier      : float  — 1.0=정상, 0.7=상관축소, 0.5=ATR축소, 0.0=차단
+
+        ATR surge와 correlation throttle이 동시 발생하면 더 보수적인 값(0.5) 사용.
+        낙폭 조건은 항상 우선 — triggered=True, size_multiplier=0.0.
+        플래시 크래시(candle_open/candle_close 제공 시)는 낙폭보다 먼저 체크.
+        연속 손실 쿨다운은 낙폭 체크 이후, ATR/상관 체크 이전에 수행.
         """
         if daily_start_balance <= 0 or peak_balance <= 0:
-            return {"triggered": False, "reason": "", "drawdown_pct": 0.0}
+            return self._make_result(False, "", 0.0)
+
+        # ── 플래시 크래시 체크 (최우선) ──────────────────────────────────────
+        if candle_open is not None and candle_close is not None and candle_open > 0:
+            candle_chg = abs(candle_close - candle_open) / candle_open
+            if candle_chg >= self.flash_crash_pct:
+                self._triggered = True
+                self._reason = (
+                    f"플래시 크래시 감지: 캔들 변동 {candle_chg:.2%} ≥ 한계 {self.flash_crash_pct:.2%} "
+                    f"(open={candle_open}, close={candle_close})"
+                )
+                logger.warning("CircuitBreaker TRIGGERED: %s", self._reason)
+                return self._make_result(True, self._reason, 0.0, size_multiplier=0.0)
 
         daily_dd = (daily_start_balance - current_balance) / daily_start_balance
         total_dd = (peak_balance - current_balance) / peak_balance
 
-        # 이미 트리거된 상태는 유지
+        # 이미 트리거된 상태 유지
         if self._triggered:
             worst = max(daily_dd, total_dd)
-            return {
-                "triggered": True,
-                "reason": self._reason,
-                "drawdown_pct": round(worst, 6),
-            }
+            return self._make_result(True, self._reason, worst, size_multiplier=0.0)
 
+        # ── 낙폭 체크 ─────────────────────────────────────────────────────────
         if daily_dd >= self.daily_drawdown_limit:
             self._triggered = True
             self._reason = (
                 f"일일 낙폭 {daily_dd:.2%} ≥ 한계 {self.daily_drawdown_limit:.2%}"
             )
             logger.warning("CircuitBreaker TRIGGERED: %s", self._reason)
-            return {
-                "triggered": True,
-                "reason": self._reason,
-                "drawdown_pct": round(daily_dd, 6),
-            }
+            return self._make_result(True, self._reason, daily_dd, size_multiplier=0.0)
 
         if total_dd >= self.total_drawdown_limit:
             self._triggered = True
@@ -63,19 +162,87 @@ class CircuitBreaker:
                 f"전체 낙폭 {total_dd:.2%} ≥ 한계 {self.total_drawdown_limit:.2%}"
             )
             logger.warning("CircuitBreaker TRIGGERED: %s", self._reason)
-            return {
-                "triggered": True,
-                "reason": self._reason,
-                "drawdown_pct": round(total_dd, 6),
-            }
+            return self._make_result(True, self._reason, total_dd, size_multiplier=0.0)
 
         worst = max(daily_dd, total_dd)
-        return {"triggered": False, "reason": "", "drawdown_pct": round(worst, 6)}
 
+        # ── 연속 손실 쿨다운 체크 ────────────────────────────────────────────
+        if self._cooldown_remaining > 0:
+            reason = (
+                f"연속 손실 쿨다운: {self._consecutive_losses}회 연속 손실, "
+                f"잔여 {self._cooldown_remaining} 기간"
+            )
+            logger.warning("CircuitBreaker COOLDOWN ACTIVE: %s", reason)
+            return self._make_result(True, reason, worst, size_multiplier=0.0)
+
+        # ── ATR 변동성 급등 체크 ──────────────────────────────────────────────
+        atr_surge = False
+        atr_reason = ""
+        if (
+            current_atr is not None
+            and baseline_atr is not None
+            and baseline_atr > 0
+            and current_atr >= baseline_atr * self.atr_surge_multiplier
+        ):
+            surge_ratio = current_atr / baseline_atr
+            atr_reason = (
+                f"ATR 급등 {surge_ratio:.2f}x "
+                f"(현재 {current_atr:.4f} ≥ 기준 {baseline_atr:.4f} × {self.atr_surge_multiplier})"
+            )
+            atr_surge = True
+            logger.warning("CircuitBreaker VOLATILITY SURGE: %s — 포지션 50%% 축소", atr_reason)
+
+        # ── 상관관계 급증 체크 ────────────────────────────────────────────────
+        corr_throttle = False
+        corr_reason = ""
+        if self._correlation_tracker is not None:
+            # 양의 상관만 throttle (전략 중복 케이스); 음의 상관은 헤지 효과
+            high_pairs = [
+                (a, b, r)
+                for a, b, r in self._correlation_tracker.high_correlation_pairs(
+                    threshold=self.corr_threshold
+                )
+                if r >= self.corr_threshold
+            ]
+            if high_pairs:
+                top_a, top_b, top_r = high_pairs[0]
+                corr_reason = (
+                    f"상관관계 급증 {top_a}↔{top_b} r={top_r:+.3f} ≥ {self.corr_threshold}"
+                )
+                corr_throttle = True
+                logger.warning(
+                    "CircuitBreaker CORRELATION THROTTLE: %s — 포지션 70%% 축소", corr_reason
+                )
+
+        # ── 복합 판정 ─────────────────────────────────────────────────────────
+        if atr_surge and corr_throttle:
+            # ATR surge가 더 보수적
+            combined_reason = f"{atr_reason} | {corr_reason}"
+            return self._make_result(
+                False, combined_reason, worst,
+                volatility_surge=True,
+                correlation_throttle=True,
+                size_multiplier=0.5,
+            )
+        if atr_surge:
+            return self._make_result(
+                False, atr_reason, worst,
+                volatility_surge=True,
+                size_multiplier=0.5,
+            )
+        if corr_throttle:
+            return self._make_result(
+                False, corr_reason, worst,
+                correlation_throttle=True,
+                size_multiplier=0.7,
+            )
+
+        return self._make_result(False, "", worst)
+
+    # ── 리셋 ──────────────────────────────────────────────────────────────────
     def reset_daily(self, daily_start_balance: float):
         """매일 자정 리셋 — 일일 트리거만 해제, 전체 낙폭 트리거는 수동 해제 필요."""
         self._daily_start_balance = daily_start_balance
-        # 전체 낙폭으로 트리거된 경우 유지, 일일로만 트리거된 경우 해제
         if self._triggered and "일일" in self._reason:
             self._triggered = False
             self._reason = ""
@@ -85,8 +252,35 @@ class CircuitBreaker:
         """전체 상태 초기화."""
         self._triggered = False
         self._reason = ""
+        self._consecutive_losses = 0
+        self._cooldown_remaining = 0
         logger.info("CircuitBreaker: 전체 리셋")
 
     @property
     def is_triggered(self) -> bool:
         return self._triggered
+
+    @property
+    def consecutive_losses(self) -> int:
+        return self._consecutive_losses
+
+    @property
+    def cooldown_remaining(self) -> int:
+        return self._cooldown_remaining
+
+    # ── 직렬화 ────────────────────────────────────────────────────────────────
+    def to_dict(self) -> dict:
+        """현재 상태를 직렬화 가능한 dict로 반환."""
+        return {
+            "triggered": self._triggered,
+            "reason": self._reason,
+            "consecutive_losses": self._consecutive_losses,
+            "cooldown_remaining": self._cooldown_remaining,
+        }
+
+    def from_dict(self, state: dict) -> None:
+        """to_dict()로 저장한 상태 복원."""
+        self._triggered = bool(state.get("triggered", False))
+        self._reason = str(state.get("reason", ""))
+        self._consecutive_losses = int(state.get("consecutive_losses", 0))
+        self._cooldown_remaining = int(state.get("cooldown_remaining", 0))

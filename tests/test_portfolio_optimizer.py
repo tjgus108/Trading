@@ -177,3 +177,139 @@ def test_var_summary_contains_var():
     result = opt.optimize(make_returns())
     assert "VaR95" in result.summary()
     assert "CVaR95" in result.summary()
+
+
+def test_var_cvar_small_sample_boundary():
+    """T=20 (cutoff_idx=1) 경계: CVaR==VaR이 되는 케이스 명시적 검증.
+
+    cutoff_idx = max(1, int(20 * 0.05)) = 1
+    → sorted_r[:1].mean() == sorted_r[0]  (CVaR == VaR, 허용된 경계)
+    """
+    rng = np.random.default_rng(7)
+    r = rng.normal(0.0, 0.01, 20)
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    # 경계에서 CVaR >= VaR 관계 유지
+    assert cvar >= var - 1e-12
+    # VaR은 실제 최솟값의 음수여야 함 (cutoff_idx=1 → sorted_r[0])
+    sorted_r = np.sort(r)
+    expected_var = max(0.0, -float(sorted_r[0]))
+    assert abs(var - expected_var) < 1e-12
+
+
+def test_var_cvar_all_positive_returns():
+    """모든 수익률이 양수인 경우 VaR=0, CVaR=0 (max(0,x) 처리 확인)."""
+    r = np.array([0.01, 0.02, 0.03, 0.005, 0.015, 0.008, 0.012, 0.007,
+                  0.011, 0.009, 0.014, 0.006, 0.013, 0.016, 0.004,
+                  0.018, 0.019, 0.003, 0.017, 0.010])
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    assert var == 0.0
+    assert cvar == 0.0
+
+
+# ── Boundary: zero correlation, all-NaN, single data point ───────────────────
+
+def test_zero_correlation_all_methods():
+    """모든 자산이 독립(zero correlation)일 때 세 방법 모두 합=1, 비중>0."""
+    rng = np.random.default_rng(99)
+    # 각 자산을 독립 시드로 생성 → correlation ≈ 0
+    data = {
+        "A": pd.Series(rng.normal(0, 0.01, 500)),
+        "B": pd.Series(rng.normal(0, 0.01, 500)),
+        "C": pd.Series(rng.normal(0, 0.01, 500)),
+    }
+    for method in ["mean_variance", "risk_parity", "equal_weight"]:
+        opt = PortfolioOptimizer(method=method, min_weight=0.0, max_weight=1.0)
+        result = opt.optimize(data)
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9, f"{method}: weights don't sum to 1"
+        for sym, w in result.weights.items():
+            assert w >= 0.0, f"{method}: {sym} weight {w} is negative"
+
+
+def test_all_nan_returns_fallback():
+    """모든 값이 NaN인 경우 dropna() 후 len<2 → equal_weight fallback."""
+    data = {
+        "BTC": pd.Series([np.nan, np.nan, np.nan]),
+        "ETH": pd.Series([np.nan, np.nan, np.nan]),
+    }
+    for method in ["mean_variance", "risk_parity", "equal_weight"]:
+        opt = PortfolioOptimizer(method=method)
+        result = opt.optimize(data)
+        assert result.method == "equal_weight"
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9
+
+
+def test_single_data_point_fallback():
+    """공통 인덱스 1행만 있을 때 equal_weight fallback."""
+    data = {
+        "BTC": pd.Series([0.01]),
+        "ETH": pd.Series([0.02]),
+        "SOL": pd.Series([0.005]),
+    }
+    for method in ["mean_variance", "risk_parity"]:
+        opt = PortfolioOptimizer(method=method)
+        result = opt.optimize(data)
+        assert result.method == "equal_weight"
+        assert abs(sum(result.weights.values()) - 1.0) < 1e-9
+
+
+# ── Numerical Instability ─────────────────────────────────────────────────────
+
+def test_nan_weights_to_apply_constraints_returns_equal_weight():
+    """NaN 포함 weights 입력 시 _apply_constraints가 equal_weight 반환."""
+    opt = PortfolioOptimizer(method="risk_parity", min_weight=0.05, max_weight=0.5)
+    nan_w = np.array([np.nan, 0.5, 0.3])
+    result = opt._apply_constraints(nan_w)
+    # NaN 없어야 하고 합=1, 모든 값>=0
+    assert not np.any(np.isnan(result)), "NaN in output weights"
+    assert abs(result.sum() - 1.0) < 1e-9
+    assert np.all(result >= 0.0)
+
+
+def test_inf_weights_to_apply_constraints_returns_equal_weight():
+    """inf 포함 weights 입력 시 _apply_constraints가 equal_weight 반환."""
+    opt = PortfolioOptimizer(method="risk_parity", min_weight=0.05, max_weight=0.5)
+    inf_w = np.array([np.inf, 0.3, 0.2])
+    result = opt._apply_constraints(inf_w)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
+    assert abs(result.sum() - 1.0) < 1e-9
+    assert np.all(result >= 0.0)
+
+
+# ── VaR/CVaR 경계 시나리오 ────────────────────────────────────────────────────
+
+def test_var_cvar_minimum_data_boundary():
+    """T=2: cutoff_idx=max(1, int(2*0.05))=1 → CVaR==VaR (최솟값 하나만 평균).
+
+    경계 조건: 데이터 2개일 때 _compute_var_cvar가 올바른 값을 반환하는지 확인.
+    """
+    r = np.array([-0.05, 0.03])  # 손실 -5%, 수익 +3%
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    # sorted_r = [-0.05, 0.03], cutoff_idx=1
+    # VaR  = -(-0.05) = 0.05
+    # CVaR = -mean([-0.05]) = 0.05  (CVaR == VaR, 경계 허용)
+    assert abs(var - 0.05) < 1e-12, f"VaR expected 0.05, got {var}"
+    assert abs(cvar - 0.05) < 1e-12, f"CVaR expected 0.05, got {cvar}"
+    assert cvar >= var - 1e-12
+
+
+def test_var_cvar_extreme_loss_tail():
+    """극단 손실 꼬리: 하위 5% 구간에 손실이 집중돼 CVaR > VaR이어야 함.
+
+    100개 수익률 중 하위 5개(5%)가 -0.10 ~ -0.06 사이 큰 손실이고
+    나머지는 소폭 양수 → CVaR(하위 5개 평균) > VaR(5번째 퍼센타일).
+    """
+    # 하위 5개: 큰 손실 (-0.10, -0.09, -0.08, -0.07, -0.06)
+    losses = np.array([-0.10, -0.09, -0.08, -0.07, -0.06])
+    gains = np.full(95, 0.002)  # 나머지 95개는 소폭 수익
+    r = np.concatenate([losses, gains])
+
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+
+    # cutoff_idx = max(1, int(100 * 0.05)) = 5
+    # sorted_r[:5] = [-0.10, -0.09, -0.08, -0.07, -0.06]
+    # VaR  = -sorted_r[4]  = 0.06
+    # CVaR = -mean(sorted_r[:5]) = mean([0.10,0.09,0.08,0.07,0.06]) = 0.08
+    assert abs(var - 0.06) < 1e-12, f"VaR expected 0.06, got {var}"
+    assert abs(cvar - 0.08) < 1e-12, f"CVaR expected 0.08, got {cvar}"
+    assert cvar > var, f"CVaR {cvar} should be > VaR {var} for fat tail"

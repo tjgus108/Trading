@@ -5,14 +5,70 @@ data-agent가 이 모듈을 사용한다.
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+import ccxt
 import numpy as np
 import pandas as pd
 
 from src.exchange.connector import ExchangeConnector
 
 logger = logging.getLogger(__name__)
+
+
+# Error classification
+def _is_transient_error(error: Exception) -> bool:
+    """네트워크/속도 제한 에러는 재시도 가능."""
+    transient_types = (
+        ccxt.NetworkError,
+        ccxt.RequestTimeout,
+        ccxt.RateLimitExceeded,
+        TimeoutError,
+        ConnectionError,
+    )
+    return isinstance(error, transient_types)
+
+
+def _is_fatal_error(error: Exception) -> bool:
+    """인증, 심볼, 권한 에러는 즉시 중단."""
+    fatal_types = (
+        ccxt.BadSymbol,
+        ccxt.InvalidAddress,
+        ccxt.AuthenticationError,
+        ccxt.PermissionDenied,
+        ValueError,  # Invalid data format
+        KeyError,    # Missing required fields
+    )
+    return isinstance(error, fatal_types)
+
+
+def _is_rate_limit_error(error: Exception) -> bool:
+    """Rate limit 에러 여부 감지."""
+    return isinstance(error, ccxt.RateLimitExceeded)
+
+
+def _backoff_with_rate_limit(error: Exception, attempt: int) -> None:
+    """
+    Rate limit 에러는 긴 backoff, 다른 transient 에러는 짧은 backoff.
+    
+    Args:
+        error: 발생한 예외
+        attempt: 시도 번호 (1부터)
+    """
+    if _is_rate_limit_error(error):
+        # Rate limit: 2초 + attempt * 2초 (2s, 4s, 6s, ...)
+        wait_time = 2 + attempt * 2
+        logger.info(
+            "RateLimitExceeded detected: backing off %d seconds (attempt %d)",
+            wait_time, attempt
+        )
+    else:
+        # 다른 transient 에러: 0.5초 * attempt (0.5s, 1s, 1.5s, ...)
+        wait_time = 0.5 * attempt
+    
+    time.sleep(wait_time)
+
 
 
 @dataclass
@@ -29,10 +85,13 @@ class DataSummary:
 
 
 class DataFeed:
-    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60):
+    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._cache_ttl = cache_ttl  # 초
+        self._max_retries = max_retries
+        self._hit_count = 0          # 캐시 히트 수
+        self._miss_count = 0         # 캐시 미스 수
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         key = (symbol, timeframe, limit)
@@ -40,11 +99,110 @@ class DataFeed:
         if key in self._cache:
             cached_summary, ts = self._cache[key]
             if now - ts < self._cache_ttl:
+                self._hit_count += 1
                 return cached_summary  # 캐시 히트
-        # 캐시 미스: 실제 fetch
-        summary = self._fetch_fresh(symbol, timeframe, limit)
+        # 캐시 미스: 실제 fetch (retry 포함)
+        self._miss_count += 1
+        summary = self._fetch_with_retry(symbol, timeframe, limit)
         self._cache[key] = (summary, now)
         return summary
+
+    def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
+        """Retry 로직과 함께 fetch. 에러 분류로 재시도 판단."""
+        last_error = None
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                logger.debug(
+                    "Fetching %s %s (limit=%d), attempt %d/%d",
+                    symbol, timeframe, limit, attempt, self._max_retries
+                )
+                return self._fetch_fresh(symbol, timeframe, limit)
+            except Exception as e:
+                # Fatal 에러는 재시도하지 않음
+                if _is_fatal_error(e):
+                    error_type = type(e).__name__
+                    logger.error(
+                        "Fatal error (no retry): symbol=%s, timeframe=%s, "
+                        "error_type=%s, message=%s",
+                        symbol, timeframe, error_type, str(e)
+                    )
+                    raise
+                
+                # Transient 에러만 재시도
+                last_error = e
+                if attempt < self._max_retries:
+                    logger.warning(
+                        "Transient error: symbol=%s, timeframe=%s, "
+                        "error=%s (attempt %d/%d, retrying...)",
+                        symbol, timeframe, str(e), attempt, self._max_retries
+                    )
+                    _backoff_with_rate_limit(e, attempt)
+                else:
+                    # 마지막 재시도도 transient이면 로그
+                    logger.warning(
+                        "Final transient error: symbol=%s, timeframe=%s, "
+                        "error=%s (attempt %d/%d)",
+                        symbol, timeframe, str(e), attempt, self._max_retries
+                    )
+        
+        # 모든 재시도 실패
+        error_type = type(last_error).__name__
+        logger.error(
+            "Fetch exhausted: symbol=%s, timeframe=%s, limit=%d, "
+            "max_retries=%d, error_type=%s, message=%s",
+            symbol, timeframe, limit, self._max_retries, error_type, str(last_error)
+        )
+        raise last_error
+
+    def fetch_multiple(
+        self,
+        symbols: list[str],
+        timeframe: str,
+        limit: int = 500,
+        max_workers: int = None,
+    ) -> dict[str, DataSummary]:
+        """
+        여러 심볼을 병렬로 fetch.
+        
+        Args:
+            symbols: 심볼 리스트 (예: ["BTC/USDT", "ETH/USDT"])
+            timeframe: 타임프레임 (예: "1h")
+            limit: 캔들 개수
+            max_workers: 스레드 풀 크기 (기본: min(32, 심볼 수 + 4))
+        
+        Returns:
+            {symbol: DataSummary} 딕셔너리
+        
+        Notes:
+            - 기본 fetch()와 동일한 캐싱 로직 적용
+            - 오류 발생 시 해당 심볼은 건너뛰고 나머지 진행
+        """
+        if max_workers is None:
+            max_workers = min(len(symbols) + 4, 32)
+        
+        results = {}
+        failed = {}
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 작업 제출
+            futures = {
+                executor.submit(self.fetch, symbol, timeframe, limit): symbol
+                for symbol in symbols
+            }
+            
+            # 완료된 작업 수집
+            for future in as_completed(futures):
+                symbol = futures[future]
+                try:
+                    results[symbol] = future.result()
+                except Exception as e:
+                    failed[symbol] = str(e)
+                    logger.warning("fetch_multiple: %s 실패 — %s", symbol, e)
+        
+        if failed:
+            logger.info("fetch_multiple 완료: %d 성공, %d 실패", len(results), len(failed))
+        
+        return results
 
     def invalidate_cache(self, symbol=None, timeframe=None):
         """특정 심볼/타임프레임 또는 전체 캐시 무효화."""
@@ -55,9 +213,37 @@ class DataFeed:
             for k in keys_to_del:
                 del self._cache[k]
 
+    def cache_stats(self) -> dict:
+        """
+        캐시 히트율/미스율 통계 조회.
+        
+        Returns:
+            {
+                'hit_count': int,     # 캐시 히트 수
+                'miss_count': int,    # 캐시 미스 수
+                'total': int,         # 총 fetch 시도 수
+                'hit_rate': float,    # 히트율 (0.0 ~ 1.0)
+                'cached_keys': int,   # 현재 캐시된 키 개수
+            }
+        """
+        total = self._hit_count + self._miss_count
+        hit_rate = self._hit_count / total if total > 0 else 0.0
+        return {
+            'hit_count': self._hit_count,
+            'miss_count': self._miss_count,
+            'total': total,
+            'hit_rate': hit_rate,
+            'cached_keys': len(self._cache),
+        }
+
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
         df = self._to_dataframe(raw)
+        
+        # 경계: 빈 DataFrame 처리
+        if df.empty:
+            raise ValueError(f"Empty OHLCV data for {symbol} {timeframe}")
+        
         missing = self._count_missing(df, timeframe)
         anomalies = self._detect_anomalies(df)
         df = self._add_indicators(df)
@@ -105,10 +291,8 @@ class DataFeed:
 
     def _detect_anomalies(self, df: pd.DataFrame) -> list[str]:
         anomalies = []
-        # 캔들 내 고/저 역전
-        inverted = df[df["high"] < df["low"]]
-        if not inverted.empty:
-            anomalies.append(f"high<low at {inverted.index[0]}")
+        # OHLC 관계 검증
+        anomalies.extend(self._validate_ohlc_relationships(df))
         # 종가 0 이하
         if (df["close"] <= 0).any():
             anomalies.append("close <= 0 detected")
@@ -118,6 +302,32 @@ class DataFeed:
         if not spikes.empty:
             anomalies.append(f"price spike >10% at {spikes.index[0]}")
         return anomalies
+
+    def _validate_ohlc_relationships(self, df: pd.DataFrame) -> list[str]:
+        """
+        OHLC 관계 검증: high >= max(open,close), low <= min(open,close)
+        
+        Returns:
+            이상 감지 목록 (문제 없으면 빈 리스트)
+        """
+        issues = []
+        
+        # high >= max(open, close) 확인
+        invalid_high = df[df["high"] < df[["open", "close"]].max(axis=1)]
+        if not invalid_high.empty:
+            issues.append(f"high < max(open,close) at {invalid_high.index[0]}")
+        
+        # low <= min(open, close) 확인
+        invalid_low = df[df["low"] > df[["open", "close"]].min(axis=1)]
+        if not invalid_low.empty:
+            issues.append(f"low > min(open,close) at {invalid_low.index[0]}")
+        
+        # high >= low 확인 (기존 로직)
+        inverted = df[df["high"] < df["low"]]
+        if not inverted.empty:
+            issues.append(f"high < low at {inverted.index[0]}")
+        
+        return issues
 
     def _add_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         close = df["close"]

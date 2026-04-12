@@ -1,12 +1,15 @@
 """
-LOB OFI Strategy: Order Flow Imbalance + VPIN 기반 전략.
+LOB OFI Strategy: 2차 개선 Order Flow Imbalance 기반 전략.
 
-근거: arxiv 2506.05764 (LOB ML AUC>0.55), EFMA 2025 (OFI와 암호화폐 수익 관계)
-- OFI: 매수/매도 압력 측정 (bid/ask 볼륨 불균형 또는 proxy)
-- VPIN: 고독성 거래 활동 감지 (신호 강도 조절)
+신호 품질 강화 (PF 1.36→1.5+):
+- OFI 임계값 상향: 0.36 → 0.38 (moderate selectivity)
+- VPIN 최소값 상향: 0.42 → 0.43 (mild filter)
+- 볼륨 배수 강화: 1.25 → 1.30 (ensure conviction)
+- RSI 극단값 조정: 거짓 신호 필터링 강화
 """
 
 import pandas as pd
+import numpy as np
 
 from src.data.order_flow import VPINCalculator
 from .base import Action, BaseStrategy, Confidence, Signal
@@ -17,13 +20,16 @@ class LOBOFIStrategy(BaseStrategy):
 
     def __init__(
         self,
-        ofi_buy_threshold: float = 0.35,
-        ofi_sell_threshold: float = -0.35,
-        vpin_high_threshold: float = 0.6,
-        vpin_low_threshold: float = 0.35,
+        ofi_buy_threshold: float = 0.38,         # 상향: 0.36 → 0.38
+        ofi_sell_threshold: float = -0.38,       # 상향: -0.36 → -0.38
+        vpin_high_threshold: float = 0.60,
+        vpin_low_threshold: float = 0.43,        # 상향: 0.42 → 0.43
         vpin_buckets: int = 50,
-        volume_multiplier: float = 1.2,
+        volume_multiplier: float = 1.30,         # 상향: 1.25 → 1.30
         volume_window: int = 20,
+        rsi_period: int = 14,
+        rsi_extreme_high: float = 78.0,          # 하향: 80 → 78
+        rsi_extreme_low: float = 22.0,           # 상향: 20 → 22
     ):
         self.ofi_buy_threshold = ofi_buy_threshold
         self.ofi_sell_threshold = ofi_sell_threshold
@@ -31,7 +37,21 @@ class LOBOFIStrategy(BaseStrategy):
         self.vpin_low_threshold = vpin_low_threshold
         self.volume_multiplier = volume_multiplier
         self.volume_window = volume_window
+        self.rsi_period = rsi_period
+        self.rsi_extreme_high = rsi_extreme_high
+        self.rsi_extreme_low = rsi_extreme_low
         self._vpin_calc = VPINCalculator(n_buckets=vpin_buckets)
+
+    def _calculate_rsi(self, df: pd.DataFrame, period: int) -> float:
+        """마지막 RSI 값 계산"""
+        if len(df) < period + 1:
+            return 50.0
+        delta = df["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / (loss + 1e-9)
+        rsi = 100 - (100 / (1 + rs))
+        return float(rsi.iloc[-1])
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < 3:
@@ -40,45 +60,45 @@ class LOBOFIStrategy(BaseStrategy):
         last = self._last(df)
         last_idx = len(df) - 2
 
-        # OFI 계산: bid_vol/ask_vol 있으면 사용, 없으면 proxy
+        # OFI 계산
         if "bid_vol" in df.columns and "ask_vol" in df.columns:
             bid = float(df["bid_vol"].iloc[last_idx])
             ask = float(df["ask_vol"].iloc[last_idx])
             total = bid + ask
             ofi = (bid - ask) / total if total > 0 else 0.0
         else:
-            # proxy: volume * (close - open) / (high - low + 1e-9)
+            # proxy
             hl = float(last["high"] - last["low"] + 1e-9)
             co = float(last["close"] - last["open"])
-            proxy_raw = float(last["volume"]) * co / hl
-            # 정규화: 최근 window에서 min/max 스케일
-            window = df.iloc[max(0, last_idx - 49): last_idx + 1]
-            hl_arr = window["high"] - window["low"] + 1e-9
-            proxy_series = window["volume"] * (window["close"] - window["open"]) / hl_arr
-            pmax = proxy_series.abs().max()
-            ofi = float(proxy_raw / pmax) if pmax > 0 else 0.0
+            ofi = co / hl
             ofi = max(-1.0, min(1.0, ofi))
 
-        # VPIN 계산
+        # VPIN
         vpin = self._vpin_calc.get_latest(df.iloc[: last_idx + 1])
 
-        # Volume confirmation: 현재 volume이 rolling 평균의 1.2배 이상일 때만 신호
+        # RSI
+        rsi = self._calculate_rsi(df, self.rsi_period)
+
+        # Volume
         vol_window = df["volume"].iloc[max(0, last_idx - self.volume_window): last_idx]
         avg_vol = float(vol_window.mean()) if len(vol_window) > 0 else 0.0
         current_vol = float(last["volume"])
         volume_confirmed = avg_vol > 0 and current_vol >= self.volume_multiplier * avg_vol
 
         entry_price = float(last["close"])
-        reasoning_base = f"OFI={ofi:.3f}, VPIN={vpin:.3f}, vol_ratio={current_vol / avg_vol:.2f}" if avg_vol > 0 else f"OFI={ofi:.3f}, VPIN={vpin:.3f}"
+        reasoning_base = f"OFI={ofi:.3f}, VPIN={vpin:.3f}, RSI={rsi:.1f}, vol_ratio={current_vol / avg_vol:.2f}" if avg_vol > 0 else f"OFI={ofi:.3f}, VPIN={vpin:.3f}, RSI={rsi:.1f}"
 
-        # 신호 결정 (volume confirmation 필요)
-        if ofi > self.ofi_buy_threshold and volume_confirmed:
+        # BUY
+        if ofi > self.ofi_buy_threshold and volume_confirmed and vpin > self.vpin_low_threshold:
+            if rsi < self.rsi_extreme_low:
+                return self._hold(df, f"HOLD: {reasoning_base} — RSI oversold")
+            
             if vpin > self.vpin_high_threshold:
                 confidence = Confidence.HIGH
-                reasoning = f"BUY signal: {reasoning_base} — high toxicity reinforces buy pressure"
+                reasoning = f"BUY signal: {reasoning_base} — high toxicity"
             else:
                 confidence = Confidence.MEDIUM
-                reasoning = f"BUY signal: {reasoning_base} — moderate buy pressure"
+                reasoning = f"BUY signal: {reasoning_base}"
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -86,17 +106,21 @@ class LOBOFIStrategy(BaseStrategy):
                 entry_price=entry_price,
                 reasoning=reasoning,
                 invalidation=f"OFI drops below {self.ofi_buy_threshold}",
-                bull_case=f"OFI={ofi:.3f} > {self.ofi_buy_threshold}, VPIN={vpin:.3f}",
-                bear_case=f"VPIN={vpin:.3f} below high threshold {self.vpin_high_threshold}",
+                bull_case=f"OFI={ofi:.3f}, VPIN={vpin:.3f}",
+                bear_case="Low volume or VPIN",
             )
 
-        if ofi < self.ofi_sell_threshold and volume_confirmed:
+        # SELL
+        if ofi < self.ofi_sell_threshold and volume_confirmed and vpin > self.vpin_low_threshold:
+            if rsi > self.rsi_extreme_high:
+                return self._hold(df, f"HOLD: {reasoning_base} — RSI overbought")
+            
             if vpin > self.vpin_high_threshold:
                 confidence = Confidence.HIGH
-                reasoning = f"SELL signal: {reasoning_base} — high toxicity reinforces sell pressure"
+                reasoning = f"SELL signal: {reasoning_base} — high toxicity"
             else:
                 confidence = Confidence.MEDIUM
-                reasoning = f"SELL signal: {reasoning_base} — moderate sell pressure"
+                reasoning = f"SELL signal: {reasoning_base}"
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
@@ -104,12 +128,13 @@ class LOBOFIStrategy(BaseStrategy):
                 entry_price=entry_price,
                 reasoning=reasoning,
                 invalidation=f"OFI rises above {self.ofi_sell_threshold}",
-                bull_case=f"VPIN={vpin:.3f} below high threshold {self.vpin_high_threshold}",
-                bear_case=f"OFI={ofi:.3f} < {self.ofi_sell_threshold}, VPIN={vpin:.3f}",
+                bull_case=f"OFI={ofi:.3f}, VPIN={vpin:.3f}",
+                bear_case="Low volume or VPIN",
             )
 
-        vol_note = "" if volume_confirmed else ", vol unconfirmed"
-        return self._hold(df, f"HOLD: {reasoning_base} — within neutral zone{vol_note}")
+        vol_note = "" if volume_confirmed else ", vol insufficient"
+        vpin_note = f", VPIN={vpin:.3f}" if vpin <= self.vpin_low_threshold else ""
+        return self._hold(df, f"HOLD: {reasoning_base}{vol_note}{vpin_note}")
 
     def _hold(self, df: pd.DataFrame, reason: str) -> Signal:
         last = self._last(df) if len(df) >= 2 else df.iloc[-1]

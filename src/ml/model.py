@@ -33,6 +33,8 @@ MIN_ACCURACY = 0.55  # 최소 정확도 기준
 
 @dataclass
 class MLPrediction:
+    """단일 예측 결과 컨테이너. summary()로 표준 출력 포맷 생성."""
+
     action: str             # "BUY" | "SELL" | "HOLD"
     confidence: float       # 0.0~1.0
     proba_buy: float
@@ -150,6 +152,7 @@ class MLSignalGenerator:
             return self._hold(f"예측 오류: {e}")
 
     def _hold(self, note: str) -> MLPrediction:
+        """note와 함께 HOLD 신호(confidence=0)를 반환하는 내부 헬퍼."""
         return MLPrediction(
             action="HOLD", confidence=0.0,
             proba_buy=0.0, proba_sell=0.0, proba_hold=1.0,

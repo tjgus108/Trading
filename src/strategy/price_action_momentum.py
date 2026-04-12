@@ -1,23 +1,19 @@
 """
-PriceActionMomentumStrategy: 가격 행동 + 모멘텀 복합 전략.
+PriceActionMomentumStrategy: Cycle 117 최종 (body 0.40 + 강한 roc5).
 
-- body = close - open_
-- body_abs = body.abs()
-- total_range = high - low + 1e-10
-- body_strength = body_abs / total_range
-- roc5 = close.pct_change(5)
-- roc5_ma = roc5.rolling(10, min_periods=1).mean()
-- BUY:  body > 0 AND body_strength > 0.5 AND roc5 > roc5_ma AND roc5 > 0
-- SELL: body < 0 AND body_strength > 0.5 AND roc5 < roc5_ma AND roc5 < 0
-- confidence: HIGH if body_strength > 0.7 AND abs(roc5) > roc5.rolling(20).std(), MEDIUM otherwise
-- 최소 20행
+개선 사항:
+- body_strength: 0.40 (균형)
+- roc5 절대값: > 0.005 (0.5% 최소)
+- roc5 상대값: roc5_std*0.6 (강함)
+- SMA50 (원래대로)
+- 목표: PF >= 1.5, Sharpe >= 1.0
 """
 
 import pandas as pd
+import math
+from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
-from .base import Action, BaseStrategy, Confidence, Signal
-
-_MIN_ROWS = 20
+_MIN_ROWS = 35
 
 
 class PriceActionMomentumStrategy(BaseStrategy):
@@ -40,6 +36,8 @@ class PriceActionMomentumStrategy(BaseStrategy):
         roc5 = close.pct_change(5)
         roc5_ma = roc5.rolling(10, min_periods=1).mean()
         roc5_std = roc5.rolling(20, min_periods=1).std()
+        
+        sma50 = close.rolling(50, min_periods=1).mean()
 
         idx = len(df) - 2
 
@@ -49,8 +47,8 @@ class PriceActionMomentumStrategy(BaseStrategy):
         v_roc5_ma = float(roc5_ma.iloc[idx])
         v_roc5_std = float(roc5_std.iloc[idx])
         v_close = float(close.iloc[idx])
+        v_sma50 = float(sma50.iloc[idx])
 
-        import math
         if any(math.isnan(x) for x in [v_body, v_body_strength, v_roc5, v_roc5_ma]):
             return self._hold(df, "NaN in indicators")
 
@@ -60,16 +58,18 @@ class PriceActionMomentumStrategy(BaseStrategy):
         )
 
         is_high_conf = (
-            v_body_strength > 0.7
+            v_body_strength > 0.6
             and not math.isnan(v_roc5_std)
-            and abs(v_roc5) > v_roc5_std
+            and abs(v_roc5) > v_roc5_std * 1.5
         )
 
+        # BUY: body 0.40 + 강한 roc5
         if (
             v_body > 0
-            and v_body_strength > 0.5
-            and v_roc5 > v_roc5_ma
-            and v_roc5 > 0
+            and v_body_strength >= 0.40
+            and v_roc5 > 0.005
+            and v_roc5 > v_roc5_ma - (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
+            and v_close > v_sma50
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
             return Signal(
@@ -79,18 +79,20 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 entry_price=v_close,
                 reasoning=(
                     f"PA Momentum BUY: body_strength={v_body_strength:.3f} "
-                    f"roc5={v_roc5:.4f}>roc5_ma={v_roc5_ma:.4f}"
+                    f"roc5={v_roc5:.4f}, sma50 uptrend"
                 ),
-                invalidation="body<0 or body_strength<=0.5 or roc5<=roc5_ma",
+                invalidation="body<=0 or body_strength<0.40 or close<=sma50",
                 bull_case=context,
                 bear_case=context,
             )
 
+        # SELL: body 0.40 + 강한 roc5
         if (
             v_body < 0
-            and v_body_strength > 0.5
-            and v_roc5 < v_roc5_ma
-            and v_roc5 < 0
+            and v_body_strength >= 0.40
+            and v_roc5 < -0.005
+            and v_roc5 < v_roc5_ma + (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
+            and v_close < v_sma50
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
             return Signal(
@@ -100,9 +102,9 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 entry_price=v_close,
                 reasoning=(
                     f"PA Momentum SELL: body_strength={v_body_strength:.3f} "
-                    f"roc5={v_roc5:.4f}<roc5_ma={v_roc5_ma:.4f}"
+                    f"roc5={v_roc5:.4f}, sma50 downtrend"
                 ),
-                invalidation="body>0 or body_strength<=0.5 or roc5>=roc5_ma",
+                invalidation="body>=0 or body_strength<0.40 or close>=sma50",
                 bull_case=context,
                 bear_case=context,
             )

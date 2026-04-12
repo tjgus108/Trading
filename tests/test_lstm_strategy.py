@@ -139,3 +139,49 @@ class TestTrainMlScript:
             f"stderr: {result.stderr}"
         )
         assert "ML_TRAINING_RESULT" in result.stdout
+
+
+class TestLSTMTorchSaveRegression:
+    """Cycle 75 회귀 테스트: torch save 경로와 n_features 검증."""
+
+    def test_train_torch_save_path_is_valid(self):
+        """_train_torch에서 model_path가 유효한 절대 경로."""
+        import tempfile
+        strategy = MLLSTMStrategy(symbol="TEST/USDT")
+        df = _make_df(300)
+        
+        # train 실행
+        result = strategy._generator.train(df)
+        
+        # passed이면 model_path 검증
+        if result.get("passed"):
+            model_path = result.get("model_path")
+            assert model_path is not None, "Passed model should have model_path"
+            assert Path(model_path).exists(), f"Model file should exist: {model_path}"
+            assert model_path.endswith(".pt"), f"Model path should end with .pt: {model_path}"
+            
+            # 파일 정리
+            Path(model_path).unlink(missing_ok=True)
+
+    def test_train_torch_saved_data_contains_n_features(self):
+        """_train_torch에서 저장된 모델이 n_features=seq_X_raw.shape[-1]을 포함."""
+        import tempfile
+        strategy = MLLSTMStrategy(symbol="REGTEST/USDT")
+        df = _make_df(300)
+        
+        result = strategy._generator.train(df)
+        
+        if result.get("passed"):
+            model_path = result.get("model_path")
+            try:
+                import torch
+                saved_data = torch.load(model_path, map_location="cpu", weights_only=False)
+                assert "n_features" in saved_data, "Saved data should contain n_features"
+                assert isinstance(saved_data["n_features"], int), "n_features should be int"
+                assert saved_data["n_features"] > 0, "n_features should be > 0"
+                
+                # scaler도 있는지 검증
+                assert "scaler" in saved_data, "Saved data should contain scaler"
+                assert "model_state" in saved_data, "Saved data should contain model_state"
+            finally:
+                Path(model_path).unlink(missing_ok=True)

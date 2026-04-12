@@ -1,0 +1,51 @@
+Cleanup Summary
+===============
+
+Deleted strategies: 42
+Deleted files: 84
+Removed imports: 42
+Removed REGISTRY entries: 42
+
+Deleted strategy list:
+  cloud_cover
+  consecutive_candles
+  consolidation_breakout
+  dual_thrust
+  dynamic_pivot_channel
+  elder_ray
+  engulfing
+  exhaustion_bar
+  flag_pennant
+  harmonic_pattern
+  high_low_reversal
+  key_reversal
+  klinger
+  mass_index
+  night_star
+  nr7
+  order_block
+  pa_confirm
+  parabolic_move
+  pivot_band
+  pre_breakout
+  price_action_quality
+  price_pattern_recog
+  psychological_line
+  range_bound
+  rsi_ob_os
+  squeeze_momentum
+  stoch_divergence
+  three_bar_reversal
+  trend_channel
+  trend_exhaustion_signal
+  trend_filtered_mean_rev
+  trend_quality
+  trend_reversal
+  triple_screen
+  ultimate_oscillator
+  vol_mean_rev
+  volatility_regime
+  volume_climax
+  volume_surge
+  wedge_pattern
+  zero_lag_ema

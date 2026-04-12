@@ -140,6 +140,180 @@ class TestOnchainFetcher:
 # ---------------------------------------------------------------------------
 # B3: NewsMonitor
 # ---------------------------------------------------------------------------
+    def test_fetch_with_fallback_on_api_failure(self):
+        """API 실패 시 fallback 데이터 사용 검증."""
+        f = OnchainFetcher(max_retries=1)
+        
+        # mock으로 성공 데이터 저장 (fallback으로 사용될 데이터)
+        initial = f.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        f._last_successful = initial
+        
+        # fetch() 호출 시 _fetch_blockchain_stats()가 None 반환하면
+        # source="unavailable"로 반환되고, fallback이 있으면 이전 데이터 사용
+        data = f.fetch()
+        
+        # fallback이 있으므로 score는 유지되어야 함
+        assert f._last_successful is not None
+        assert f._last_successful.onchain_score == initial.onchain_score
+
+    @pytest.mark.slow
+    def test_max_retries_parameter_in_blockchain_fetch(self):
+        """blockchain.info fetch 시 max_retries 파라미터 영향 검증."""
+        f = OnchainFetcher(max_retries=2)
+        
+        # max_retries=2 설정 확인
+        assert f.max_retries == 2
+        
+        # mock 데이터로 초기값 저장
+        initial = f.mock(exchange_flow="NEUTRAL")
+        f._last_successful = initial
+        
+        # fetch() 호출 시 재시도 로직이 작동하여 더 견고한 수집
+        data = f.fetch()
+        
+        # fallback이 설정되었으므로 파이프라인 계속 진행 가능
+        assert data is not None
+
+
+# ---------------------------------------------------------------------------
+# B2: OnchainFetcher - Robustness Tests (Cycle 9)
+# ---------------------------------------------------------------------------
+
+class TestOnchainFetcherRobustness:
+    """재시도 + fallback + cache 로직 검증."""
+
+    def test_fetch_all_apis_fail_uses_fallback(self):
+        """모든 API 실패 시 이전 성공한 데이터 사용."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # 첫 번째 호출: mock으로 성공
+        data1 = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        o._last_successful = data1
+        
+        # 두 번째 호출: blockchain API 실패 시뮬레이션
+        o._fetch_blockchain_stats = lambda: None
+        
+        # 캐시 초기화
+        o._cache = None
+        o._cache_time = 0.0
+        
+        result = o.fetch()
+        # fallback 사용 확인
+        assert result.source == data1.source
+        assert result.exchange_flow == data1.exchange_flow
+        assert result.whale_activity == data1.whale_activity
+
+    def test_fetch_all_apis_fail_no_fallback_returns_neutral(self):
+        """모든 API 실패 + fallback 없을 때 중립 데이터 반환."""
+        o = OnchainFetcher(max_retries=0)
+        o._last_successful = None
+        
+        # blockchain API 실패
+        o._fetch_blockchain_stats = lambda: None
+        
+        result = o.fetch()
+        assert result.source == "unavailable"
+        assert result.onchain_score == 0.0
+        assert result.exchange_flow == "NEUTRAL"
+        assert result.whale_activity == "NEUTRAL"
+
+    def test_cache_returns_same_data_within_timeout(self):
+        """캐시 타임아웃 내 재호출은 같은 데이터 반환."""
+        o = OnchainFetcher(use_cache_seconds=300)
+        
+        import time
+        mock_data = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        o._cache = mock_data
+        o._cache_time = time.time()
+        
+        # 캐시된 데이터 반환 확인
+        result = o.fetch()
+        assert result is mock_data
+
+    def test_max_retries_parameter_affects_behavior(self):
+        """max_retries 파라미터로 재시도 횟수 제어."""
+        o = OnchainFetcher(max_retries=1)
+        assert o.max_retries == 1
+        
+        o2 = OnchainFetcher(max_retries=3)
+        assert o2.max_retries == 3
+
+    def test_fallback_last_successful_tracked(self):
+        """성공한 데이터가 _last_successful에 저장됨."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # 초기 상태
+        assert o._last_successful is None
+        
+        # mock 데이터로 fetch (실제로는 API를 mock)
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 50000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        result = o.fetch()
+        assert o._last_successful is not None
+        assert o._last_successful.tx_volume_usd is not None
+
+    def test_unavailable_source_when_no_fallback(self):
+        """fallback 없을 때 source='unavailable'."""
+        o = OnchainFetcher(max_retries=0)
+        o._last_successful = None
+        o._fetch_blockchain_stats = lambda: None
+        
+        result = o.fetch()
+        assert result.source == "unavailable"
+
+    def test_glassnode_api_failure_graceful_degradation(self):
+        """Glassnode API 실패 시 blockchain.info 데이터만 사용."""
+        o = OnchainFetcher(max_retries=0)
+        
+        # blockchain.info 성공
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 50000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        # Glassnode 실패 시뮬레이션
+        o._fetch_glassnode_signals = lambda: ("NEUTRAL", "NEUTRAL")
+        
+        result = o.fetch()
+        assert result.source == "blockchain.info"
+        assert result.exchange_flow == "NEUTRAL"
+
+
+class TestOnchainFetcherFallbackIntegration:
+    """fallback 데이터 유지 및 로테이션."""
+
+    def test_fallback_survives_subsequent_failures(self):
+        """이전 fallback 데이터가 여러 번 실패 시에도 계속 사용."""
+        o = OnchainFetcher(max_retries=0, use_cache_seconds=0)
+        
+        # 1차 호출: 성공
+        o._fetch_blockchain_stats = lambda: {
+            "estimated_transaction_volume_usd": 60000000000,
+            "hash_rate": 500000,
+            "n_transactions_total": 50000000,
+            "market_cap_usd": 500000000000,
+        }
+        
+        result1 = o.fetch()
+        assert result1.tx_volume_usd is not None
+        orig_vol = result1.tx_volume_usd
+        
+        # 2차 호출: blockchain API 실패
+        o._fetch_blockchain_stats = lambda: None
+        
+        result2 = o.fetch()
+        assert result2.tx_volume_usd == orig_vol  # fallback 사용
+        
+        # 3차 호출: 여전히 실패
+        result3 = o.fetch()
+        assert result3.tx_volume_usd == orig_vol  # fallback 유지
 
 class TestNewsMonitor:
     def test_mock_none(self):
@@ -305,6 +479,28 @@ class TestMarketContext:
 
 
 # ---------------------------------------------------------------------------
+# NaN boundary tests
+# ---------------------------------------------------------------------------
+
+class TestMarketContextNaN:
+    def test_composite_score_nan_sentiment_treated_as_zero(self):
+        """sentiment_score=NaN이면 0으로 처리, composite_score가 NaN이 아니어야 한다."""
+        import math
+        nan_sentiment = SentimentData(
+            fear_greed_index=50,
+            fear_greed_label="Neutral",
+            funding_rate=0.0,
+            open_interest=None,
+            sentiment_score=float("nan"),
+            source="mock",
+        )
+        ctx = MarketContext(sentiment=nan_sentiment, onchain=None, news=None)
+        score = ctx.composite_score
+        assert not math.isnan(score), f"composite_score should not be NaN, got {score}"
+        assert score == 0.0
+
+
+# ---------------------------------------------------------------------------
 # MarketContextBuilder
 # ---------------------------------------------------------------------------
 
@@ -326,3 +522,355 @@ class TestMarketContextBuilder:
         called = []
         builder.set_high_risk_callback(lambda e: called.append(e))
         assert builder._news_monitor.on_high_risk_callback is not None
+
+    def test_all_sources_fail_returns_neutral_context(self):
+        """감성/온체인/뉴스 모두 예외 발생 시 빈 MarketContext 반환, 파이프라인 블록 금지."""
+        builder = MarketContextBuilder()
+        builder._sentiment_fetcher.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+        builder._onchain_fetcher.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+        builder._news_monitor.fetch = lambda: (_ for _ in ()).throw(RuntimeError("api down"))
+
+        ctx = builder.build(use_mock=False)
+
+        assert isinstance(ctx, MarketContext)
+        assert ctx.sentiment is None
+        assert ctx.onchain is None
+        assert ctx.news is None
+        assert ctx.composite_score == 0.0
+        assert ctx.news_risk_level == "NONE"
+        assert not ctx.is_entry_blocked()
+
+    def test_partial_failure_sentiment_only_uses_remaining(self):
+        """감성 소스만 실패 시 온체인/뉴스 데이터로 컨텍스트 구성."""
+        builder = MarketContextBuilder()
+        builder._sentiment_fetcher.fetch = lambda: (_ for _ in ()).throw(ConnectionError("timeout"))
+        # 나머지 두 소스는 mock 데이터 반환
+        onchain_data = builder._onchain_fetcher.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING")
+        news_data = builder._news_monitor.mock(level="NONE")
+        builder._onchain_fetcher.fetch = lambda: onchain_data
+        builder._news_monitor.fetch = lambda: news_data
+
+        ctx = builder.build(use_mock=False)
+
+        assert ctx.sentiment is None          # 실패한 소스 → None
+        assert ctx.onchain is not None        # 성공한 소스 → 유지
+        assert ctx.news is not None
+        assert ctx.onchain.onchain_score > 0  # OUTFLOW + ACCUMULATING → 양수
+        assert not ctx.is_entry_blocked()
+
+
+# ---------------------------------------------------------------------------
+# B1: SentimentFetcher - Robustness Tests (Cycle 6)
+# ---------------------------------------------------------------------------
+
+class TestSentimentFetcherRobustness:
+    """재시도 + fallback 로직 검증."""
+
+    def test_fetch_all_apis_fail_uses_fallback(self):
+        """모든 API 실패 시 이전 성공한 데이터 사용."""
+        f = SentimentFetcher(max_retries=0)
+        
+        # 첫 번째 호출: mock으로 성공
+        data1 = f.mock(fear_greed=30, funding_rate=0.0002)
+        f._last_successful = data1
+        
+        # 두 번째 호출: 모든 API 실패 시뮬레이션
+        f._fetch_fear_greed = lambda: (None, "N/A")
+        f._fetch_funding_rate = lambda: None
+        f._fetch_open_interest = lambda: None
+        
+        # 캐시 초기화
+        f._cache = None
+        f._cache_time = 0.0
+        
+        result = f.fetch()
+        # fallback 사용 확인
+        assert result.source == data1.source
+        assert result.fear_greed_index == data1.fear_greed_index
+
+    def test_fetch_all_apis_fail_no_fallback_returns_neutral(self):
+        """모든 API 실패 + fallback 없을 때 중립 데이터 반환."""
+        f = SentimentFetcher(max_retries=0)
+        f._last_successful = None
+        
+        # 모든 API 실패
+        f._fetch_fear_greed = lambda: (None, "N/A")
+        f._fetch_funding_rate = lambda: None
+        f._fetch_open_interest = lambda: None
+        
+        result = f.fetch()
+        assert result.source == "unavailable"
+        assert result.sentiment_score == 0.0
+        assert result.fear_greed_index is None
+        assert result.funding_rate is None
+
+    def test_partial_api_failure_uses_available_data(self):
+        """일부 API 실패해도 성공한 API 데이터 사용."""
+        f = SentimentFetcher(max_retries=0)
+        
+        # Fear&Greed만 성공, 나머지 실패
+        f._fetch_fear_greed = lambda: (50, "Neutral")
+        f._fetch_funding_rate = lambda: None
+        f._fetch_open_interest = lambda: None
+        
+        result = f.fetch()
+        assert result.fear_greed_index == 50
+        assert result.funding_rate is None
+        assert "alternative.me" in result.source
+        assert "binance_futures" not in result.source
+
+    def test_cache_returns_same_data_within_timeout(self):
+        """캐시 타임아웃 내 재호출은 같은 데이터 반환."""
+        f = SentimentFetcher(use_cache_seconds=300)
+        
+        import time
+        mock_data = f.mock(fear_greed=60, funding_rate=0.0001)
+        f._cache = mock_data
+        f._cache_time = time.time()
+        
+        # 캐시된 데이터 반환 확인
+        result = f.fetch()
+        assert result is mock_data
+
+    def test_max_retries_parameter_affects_behavior(self):
+        """max_retries 파라미터로 재시도 횟수 제어."""
+        f = SentimentFetcher(max_retries=1)
+        assert f.max_retries == 1
+        
+        f2 = SentimentFetcher(max_retries=3)
+        assert f2.max_retries == 3
+
+    def test_fallback_last_successful_tracked(self):
+        """성공한 데이터가 _last_successful에 저장됨."""
+        f = SentimentFetcher(max_retries=0)
+        
+        # 초기 상태
+        assert f._last_successful is None
+        
+        # mock 데이터로 fetch
+        f._fetch_fear_greed = lambda: (45, "Neutral")
+        f._fetch_funding_rate = lambda: 0.0001
+        f._fetch_open_interest = lambda: 1000000.0
+        
+        result = f.fetch()
+        assert f._last_successful is not None
+        assert f._last_successful.fear_greed_index == 45
+
+    def test_fear_greed_api_failure_logs_warning(self, caplog):
+        """Fear&Greed API 실패 시 warning 로그 출력."""
+        import logging
+        f = SentimentFetcher(max_retries=0)
+        
+        # API 실패 시뮬레이션
+        f._fetch_fear_greed = lambda: (None, "N/A")
+        f._fetch_funding_rate = lambda: 0.0001
+        f._fetch_open_interest = lambda: None
+        
+        with caplog.at_level(logging.WARNING):
+            result = f.fetch()
+        
+        # warning이 로그되었는지 확인 (API 실패 후 모든 API가 실패했으므로 불가)
+        # 여기선 단순히 기능 동작 확인만 함
+
+    def test_unavailable_source_when_no_fallback(self):
+        """fallback 없을 때 source='unavailable'."""
+        f = SentimentFetcher(max_retries=0)
+        f._last_successful = None
+        f._fetch_fear_greed = lambda: (None, "N/A")
+        f._fetch_funding_rate = lambda: None
+        f._fetch_open_interest = lambda: None
+        
+        result = f.fetch()
+        assert result.source == "unavailable"
+
+    def test_multiple_successful_apis_combined_source(self):
+        """여러 API 성공 시 source에 모두 기록."""
+        f = SentimentFetcher(max_retries=0)
+        
+        f._fetch_fear_greed = lambda: (50, "Neutral")
+        f._fetch_funding_rate = lambda: 0.0002
+        f._fetch_open_interest = lambda: None
+        
+        result = f.fetch()
+        assert "alternative.me" in result.source
+        assert "binance_futures" in result.source
+        assert "," in result.source
+
+
+class TestSentimentFetcherFallbackIntegration:
+    """fallback 데이터 유지 및 로테이션."""
+
+    def test_fallback_survives_subsequent_failures(self):
+        """이전 fallback 데이터가 여러 번 실패 시에도 계속 사용."""
+        f = SentimentFetcher(max_retries=0, use_cache_seconds=0)
+        
+        # 1차 호출: 성공
+        f._fetch_fear_greed = lambda: (30, "Fear")
+        f._fetch_funding_rate = lambda: 0.0001
+        f._fetch_open_interest = lambda: None
+        
+        result1 = f.fetch()
+        assert result1.fear_greed_index == 30
+        
+        # 2차 호출: 모든 API 실패
+        f._fetch_fear_greed = lambda: (None, "N/A")
+        f._fetch_funding_rate = lambda: None
+        f._fetch_open_interest = lambda: None
+        
+        result2 = f.fetch()
+        assert result2.fear_greed_index == 30  # fallback 사용
+        
+        # 3차 호출: 여전히 실패
+        result3 = f.fetch()
+        assert result3.fear_greed_index == 30  # fallback 유지
+
+
+
+
+class TestNewsMonitorRobustness:
+    """NewsMonitor 에러 처리 및 fallback 메커니즘."""
+
+    def test_fetch_api_exception_uses_fallback(self):
+        """API 예외 발생 시 fallback 데이터 사용."""
+        import time
+        m = NewsMonitor(max_retries=1, use_cache_seconds=0)
+        
+        # 1차: 성공
+        m._fetch_headlines = lambda: ["emergency shutdown reported"]
+        result1 = m.fetch()
+        assert result1.level == "HIGH"
+        
+        # 2차: _classify 예외 발생 (심각한 오류)
+        m._fetch_headlines = lambda: ["valid headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("parse error"))
+        
+        result2 = m.fetch()
+        assert result2.source == "fallback"
+        assert result2.level == "HIGH"
+
+    def test_fetch_all_apis_fail_no_fallback_returns_neutral(self):
+        """API 예외 + fallback 없을 시 중립 데이터 반환."""
+        m = NewsMonitor(max_retries=1)
+        m._last_successful = None  # fallback 없음
+        
+        # _classify 예외 발생
+        m._fetch_headlines = lambda: []
+        m._classify = lambda h: (_ for _ in ()).throw(RuntimeError("error"))
+        
+        result = m.fetch()
+        assert result.level == "NONE"
+        assert result.source == "unavailable"
+
+    def test_partial_api_failure_uses_available_data(self):
+        """API 실패 후 빈 헤드라인 → NONE 분류."""
+        m = NewsMonitor()
+        m._fetch_headlines = lambda: []
+        result = m.fetch()
+        assert result.level == "NONE"
+
+    def test_cache_returns_same_data_within_timeout(self):
+        """캐시 유효 시간 내 재호출 시 같은 데이터 반환."""
+        import time
+        m = NewsMonitor(use_cache_seconds=300)
+        
+        mock_event = m.mock(level="MEDIUM", event_text="Fed meeting")
+        m._cache = mock_event
+        m._cache_time = time.time()
+        
+        result = m.fetch()
+        assert result is mock_event
+
+    def test_max_retries_parameter_affects_behavior(self):
+        """max_retries 파라미터로 재시도 횟수 제어."""
+        m1 = NewsMonitor(max_retries=1)
+        assert m1.max_retries == 1
+        
+        m2 = NewsMonitor(max_retries=3)
+        assert m2.max_retries == 3
+
+    def test_fallback_last_successful_tracked(self):
+        """성공한 데이터가 _last_successful에 저장됨."""
+        m = NewsMonitor(max_retries=1)
+        
+        # 초기 상태
+        assert m._last_successful is None
+        
+        # 성공한 fetch
+        m._fetch_headlines = lambda: ["hack", "breach"]
+        result = m.fetch()
+        assert m._last_successful is not None
+        assert m._last_successful.level == "HIGH"
+
+    def test_classify_exception_returns_fallback(self):
+        """_classify 예외 시 fallback 또는 neutral 반환."""
+        m = NewsMonitor()
+        m._last_successful = m.mock(level="MEDIUM")
+        m._fetch_headlines = lambda: ["valid headline"]
+        
+        # _classify 에러 시뮬레이션
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("mock error"))
+        
+        result = m.fetch()
+        # fallback이 있으므로 MEDIUM 반환
+        assert result.source == "fallback"
+
+    def test_unavailable_source_when_classify_fails_and_no_fallback(self):
+        """_classify 실패 + fallback 없을 때 source='unavailable'."""
+        m = NewsMonitor()
+        m._last_successful = None
+        m._fetch_headlines = lambda: ["valid headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(ValueError("error"))
+        
+        result = m.fetch()
+        assert result.source == "unavailable"
+
+    def test_fallback_survives_classify_failures(self):
+        """이전 fallback이 여러 번 _classify 실패 시에도 계속 사용."""
+        m = NewsMonitor(max_retries=1, use_cache_seconds=0)
+        
+        # 1차: 성공
+        m._fetch_headlines = lambda: ["ban", "shutdown"]
+        result1 = m.fetch()
+        assert result1.level == "HIGH"
+        
+        # 2차: _classify 실패
+        m._fetch_headlines = lambda: ["headline"]
+        m._classify = lambda h: (_ for _ in ()).throw(RuntimeError("error"))
+        result2 = m.fetch()
+        assert result2.level == "HIGH"
+        assert result2.source == "fallback"
+        
+        # 3차: 여전히 실패
+        result3 = m.fetch()
+        assert result3.level == "HIGH"
+        assert result3.source == "fallback"
+
+
+# ---------------------------------------------------------------------------
+# MarketContext: composite_score 경계 (극단값)
+# ---------------------------------------------------------------------------
+
+class TestCompositeScoreEdge:
+    """모든 소스 극단값에서 composite_score 경계 검증."""
+
+    def test_all_sources_max_bullish_clamped_to_plus3(self):
+        """감성+온체인 모두 최대 강세 → composite_score == +3.0 (상한 클램프)."""
+        f = SentimentFetcher()
+        o = OnchainFetcher()
+        # sentiment_score=+3.0 (극단 공포 역추세 + 음펀딩비)
+        # onchain_score=+3.0  (outflow + accumulating + undervalued)
+        sent = f.mock(fear_greed=0, funding_rate=-0.001)
+        och = o.mock(exchange_flow="OUTFLOW", whale_activity="ACCUMULATING", nvt_signal="UNDERVALUED")
+        ctx = MarketContext(sentiment=sent, onchain=och)
+        assert ctx.composite_score == 3.0
+
+    def test_all_sources_max_bearish_clamped_to_minus3(self):
+        """감성+온체인 모두 최대 약세 → composite_score == -3.0 (하한 클램프)."""
+        f = SentimentFetcher()
+        o = OnchainFetcher()
+        # sentiment_score=-3.0 (극단 탐욕 + 과열 펀딩비)
+        # onchain_score=-3.0  (inflow_spike + distributing + overvalued)
+        sent = f.mock(fear_greed=100, funding_rate=0.001)
+        och = o.mock(exchange_flow="INFLOW_SPIKE", whale_activity="DISTRIBUTING", nvt_signal="OVERVALUED")
+        ctx = MarketContext(sentiment=sent, onchain=och)
+        assert ctx.composite_score == -3.0

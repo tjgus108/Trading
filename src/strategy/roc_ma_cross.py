@@ -1,10 +1,12 @@
 """
-ROCMACrossStrategy:
+ROCMACrossStrategy v2:
 - ROC = (close / close.shift(12) - 1) * 100
 - ROC_MA = ROC.rolling(3).mean()  (스무딩)
 - BUY: ROC_MA crosses above 0 (prev < 0, now >= 0) AND close > EMA50
+       AND ROC > 0 (양의 모멘텀 확인)
 - SELL: ROC_MA crosses below 0 (prev > 0, now <= 0) AND close < EMA50
-- confidence: HIGH if |ROC| > ROC.rolling(20).std() * 1.5, MEDIUM 그 외
+        AND ROC < 0 (음의 모멘텀 확인)
+- confidence: HIGH if |ROC| > ROC.rolling(20).std() * 2.0 (상향)
 - 최소 20행 필요
 """
 
@@ -16,7 +18,7 @@ _MIN_ROWS = 20
 _ROC_PERIOD = 12
 _MA_PERIOD = 3
 _STD_PERIOD = 20
-_STD_MULT = 1.5
+_STD_MULT = 2.0  # 2.0으로 상향 (이전 1.5)
 
 
 class ROCMACrossStrategy(BaseStrategy):
@@ -71,7 +73,8 @@ class ROCMACrossStrategy(BaseStrategy):
 
         conf = Confidence.HIGH if conf_high else Confidence.MEDIUM
 
-        if cross_above and close > ema50:
+        # BUY: 추가 필터 - ROC > 0 확인 (양의 모멘텀)
+        if cross_above and close > ema50 and roc_now > 0:
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -86,7 +89,8 @@ class ROCMACrossStrategy(BaseStrategy):
                 bear_case="단순 조정 후 재하락 가능",
             )
 
-        if cross_below and close < ema50:
+        # SELL: 추가 필터 - ROC < 0 확인 (음의 모멘텀)
+        if cross_below and close < ema50 and roc_now < 0:
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
@@ -107,8 +111,8 @@ class ROCMACrossStrategy(BaseStrategy):
             strategy=self.name,
             entry_price=close,
             reasoning=(
-                f"ROC_MA 크로스 없음 또는 EMA50 조건 미충족: "
-                f"ROC_MA={roc_ma_now:.2f}, close={close:.4f}, EMA50={ema50:.4f}"
+                f"ROC_MA 크로스 없음 또는 조건 미충족: "
+                f"ROC_MA={roc_ma_now:.2f}, close={close:.4f}, EMA50={ema50:.4f}, ROC={roc_now:.2f}"
             ),
             invalidation="",
             bull_case="",

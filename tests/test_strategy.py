@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.base import Action
+from src.strategy.base import Action, Confidence, Signal, REASONING_MAX_LEN
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -58,6 +58,32 @@ def test_signal_has_bull_bear_case():
     assert isinstance(signal.invalidation, str)
 
 
+def test_signal_metadata_optional():
+    """Signal.metadata는 기본 None이며, dict 할당 시 저장된다."""
+    from src.strategy.base import Signal, Action, Confidence
+
+    sig_no_meta = Signal(
+        action=Action.HOLD,
+        confidence=Confidence.LOW,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="r",
+        invalidation="i",
+    )
+    assert sig_no_meta.metadata is None
+
+    sig_with_meta = Signal(
+        action=Action.BUY,
+        confidence=Confidence.HIGH,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="r",
+        invalidation="i",
+        metadata={"rsi": 55.0, "atr_ratio": 1.2},
+    )
+    assert sig_with_meta.metadata["rsi"] == 55.0
+
+
 def test_ema_cross_buy_on_crossover():
     """EMA20이 EMA50을 상향 돌파하는 시나리오를 직접 주입 (ATR/VWAP 필터 포함)."""
     df = _make_df(100)
@@ -75,3 +101,26 @@ def test_ema_cross_buy_on_crossover():
     df.iloc[-2, df.columns.get_loc("vwap")] = close_val * 0.99  # close > vwap
     signal = EmaCrossStrategy().generate(df)
     assert signal.action == Action.BUY
+
+
+def test_signal_reasoning_max_length():
+    """reasoning이 REASONING_MAX_LEN 초과 시 ValueError를 발생시킨다."""
+    with pytest.raises(ValueError, match="reasoning exceeds"):
+        Signal(
+            action=Action.HOLD,
+            confidence=Confidence.LOW,
+            strategy="test",
+            entry_price=100.0,
+            reasoning="x" * (REASONING_MAX_LEN + 1),
+            invalidation="i",
+        )
+    # 경계값: 정확히 REASONING_MAX_LEN 길이는 통과해야 한다
+    sig = Signal(
+        action=Action.HOLD,
+        confidence=Confidence.LOW,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="x" * REASONING_MAX_LEN,
+        invalidation="i",
+    )
+    assert len(sig.reasoning) == REASONING_MAX_LEN

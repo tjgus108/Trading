@@ -122,6 +122,58 @@ def test_add_strategy():
     sel.record_pnl("new_strat", 5.0)  # 에러 없어야 함
 
 
+# ── rolling_consistency ───────────────────────────────────────────────────
+
+def test_rolling_consistency_all_positive():
+    sel = _make_selector()
+    for p in [5, 10, 8, 12, 6, 9, 11, 7, 10, 8]:
+        sel.record_pnl("ema_cross", p)
+    score = sel.rolling_consistency("ema_cross", window=30)
+    assert score == 1.0, "모두 양수 → 일관성 1.0"
+
+
+def test_rolling_consistency_mixed():
+    sel = _make_selector()
+    # 8 양수 + 2 음수 → dominant=8/10=0.8
+    for p in [5, 10, -3, 8, 6, -1, 9, 7, 10, 8]:
+        sel.record_pnl("ema_cross", p)
+    score = sel.rolling_consistency("ema_cross", window=10)
+    assert abs(score - 0.8) < 1e-9, f"expected 0.8, got {score}"
+
+
+def test_rolling_consistency_insufficient_data():
+    sel = _make_selector()
+    for p in [1, 2, 3]:  # MIN_SAMPLES=5 미만
+        sel.record_pnl("ema_cross", p)
+    assert sel.rolling_consistency("ema_cross") == 0.0
+
+
+def test_consistency_summary_keys():
+    sel = _make_selector()
+    result = sel.consistency_summary(window=30)
+    assert set(result.keys()) == {"ema_cross", "rsi_div", "funding"}
+    assert all(0.0 <= v <= 1.0 for v in result.values())
+
+
+def test_select_single_strategy():
+    """단일 전략일 때 select()가 항상 해당 전략을 반환."""
+    strats = {"solo": _make_strategy("solo")}
+    sel = AdaptiveStrategySelector(strats, window=10)
+    result = sel.select()
+    assert result.name == "solo"
+
+
+def test_select_empty_history_all_negative_sharpe():
+    """모든 Sharpe가 음수(데이터 부족)이면 균등 선택 — select() 에러 없음."""
+    sel = _make_selector()
+    # 4개만 기록 (MIN_SAMPLES 미달) → sharpe=0 → total=0 → 균등 선택
+    sel.record_pnl("ema_cross", -5.0)
+    sel.record_pnl("rsi_div", -5.0)
+    result = sel.select()
+    assert result is not None
+    assert result.name in ["ema_cross", "rsi_div", "funding"]
+
+
 def test_window_cap():
     """window=5 초과 기록 시 오래된 데이터 버림."""
     strats = {"a": _make_strategy("a")}
@@ -135,3 +187,78 @@ def test_window_cap():
     # window=5이므로 최신 5개(양수)만 남아야 → Sharpe > 0
     sh = sel.sharpe("a")
     assert sh > 0, f"최신 양수 데이터만 남아야 하는데 Sharpe={sh}"
+
+
+# ── 가중치 변동성 검증 ────────────────────────────────────────────────────
+
+def test_weight_shifts_with_changing_sharpe():
+    """PnL 패턴이 바뀌면 rolling Sharpe(가중치)가 실제로 변한다."""
+    sel = _make_selector()
+    # 초기: ema_cross 양호
+    for p in [10, 12, 9, 11, 10, 13, 8, 11, 10, 12]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div: 혼합
+    for p in [1, -2, 3, -1, 2, -3, 1, -2, 2, -1]:
+        sel.record_pnl("rsi_div", p)
+    sh_ema_before = sel.sharpe("ema_cross")
+    sh_rsi_before = sel.sharpe("rsi_div")
+    assert sh_ema_before > sh_rsi_before, "ema_cross Sharpe > rsi_div Sharpe"
+
+    # 이후: rsi_div 성과 역전(양수 몰림)
+    for p in [20, 22, 21, 25, 19, 23, 20, 22, 21, 24]:
+        sel.record_pnl("rsi_div", p)
+    sh_rsi_after = sel.sharpe("rsi_div")
+    assert sh_rsi_after > sh_rsi_before, "새 데이터 반영 후 rsi_div Sharpe 상승"
+
+
+def test_low_sharpe_reduces_selection_weight():
+    """최근 성과 낮은 전략은 가중치가 줄어 선택 빈도가 낮아진다."""
+    sel = _make_selector()
+    # ema_cross: 고성과 (양의 PnL, 낮은 분산 → 높은 Sharpe)
+    for p in [10, 11, 10, 12, 11, 10, 12, 11, 10, 11]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div: 저성과 (음/양 혼재 → Sharpe 0 이하)
+    for p in [5, -8, 3, -9, 4, -7, 2, -6, 5, -8]:
+        sel.record_pnl("rsi_div", p)
+
+    ema_sharpe = sel.sharpe("ema_cross")
+    rsi_sharpe = sel.sharpe("rsi_div")
+    assert ema_sharpe > 0, f"ema_cross Sharpe should be positive, got {ema_sharpe}"
+    assert rsi_sharpe <= 0, f"rsi_div Sharpe should be <=0, got {rsi_sharpe}"
+
+    counts = {"ema_cross": 0, "rsi_div": 0, "funding": 0}
+    for _ in range(300):
+        counts[sel.select().name] += 1
+    # rsi_div Sharpe<=0 → 가중치 0 → 선택 비율이 ema_cross보다 낮아야 함
+    assert counts["ema_cross"] > counts["rsi_div"], (
+        f"저성과 rsi_div 선택 비율이 낮아야 함: {counts}"
+    )
+
+
+def test_best_strategy_name_tie_break_first_key():
+    """동일 Sharpe(모두 0)일 때 best_strategy_name은 dict 첫 번째 키를 반환."""
+    strats = {
+        "alpha": _make_strategy("alpha"),
+        "beta": _make_strategy("beta"),
+    }
+    sel = AdaptiveStrategySelector(strats, window=20)
+    # 데이터 없음 → sharpe=0.0 동일 → max() tie-break → 첫 번째 키 "alpha"
+    assert sel.best_strategy_name() == "alpha"
+
+
+def test_select_weight_proportional_after_reversal():
+    """가중치 역전 후 select() 선택 빈도가 바뀐다."""
+    sel = _make_selector()
+    # ema_cross 초기 우세
+    for p in [10, 12, 11, 13, 10, 12, 11, 13, 10, 12]:
+        sel.record_pnl("ema_cross", p)
+    # rsi_div 최신 10개 = 더 높은 Sharpe로 역전
+    for p in [50, 55, 52, 58, 51, 53, 57, 54, 56, 55]:
+        sel.record_pnl("rsi_div", p)
+
+    counts = {"ema_cross": 0, "rsi_div": 0, "funding": 0}
+    for _ in range(200):
+        counts[sel.select().name] += 1
+    assert counts["rsi_div"] > counts["ema_cross"], (
+        f"rsi_div(high Sharpe) 선택 빈도가 더 높아야 함: {counts}"
+    )

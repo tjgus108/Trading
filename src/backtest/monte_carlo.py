@@ -130,6 +130,11 @@ class MonteCarlo:
     def _block_bootstrap(self, r: np.ndarray, target_len: int) -> np.ndarray:
         """Block bootstrap 리샘플링."""
         n = len(r)
+        
+        # 빈 배열이거나 target_len이 0이면 빈 배열 반환
+        if n == 0 or target_len == 0:
+            return np.array([], dtype=float)
+        
         blocks = []
         while sum(len(b) for b in blocks) < target_len:
             start = self._rng.integers(0, max(1, n - self.block_size + 1))
@@ -139,6 +144,8 @@ class MonteCarlo:
         return combined
 
     def _sharpe(self, r: np.ndarray) -> float:
+        if len(r) == 0:
+            return np.nan
         ann_r = r.mean() * self.annualization
         ann_v = r.std() * np.sqrt(self.annualization)
         if ann_v <= 0:
@@ -147,6 +154,8 @@ class MonteCarlo:
 
     @staticmethod
     def _max_drawdown(r: np.ndarray) -> float:
+        if len(r) == 0:
+            return np.nan
         equity = np.cumprod(1 + r)
         peak = np.maximum.accumulate(equity)
         dd = (peak - equity) / np.where(peak > 0, peak, 1)

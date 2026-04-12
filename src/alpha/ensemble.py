@@ -18,8 +18,27 @@ D1. MultiLLMEnsemble: Claude + GPT-4o 동시 신호 → 합의 시 진입.
 
 import logging
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Optional
+
+_RETRY_ATTEMPTS = 3
+_RETRY_BACKOFF = [0.5, 1.0]
+
+
+def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: list[float] = _RETRY_BACKOFF):
+    """Simple retry wrapper for transient API errors."""
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            if i < len(backoff):
+                time.sleep(backoff[i])
+            logger.debug("_with_retry attempt %d/%d failed: %s", i + 1, attempts, e)
+    raise last_exc
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +140,7 @@ class MultiLLMEnsemble:
 
         prompt = self._build_prompt(symbol, rule_signal, signal_context, market_summary)
 
-        claude_vote = self._ask_claude(prompt)
-        openai_vote = self._ask_openai(prompt)
+        claude_vote, openai_vote = self._ask_parallel(prompt)
 
         consensus, confidence = self._compute_consensus(
             rule_signal, claude_vote, openai_vote
@@ -162,34 +180,51 @@ class MultiLLMEnsemble:
             f"(NEUTRAL = no strong opinion)"
         )
 
+    def _ask_parallel(self, prompt: str) -> tuple[str, str]:
+        """Claude + OpenAI를 ThreadPoolExecutor로 병렬 호출."""
+        results: dict[str, str] = {}
+        tasks = {}
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            if self._claude_client:
+                tasks["claude"] = executor.submit(self._ask_claude, prompt)
+            if self._openai_client:
+                tasks["openai"] = executor.submit(self._ask_openai, prompt)
+            for key, future in tasks.items():
+                try:
+                    results[key] = future.result(timeout=10)
+                except Exception as e:
+                    logger.debug("Parallel vote timeout/error (%s): %s", key, e)
+                    results[key] = "N/A"
+        return results.get("claude", "N/A"), results.get("openai", "N/A")
+
     def _ask_claude(self, prompt: str) -> str:
         if not self._claude_client:
             return "N/A"
         try:
-            resp = self._claude_client.messages.create(
+            resp = _with_retry(lambda: self._claude_client.messages.create(
                 model=self._claude_model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
-            )
+            ))
             vote = resp.content[0].text.strip().upper()
             return vote if vote in ("BUY", "SELL", "HOLD", "NEUTRAL") else "NEUTRAL"
         except Exception as e:
-            logger.debug("Claude vote failed: %s", e)
+            logger.debug("Claude vote failed after retries: %s", e)
             return "N/A"
 
     def _ask_openai(self, prompt: str) -> str:
         if not self._openai_client:
             return "N/A"
         try:
-            resp = self._openai_client.chat.completions.create(
+            resp = _with_retry(lambda: self._openai_client.chat.completions.create(
                 model=self._openai_model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
-            )
+            ))
             vote = resp.choices[0].message.content.strip().upper()
             return vote if vote in ("BUY", "SELL", "HOLD", "NEUTRAL") else "NEUTRAL"
         except Exception as e:
-            logger.debug("OpenAI vote failed: %s", e)
+            logger.debug("OpenAI vote failed after retries: %s", e)
             return "N/A"
 
     def _compute_consensus(

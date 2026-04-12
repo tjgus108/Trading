@@ -8,6 +8,10 @@ ATR 조정:
   ATR이 높을수록 사이즈 축소:
   atr_factor = target_atr / current_atr (capped at 1.0)
   final_size = kelly_size * atr_factor
+
+Risk-Constrained Kelly (max_drawdown 제약):
+  max_dd_constrained = max_drawdown / (avg_loss * leverage)
+  final_fraction = min(half_kelly, max_dd_constrained)
 """
 
 from __future__ import annotations
@@ -28,10 +32,22 @@ class KellySizer:
         fraction: float = 0.5,
         max_fraction: float = 0.10,
         min_fraction: float = 0.001,
+        max_drawdown: Optional[float] = None,
+        leverage: float = 1.0,
     ) -> None:
+        """
+        Args:
+            fraction: Kelly 분수 배율 (0.5 = Half-Kelly)
+            max_fraction: 자본 대비 최대 포지션 비율
+            min_fraction: 자본 대비 최소 포지션 비율
+            max_drawdown: 허용 최대 낙폭 (e.g. 0.05 = 5%). None이면 DD 제약 미적용.
+            leverage: 레버리지 배수 (기본 1.0 = 현물)
+        """
         self.fraction = fraction
         self.max_fraction = max_fraction
         self.min_fraction = min_fraction
+        self.max_drawdown = max_drawdown
+        self.leverage = leverage
 
     def compute(
         self,
@@ -69,6 +85,11 @@ class KellySizer:
         # Fractional Kelly
         fractional_f = kelly_f * self.fraction
 
+        # Risk-Constrained Kelly: max_drawdown 제약
+        if self.max_drawdown is not None and avg_loss > 0 and self.leverage > 0:
+            max_dd_constrained = self.max_drawdown / (avg_loss * self.leverage)
+            fractional_f = min(fractional_f, max_dd_constrained)
+
         # 상·하한 클리핑
         fractional_f = float(np.clip(fractional_f, self.min_fraction, self.max_fraction))
 
@@ -93,6 +114,8 @@ class KellySizer:
         fraction: float = 0.5,
         max_fraction: float = 0.10,
         min_fraction: float = 0.001,
+        max_drawdown: Optional[float] = None,
+        leverage: float = 1.0,
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.
 
@@ -105,6 +128,8 @@ class KellySizer:
             fraction: Kelly 분수 배율
             max_fraction: 최대 자본 비율
             min_fraction: 최소 자본 비율
+            max_drawdown: 허용 최대 낙폭 (선택)
+            leverage: 레버리지 배수 (기본 1.0)
 
         Returns:
             포지션 사이즈 (수량)
@@ -120,5 +145,11 @@ class KellySizer:
         avg_win = float(wins.mean()) if len(wins) > 0 else 0.0
         avg_loss = float(abs(losses.mean())) if len(losses) > 0 else 0.0
 
-        sizer = cls(fraction=fraction, max_fraction=max_fraction, min_fraction=min_fraction)
+        sizer = cls(
+            fraction=fraction,
+            max_fraction=max_fraction,
+            min_fraction=min_fraction,
+            max_drawdown=max_drawdown,
+            leverage=leverage,
+        )
         return sizer.compute(win_rate, avg_win, avg_loss, capital, price, atr, target_atr)

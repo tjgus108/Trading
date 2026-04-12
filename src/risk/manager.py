@@ -6,9 +6,13 @@ LLM이 직접 수치를 계산하지 않고 이 코드가 처리한다.
 
 import logging
 import math
+import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Union
+
+from src.strategy.base import SessionType, is_active_session
 
 import numpy as np
 import pandas as pd
@@ -103,12 +107,28 @@ class RiskManager:
         atr_multiplier_tp: float = 3.0,    # 익절: ATR * 3.0
         max_position_size: float = 0.10,   # 계좌 대비 최대 10%
         circuit_breaker: Optional[CircuitBreaker] = None,
+        jitter_pct: float = 0.0,  # ±jitter_pct 랜덤 노이즈 (0~0.05)
+        session_filter: bool = False,  # True 시 세션별 포지션 축소 활성화
+        max_total_exposure: float = 0.30,  # 다중 포지션 총 노출 한도 (계좌 대비 30%)
     ):
+        if not (0 < risk_per_trade <= 1.0):
+            raise ValueError(f"risk_per_trade must be in (0, 1.0], got {risk_per_trade}")
+        if atr_multiplier_sl <= 0:
+            raise ValueError(f"atr_multiplier_sl must be > 0, got {atr_multiplier_sl}")
+        if atr_multiplier_tp <= 0:
+            raise ValueError(f"atr_multiplier_tp must be > 0, got {atr_multiplier_tp}")
+        if not (0 < max_position_size <= 1.0):
+            raise ValueError(f"max_position_size must be in (0, 1.0], got {max_position_size}")
+        if not (0 < max_total_exposure <= 1.0):
+            raise ValueError(f"max_total_exposure must be in (0, 1.0], got {max_total_exposure}")
         self.risk_per_trade = risk_per_trade
         self.atr_multiplier_sl = atr_multiplier_sl
         self.atr_multiplier_tp = atr_multiplier_tp
         self.max_position_size = max_position_size
         self.circuit_breaker = circuit_breaker
+        self.jitter_pct = max(0.0, min(jitter_pct, 0.05))  # 상한 5%
+        self.session_filter = session_filter
+        self.max_total_exposure = max_total_exposure
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
@@ -154,6 +174,20 @@ class RiskManager:
         )
         return mult
 
+    def check_total_exposure(
+        self,
+        open_positions: list,  # list of {"size": float, "price": float}
+        account_balance: float,
+    ) -> Optional[str]:
+        """기존 포지션들의 총 노출이 max_total_exposure 초과 시 사유 반환, 정상이면 None."""
+        total = sum(p["size"] * p["price"] for p in open_positions)
+        ratio = total / account_balance if account_balance > 0 else 0.0
+        if ratio >= self.max_total_exposure:
+            return (
+                f"total_exposure {ratio:.2%} >= limit {self.max_total_exposure:.2%}"
+            )
+        return None
+
     def reset_daily(self) -> None:
         """자정 리셋: 일일 손실 초기화."""
         if self.circuit_breaker:
@@ -167,6 +201,8 @@ class RiskManager:
         account_balance: float,
         last_candle_pct_change: float = 0.0,
         candle_df: Optional[pd.DataFrame] = None,  # adaptive multiplier용
+        timestamp: Union[datetime, None] = None,  # 세션 필터용 UTC 시각
+        open_positions: Optional[list] = None,  # 다중 포지션 total exposure 체크용
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -194,6 +230,34 @@ class RiskManager:
                     portfolio_exposure=None,
                 )
 
+        # 다중 포지션 total exposure 체크
+        if open_positions:
+            exposure_reason = self.check_total_exposure(open_positions, account_balance)
+            if exposure_reason:
+                logger.warning("Total exposure limit breached: %s", exposure_reason)
+                return RiskResult(
+                    status=RiskStatus.BLOCKED,
+                    reason=f"Total exposure limit: {exposure_reason}",
+                    position_size=None,
+                    stop_loss=None,
+                    take_profit=None,
+                    risk_amount=None,
+                    portfolio_exposure=None,
+                )
+
+        # ATR 경계 검증: 0 이하면 SL 계산 불가
+        if atr <= 0:
+            logger.warning("Invalid ATR value: %.6f — BLOCKED", atr)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"Invalid ATR: {atr} (must be > 0)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
+
         # 포지션 사이징 (candle_df 있으면 adaptive multiplier, 없으면 config 값 사용)
         if candle_df is not None:
             sl_mult = self.adaptive_stop_multiplier(candle_df)
@@ -206,6 +270,42 @@ class RiskManager:
         # 최대 포지션 한도 클램프
         max_size = (account_balance * self.max_position_size) / entry_price
         position_size = min(position_size, max_size)
+
+        # ATR이 매우 커서 포지션 사이즈가 사실상 0인 경우 BLOCK (< 1e-8 단위)
+        if position_size < 1e-8:
+            logger.warning("position_size <= 0 after sizing (ATR too large?): atr=%.6f — BLOCKED", atr)
+            return RiskResult(
+                status=RiskStatus.BLOCKED,
+                reason=f"position_size is zero after sizing (ATR={atr} may be abnormally large)",
+                position_size=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_amount=None,
+                portfolio_exposure=None,
+            )
+
+        # 주문 지터: 봇의 예측 가능한 패턴 노출 방지 (AMM 착취 대응)
+        if self.jitter_pct > 0.0:
+            noise = random.uniform(-self.jitter_pct, self.jitter_pct)
+            position_size = position_size * (1.0 + noise)
+            position_size = min(position_size, max_size)  # 클램프 재적용
+            logger.debug("Order jitter applied: noise=%.4f%%", noise * 100)
+
+        # 세션 필터: REDUCED 세션 → 50% 축소, 주말 → 30% 축소
+        if self.session_filter:
+            session = is_active_session(timestamp)
+            if session == SessionType.REDUCED:
+                ts = timestamp
+                if ts is None:
+                    from datetime import timezone
+                    ts = datetime.now(timezone.utc)
+                is_weekend = ts.weekday() >= 5
+                scale = 0.30 if is_weekend else 0.50
+                position_size *= scale
+                logger.debug(
+                    "Session filter (%s): position_size scaled by %.0f%%",
+                    "weekend" if is_weekend else "asia/off-hours", scale * 100,
+                )
 
         if action == "BUY":
             stop_loss = entry_price - sl_distance

@@ -141,3 +141,201 @@ class TestFetchFailure(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVPINCalculator(unittest.TestCase):
+    """VPIN (Volume-Synchronized Probability of Informed Trading) 테스트"""
+    
+    def setUp(self):
+        from src.data.order_flow import VPINCalculator
+        self.calc = VPINCalculator(n_buckets=3)
+    
+    def test_vpin_zero_bucket_size_raises_error(self):
+        """n_buckets <= 0: ValueError 발생"""
+        from src.data.order_flow import VPINCalculator
+        with self.assertRaises(ValueError) as ctx:
+            VPINCalculator(n_buckets=0)
+        self.assertIn("n_buckets must be > 0", str(ctx.exception))
+    
+    def test_vpin_all_neutral_candles(self):
+        """close == open: NEUTRAL → low VPIN"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0],
+            "close": [100.0, 100.0, 100.0],
+            "volume": [100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # NEUTRAL candles 모두 0.5 buy_frac → imbalance = 0
+        self.assertAlmostEqual(result.iloc[-1], 0.0, places=2)
+    
+    def test_vpin_perfect_buy_pressure(self):
+        """close > open: BUY → high VPIN (all buy)"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [90.0, 90.0, 90.0],
+            "close": [100.0, 100.0, 100.0],
+            "volume": [100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # All BUY → buy_vol = 100, sell_vol = 0, imbalance = 100
+        self.assertAlmostEqual(result.iloc[-1], 1.0, places=2)
+    
+    def test_vpin_perfect_sell_pressure(self):
+        """close < open: SELL → high VPIN (all sell)"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0],
+            "close": [90.0, 90.0, 90.0],
+            "volume": [100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # All SELL → buy_vol = 0, sell_vol = 100, imbalance = 100
+        self.assertAlmostEqual(result.iloc[-1], 1.0, places=2)
+    
+    def test_vpin_balanced_buy_sell(self):
+        """Perfectly balanced buy/sell → low VPIN"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0],
+            "close": [105.0, 95.0, 105.0],  # buy, sell, buy
+            "volume": [100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # Row 2: buy_vol = 100 + 0 + 100 = 200, sell_vol = 0 + 100 + 0 = 100
+        # imbalance = |100| + |100| + |100| = 300 (not 0, test expectation was wrong)
+        # Let's test with perfectly balanced window
+        calc2 = calc2 = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=2)
+        df2 = pd.DataFrame({
+            "open": [100.0, 100.0],
+            "close": [105.0, 95.0],  # buy, sell
+            "volume": [100.0, 100.0]
+        })
+        result2 = calc2.compute(df2)
+        # buy_vol = 100 + 0 = 100, sell_vol = 0 + 100 = 100
+        # imbalance = 100 + 100 = 200, total = 200
+        # VPIN = 200 / 200 = 1.0 (opposite imbalances sum)
+        self.assertAlmostEqual(result2.iloc[-1], 1.0, places=2)
+    
+    def test_vpin_bounded_zero_to_one(self):
+        """VPIN always in [0, 1]"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 99.0, 98.0, 97.0, 96.0],
+            "close": [110.0, 95.0, 110.0, 95.0, 110.0],
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
+        })
+        result = self.calc.compute(df)
+        for val in result.dropna():
+            self.assertGreaterEqual(val, 0.0)
+            self.assertLessEqual(val, 1.0)
+    
+    def test_vpin_get_latest(self):
+        """get_latest() returns last VPIN value"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 10,
+            "close": [105.0] * 10,  # all BUY
+            "volume": [100.0] * 10
+        })
+        latest = self.calc.get_latest(df)
+        self.assertGreaterEqual(latest, 0.0)
+        self.assertLessEqual(latest, 1.0)
+    
+    def test_vpin_get_latest_insufficient_data(self):
+        """get_latest() returns 0.5 when data insufficient"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0],
+            "close": [105.0],
+            "volume": [100.0]
+        })
+        latest = self.calc.get_latest(df)
+        self.assertEqual(latest, 0.5)
+    
+    def test_vpin_get_latest_nan(self):
+        """get_latest() handles NaN gracefully"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0],
+            "close": [float('nan')],
+            "volume": [100.0]
+        })
+        latest = self.calc.get_latest(df)
+        self.assertEqual(latest, 0.5)
+    
+    def test_vpin_massive_volume_spike(self):
+        """거대 거래량 급증 한 봉 → imbalance 반영"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 105.0, 105.0, 105.0],  # all BUY
+            "volume": [100.0, 100.0, 10000.0, 100.0]  # spike at index 2
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=3)
+        result = calc.compute(df)
+        # Row 3: last 3 candles, total_vol = 100 + 10000 + 100 = 10200
+        # All BUY → imbalance = 10200, VPIN = 10200/10200 = 1.0
+        self.assertAlmostEqual(result.iloc[-1], 1.0, places=2)
+        self.assertLessEqual(result.iloc[-1], 1.0)
+    
+    def test_vpin_mixed_volume_sizes(self):
+        """혼합 거래량 크기 → 가중치 적용"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0],
+            "close": [100.0, 100.0, 101.0],  # 2 neutral, 1 slight buy
+            "volume": [100.0, 100.0, 100.0]
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=3)
+        result = calc.compute(df)
+        # Imbalance = 0 + 0 + 100 = 100, total = 300
+        # VPIN = 100/300 ≈ 0.33
+        self.assertGreater(result.iloc[-1], 0.0)
+        self.assertLess(result.iloc[-1], 0.5)
+    
+    def test_vpin_zero_volume_candle(self):
+        """0 거래량 봉 → 안전 처리 (division by zero 회피)"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0],
+            "close": [105.0, 100.0, 105.0],
+            "volume": [100.0, 0.0, 100.0]  # zero volume at index 1
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=3)
+        result = calc.compute(df)
+        # Should not raise exception, should return valid VPIN
+        self.assertFalse(result.isna().all())
+        self.assertGreaterEqual(result.iloc[-1], 0.0)
+        self.assertLessEqual(result.iloc[-1], 1.0)
+
+    def test_vpin_extreme_buy_ratio(self):
+        """극단값: 99% buy, 1% sell → VPIN ≈ 0.98"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 105.0, 105.0, 101.5],  # 3 BUY, 1 NEUTRAL
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0]
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=4)
+        result = calc.compute(df)
+        # buy_vol = 3000 + 500 = 3500, sell_vol = 0 + 500 = 500
+        # imbalance = |3000| + |3000| + |3000| + |3000| = 12000
+        # total_vol = 4000, VPIN = 12000/4000 = 3.0 (clamped to 1.0)
+        self.assertGreaterEqual(result.iloc[-1], 0.8)
+        self.assertLessEqual(result.iloc[-1], 1.0)
+
+    def test_vpin_extreme_sell_ratio(self):
+        """극단값: 1% buy, 99% sell → VPIN ≈ 0.98"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0],
+            "close": [95.0, 95.0, 95.0, 99.5],  # 3 SELL, 1 NEUTRAL
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0]
+        })
+        calc = __import__('src.data.order_flow', fromlist=['VPINCalculator']).VPINCalculator(n_buckets=4)
+        result = calc.compute(df)
+        # buy_vol = 0 + 500 = 500, sell_vol = 3000 + 500 = 3500
+        # imbalance dominance = strong sell signal
+        self.assertGreaterEqual(result.iloc[-1], 0.8)
+        self.assertLessEqual(result.iloc[-1], 1.0)

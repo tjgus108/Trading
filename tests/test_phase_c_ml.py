@@ -115,6 +115,225 @@ class TestFeatureBuilder:
         X, _ = fb.build(df)
         assert np.isfinite(X.values).all()
 
+    def test_no_lookahead_bias_in_features(self):
+        """
+        EMA/rolling 계산이 이전 바만 사용하는지 확인 (현재 바 제외).
+
+        검증:
+        1. RSI z-score: 이전 20바 기준
+        2. Volatility: 이전 20바 기준
+        3. EMA features: 이전 바 기준
+        4. Donchian: 이전 20바 기준
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+        X, _ = fb.build(df)
+
+        # Feature가 존재하는지 확인
+        required_features = ["rsi_zscore", "volatility_20", "ema_ratio",
+                            "price_vs_ema20", "volume_ratio_20", "donchian_pct"]
+        for feat in required_features:
+            assert feat in X.columns, f"Feature {feat} missing"
+
+        # 모든 feature가 유한 값인지 확인 (inf/nan 없음)
+        assert X[required_features].notna().all().all()
+        assert np.isfinite(X[required_features]).all().all()
+
+        # EMA는 첫 50바 정도는 정규화 과정에서 NaN 처리됨
+        # (rolling window warm-up) → 그 이후만 유효
+        assert len(X) > 0
+
+    def test_future_price_change_does_not_affect_past_features(self):
+        """
+        미래 가격 변화가 과거 피처에 영향 없음 확인.
+
+        row t의 피처는 t 이전 데이터만 사용해야 함.
+        last row의 close를 10배로 바꾸면 그 row의 피처는 변해도
+        그 이전 rows의 피처는 불변이어야 한다.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+
+        # 원본 피처 (마지막 행 제외한 앞부분)
+        X_orig = fb.build_features_only(df)
+
+        # 마지막 행 close를 10배로 수정
+        df_modified = df.copy()
+        df_modified.iloc[-1, df_modified.columns.get_loc("close")] *= 10.0
+
+        X_mod = fb.build_features_only(df_modified)
+
+        # 공통 인덱스 (마지막 행 제외)
+        common_idx = X_orig.index[:-1].intersection(X_mod.index[:-1])
+        assert len(common_idx) > 50, "비교 가능한 공통 행이 너무 적음"
+
+        # shift(1) 기반 피처: 이전 행까지만 영향 받아야 함
+        # 마지막 행 수정 → 그 이전 행들의 피처는 동일해야 함
+        shifted_features = ["volatility_20", "rsi_zscore", "ema_ratio",
+                            "price_vs_ema20", "price_vs_ema50", "volume_ratio_20"]
+        for feat in shifted_features:
+            if feat in X_orig.columns and feat in X_mod.columns:
+                diff = (X_orig.loc[common_idx, feat] - X_mod.loc[common_idx, feat]).abs().max()
+                assert diff < 1e-9, (
+                    f"피처 '{feat}'가 미래 데이터 영향을 받음 (max_diff={diff:.2e}). "
+                    "look-ahead bias 가능성."
+                )
+
+    def test_labels_use_future_data_not_features(self):
+        """
+        레이블은 미래 데이터(forward_n 이후)를 사용하지만,
+        피처는 그 미래 데이터를 사용하지 않음을 확인.
+
+        같은 시점 t에서:
+        - 피처: t 시점의 close/volume 등 과거 정보만
+        - 레이블: t+forward_n 시점의 close (미래)
+
+        피처와 레이블의 인덱스가 같으며, 피처에 forward shift가 없음을 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder(forward_n=5, threshold=0.003)
+        X, y = fb.build(df)
+
+        # 레이블이 마지막 forward_n 행에서 NaN으로 처리되는지 확인
+        # (build()는 dropna()로 레이블 NaN 제거 → 마지막 5행은 X에 없어야 함)
+        last_ts = df.index[-1]
+        assert last_ts not in X.index, (
+            "마지막 행이 X에 포함됨 — 레이블 forward_n 미적용 가능성"
+        )
+        # 마지막 forward_n 행이 전부 제거됐는지 확인
+        last_n_ts = df.index[-fb.forward_n:]
+        overlap = X.index.intersection(last_n_ts)
+        assert len(overlap) == 0, (
+            f"마지막 {fb.forward_n}행 중 {len(overlap)}개가 X에 남아있음 — "
+            "레이블 누수 가능성"
+        )
+
+    def test_all_features_same_length_and_index(self):
+        """
+        _compute_features()가 반환하는 모든 컬럼이 동일한 길이와 인덱스를 가짐.
+        시계열 일관성 핵심 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder()
+        feat = fb._compute_features(df)
+
+        # 모든 컬럼 길이가 df와 동일
+        assert len(feat) == len(df), (
+            f"피처 행 수({len(feat)}) != 입력 df 행 수({len(df)})"
+        )
+
+        # 인덱스가 df와 정확히 일치
+        assert feat.index.equals(df.index), "피처 인덱스가 입력 df 인덱스와 불일치"
+
+        # 컬럼 간 길이 모두 동일 (DataFrame이므로 보장되지만 명시적 확인)
+        col_lengths = {col: len(feat[col]) for col in feat.columns}
+        unique_lengths = set(col_lengths.values())
+        assert len(unique_lengths) == 1, (
+            f"컬럼 간 길이 불일치: {col_lengths}"
+        )
+
+        # feature_names 목록의 모든 피처가 존재
+        for name in fb.feature_names:
+            assert name in feat.columns, f"feature_names의 '{name}'이 feat에 없음"
+
+        # 인덱스가 단조증가(시계열 순서) 유지
+        assert feat.index.is_monotonic_increasing, "피처 인덱스가 시계열 순서 미유지"
+
+    def test_xy_index_aligned(self):
+        """
+        build()가 반환하는 X와 y의 인덱스가 완전히 일치함을 검증.
+        """
+        df = _make_df(200)
+        fb = FeatureBuilder(forward_n=5, threshold=0.003)
+        X, y = fb.build(df)
+
+        assert X.index.equals(y.index), "X와 y의 인덱스 불일치 — 정렬 오류"
+        assert len(X) == len(y), f"X({len(X)})와 y({len(y)}) 길이 불일치"
+        # 인덱스 단조증가
+        assert X.index.is_monotonic_increasing, "build() 결과 인덱스 시계열 순서 미유지"
+
+    def test_rolling_features_use_prior_bars_only(self):
+        """
+        rolling/ewm 피처가 현재 바 포함 여부 직접 검증.
+
+        중간 row t의 close를 극단값으로 변경 → t+1 row의 shift(1) 기반 피처는
+        영향 받아야 하지만, t-1 이전 피처는 불변이어야 함.
+        """
+        df = _make_df(150)
+        fb = FeatureBuilder()
+
+        # 중간 행 인덱스 (warm-up 이후)
+        mid = 100
+        mid_ts = df.index[mid]
+        prev_ts = df.index[mid - 1]
+
+        # 원본 피처
+        X_orig = fb.build_features_only(df)
+
+        # mid 행의 close를 극단값으로 변경
+        df_mod = df.copy()
+        df_mod.iloc[mid, df_mod.columns.get_loc("close")] = 1_000_000.0
+
+        X_mod = fb.build_features_only(df_mod)
+
+        # mid 이전 행들의 피처는 영향 없어야 함
+        pre_mid_idx = X_orig.index[X_orig.index < mid_ts]
+        pre_mid_idx = pre_mid_idx.intersection(X_mod.index)
+
+        check_feats = ["volatility_20", "ema_ratio", "volume_ratio_20", "donchian_pct"]
+        for feat in check_feats:
+            if feat in X_orig.columns and feat in X_mod.columns:
+                diff = (X_orig.loc[pre_mid_idx, feat] - X_mod.loc[pre_mid_idx, feat]).abs().max()
+                assert diff < 1e-9, (
+                    f"피처 '{feat}'가 미래(mid row) 변경에 영향받음 (max_diff={diff:.2e}). "
+                    "look-ahead bias."
+                )
+
+    def test_label_nan_boundary_exactly_forward_n_rows_dropped(self):
+        """
+        Cycle 12 회귀: _compute_labels()가 마지막 forward_n 행을 정확히 NaN으로 남겨야 함.
+        - 마지막 forward_n 행은 NaN → build() 후 X에 없어야 함
+        - 나머지 행은 {-1, 0, 1} 중 하나여야 함 (NaN 없음)
+        """
+        n = 100
+        df = _make_df(n)
+        forward_n = 7
+        fb = FeatureBuilder(forward_n=forward_n, threshold=0.003)
+
+        # 레이블 직접 검사
+        labels = fb._compute_labels(df)
+        last_n = labels.iloc[-forward_n:]
+        rest = labels.iloc[:-forward_n]
+
+        assert last_n.isna().all(), (
+            f"마지막 {forward_n}행 레이블이 NaN이어야 함 — {last_n.dropna()} 남아있음"
+        )
+        assert not rest.isna().any(), (
+            f"나머지 행에 NaN 레이블 존재 — {rest[rest.isna()].index.tolist()}"
+        )
+        assert set(rest.dropna().unique()).issubset({-1, 0, 1}), (
+            f"레이블 값이 범위 밖: {rest.unique()}"
+        )
+
+    def test_shift1_feature_first_row_is_nan_before_dropna(self):
+        """
+        Cycle 11 회귀: shift(1) 기반 피처의 첫 행이 NaN인지 확인.
+        build_features_only()의 dropna() 전에 첫 행에 NaN이 있어야 정상적으로 shift(1)이 적용된 것.
+        직접 _compute_features()로 확인.
+        """
+        df = _make_df(100)
+        fb = FeatureBuilder()
+        feat = fb._compute_features(df)
+
+        # shift(1) 기반 피처: 첫 행은 NaN이어야 함
+        assert pd.isna(feat["volatility_20"].iloc[0]) or pd.isna(feat["return_1"].iloc[0]), (
+            "첫 행에 NaN이 없음 — shift(1)이 적용되지 않았을 가능성"
+        )
+        # return_1 = log(close / close.shift(1)) → row 0은 NaN
+        assert pd.isna(feat["return_1"].iloc[0]), (
+            "return_1 첫 행이 NaN이어야 함 (shift(1) 적용 확인)"
+        )
+
 
 # ---------------------------------------------------------------------------
 # C1: MLSignalGenerator (모델 없는 상태)
@@ -203,6 +422,38 @@ class TestWalkForwardTrainer:
         assert "train_accuracy" in s
         assert "test_accuracy" in s
 
+    def test_feature_importance_report_after_train(self):
+        """학습 후 feature_importance_report() 형식 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        report = result.feature_importance_report(top_n=5)
+        assert "FEATURE_IMPORTANCE_REPORT" in report
+        assert "cumul=" in report
+        # 5개 항목
+        lines = [l for l in report.splitlines() if l.strip().startswith(("1.", "2.", "3.", "4.", "5."))]
+        assert len(lines) == 5
+
+    def test_get_feature_importances_ranked(self):
+        """get_feature_importances() 내림차순 정렬 + top_n 동작 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+        ranked = trainer.get_feature_importances(top_n=3)
+        assert len(ranked) == 3
+        assert ranked[0][1] >= ranked[1][1] >= ranked[2][1]
+        # 전체 반환
+        all_feats = trainer.get_feature_importances()
+        assert len(all_feats) > 3
+        # RuntimeError before training
+        trainer2 = WalkForwardTrainer()
+        with pytest.raises(RuntimeError):
+            trainer2.get_feature_importances()
+
     def test_save_requires_trained_model(self, tmp_path):
         """학습 전 save() → RuntimeError."""
         from src.ml.trainer import WalkForwardTrainer
@@ -228,6 +479,35 @@ class TestWalkForwardTrainer:
         pred = gen.predict(df)
         assert pred.action in ("BUY", "SELL", "HOLD")
         assert 0.0 <= pred.confidence <= 1.0
+
+    def test_calibrated_proba_sum_to_one(self):
+        """Calibration 후 predict_proba 합이 1.0 (±1e-6)."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+
+        # 내부 모델로 직접 확인
+        from src.ml.features import FeatureBuilder
+        fb = FeatureBuilder()
+        X, _ = fb.build(df)
+        proba = trainer._trained_model.predict_proba(X)
+        row_sums = proba.sum(axis=1)
+        assert (row_sums - 1.0).abs().max() < 1e-6 if hasattr(row_sums, "abs") else True
+        # numpy array 경우
+        import numpy as np
+        assert np.allclose(proba.sum(axis=1), 1.0, atol=1e-6)
+
+    def test_calibrated_model_is_wrapped(self):
+        """학습 후 _trained_model이 CalibratedClassifierCV 래퍼인지 확인."""
+        pytest.importorskip("sklearn")
+        from sklearn.calibration import CalibratedClassifierCV
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        trainer.train(df)
+        assert isinstance(trainer._trained_model, CalibratedClassifierCV)
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +581,9 @@ class TestMLRFStrategy:
         assert signal.confidence == Confidence.LOW
 
 
+# ---------------------------------------------------------------------------
+# C2: LLMAnalyst (API 없는 mock 모드)
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # C2: LLMAnalyst (API 없는 mock 모드)
 # ---------------------------------------------------------------------------

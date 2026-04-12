@@ -37,6 +37,11 @@ class FeatureBuilder:
         forward_n: int = DEFAULT_FORWARD_N,
         threshold: float = DEFAULT_THRESHOLD,
     ):
+        """
+        Args:
+            forward_n: 레이블 생성 기준 — N 캔들 후 수익률 참조.
+            threshold: BUY/SELL 판정 최소 수익률 (기본 0.003 = 0.3%).
+        """
         self.forward_n = forward_n
         self.threshold = threshold
 
@@ -66,6 +71,15 @@ class FeatureBuilder:
     # ------------------------------------------------------------------
 
     def _compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        피처 계산 (look-ahead bias 방지).
+        
+        Look-ahead bias 주의:
+        - rolling/ewm: 현재 바 포함 → shift(1) 적용하여 이전 데이터만 사용
+        - RSI: 이전 20바 기준으로 정규화
+        - 변동성: 이전 20바 기준
+        - Donchian: 이전 20바의 고저 기준
+        """
         close = df["close"]
         volume = df["volume"]
         high = df["high"]
@@ -81,11 +95,12 @@ class FeatureBuilder:
         feat["return_10"] = np.log(close / close.shift(10))
         feat["return_20"] = np.log(close / close.shift(20))
 
-        # RSI
+        # RSI: 이전 20바의 통계로 정규화 (현재 바 제외)
         if "rsi14" in df.columns:
             feat["rsi14"] = df["rsi14"] / 100.0  # 0~1 정규화
-            feat["rsi_zscore"] = (df["rsi14"] - df["rsi14"].rolling(20).mean()) / (
-                df["rsi14"].rolling(20).std() + 1e-9
+            rsi_shifted = df["rsi14"].shift(1)  # 이전 바 기준
+            feat["rsi_zscore"] = (rsi_shifted - rsi_shifted.rolling(20).mean()) / (
+                rsi_shifted.rolling(20).std() + 1e-9
             )
         else:
             feat["rsi14"] = 0.5
@@ -97,31 +112,37 @@ class FeatureBuilder:
         else:
             feat["atr_pct"] = (high - low) / close
 
-        feat["volatility_20"] = log_ret.rolling(20).std()
+        # 변동성: 이전 20바 기준 (현재 바 제외)
+        feat["volatility_20"] = log_ret.shift(1).rolling(20).std()
 
-        # EMA 비율
+        # EMA 비율: 이전 바 기준 EMA 사용
         if "ema20" in df.columns and "ema50" in df.columns:
-            feat["ema_ratio"] = df["ema20"] / df["ema50"]
-            feat["price_vs_ema20"] = (close - df["ema20"]) / (df["ema20"] + 1e-9)
-            feat["price_vs_ema50"] = (close - df["ema50"]) / (df["ema50"] + 1e-9)
+            ema20_prev = df["ema20"].shift(1)
+            ema50_prev = df["ema50"].shift(1)
+            feat["ema_ratio"] = ema20_prev / ema50_prev
+            feat["price_vs_ema20"] = (close - ema20_prev) / (ema20_prev + 1e-9)
+            feat["price_vs_ema50"] = (close - ema50_prev) / (ema50_prev + 1e-9)
         else:
-            ema20 = close.ewm(span=20, adjust=False).mean()
-            ema50 = close.ewm(span=50, adjust=False).mean()
+            close_prev = close.shift(1)
+            ema20 = close_prev.ewm(span=20, adjust=False).mean()
+            ema50 = close_prev.ewm(span=50, adjust=False).mean()
             feat["ema_ratio"] = ema20 / ema50
             feat["price_vs_ema20"] = (close - ema20) / (ema20 + 1e-9)
             feat["price_vs_ema50"] = (close - ema50) / (ema50 + 1e-9)
 
-        # 볼륨
-        vol_ma20 = volume.rolling(20).mean()
+        # 볼륨: 이전 20바의 평균값 기준
+        vol_ma20 = volume.shift(1).rolling(20).mean()
         feat["volume_ratio_20"] = volume / (vol_ma20 + 1e-9)
 
-        # Donchian 채널 위치 (0~1)
+        # Donchian 채널 위치: 이전 20바 기준 (0~1)
         if "donchian_high" in df.columns and "donchian_low" in df.columns:
             chan_range = df["donchian_high"] - df["donchian_low"]
             feat["donchian_pct"] = (close - df["donchian_low"]) / (chan_range + 1e-9)
         else:
-            high20 = high.rolling(20).max()
-            low20 = low.rolling(20).min()
+            high_prev = high.shift(1)
+            low_prev = low.shift(1)
+            high20 = high_prev.rolling(20).max()
+            low20 = low_prev.rolling(20).min()
             chan_range = high20 - low20
             feat["donchian_pct"] = (close - low20) / (chan_range + 1e-9)
 
@@ -131,19 +152,31 @@ class FeatureBuilder:
         else:
             feat["price_vs_vwap"] = 0.0
 
+        # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
+        feat = feat.replace([np.inf, -np.inf], np.nan)
+
         return feat
 
     def _compute_labels(self, df: pd.DataFrame) -> pd.Series:
-        """forward_n 캔들 후 수익률 기반 레이블."""
+        """
+        forward_n 캔들 후 수익률 기반 레이블 생성.
+
+        Returns:
+            pd.Series[Int64]: 1(BUY) / -1(SELL) / 0(HOLD). 미래 데이터 부족한
+            마지막 forward_n 행은 NaN으로 반환 → build()의 dropna()에서 제거됨.
+        """
         close = df["close"]
         fwd_ret = close.shift(-self.forward_n) / close - 1.0
-        label = pd.Series(0, index=df.index, name="label", dtype=int)
-        label[fwd_ret > self.threshold] = 1
-        label[fwd_ret < -self.threshold] = -1
-        return label
+        label = pd.Series(np.nan, index=df.index, name="label", dtype=float)
+        label[fwd_ret > self.threshold] = 1.0
+        label[fwd_ret < -self.threshold] = -1.0
+        # 미래 데이터가 없는 마지막 forward_n 행은 NaN → build()의 dropna()에서 제거
+        label[~fwd_ret.isna()] = label[~fwd_ret.isna()].fillna(0.0)
+        return label.astype("Int64")
 
     @property
     def feature_names(self) -> list[str]:
+        """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정)."""
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",
             "rsi14", "rsi_zscore",

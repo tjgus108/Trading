@@ -1,4 +1,4 @@
-from .base import BaseStrategy, Signal
+from .base import BaseStrategy, Signal, SessionType, is_active_session
 from .macd_strategy import MACDStrategy
 from .ema_cross import EmaCrossStrategy
 from .donchian_breakout import DonchianBreakoutStrategy
@@ -21,6 +21,8 @@ from .cme_basis_strategy import CMEBasisStrategy
 __all__ = [
     "BaseStrategy",
     "Signal",
+    "SessionType",
+    "is_active_session",
     "EmaCrossStrategy",
     "DonchianBreakoutStrategy",
     "FundingRateStrategy",

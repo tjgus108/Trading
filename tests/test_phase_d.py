@@ -139,6 +139,43 @@ class TestMultiLLMEnsemble:
         assert isinstance(result, EnsembleSignal)
         assert result.consensus in ("BUY", "SELL", "HOLD", "NEUTRAL")
 
+    def test_ask_parallel_both_na_without_clients(self):
+        """클라이언트 없을 때 _ask_parallel → (N/A, N/A)."""
+        ens = MultiLLMEnsemble.__new__(MultiLLMEnsemble)
+        ens._claude_client = None
+        ens._openai_client = None
+        ens._claude_model = "haiku"
+        ens._openai_model = "gpt-4o-mini"
+        claude_v, openai_v = ens._ask_parallel("dummy prompt")
+        assert claude_v == "N/A"
+        assert openai_v == "N/A"
+
+    def test_ask_parallel_uses_stub(self):
+        """stub 클라이언트로 병렬 호출 결과 검증."""
+        import types
+
+        ens = MultiLLMEnsemble.__new__(MultiLLMEnsemble)
+        ens._claude_model = "haiku"
+        ens._openai_model = "gpt-4o-mini"
+
+        # stub: _ask_claude / _ask_openai를 직접 교체
+        ens._claude_client = object()   # non-None → tasks 등록됨
+        ens._openai_client = object()
+
+        def _fake_claude(prompt):
+            return "BUY"
+
+        def _fake_openai(prompt):
+            return "BUY"
+
+        # 메서드를 인스턴스에 바인딩
+        ens._ask_claude = _fake_claude
+        ens._ask_openai = _fake_openai
+
+        claude_v, openai_v = ens._ask_parallel("test")
+        assert claude_v == "BUY"
+        assert openai_v == "BUY"
+
     def test_build_prompt_contains_symbol(self):
         ens = MultiLLMEnsemble.__new__(MultiLLMEnsemble)
         ens._claude_client = None

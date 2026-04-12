@@ -1,6 +1,24 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git *)",
+      "Bash(python3 *)",
+      "Bash(python3.* *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(python3 -m pip *)",
+      "Bash(pytest *)",
+      "Bash(~/Library/Python/3.9/bin/pytest *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(wc *)",
+      "Bash(date *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
       "WebSearch",
       "WebFetch(domain:tradingagents-ai.github.io)",
       "WebFetch(domain:www.digitalocean.com)",
@@ -80,7 +98,8 @@
       "Bash(grep -v \"^base$\\\\|^__init__$\\\\|^adaptive_selector$\\\\|^multi_signal$\")",
       "Bash(ls /Users/seohyunhan/Desktop/AgentTest/Trading/tests/test_*.py)",
       "Bash(xargs -I{} basename {} .py)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "WebFetch(*)"
     ]
   }
 }

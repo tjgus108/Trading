@@ -68,6 +68,34 @@ class TrainingResult:
                 lines.append(f"    {fname}: {imp:.3f}")
         return "\n".join(lines)
 
+    def feature_importance_report(self, top_n: int = 10) -> str:
+        """
+        피처 중요도 순위 보고서 반환.
+
+        Args:
+            top_n: 상위 N개 피처 출력 (기본 10)
+
+        Returns:
+            str: 순위별 피처명 + 중요도 + 누적 기여도
+        """
+        if not self.feature_importances:
+            return "FEATURE_IMPORTANCE: (no data)"
+
+        ranked = sorted(
+            self.feature_importances.items(), key=lambda x: x[1], reverse=True
+        )
+        total = sum(v for _, v in ranked)
+        cutoff = min(top_n, len(ranked))
+        lines = [f"FEATURE_IMPORTANCE_REPORT (top {cutoff} / {len(ranked)}):"]
+        cumulative = 0.0
+        for rank, (fname, imp) in enumerate(ranked[:cutoff], start=1):
+            pct = imp / total * 100 if total > 0 else 0.0
+            cumulative += pct
+            lines.append(
+                f"  {rank:2d}. {fname:<22s} {imp:.4f}  ({pct:5.1f}%)  cumul={cumulative:5.1f}%"
+            )
+        return "\n".join(lines)
+
 
 class WalkForwardTrainer:
     """
@@ -91,13 +119,18 @@ class WalkForwardTrainer:
         self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
         self._trained_model = None
         self._class_order: Optional[list[int]] = None
+        self._feature_names: list[str] = []
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
-        walk-forward 학습 실행.
+        walk-forward 학습 실행 (데이터 누출 방지).
         df: DataFeed.fetch() 반환 DataFrame (지표 포함, 최소 200 캔들 권장)
+        
+        중요: 시계열 분할을 먼저 한 후, 각 구간에서만 피처 계산
+        (rolling/ewm은 미래 데이터 포함 금지)
         """
         try:
+            from sklearn.calibration import CalibratedClassifierCV
             from sklearn.ensemble import RandomForestClassifier
             from sklearn.metrics import accuracy_score
         except ImportError:
@@ -109,50 +142,65 @@ class WalkForwardTrainer:
                 fail_reasons=["scikit-learn not installed"],
             )
 
-        X, y = self.feature_builder.build(df)
-        n = len(X)
+        # 데이터 누출 방지: raw df를 먼저 분할
+        n_total = len(df)
+        train_end = int(n_total * 0.60)
+        val_end = int(n_total * 0.80)
 
+        df_train = df.iloc[:train_end].copy()
+        df_val = df.iloc[train_end:val_end].copy()
+        df_test = df.iloc[val_end:].copy()
+
+        logger.info(
+            "Walk-forward split: n_total=%d train=%d val=%d test=%d",
+            n_total, len(df_train), len(df_val), len(df_test),
+        )
+
+        # 각 구간별로 피처 계산 (rolling/ewm이 미래 데이터 포함 금지)
+        X_train, y_train = self.feature_builder.build(df_train)
+        X_val, y_val = self.feature_builder.build(df_val)
+        X_test, y_test = self.feature_builder.build(df_test)
+
+        # 전체 샘플 수
+        n = len(X_train) + len(X_val) + len(X_test)
+        
         if n < 100:
             return TrainingResult(
-                model_name="", n_samples=n, n_features=X.shape[1] if n > 0 else 0,
+                model_name="", n_samples=n, n_features=X_train.shape[1] if len(X_train) > 0 else 0,
                 train_accuracy=0, val_accuracy=0, test_accuracy=0,
                 feature_importances={}, passed=False,
                 fail_reasons=[f"샘플 부족: {n} < 100"],
             )
 
-        # 60/20/20 시계열 분할
-        train_end = int(n * 0.60)
-        val_end = int(n * 0.80)
-
-        X_train = X.iloc[:train_end]
-        y_train = y.iloc[:train_end]
-        X_val = X.iloc[train_end:val_end]
-        y_val = y.iloc[train_end:val_end]
-        X_test = X.iloc[val_end:]
-        y_test = y.iloc[val_end:]
-
         logger.info(
-            "Training RF: n=%d train=%d val=%d test=%d features=%d",
-            n, len(X_train), len(X_val), len(X_test), X.shape[1],
+            "Training RF: n_train=%d n_val=%d n_test=%d features=%d",
+            len(X_train), len(X_val), len(X_test), X_train.shape[1] if len(X_train) > 0 else 0,
         )
 
         # 학습
-        clf = RandomForestClassifier(
+        base_clf = RandomForestClassifier(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
             random_state=42,
             n_jobs=-1,
             class_weight="balanced",
         )
-        clf.fit(X_train, y_train)
+        base_clf.fit(X_train, y_train)
 
-        # 성과 평가
+        # Calibration: validation set으로 isotonic regression 적용
+        # RF predict_proba는 과신(overconfident) 경향 → calibration으로 보정
+        # method="isotonic" (비모수적, val set 크기 충분할 때 선호)
+        # cv="prefit": base_clf가 이미 학습된 상태 → val set만 calibration에 사용
+        clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
+        clf.fit(X_val, y_val)
+
+        # 성과 평가 (calibrated 모델 기준)
         train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
         val_acc = float(accuracy_score(y_val, clf.predict(X_val)))
         test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
 
-        # 피처 중요도
-        feat_importance = dict(zip(X.columns, clf.feature_importances_))
+        # 피처 중요도 (base estimator에서 추출)
+        feat_importance = dict(zip(X_train.columns, base_clf.feature_importances_))
 
         fail_reasons = []
         if test_acc < MIN_ACCURACY:
@@ -161,13 +209,14 @@ class WalkForwardTrainer:
             fail_reasons.append(f"val_accuracy {val_acc:.3f} < {MIN_ACCURACY}")
 
         self._trained_model = clf
-        self._class_order = list(clf.classes_)
+        self._class_order = list(base_clf.classes_)
+        self._feature_names = list(X_train.columns)
         model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
 
         result = TrainingResult(
             model_name=model_name,
             n_samples=n,
-            n_features=X.shape[1],
+            n_features=X_train.shape[1],
             train_accuracy=round(train_acc, 4),
             val_accuracy=round(val_acc, 4),
             test_accuracy=round(test_acc, 4),
@@ -176,7 +225,33 @@ class WalkForwardTrainer:
             fail_reasons=fail_reasons,
         )
         logger.info(result.summary())
+        logger.info(result.feature_importance_report())
         return result
+
+    def get_feature_importances(self, top_n: Optional[int] = None) -> list[tuple[str, float]]:
+        """
+        학습된 모델의 피처 중요도를 내림차순으로 반환.
+
+        Args:
+            top_n: 상위 N개만 반환. None이면 전체.
+
+        Returns:
+            list of (feature_name, importance) �ples, 내림차순.
+
+        Raises:
+            RuntimeError: 모델이 학습되지 않은 경우.
+        """
+        if self._trained_model is None:
+            raise RuntimeError("모델이 학습되지 않음 — train() 먼저 호출")
+
+        # CalibratedClassifierCV는 feature_importances_ 없음 → base estimator에서 추출
+        base = getattr(self._trained_model, "estimator", self._trained_model)
+        importances = base.feature_importances_
+        names = getattr(self, "_feature_names", [f"f{i}" for i in range(len(importances))])
+        ranked = sorted(zip(names, importances), key=lambda x: x[1], reverse=True)
+        if top_n is not None:
+            ranked = ranked[:top_n]
+        return ranked
 
     def save(self, path: Optional[str] = None) -> str:
         """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""

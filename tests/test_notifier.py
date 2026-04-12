@@ -115,7 +115,7 @@ class TestMessageFormat:
         result = _make_pipeline_result(signal=_make_signal())
         msg = _format_pipeline(result)
         assert "BUY" in msg
-        assert "65000.00" in msg
+        assert "65,000.00" in msg
         assert "HIGH" in msg
 
     def test_pipeline_with_risk_approved(self):
@@ -237,3 +237,67 @@ class TestSendBehavior:
         with patch.object(notifier, "_send") as mock_send:
             notifier.notify_pipeline(result)
             mock_send.assert_called_once()
+
+    def test_error_message_html_bold(self):
+        """notify_error wraps [ERROR] in HTML bold tags."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error("disk full")
+        assert "<b>[ERROR]</b>" in captured[0]
+        assert "disk full" in captured[0]
+
+    def test_startup_separator_and_html_bold(self):
+        """notify_startup includes separator line and HTML bold for mode."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_startup("rsi_cross", "SOL/USDT", dry_run=True)
+        msg = captured[0]
+        assert "---" in msg
+        assert "<b>[STARTUP]</b>" in msg
+        assert "<b>DRY RUN</b>" in msg
+
+
+class TestHTMLEscape:
+    """Test HTML escaping of user-controlled strings in notifier."""
+
+    def test_html_escape_in_error_message(self):
+        """notify_error escapes HTML special characters in user input."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error("<script>alert('xss')</script>")
+        msg = captured[0]
+        # Should contain escaped HTML, not raw tags
+        assert "&lt;script&gt;" in msg
+        assert "<script>" not in msg
+
+    def test_html_escape_in_pipeline_result(self):
+        """_format_pipeline escapes HTML special characters in result fields."""
+        result = _make_pipeline_result(
+            symbol="<img src=x>",
+            error="<b>error</b> & more",
+            notes=["dry_run=True <test>"]
+        )
+        msg = _format_pipeline(result)
+        # Should contain escaped versions
+        assert "&lt;img src=x&gt;" in msg
+        assert "&lt;b&gt;" in msg
+        assert "&amp;" in msg
+        # Raw tags should not appear
+        assert "<img src=x>" not in msg
+        assert "<b>error</b>" not in msg
+
+    def test_html_escape_javascript_and_event_handler(self):
+        """notify_error escapes javascript: URI and onerror= event handler vectors."""
+        notifier = TelegramNotifier(bot_token="tok", chat_id="123")
+        captured = []
+        payload = '<a href="javascript:alert(1)" onerror=alert(2)>click</a>'
+        with patch.object(notifier, "_send", side_effect=captured.append):
+            notifier.notify_error(payload)
+        msg = captured[0]
+        assert "javascript:" not in msg or "&lt;a" in msg
+        assert "<a href=" not in msg
+        assert "&lt;a href=&quot;javascript:alert(1)&quot;" in msg
+        assert "onerror=alert(2)" not in msg or "&lt;a" in msg

@@ -3,6 +3,7 @@ RiskManager / CircuitBreaker 단위 테스트.
 """
 
 import math
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -204,3 +205,597 @@ def test_evaluate_uses_adaptive_multiplier():
     # 저변동 → SL이 entry에 더 가까워야 함 (multiplier 1.2 < 1.5)
     assert result_adaptive.stop_loss > result_fixed.stop_loss
     assert result_adaptive.status == RiskStatus.APPROVED
+
+
+# ── Order Jitter ──────────────────────────────────────────────────────────────
+
+def test_jitter_varies_position_size():
+    """jitter_pct > 0 이면 동일 입력에서 position_size가 매 호출마다 달라진다."""
+    import random as _random
+    rm = _make_rm(jitter_pct=0.05)
+    sizes = set()
+    _random.seed(None)  # 시드 고정 해제
+    for _ in range(30):
+        result = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+        assert result.status == RiskStatus.APPROVED
+        sizes.add(result.position_size)
+    # 30번 중 최소 2개 이상 다른 값이 나와야 함
+    assert len(sizes) >= 2
+
+
+def test_jitter_within_bounds():
+    """jitter_pct=0.05 → position_size가 기준값 ±5% 범위 이내여야 한다."""
+    # jitter 없는 기준값 계산
+    rm_base = _make_rm(jitter_pct=0.0)
+    base_result = rm_base.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    base_size = base_result.position_size
+
+    rm_jitter = _make_rm(jitter_pct=0.05)
+    for _ in range(50):
+        result = rm_jitter.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+        assert result.status == RiskStatus.APPROVED
+        assert result.position_size <= base_size * 1.05 + 1e-9
+        assert result.position_size >= base_size * 0.95 - 1e-9
+
+
+def test_jitter_zero_is_deterministic():
+    """jitter_pct=0.0 (기본값) 이면 동일 입력에 항상 같은 position_size."""
+    rm = _make_rm(jitter_pct=0.0)
+    results = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(10)
+    ]
+    assert len(set(results)) == 1
+
+
+def test_jitter_pct_clamped_at_five_percent():
+    """jitter_pct > 0.05 전달 시 내부적으로 0.05로 클램프된다."""
+    rm = _make_rm(jitter_pct=0.99)
+    assert rm.jitter_pct == pytest.approx(0.05)
+
+
+# ── Session Filter ────────────────────────────────────────────────────────────
+
+def test_session_filter_reduced_asia_halves_position():
+    """session_filter=True + 아시아(평일 REDUCED) 세션 → 50% 축소."""
+    from datetime import timezone
+    rm = _make_rm(session_filter=True)
+    rm_off = _make_rm(session_filter=False)
+
+    # 평일 09:00 UTC → REDUCED (아시아 세션)
+    ts = datetime(2026, 4, 13, 9, 0, 0, tzinfo=timezone.utc)  # Monday
+
+    base = rm_off.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    filtered = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000, timestamp=ts)
+
+    assert filtered.status == RiskStatus.APPROVED
+    assert abs(filtered.position_size - base.position_size * 0.50) < 1e-5
+
+
+def test_session_filter_weekend_scales_to_30_pct():
+    """session_filter=True + 주말 → 30% 축소."""
+    from datetime import timezone
+    rm = _make_rm(session_filter=True)
+    rm_off = _make_rm(session_filter=False)
+
+    # Saturday 14:00 UTC
+    ts = datetime(2026, 4, 11, 14, 0, 0, tzinfo=timezone.utc)  # Saturday
+
+    base = rm_off.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000)
+    filtered = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000, timestamp=ts)
+
+    assert filtered.status == RiskStatus.APPROVED
+    assert abs(filtered.position_size - base.position_size * 0.30) < 1e-5
+
+
+# ── Integration Tests ─────────────────────────────────────────────────────────
+
+def _make_cb_from_config() -> CircuitBreaker:
+    """config/config.yaml 기준 CircuitBreaker 생성."""
+    return CircuitBreaker(
+        max_daily_loss=0.03,
+        max_drawdown=0.05,
+        max_consecutive_losses=5,
+        flash_crash_pct=0.10,
+    )
+
+
+def test_integration_all_features_approved():
+    """jitter + session_filter + max_total_exposure + VaR(adaptive ATR) 모두 활성화 — 정상 시나리오."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.02,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    # 중변동 candle_df → adaptive multiplier 1.5
+    df = _make_df_with_vol(0.45)
+
+    # 기존 포지션: 총 노출 20% (한도 30% 미만)
+    open_positions = [{"size": 0.04, "price": 50000}]  # 0.04 * 50000 = 2000, 20% of 10000
+
+    # 평일 London session (14:00 UTC) → ACTIVE → 축소 없음
+    ts = datetime(2026, 4, 13, 14, 0, 0, tzinfo=timezone.utc)
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.02,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.APPROVED
+    assert result.position_size > 0
+    assert result.stop_loss < 50000
+    assert result.take_profit > 50000
+    assert result.risk_amount == pytest.approx(100.0)  # 10000 * 0.01
+    # max_position_size=10% → max_size = 10000*0.10/50000 = 0.02
+    assert result.position_size <= 0.02 * 1.05 + 1e-9  # jitter 상한 포함
+
+
+def test_integration_boundary_circuit_and_exposure_blocked():
+    """경계 시나리오: daily_loss 한계치 + total_exposure 한계치 동시 — 서킷 브레이커가 먼저 BLOCK."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    cb._daily_loss = 0.03  # 정확히 한도(>=) → BLOCKED
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.02,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    df = _make_df_with_vol(0.45)
+    # total_exposure도 한계치 초과 (30%)
+    open_positions = [{"size": 0.06, "price": 50000}]  # 3000/10000 = 30%
+
+    ts = datetime(2026, 4, 11, 14, 0, 0, tzinfo=timezone.utc)  # Saturday
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.05,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.BLOCKED
+    assert "Circuit breaker" in result.reason
+    assert "daily_loss" in result.reason
+    assert result.position_size is None
+
+
+def test_integration_drawdown_session_exposure_near_limits_approved():
+    """통합: 드로다운·세션·exposure 모두 한계 근처이지만 미초과 → APPROVED + 포지션 축소 확인."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    # 드로다운 4.9% (한도 5% 미만)
+    cb._peak_balance = 10000
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    df = _make_df_with_vol(0.45)  # 중변동 → adaptive multiplier 1.5
+
+    # 총 노출 29% (한도 30% 미만)
+    open_positions = [{"size": 0.056, "price": 50000}]  # 0.056*50000=2800, ~29.4% of 9510
+
+    # 아시아 세션 평일 (REDUCED → 50% 축소)
+    ts = datetime(2026, 4, 13, 9, 0, 0, tzinfo=timezone.utc)  # Monday 09:00 UTC
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9510,          # peak 10000 대비 4.9% 드로다운
+        last_candle_pct_change=0.03,   # 플래시크래시 기준 10% 미만
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.APPROVED
+    assert result.position_size > 0
+
+    # 세션 50% 축소 + max_position_size 클램프 반영된 포지션이어야 함
+    # max_size = 9510 * 0.10 / 50000 = 0.01902, then *0.5 = 0.00951
+    expected_max = (9510 * 0.10 / 50000) * 0.50
+    assert result.position_size <= expected_max + 1e-9
+    assert result.stop_loss < 50000
+    assert result.take_profit > 50000
+
+
+def test_integration_kelly_constrained_exposure_blocked():
+    """Risk-Constrained Kelly 시나리오: 고승률이라도 exposure 한도 초과 시 BLOCKED."""
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    # Kelly 기법으로 risk_per_trade를 높게 설정 (승률 60%, R:R 2 → Kelly=0.20)
+    # 그러나 max_total_exposure 한도(20%)가 이미 채워진 상황
+    rm = RiskManager(
+        risk_per_trade=0.20,          # Kelly fraction (공격적)
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.20,       # Kelly 반영한 상한
+        circuit_breaker=cb,
+        jitter_pct=0.0,
+        session_filter=False,
+        max_total_exposure=0.20,      # 보수적 총 노출 한도 20%
+    )
+
+    # 기존 포지션이 이미 노출 20% 정확히 채움 → 추가 진입 BLOCKED
+    open_positions = [{"size": 0.04, "price": 50000}]  # 0.04*50000=2000, 20%
+
+    ts = datetime(2026, 4, 14, 14, 0, 0, tzinfo=timezone.utc)
+
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+
+    assert result.status == RiskStatus.BLOCKED
+    assert "Total exposure limit" in result.reason
+    assert "total_exposure" in result.reason
+    assert result.position_size is None
+
+
+# ── Multi-Position Boundary Scenarios ────────────────────────────────────────
+
+def test_same_direction_multi_position_boundary_approved_then_blocked():
+    """동일 방향(BUY) 포지션 누적: 한도 직전 APPROVED, 초과 시 BLOCKED."""
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        max_total_exposure=0.30,
+    )
+
+    # 경우 1: 기존 BUY 포지션 2개, 총 노출 29.9% → 한도 미만 → APPROVED
+    open_positions_under = [
+        {"size": 0.02, "price": 50000},  # 1000 = 10%
+        {"size": 0.0199, "price": 50000},  # 995 = 9.95%  → 합 19.95%
+        {"size": 0.02, "price": 50000},  # 1000 = 10%  → 합 29.95%
+    ]
+    # 총 노출: (0.02+0.0199+0.02)*50000 = 2995 / 10000 = 29.95% < 30% → APPROVED
+    result_under = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_under,
+    )
+    assert result_under.status == RiskStatus.APPROVED, (
+        f"Expected APPROVED but got BLOCKED: {result_under.reason}"
+    )
+
+    # 경우 2: 기존 포지션 총 노출 정확히 30% → 한도 도달(>=) → BLOCKED
+    open_positions_at = [
+        {"size": 0.02, "price": 50000},  # 10%
+        {"size": 0.02, "price": 50000},  # 10%
+        {"size": 0.02, "price": 50000},  # 10%  → 합 30%
+    ]
+    result_at = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_at,
+    )
+    assert result_at.status == RiskStatus.BLOCKED
+    assert "total_exposure" in result_at.reason
+
+
+def test_mixed_direction_positions_total_exposure_is_gross_not_net():
+    """반대 방향 포지션 혼합: check_total_exposure는 net이 아닌 gross 합산 → 한도 초과 시 BLOCKED.
+
+    BUY 포지션 20% + SELL 포지션 15% = gross 35% > 30% 한도 → BLOCKED.
+    net 기준이라면 5%로 통과할 수 있으나, 현재 구현은 gross 합산 방식이어야 한다.
+    """
+    cb = _make_cb_from_config()
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        max_total_exposure=0.30,
+    )
+
+    # BUY 포지션 20% + SELL 포지션 15% → gross 35% > 30%
+    open_positions_mixed = [
+        {"size": 0.04, "price": 50000},   # 2000 = 20%  (long)
+        {"size": 0.03, "price": 50000},   # 1500 = 15%  (short, size는 양수로 전달)
+    ]
+    # gross total: (0.04+0.03)*50000 = 3500 / 10000 = 35% ≥ 30% → BLOCKED
+    result = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_mixed,
+    )
+    assert result.status == RiskStatus.BLOCKED
+    assert "total_exposure" in result.reason
+
+    # 반대: net이 낮아도 gross가 한도 미만이면 APPROVED
+    open_positions_small = [
+        {"size": 0.02, "price": 50000},   # 10%
+        {"size": 0.015, "price": 50000},  # 7.5%  → gross 17.5% < 30%
+    ]
+    result_small = rm.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=10000,
+        last_candle_pct_change=0.01,
+        open_positions=open_positions_small,
+    )
+    assert result_small.status == RiskStatus.APPROVED
+
+
+# ── __init__ 입력 파라미터 범위 검증 ─────────────────────────────────────────
+
+def test_risk_per_trade_above_one_raises():
+    with pytest.raises(ValueError, match="risk_per_trade"):
+        RiskManager(risk_per_trade=1.01)
+
+
+def test_risk_per_trade_zero_raises():
+    with pytest.raises(ValueError, match="risk_per_trade"):
+        RiskManager(risk_per_trade=0.0)
+
+
+def test_risk_per_trade_boundary_exactly_one_ok():
+    rm = RiskManager(risk_per_trade=1.0)
+    assert rm.risk_per_trade == 1.0
+
+
+def test_atr_multiplier_sl_zero_raises():
+    with pytest.raises(ValueError, match="atr_multiplier_sl"):
+        RiskManager(atr_multiplier_sl=0.0)
+
+
+def test_max_position_size_above_one_raises():
+    with pytest.raises(ValueError, match="max_position_size"):
+        RiskManager(max_position_size=1.1)
+
+
+def test_max_total_exposure_zero_raises():
+    with pytest.raises(ValueError, match="max_total_exposure"):
+        RiskManager(max_total_exposure=0.0)
+
+
+# ── Multi-Position + Drawdown + Jitter Complex Scenarios ─────────────────────
+
+def test_multi_position_drawdown_jitter_approved():
+    """복합: 멀티 포지션(노출 20%) + 드로다운 4% + jitter=0.03 → APPROVED, 포지션 jitter 범위 내."""
+    import random as _random
+    from datetime import timezone
+
+    cb = _make_cb_from_config()
+    cb._peak_balance = 10000
+    # current_balance 9600 → drawdown 4.0% < 5% 한도
+
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb,
+        jitter_pct=0.03,
+        session_filter=False,
+        max_total_exposure=0.30,
+    )
+
+    # 기존 포지션 2개: 총 노출 20%
+    open_positions = [
+        {"size": 0.02, "price": 9600},   # 192 / 9600 = 2.0%  (wrong — use entry_price scale)
+        {"size": 0.02, "price": 48000},  # 960 / 9600 = 10.0%
+        {"size": 0.02, "price": 48000},  # 960 / 9600 = 10.0%  → gross 20%
+    ]
+    # (0.02*9600 + 0.02*48000 + 0.02*48000) = 192+960+960 = 2112 / 9600 ≈ 22% < 30%
+
+    # 기준값(jitter=0) 계산
+    rm_base = RiskManager(
+        risk_per_trade=0.01, atr_multiplier_sl=1.5, atr_multiplier_tp=3.0,
+        max_position_size=0.10, jitter_pct=0.0, max_total_exposure=0.30,
+    )
+    base_result = rm_base.evaluate(
+        action="BUY", entry_price=48000, atr=480, account_balance=9600,
+        open_positions=open_positions,
+    )
+    base_size = base_result.position_size
+
+    _random.seed(None)
+    for _ in range(20):
+        result = rm.evaluate(
+            action="BUY",
+            entry_price=48000,
+            atr=480,
+            account_balance=9600,
+            last_candle_pct_change=0.02,
+            open_positions=open_positions,
+        )
+        assert result.status == RiskStatus.APPROVED
+        assert result.position_size >= base_size * 0.97 - 1e-9
+        assert result.position_size <= base_size * 1.03 + 1e-9
+        assert result.stop_loss < 48000
+        assert result.take_profit > 48000
+
+
+def test_multi_position_drawdown_near_limit_then_breached():
+    """복합: 멀티 포지션 + 드로다운이 한계 직전(APPROVED) → 한계 도달(BLOCKED) 전환."""
+    from datetime import timezone
+
+    cb_ok = _make_cb_from_config()
+    cb_ok._peak_balance = 10000
+    rm_ok = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb_ok,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+
+    # 기존 포지션 2개: 총 노출 18% (한도 30% 미만)
+    open_positions = [
+        {"size": 0.018, "price": 50000},  # 900 / 9510 ≈ 9.46%
+        {"size": 0.018, "price": 50000},  # 900 / 9510 ≈ 9.46%  → 합 ~18.9%
+    ]
+    df = _make_df_with_vol(0.45)
+
+    # London session (평일 14:00 UTC) → ACTIVE, 축소 없음
+    ts = datetime(2026, 4, 14, 14, 0, 0, tzinfo=timezone.utc)
+
+    # 경우 1: 드로다운 4.9% (9510/10000) → 한도 5% 미만 → APPROVED
+    result_ok = rm_ok.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9510,
+        last_candle_pct_change=0.03,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+    assert result_ok.status == RiskStatus.APPROVED
+    assert result_ok.position_size > 0
+
+    # 경우 2: 드로다운 5.0% 정확히 도달 → BLOCKED
+    cb_breach = _make_cb_from_config()
+    cb_breach._peak_balance = 10000
+    rm_breach = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+        max_position_size=0.10,
+        circuit_breaker=cb_breach,
+        jitter_pct=0.0,
+        session_filter=True,
+        max_total_exposure=0.30,
+    )
+    result_breach = rm_breach.evaluate(
+        action="BUY",
+        entry_price=50000,
+        atr=500,
+        account_balance=9500,           # drawdown = 5.0% ≥ 5% → BLOCKED
+        last_candle_pct_change=0.03,
+        candle_df=df,
+        timestamp=ts,
+        open_positions=open_positions,
+    )
+    assert result_breach.status == RiskStatus.BLOCKED
+    assert "Circuit breaker" in result_breach.reason
+    assert "drawdown" in result_breach.reason
+    assert result_breach.position_size is None
+
+
+# ── ATR boundary tests ────────────────────────────────────────────────────────
+
+def test_atr_zero_blocked():
+    """ATR=0 → ZeroDivisionError 없이 BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=0, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "ATR" in result.reason
+
+
+def test_atr_negative_blocked():
+    """음수 ATR → BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=-100, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "ATR" in result.reason
+
+
+def test_atr_extremely_large_blocked():
+    """ATR이 매우 커서 position_size가 0이 되는 경우 → BLOCKED 반환."""
+    rm = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5, max_position_size=0.10)
+    # sl_distance = 1e12 * 1.5 → position_size ≈ 0
+    result = rm.evaluate(action="BUY", entry_price=50000, atr=1e12, account_balance=10000)
+    assert result.status == RiskStatus.BLOCKED
+    assert result.position_size is None
+    assert "zero" in result.reason.lower() or "ATR" in result.reason
+
+
+# ── Jitter seed consistency ───────────────────────────────────────────────────
+
+def test_jitter_same_seed_same_sequence():
+    """같은 seed로 반복 호출 시 동일한 position_size 시퀀스를 반환한다."""
+    import random as _random
+
+    rm = _make_rm(jitter_pct=0.05)
+
+    _random.seed(42)
+    run1 = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(5)
+    ]
+
+    _random.seed(42)
+    run2 = [
+        rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        for _ in range(5)
+    ]
+
+    assert run1 == run2, f"seed=42 두 번 실행 결과가 다름: {run1} vs {run2}"
+
+
+def test_jitter_zero_no_variation_across_seeds():
+    """jitter_pct=0.0 이면 seed와 무관하게 항상 같은 position_size."""
+    import random as _random
+
+    rm = _make_rm(jitter_pct=0.0)
+
+    results = []
+    for seed in (0, 1, 99, 12345):
+        _random.seed(seed)
+        results.append(
+            rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=10000).position_size
+        )
+
+    assert len(set(results)) == 1, f"jitter=0인데 seed마다 값이 다름: {results}"

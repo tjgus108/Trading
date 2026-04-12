@@ -5,6 +5,7 @@ K1. Anomaly Detector — 가격/거래량 이상치 실시간 감지.
   1. Z-score: |z| > threshold → 이상치
   2. IQR: value < Q1 - k*IQR 또는 > Q3 + k*IQR → 이상치
   3. Return spike: |single candle return| > spike_threshold → 이상치
+  4. Volume surge: volume > rolling_mean * surge_multiplier → 이상치 (크립토 특화)
 
 이상치 발생 시 AnomalyEvent 반환.
 
@@ -52,12 +53,14 @@ class AnomalyDetector:
         return_spike_threshold: float = 0.05,  # 단일 캔들 수익률 5% 초과
         columns: Optional[list[str]] = None,   # 감지할 컬럼 (None=자동)
         window: int = 50,               # rolling 통계 창
+        volume_surge_multiplier: float = 3.0,  # 거래량 평균 대비 급증 배수
     ) -> None:
         self.z_threshold = z_threshold
         self.iqr_k = iqr_k
         self.return_spike_threshold = return_spike_threshold
         self.columns = columns
         self.window = window
+        self.volume_surge_multiplier = volume_surge_multiplier
 
     def detect(self, df: pd.DataFrame) -> list[AnomalyEvent]:
         """DataFrame에서 이상치 감지. 이상치 이벤트 리스트 반환."""
@@ -79,6 +82,10 @@ class AnomalyDetector:
         # 수익률 스파이크
         if "close" in df.columns:
             events.extend(self._detect_return_spike(df))
+
+        # 거래량 급증 (크립토 특화)
+        if "volume" in df.columns:
+            events.extend(self._detect_volume_surge(df))
 
         return events
 
@@ -149,6 +156,35 @@ class AnomalyDetector:
                     column="close_return", method="return_spike",
                     value=float(closes[i]),
                     score=float(ret),
+                    index=i, severity=severity,
+                ))
+        return events
+
+    def _detect_volume_surge(self, df: pd.DataFrame) -> list[AnomalyEvent]:
+        """거래량 3배 이상 급증 감지 (크립토 특화).
+
+        rolling 평균 대비 volume_surge_multiplier 배 초과 시 이상치로 판단.
+        5배 이상이면 HIGH, 그 미만이면 MEDIUM.
+        """
+        events = []
+        volumes = df["volume"].values
+        rolling_mean = (
+            pd.Series(volumes)
+            .rolling(self.window, min_periods=5)
+            .mean()
+            .values
+        )
+        for i in range(len(volumes)):
+            mean_vol = rolling_mean[i]
+            if np.isnan(mean_vol) or mean_vol <= 0:
+                continue
+            ratio = volumes[i] / mean_vol
+            if ratio >= self.volume_surge_multiplier:
+                severity = "HIGH" if ratio >= self.volume_surge_multiplier * 1.5 else "MEDIUM"
+                events.append(AnomalyEvent(
+                    column="volume", method="volume_surge",
+                    value=float(volumes[i]),
+                    score=float(ratio),
                     index=i, severity=severity,
                 ))
         return events

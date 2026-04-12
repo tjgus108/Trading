@@ -183,8 +183,12 @@ class WalkForwardOptimizer:
             oos_strategy = self.strategy_factory(best_params)
             oos_result = self._engine.run(oos_strategy, oos_df)
 
-            ratio = (oos_result.sharpe_ratio / best_is_sharpe
-                     if best_is_sharpe > 0 else 0.0)
+            if best_is_sharpe > 0:
+                ratio = oos_result.sharpe_ratio / best_is_sharpe
+            elif oos_result.sharpe_ratio > 0:
+                ratio = 1.0  # IS<=0 but OOS>0: non-overfit
+            else:
+                ratio = 0.0  # IS<=0 and OOS<=0: overfit
 
             wr = WindowResult(
                 window_id=i,

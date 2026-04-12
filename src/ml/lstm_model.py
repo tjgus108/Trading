@@ -172,28 +172,36 @@ class LSTMSignalGenerator:
         if len(feat_df) < self.sequence_len + 50:
             return {"passed": False, "test_accuracy": 0.0, "model_path": None,
                     "fail_reasons": ["데이터 부족"]}
-
-        # 정규화
-        from sklearn.preprocessing import StandardScaler  # type: ignore
-        scaler = StandardScaler()
-        X = scaler.fit_transform(feat_df.values).astype(np.float32)
         # 레이블 {-1,0,1} → {0,1,2}
         y_raw = label_s.values
         y = (y_raw + 1).astype(np.int64)  # -1→0, 0→1, 1→2
 
-        seq_X, seq_y = self._prepare_sequences(X, y)
-        n = len(seq_X)
+        # IMPORTANT: 시퀀스 생성을 먼저 수행 (정규화 전)
+        # 이를 통해 시퀀스 분할 후 train 데이터에만 scaler를 fit하여 데이터 누출 방지
+        seq_X_raw, seq_y = self._prepare_sequences(feat_df.values, y)
+        n = len(seq_X_raw)
         tr_e, va_e = int(n * 0.6), int(n * 0.8)
+
+        # 정규화: train 시퀀스에만 fit 하고, val/test에 apply (데이터 누출 방지)
+        from sklearn.preprocessing import StandardScaler  # type: ignore
+        scaler = StandardScaler()
+        # Train 시퀀스로 scaler 피팅
+        train_flat = seq_X_raw[:tr_e].reshape(-1, seq_X_raw.shape[-1])
+        scaler.fit(train_flat)
+        # 각 구간에 적용
+        seq_X_tr_scaled = scaler.transform(seq_X_raw[:tr_e].reshape(-1, seq_X_raw.shape[-1])).reshape(seq_X_raw[:tr_e].shape).astype(np.float32)
+        seq_X_va_scaled = scaler.transform(seq_X_raw[tr_e:va_e].reshape(-1, seq_X_raw.shape[-1])).reshape(seq_X_raw[tr_e:va_e].shape).astype(np.float32)
+        seq_X_te_scaled = scaler.transform(seq_X_raw[va_e:].reshape(-1, seq_X_raw.shape[-1])).reshape(seq_X_raw[va_e:].shape).astype(np.float32)
 
         def make_loader(X_, y_, shuffle):
             ds = TensorDataset(torch.FloatTensor(X_), torch.LongTensor(y_))
             return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=shuffle)
 
-        tr_loader = make_loader(seq_X[:tr_e], seq_y[:tr_e], True)
-        va_loader = make_loader(seq_X[tr_e:va_e], seq_y[tr_e:va_e], False)
-        te_loader = make_loader(seq_X[va_e:], seq_y[va_e:], False)
+        tr_loader = make_loader(seq_X_tr_scaled, seq_y[:tr_e], True)
+        va_loader = make_loader(seq_X_va_scaled, seq_y[tr_e:va_e], False)
+        te_loader = make_loader(seq_X_te_scaled, seq_y[va_e:], False)
 
-        model = self._build_torch_model(X.shape[1])
+        model = self._build_torch_model(seq_X_raw.shape[-1])
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
         criterion = nn.CrossEntropyLoss()
 
@@ -247,7 +255,7 @@ class LSTMSignalGenerator:
             MODELS_DIR.mkdir(exist_ok=True)
             model_path = str(MODELS_DIR / f"{self._model_name}.pt")
             torch.save({"model_state": best_state, "scaler": scaler,
-                        "n_features": X.shape[1], "name": self._model_name}, model_path)
+                        "n_features": seq_X_raw.shape[-1], "name": self._model_name}, model_path)
             logger.info("LSTM model saved: %s (acc=%.3f)", model_path, test_acc)
 
         return {

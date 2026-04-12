@@ -56,6 +56,7 @@ class OrchestratorStatusProvider(StatusProvider):
             "timeframe": orch.cfg.trading.timeframe,
             "dry_run": getattr(orch, "_dry_run", True),
             "cycle_count": orch._cycle_count,
+            "cumulative_pnl": sum(t.pnl for t in tracker._history),
             "open_positions": open_positions,
             "today_pnl": tracker.today_pnl(),
             "daily_summary": tracker.daily_summary(),
@@ -69,6 +70,11 @@ class OrchestratorStatusProvider(StatusProvider):
             },
             "regime": getattr(orch, "_last_regime", None),
             "last_tournament_winner": getattr(orch, "_last_tournament_winner", None),
+            "impl_shortfall_avg_bps": (
+                sum(orch._impl_shortfall_samples) / len(orch._impl_shortfall_samples)
+                if getattr(orch, "_impl_shortfall_samples", None)
+                else None
+            ),
         }
 
 
@@ -138,6 +144,19 @@ def _render_html(data: dict) -> str:
     pnl = data.get("today_pnl", 0)
     pnl_color = "green" if pnl >= 0 else "red"
     cycles = data.get("cycle_count", 0)
+    cumulative_pnl = data.get("cumulative_pnl", 0)
+    cum_pnl_color = "green" if cumulative_pnl >= 0 else "red"
+    _milestones = [(100, '#ffd700', '#111', 'CYCLE 100 MILESTONE'),
+                   (90, '#00e676', '#111', 'CYCLE 90 MILESTONE'),
+                   (80, '#ff4500', '#fff', 'CYCLE 80 MILESTONE'),
+                   (70, '#7b2ff7', '#fff', 'CYCLE 70 MILESTONE'),
+                   (60, '#00b4d8', '#111', 'CYCLE 60 MILESTONE'),
+                   (50, '#c8a800', '#111', 'CYCLE 50 MILESTONE')]
+    milestone_html = ''.join(
+        f" <span class='badge' style='background:{bg};color:{fg}'>{label}</span>"
+        for threshold, bg, fg, label in _milestones
+        if cycles >= threshold
+    )
     dry_run = data.get("dry_run", True)
     mode_badge = "DRY RUN" if dry_run else "LIVE"
     mode_color = "gray" if dry_run else "red"
@@ -160,7 +179,13 @@ def _render_html(data: dict) -> str:
     tournament_winner = data.get("last_tournament_winner") or "—"
     regime_color_map = {"bull": "#4caf50", "bear": "#f44336", "sideways": "#ff9800"}
     regime_color = regime_color_map.get(regime, "#aaa")
+    daily_summary = data.get("daily_summary", "")
+    sf_raw = data.get("impl_shortfall_avg_bps")
+    sf_str = f"{sf_raw:+.2f} bps" if sf_raw is not None else "—"
+    sf_color = "#aaa" if sf_raw is None else ("#f44336" if sf_raw > 5 else ("#ff9800" if sf_raw > 1 else "#4caf50"))
 
+    daily_summary_html = (f'<p style="color:#aaa;font-size:13px">{daily_summary}</p>'
+                          if daily_summary else "")
     # 멀티 봇 섹션
     bots_html = ""
     for bot in data.get("bots", []):
@@ -202,7 +227,9 @@ def _render_html(data: dict) -> str:
   <div class="stat"><div class="label">Symbol</div><div class="value">{symbol}</div></div>
   <div class="stat"><div class="label">Today P&L</div>
     <div class="value" style="color:{pnl_color}">{pnl:+.2f} USDT</div></div>
-  <div class="stat"><div class="label">Cycles</div><div class="value">{cycles}</div></div>
+  <div class="stat"><div class="label">Cycles</div><div class="value">{cycles}{milestone_html}</div></div>
+  <div class="stat"><div class="label">Cumulative P&amp;L</div>
+    <div class="value" style="color:{cum_pnl_color}">{cumulative_pnl:+.2f} USDT</div></div>
   <div class="stat"><div class="label">Daily Loss</div>
     <div class="value">{daily_loss_pct:.1f}%</div></div>
   <div class="stat"><div class="label">Consec Losses</div>
@@ -211,9 +238,11 @@ def _render_html(data: dict) -> str:
     <div class="value" style="color:{regime_color}">{regime}</div></div>
   <div class="stat"><div class="label">Tournament Winner</div>
     <div class="value">{tournament_winner}</div></div>
+  <div class="stat"><div class="label">Impl Shortfall (avg)</div>
+    <div class="value" style="color:{sf_color}">{sf_str}</div></div>
 </div>
 
-<h2>Open Positions</h2>
+{daily_summary_html}<h2>Open Positions</h2>
 <table>
   <tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Size</th>
       <th>Stop Loss</th><th>Take Profit</th><th>Opened</th></tr>
@@ -250,4 +279,6 @@ class Dashboard:
     def stop(self) -> None:
         if self._server:
             self._server.shutdown()
+            self._server.server_close()
+            self._server = None
             logger.info("Dashboard stopped")

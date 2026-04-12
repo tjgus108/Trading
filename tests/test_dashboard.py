@@ -110,6 +110,42 @@ def test_render_html_contains_key_fields():
     assert "-50.00" in html
 
 
+
+def test_render_html_impl_shortfall():
+    """impl_shortfall_avg_bps 가 HTML에 표시되는지 확인."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 5,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+        "impl_shortfall_avg_bps": 3.75,
+    }
+    html = _render_html(data)
+    assert "Impl Shortfall" in html
+    assert "+3.75 bps" in html
+
+
+def test_render_html_impl_shortfall_none():
+    """impl_shortfall 없으면 '—' 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 0,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "Impl Shortfall" in html
+    # value should be em-dash when no data
+    assert "—" in html
+
 def test_dashboard_stop_is_idempotent(mock_provider):
     port = _free_port()
     d = Dashboard(mock_provider, host="127.0.0.1", port=port)
@@ -117,3 +153,246 @@ def test_dashboard_stop_is_idempotent(mock_provider):
     time.sleep(0.05)
     d.stop()
     d.stop()  # 두 번 호출해도 에러 없음
+
+
+def test_render_html_cycle50_milestone():
+    """cycle_count >= 50 이면 CYCLE 50 MILESTONE 배지가 표시된다."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 50,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 234.56,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 50 MILESTONE" in html
+    assert "+234.56" in html
+
+
+def test_render_html_no_milestone_below_50():
+    """cycle_count < 50 이면 마일스톤 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 49,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": -10.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 50 MILESTONE" not in html
+    assert "-10.00" in html
+
+
+def test_render_html_cycle60_milestone():
+    """cycle_count >= 60 이면 CYCLE 60 + CYCLE 50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 60,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 500.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 60 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle60_below_60():
+    """cycle_count < 60 이면 CYCLE 60 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 59,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 60 MILESTONE" not in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_cycle70_milestone():
+    """cycle_count >= 70 이면 CYCLE 70, 60, 50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 70,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 700.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 70 MILESTONE" in html
+    assert "CYCLE 60 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle70_below_70():
+    """cycle_count < 70 이면 CYCLE 70 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 69,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 70 MILESTONE" not in html
+    assert "CYCLE 60 MILESTONE" in html
+
+
+def test_render_html_cycle80_milestone():
+    """cycle_count >= 80 이면 CYCLE 80, 70, 60, 50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 80,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 800.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 80 MILESTONE" in html
+    assert "#ff4500" in html
+    assert "CYCLE 70 MILESTONE" in html
+    assert "CYCLE 60 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle80_below_80():
+    """cycle_count < 80 이면 CYCLE 80 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 79,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 80 MILESTONE" not in html
+    assert "CYCLE 70 MILESTONE" in html
+
+
+def test_render_html_cycle90_milestone():
+    """cycle_count >= 90 이면 CYCLE 90~50 배지 모두 표시."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 90,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 900.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 90 MILESTONE" in html
+    assert "#00e676" in html
+    assert "CYCLE 80 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle90_below_90():
+    """cycle_count < 90 이면 CYCLE 90 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 89,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 90 MILESTONE" not in html
+    assert "CYCLE 80 MILESTONE" in html
+
+
+def test_render_html_cumulative_pnl_displayed():
+    """cumulative_pnl 값이 HTML에 부호 포함으로 표시되고, 음수일 때 red 색상 적용."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 10,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": -345.67,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "Cumulative P&amp;L" in html
+    assert "-345.67" in html
+    assert 'color:red' in html
+
+
+def test_render_html_cycle100_milestone():
+    """cycle_count >= 100 이면 CYCLE 100 MILESTONE 금색 배지가 표시된다."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 100,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 1000.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 100 MILESTONE" in html
+    assert "#ffd700" in html
+    assert "CYCLE 90 MILESTONE" in html
+    assert "CYCLE 50 MILESTONE" in html
+
+
+def test_render_html_no_cycle100_below_100():
+    """cycle_count < 100 이면 CYCLE 100 배지 없음."""
+    data = {
+        "timestamp": "2026-04-11T00:00:00+00:00",
+        "strategy": "ema_cross",
+        "symbol": "BTC/USDT",
+        "dry_run": True,
+        "cycle_count": 99,
+        "open_positions": [],
+        "today_pnl": 0.0,
+        "cumulative_pnl": 0.0,
+        "circuit_breaker": {"daily_loss": 0.0, "consecutive_losses": 0},
+    }
+    html = _render_html(data)
+    assert "CYCLE 100 MILESTONE" not in html
+    assert "CYCLE 90 MILESTONE" in html

@@ -5,10 +5,16 @@ Binance 청산 주문 REST API:
   GET https://fapi.binance.com/fapi/v1/forceOrders?symbol=BTCUSDT&limit=100
 
 응답: [{symbol, side, type, price, origQty, executedQty, time}, ...]
+
+재시도: exponential backoff (Cycle 6 패턴) + fallback
+  - 최대 2회 재시도
+  - 실패 시 마지막 성공 청산 데이터 반환
+  - fallback도 없으면 빈 리스트 반환
 """
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -17,6 +23,11 @@ try:
     import requests as _requests
 except ImportError:
     _requests = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_SECONDS = [1, 2]  # exponential backoff
 
 
 @dataclass
@@ -32,33 +43,68 @@ class LiquidationPressure:
 class LiquidationFetcher:
     _BASE_URL = "https://fapi.binance.com/fapi/v1/forceOrders"
 
-    def __init__(self, symbol: str = "BTC/USDT"):
+    def __init__(self, symbol: str = "BTC/USDT", max_retries: int = _MAX_RETRIES):
         self.symbol = symbol
         self._ccxt_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
         self._mock_data: Optional[list[dict]] = None
+        self.max_retries = max_retries
+        self._last_successful: Optional[list[dict]] = None  # fallback 데이터
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def get_recent(self, limit: int = 100) -> list[dict]:
-        """Binance fapi /forceOrders 엔드포인트 호출. 실패 시 [] 반환."""
+        """Binance fapi /forceOrders 엔드포인트 호출. 재시도 + fallback 포함."""
         if self._mock_data is not None:
             return self._mock_data
 
         if _requests is None:
             return []
 
-        try:
-            resp = _requests.get(
-                self._BASE_URL,
-                params={"symbol": self._ccxt_symbol, "limit": limit},
-                timeout=5,
+        # 재시도 로직
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = _requests.get(
+                    self._BASE_URL,
+                    params={"symbol": self._ccxt_symbol, "limit": limit},
+                    timeout=5,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                self._last_successful = result
+                logger.debug("LiquidationFetcher: API success (attempt %d/%d)", 
+                           attempt + 1, self.max_retries + 1)
+                return result
+            except Exception as e:
+                if attempt < self.max_retries:
+                    wait = _RETRY_BACKOFF_SECONDS[attempt]
+                    logger.warning(
+                        "LiquidationFetcher: attempt %d/%d failed for '%s': %s. Retry in %ds...",
+                        attempt + 1,
+                        self.max_retries + 1,
+                        self._ccxt_symbol,
+                        str(e),
+                        wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.warning(
+                        "LiquidationFetcher: failed after %d retries for '%s': %s",
+                        self.max_retries + 1,
+                        self._ccxt_symbol,
+                        str(e),
+                    )
+
+        # 재시도 후 실패 → fallback 사용
+        if self._last_successful is not None:
+            logger.warning(
+                "LiquidationFetcher.get_recent failed after retries, using fallback for '%s'",
+                self._ccxt_symbol
             )
-            resp.raise_for_status()
-            return resp.json()
-        except Exception:
-            return []
+            return self._last_successful
+
+        return []
 
     def compute_pressure(self, limit: int = 100) -> LiquidationPressure:
         """최근 청산 데이터로 매수/매도 압력 계산."""

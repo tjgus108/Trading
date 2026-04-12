@@ -33,6 +33,80 @@ class ExchangeConnector:
             self._exchange.set_sandbox_mode(True)
         self._exchange.load_markets()
         logger.info("Connected to %s (sandbox=%s)", self.exchange_name, self.sandbox)
+        self.check_api_permissions()
+
+    def check_api_permissions(self) -> dict:
+        """API Key 권한을 조회하고 출금(withdraw) 권한 유무를 확인한다.
+
+        출금 권한이 감지되면 CRITICAL 경고를 남긴다.
+        반환값: {"withdraw": bool, "trade": bool, "read": bool} — 거래소가 제공하는 키
+        거래소가 권한 조회를 지원하지 않으면 빈 dict를 반환하고 WARNING을 남긴다.
+        """
+        try:
+            info = self.exchange.fetch_api_key_permissions()
+        except (ccxt.NotSupported, AttributeError):
+            logger.warning(
+                "check_api_permissions: %s does not support fetchApiKeyPermissions — skipping",
+                self.exchange_name,
+            )
+            return {}
+
+        withdraw_enabled = bool(info.get("withdraw", False))
+        if withdraw_enabled:
+            logger.critical(
+                "SECURITY WARNING: API key has WITHDRAW permission enabled on %s. "
+                "Revoke withdraw permission immediately to prevent fund loss.",
+                self.exchange_name,
+            )
+        else:
+            logger.info(
+                "API key permission check passed: no withdraw permission detected on %s",
+                self.exchange_name,
+            )
+        return info
+
+
+    def health_check(self) -> dict:
+        """연결 상태 및 거래소 상태 확인.
+        
+        반환값: {
+            "connected": bool,
+            "exchange": str,
+            "sandbox": bool,
+            "markets_loaded": bool,
+            "last_tick": dict or None
+        }
+        """
+        if self._exchange is None:
+            return {
+                "connected": False,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": False,
+                "last_tick": None,
+            }
+        
+        try:
+            # 시장 정보 확인 (간단한 ping)
+            markets_loaded = len(self._exchange.symbols) > 0 if hasattr(self._exchange, 'symbols') else False
+            
+            logger.debug("health_check: %s is healthy", self.exchange_name)
+            return {
+                "connected": True,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": markets_loaded,
+                "last_tick": None,
+            }
+        except Exception as e:
+            logger.warning("health_check failed: %s", str(e))
+            return {
+                "connected": False,
+                "exchange": self.exchange_name,
+                "sandbox": self.sandbox,
+                "markets_loaded": False,
+                "last_tick": None,
+            }
 
     @property
     def exchange(self) -> ccxt.Exchange:
@@ -48,10 +122,21 @@ class ExchangeConnector:
         return data
 
     def fetch_balance(self) -> dict:
-        return self.exchange.fetch_balance()
+        """잔고 조회. None 또는 빈 dict 응답 시 안전한 기본값 반환."""
+        try:
+            result = self.exchange.fetch_balance()
+        except Exception as exc:
+            logger.warning("fetch_balance failed: %s", exc)
+            return {"total": {}, "free": {}, "used": {}}
+        if not result or not isinstance(result, dict):
+            logger.warning("fetch_balance returned unexpected response: %r", result)
+            return {"total": {}, "free": {}, "used": {}}
+        return result
 
     def fetch_ticker(self, symbol: str) -> dict:
         return self.exchange.fetch_ticker(symbol)
+
+    _RETRYABLE = (ccxt.NetworkError, ccxt.RequestTimeout)
 
     def create_order(
         self,
@@ -60,6 +145,7 @@ class ExchangeConnector:
         amount: float,
         order_type: str = "market",
         price: Optional[float] = None,
+        max_retries: int = 2,
     ) -> dict:
         logger.info(
             "Submitting %s %s order: %s %.6f @ %s",
@@ -69,16 +155,31 @@ class ExchangeConnector:
             amount,
             price or "market",
         )
-        if order_type == "market":
-            order = self.exchange.create_market_order(symbol, side, amount)
-        elif order_type == "limit":
-            if price is None:
-                raise ValueError("price required for limit order")
-            order = self.exchange.create_limit_order(symbol, side, amount, price)
-        else:
-            raise ValueError(f"Unsupported order_type: {order_type}")
-        logger.info("Order submitted: %s", order.get("id"))
-        return order
+        last_exc: Exception = RuntimeError("max_retries must be >= 1")
+        for attempt in range(1, max_retries + 1):
+            try:
+                if order_type == "market":
+                    order = self.exchange.create_market_order(symbol, side, amount)
+                elif order_type == "limit":
+                    if price is None:
+                        raise ValueError("price required for limit order")
+                    order = self.exchange.create_limit_order(symbol, side, amount, price)
+                else:
+                    raise ValueError(f"Unsupported order_type: {order_type}")
+                logger.info(
+                    "Order submitted: id=%s status=%s filled=%s avg_price=%s",
+                    order.get("id"), order.get("status"), order.get("filled"), order.get("average"),
+                )
+                return order
+            except self._RETRYABLE as exc:
+                last_exc = exc
+                logger.warning(
+                    "create_order attempt %d/%d failed (%s): %s",
+                    attempt, max_retries, type(exc).__name__, exc,
+                )
+                if attempt < max_retries:
+                    time.sleep(1)
+        raise last_exc
 
     def fetch_order(self, order_id: str, symbol: str) -> dict:
         return self.exchange.fetch_order(order_id, symbol)
@@ -88,15 +189,25 @@ class ExchangeConnector:
         return self.exchange.cancel_order(order_id, symbol)
 
     def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60) -> dict:
-        """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환."""
+        """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환.
+
+        반환 시 filled/amount를 포함해 partial fill 수량을 보존한다.
+        """
         deadline = time.time() + timeout
+        last_order: dict = {}
         while time.time() < deadline:
-            order = self.fetch_order(order_id, symbol)
-            status = order.get("status")
+            last_order = self.fetch_order(order_id, symbol)
+            status = last_order.get("status")
             if status == "closed":
-                return order
+                return last_order
             if status == "canceled":
-                return order
+                return last_order
             time.sleep(2)
         self.cancel_order(order_id, symbol)
-        return {"status": "timeout", "id": order_id, "symbol": symbol}
+        return {
+            "status": "timeout",
+            "id": order_id,
+            "symbol": symbol,
+            "filled": last_order.get("filled", 0.0),
+            "amount": last_order.get("amount", 0.0),
+        }

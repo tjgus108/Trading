@@ -1,11 +1,14 @@
 """
 SupertrendMultiStrategy: 3개의 Supertrend 지표를 조합한 추세 추종 전략.
 
+ENHANCED VERSION:
 - Supertrend 3개: (ATR10, mult=1.5), (ATR14, mult=2.0), (ATR20, mult=3.0)
-- BUY:  3개 모두 bullish (trend == 1)
-- SELL: 3개 모두 bearish (trend == -1)
-- confidence: 3개 모두 일치 AND volume > avg_vol * 1.1 → HIGH, 아니면 MEDIUM
+- BUY:  3개 모두 bullish (trend == 1) + ATR volatility threshold + trend age confirmation
+- SELL: 3개 모두 bearish (trend == -1) + ATR volatility threshold + trend age confirmation
+- confidence: 3개 모두 일치 AND volume > avg_vol * 1.1 AND ATR momentum good → HIGH
 - 최소 행: 25
+- ATR 필터: 평균 ATR 대비 현재 ATR >= 0.9x (과도한 volatility 피함)
+- 추세 유지: 마지막 2봉 모두 같은 추세 방향 (거짓 신호 제거)
 """
 
 from typing import List, Optional, Tuple
@@ -26,6 +29,7 @@ class SupertrendMultiStrategy(BaseStrategy):
         (20, 3.0),
     ]
     MIN_ROWS = 25
+    ATR_THRESHOLD = 0.9  # ATR이 평균의 90% 이상이어야 신호 생성
 
     def _compute_atr(self, df: pd.DataFrame, period: int) -> pd.Series:
         """True Range 기반 ATR 계산."""
@@ -101,18 +105,66 @@ class SupertrendMultiStrategy(BaseStrategy):
 
         return trend
 
+    def _atr_filter_pass(self, df: pd.DataFrame) -> bool:
+        """
+        ATR 필터: 현재 ATR이 평균의 ATR_THRESHOLD 이상이어야 신호 생성.
+        목표: 과도한 변동성 피하기 (거짓 신호 감소).
+        """
+        if len(df) < self.MIN_ROWS:
+            return False
+        
+        atr = self._compute_atr(df, 14)
+        lookback = min(20, len(df) - 2)
+        avg_atr = float(atr.iloc[-lookback - 2: -2].mean())
+        cur_atr = float(atr.iloc[-2])
+        
+        # 현재 ATR이 평균의 80% 이상이면 PASS
+        return avg_atr > 0 and cur_atr >= avg_atr * self.ATR_THRESHOLD
+
+    def _trend_confirmation_pass(self, trends_series: List[pd.Series]) -> bool:
+        """
+        추세 확인: 지난 2봉 모두 같은 추세 방향이어야 신호 생성.
+        목표: 추세 전환 초기의 거짓 신호 제거.
+        """
+        if not trends_series:
+            return False
+        
+        # 각 Supertrend의 마지막 2봉(iloc[-2], iloc[-1]) 추세 비교
+        for trend_series in trends_series:
+            if len(trend_series) < 2:
+                return False
+            
+            # 마지막 완성봉(-2)과 현재봉(-1)의 추세가 모두 같아야 함
+            t_minus_2 = int(trend_series.iloc[-2])
+            t_minus_1 = int(trend_series.iloc[-1])
+            
+            if t_minus_2 != t_minus_1:
+                return False
+        
+        return True
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < self.MIN_ROWS:
             return self._hold(df, f"데이터 부족: {len(df)} < {self.MIN_ROWS}")
 
+        # ATR 필터 체크
+        if not self._atr_filter_pass(df):
+            return self._hold(df, "ATR 필터 미충족: 변동성 부족")
+
         # 각 Supertrend의 마지막 완성봉(-2) trend 값 계산
-        trends: List[int] = []
+        trends_series: List[pd.Series] = []
         for atr_period, mult in self.CONFIGS:
             t = self._compute_supertrend_trend(df, atr_period, mult)
-            trends.append(int(t.iloc[-2]))
+            trends_series.append(t)
 
-        all_bullish = all(t == 1 for t in trends)
-        all_bearish = all(t == -1 for t in trends)
+        # 마지막 완성봉 기준으로 추세 확인
+        last_trends = [int(t.iloc[-2]) for t in trends_series]
+        
+        all_bullish = all(t == 1 for t in last_trends)
+        all_bearish = all(t == -1 for t in last_trends)
+
+        # 추세 확인 필터 (마지막 2봉 일치 여부)
+        trend_confirmed = self._trend_confirmation_pass(trends_series)
 
         last = self._last(df)
         entry = float(last["close"])
@@ -127,33 +179,36 @@ class SupertrendMultiStrategy(BaseStrategy):
             vol_high = avg_vol > 0 and cur_vol > avg_vol * 1.1
             vol_info = f" vol={cur_vol:.0f} avg={avg_vol:.0f}"
 
-        trend_str = str(trends)
+        trend_str = str(last_trends)
 
-        if all_bullish:
+        if all_bullish and trend_confirmed:
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
-                reasoning=f"3개 Supertrend 모두 bullish{vol_info}. trends={trend_str}",
+                reasoning=f"3개 Supertrend 모두 bullish + 추세 확인{vol_info}. trends={trend_str}",
                 invalidation="Supertrend 중 하나라도 bearish 전환 시 무효",
-                bull_case=f"ATR 기반 3중 bullish 확인. trends={trend_str}",
+                bull_case=f"ATR 기반 3중 bullish 확인 + 추세 연속성. trends={trend_str}",
                 bear_case="추세 반전 가능성 존재",
             )
 
-        if all_bearish:
+        if all_bearish and trend_confirmed:
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
-                reasoning=f"3개 Supertrend 모두 bearish{vol_info}. trends={trend_str}",
+                reasoning=f"3개 Supertrend 모두 bearish + 추세 확인{vol_info}. trends={trend_str}",
                 invalidation="Supertrend 중 하나라도 bullish 전환 시 무효",
                 bull_case="추세 반전 가능성 존재",
-                bear_case=f"ATR 기반 3중 bearish 확인. trends={trend_str}",
+                bear_case=f"ATR 기반 3중 bearish 확인 + 추세 연속성. trends={trend_str}",
             )
+
+        if all_bullish or all_bearish:
+            return self._hold(df, f"Supertrend 일치하지만 추세 확인 대기: trends={trend_str}")
 
         return self._hold(df, f"Supertrend 불일치: trends={trend_str}")
 

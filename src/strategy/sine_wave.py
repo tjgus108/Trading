@@ -30,7 +30,9 @@ class SineWaveStrategy(BaseStrategy):
 
         sma20 = pd.Series(close_arr).rolling(period).mean().values
         std20 = pd.Series(close_arr).rolling(period).std().values
-        zscore = np.where(std20 > 0, (close_arr - sma20) / std20, 0.0)
+        zscore = np.zeros(n)
+        mask = (~np.isnan(std20)) & (std20 > 0)
+        zscore[mask] = (close_arr[mask] - sma20[mask]) / std20[mask]
 
         phase = np.arcsin(np.clip(zscore, -1, 1))
         lead_phase = phase + np.pi / 4

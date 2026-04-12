@@ -106,7 +106,10 @@ class BinanceWebSocketFeed:
     def stop(self) -> None:
         """WebSocket 수신 중지."""
         self._stop_event.set()
-        if self._loop and not self._loop.is_closed():
+        # Guard against race condition: if stop() is called before _run_loop()
+        # assigns self._loop, _loop will be None. The _stop_event.set() above
+        # ensures clean exit via _stop_event.is_set() check in _connect_with_retry.
+        if self._loop is not None and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread:
             self._thread.join(timeout=5)
@@ -192,17 +195,20 @@ class BinanceWebSocketFeed:
         url = f"{BINANCE_WS_BASE}/{self.symbol}@kline_{self.interval}"
         logger.info("Connecting to %s", url)
 
-        async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
-            self._connected = True
-            logger.info("WebSocket connected: %s", url)
+        try:
+            async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+                self._connected = True
+                logger.info("WebSocket connected: %s", url)
 
-            async for msg in ws:
-                if self._stop_event.is_set():
-                    break
-                try:
-                    self._process_message(json.loads(msg))
-                except Exception as e:
-                    logger.debug("Message parse error: %s", e)
+                async for msg in ws:
+                    if self._stop_event.is_set():
+                        break
+                    try:
+                        self._process_message(json.loads(msg))
+                    except Exception as e:
+                        logger.debug("Message parse error: %s", e)
+        finally:
+            self._connected = False
 
     def _process_message(self, data: dict) -> None:
         """kline 메시지 파싱 → 완성 캔들 저장."""

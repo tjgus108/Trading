@@ -5,13 +5,14 @@ backtest-agent가 이 모듈을 사용한다.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 from src.strategy.base import Action, BaseStrategy
+from src.backtest.report import deflated_sharpe_ratio
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,12 @@ class BacktestResult:
     fail_reasons: list[str]
     total_fees: float = 0.0
     total_slippage_cost: float = 0.0
+    deflated_sharpe_ratio: float = 0.0  # DSR (과최적화 보정)
+    avg_win: float = 0.0  # 평균 수익 거래
+    avg_loss: float = 0.0  # 평균 손실 거래 (양수)
+    win_loss_ratio: float = 0.0  # avg_win / avg_loss
+    max_consecutive_losses: int = 0  # 최대 연속 손실
+    trades: list[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -55,6 +62,7 @@ class BacktestResult:
             f"  win_rate: {self.win_rate:.1%}",
             f"  profit_factor: {self.profit_factor:.2f}",
             f"  sharpe_ratio: {self.sharpe_ratio:.2f}",
+            f"  deflated_sharpe_ratio: {self.deflated_sharpe_ratio:.2f}",
             f"  max_drawdown: {self.max_drawdown:.1%}",
             f"  total_return: {self.total_return:.1%}",
             f"  total_fees: {self.total_fees:.4f}",
@@ -78,6 +86,7 @@ class BacktestEngine:
         slippage_pct: Optional[float] = None,  # 0.05% 슬리피지
         timeframe: str = "1h",
         funding_cost_per_candle: float = 0.0,
+        dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -90,6 +99,7 @@ class BacktestEngine:
         self.slippage_pct = self.slippage  # 별칭
         self.timeframe = timeframe
         self.funding_cost_per_candle = funding_cost_per_candle
+        self.dsr_threshold = dsr_threshold
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -263,6 +273,16 @@ class BacktestEngine:
 
         total_return = (eq[-1] - self.initial_balance) / self.initial_balance
 
+        # DSR 계산 (과최적화 보정)
+        pnls = np.array(trades)
+        dsr = deflated_sharpe_ratio(pnls, sharpe, ann_factor)
+        if dsr < self.dsr_threshold:
+            logger.warning(
+                "DSR %.3f < threshold %.3f for strategy '%s': "
+                "Sharpe may be overfitted.",
+                dsr, self.dsr_threshold, name,
+            )
+
         fail_reasons = []
         if sharpe < MIN_SHARPE:
             fail_reasons.append(f"sharpe {sharpe:.2f} < {MIN_SHARPE}")
@@ -273,6 +293,21 @@ class BacktestEngine:
         if len(trades) < MIN_TRADES:
             fail_reasons.append(f"trades {len(trades)} < {MIN_TRADES}")
 
+        # avg_win, avg_loss, win_loss_ratio 계산
+        avg_win_val = float(np.mean(wins)) if wins else 0.0
+        avg_loss_val = float(abs(np.mean(losses))) if losses else 0.0
+        win_loss_ratio_val = avg_win_val / avg_loss_val if avg_loss_val > 1e-9 else (0.0 if avg_win_val == 0.0 else float("inf"))
+        
+        # 최대 연속 손실 횟수
+        max_cons_loss = 0
+        cur_cons_loss = 0
+        for t in trades:
+            if t <= 0:
+                cur_cons_loss += 1
+                max_cons_loss = max(max_cons_loss, cur_cons_loss)
+            else:
+                cur_cons_loss = 0
+        
         return BacktestResult(
             strategy=name,
             total_trades=len(trades),
@@ -285,4 +320,10 @@ class BacktestEngine:
             fail_reasons=fail_reasons,
             total_fees=round(total_fees, 6),
             total_slippage_cost=round(total_slippage_cost, 6),
+            deflated_sharpe_ratio=round(dsr, 3),
+            avg_win=round(avg_win_val, 6),
+            avg_loss=round(avg_loss_val, 6),
+            win_loss_ratio=round(win_loss_ratio_val, 3) if win_loss_ratio_val != float("inf") else float("inf"),
+            max_consecutive_losses=max_cons_loss,
+            trades=trades,  # 거래 PnL 리스트 저장
         )

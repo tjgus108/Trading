@@ -105,3 +105,76 @@ def test_kelly_sizer_from_trade_history():
     ]
     qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
     assert qty >= 0
+
+
+# ── Risk-Constrained Kelly 테스트 ────────────────────────────────────────────
+
+def test_dd_constraint_reduces_size():
+    """max_drawdown 제약이 있을 때 size가 unconstrained보다 작거나 같음."""
+    # avg_loss=0.10 (10%), leverage=1 → max_dd_constrained = 0.05/0.10 = 0.50
+    # Half-Kelly가 0.50을 초과할 만큼 win_rate를 높게 설정
+    sizer_unconstrained = KellySizer(fraction=0.5, max_fraction=0.10)
+    sizer_constrained = KellySizer(fraction=0.5, max_fraction=0.10, max_drawdown=0.05, leverage=1.0)
+
+    qty_unc = sizer_unconstrained.compute(
+        win_rate=0.9, avg_win=0.20, avg_loss=0.10, capital=10000, price=100
+    )
+    qty_con = sizer_constrained.compute(
+        win_rate=0.9, avg_win=0.20, avg_loss=0.10, capital=10000, price=100
+    )
+    assert qty_con <= qty_unc
+
+
+def test_dd_constraint_binding():
+    """max_dd_constrained < half_kelly 일 때 DD 값이 실제로 binding됨."""
+    # avg_loss=0.02, leverage=2 → max_dd_constrained = 0.05 / (0.02 * 2) = 1.25 → clipped at max_fraction=0.10
+    # avg_loss=0.50, leverage=2 → max_dd_constrained = 0.05 / (0.50 * 2) = 0.05
+    # Half-Kelly(win_rate=0.7, avg_win=0.5, avg_loss=0.5) = (0.7*0.5 - 0.3*0.5)/0.5 * 0.5 = 0.4 * 0.5 = 0.20
+    # DD constrained = 0.05 / (0.50*2) = 0.05 → binding (0.05 < 0.20), clipped at max_fraction=0.10 → min(0.05, 0.10)=0.05
+    sizer = KellySizer(fraction=0.5, max_fraction=0.10, max_drawdown=0.05, leverage=2.0)
+    qty = sizer.compute(
+        win_rate=0.7, avg_win=0.50, avg_loss=0.50, capital=10000, price=100
+    )
+    # position_capital = 10000 * 0.05 = 500, qty = 500/100 = 5.0
+    assert abs(qty - 5.0) < 1e-6
+
+
+def test_dd_constraint_none_no_effect():
+    """max_drawdown=None이면 기존 동작과 동일."""
+    sizer_default = KellySizer(fraction=0.5, max_fraction=0.10)
+    sizer_none_dd = KellySizer(fraction=0.5, max_fraction=0.10, max_drawdown=None)
+
+    qty_d = sizer_default.compute(
+        win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100
+    )
+    qty_n = sizer_none_dd.compute(
+        win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100
+    )
+    assert abs(qty_d - qty_n) < 1e-9
+
+
+# ── avg_loss = 0 경계 테스트 ─────────────────────────────────────────────────
+
+def test_avg_loss_zero_no_division_error():
+    """avg_loss=0 시 ZeroDivisionError 없이 양수 반환 (all-win 기록)."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.10)
+    qty = sizer.compute(win_rate=1.0, avg_win=0.05, avg_loss=0.0, capital=10000, price=100)
+    assert qty > 0  # kelly_f = 1.0 → fractional=0.5 → clipped at 0.10
+
+def test_from_trade_history_all_wins_no_error():
+    """손실 거래 없는 기록 → avg_loss=0 → 정상 수량 반환."""
+    trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 50}]
+    qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
+    assert qty >= 0
+
+
+def test_kelly_sizer_default_fraction_is_half_kelly():
+    """KellySizer 기본 fraction=0.5 (Half-Kelly) 확인 및 Quarter-Kelly(0.25)는 정확히 절반."""
+    # max_fraction을 높여서 clip 없이 ratio 확인
+    half = KellySizer(fraction=0.5, max_fraction=0.50)
+    quarter = KellySizer(fraction=0.25, max_fraction=0.50)
+    assert half.fraction == 0.5
+    qty_half = half.compute(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
+    qty_quarter = quarter.compute(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
+    # Half은 Quarter의 2배여야 함
+    assert abs(qty_half / qty_quarter - 2.0) < 1e-9
