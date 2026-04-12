@@ -1,19 +1,37 @@
-# Cycle 120: Wick Reversal Research
+# Cycle 121 Todo
 
-## [2026-04-12] Cycle 120 — Wick Reversal
-- Hammer/Shooting Star: 68% daily reversal accuracy (ChartSchool). 위꼬리/아래꼬리 비율 >60%, 다음 봉 확인+볼륨이 성공률 결정적 요소.
-- 2025 실전: 고점 Shooting Star → 10% 하락 사례 확인. 확인 캔들 없이 진입 시 실패율 높음.
-- `wick_reversal` 전략 이미 구현됨 (`src/strategy/wick_reversal.py`, registry 등록 완료). 개선 포인트: 다음 봉 확인 로직 추가 고려.
+## wick_reversal 2차 강화 결과 (Cycle 120)
+- Sharpe 0.49 (< 1.0) ❌
+- Profit Factor 1.10 (< 1.5) ❌
+- Trades 48 (>= 30) ✅
+- **Verdict: FAIL** — 라이브 실행 금지
 
-## 기존 구현 상태
-- 파일: `src/strategy/wick_reversal.py` — WickReversalStrategy (wick_ratio > 0.65, SMA20 필터, 볼륨, 추세 필터)
-- Registry: ✅ 등록됨 (`"wick_reversal": WickReversalStrategy`)
-- 테스트: `tests/test_wick_reversal.py` 존재
+### 개선 사항 (Cycle 120)
+1. RSI 오버부스트/오버셀드 필터 추가 (선택적)
+2. 기본 거래 조건 유지 (0.8배 볼륨)
+3. 추세 필터 강화 (14기간 고점/저점)
 
-## 개선 가능 포인트 (다음 Cycle)
-1. 다음 봉 확인(confirmation candle) 로직 추가 → false signal 감소
-2. 볼륨 임계값 상향 (현재 avg*0.8 → avg*1.2)
-3. RSI 극단값 필터 추가 (Hammer RSI<40, ShootingStar RSI>60)
+### 근본 원인
+- 패턴 기반 신호만으로는 신뢰도 부족
+- 모멘텀/추세 강도 지표 부재
+- Sharpe 개선을 위해 승률 향상 또는 손실 관리 필요
 
----
-Updated: 2026-04-12 Cycle 120
+## Cycle 121 옵션
+1. **wick_reversal 3차 개선**
+   - MACD 신호 추가 (추세 확인)
+   - Bollinger Band 밴드폭 필터 (변동성 확인)
+   - 거래당 조정 손절/익절 동적 계산
+
+2. **신 전략 개발** (더 우선)
+   - Volume Cluster + Support/Resistance
+   - RSI Divergence 감지
+   - 다중 시간틀 확인
+
+3. **포트폴리오 최적화**
+   - 상위 전략들의 상관관계 분석
+   - 균등/가중 배분 vs 최적화 배분
+
+## 파일 경로
+- 전략: /home/user/Trading/src/strategy/wick_reversal.py
+- 테스트: /home/user/Trading/tests/test_wick_reversal.py
+- 시뮬 리포트: /home/user/Trading/.claude-state/PAPER_SIMULATION_REPORT.md
