@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 101 — 2026-04-12T00:02:55.367486Z
+🔄 CYCLE 102 — 2026-04-12T00:18:53.669314Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 99 COMPLETED — E + A + SIM + F** (2026-04-12 23:10 UTC)
-  **[E] Execution:** tests/test_notifier.py +1 XSS javascript:/onerror= 벡터 차단.
-  **[A] Quality:** tests/test_walk_forward.py +1 WF 윈도우 최소 경계 검증.
-  **[SIM] Auto-improve:** frama 2차 개선. ATR 필터 + Adaptive RSI (gap>=1% 완화, 약한 신호 엄격). **-3.77% → +1.02% 흑자 전환!** (+4.79%p, Sharpe -0.69→0.38). 17 tests 유지.
-  **[F] Research:** FRAMA noise filter + FRAMA-RSI hybrid. 131일 파라미터 최적.
+**Cycle 101 COMPLETED — D + E + (SIM no-op) + F** (2026-04-12 00:50 UTC)
+  **[D] ML:** src/strategy/base.py Signal reasoning 500자 초과 ValueError. +1 test.
+  **[E] Execution BUG FIX:** src/exchange/paper_trader.py float precision 버그. `new_qty <= 0` → `< 1e-9` 가드. 작은 float 잔여가 positions 남던 문제 해결.
+  **[SIM] No-op:** engulfing_zone 개선 시도했으나 F agent와 범위 충돌로 원복. 다음 사이클 재시도.
+  **[F] Research:** Engulfing + 추세/위치 필터. EMA50 + Pivot zone 50-70% 향상. **주의**: F agent가 연구 외 코드 수정도 해서 원복됨.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

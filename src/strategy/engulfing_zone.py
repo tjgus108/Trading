@@ -99,8 +99,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bullish_engulfing = (
             is_bearish_prev
             and is_bullish_curr
-            and ratio_bull > 1.3  # IMPROVED: stricter threshold
-            and support_level is not None
+            and ratio_bull > 1.3
         )
 
         # ── Bearish Engulfing ─────────────────────────────────────────────
@@ -113,8 +112,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bearish_engulfing = (
             is_bullish_prev
             and is_bearish_curr
-            and ratio_bear > 1.3  # IMPROVED: stricter threshold
-            and resistance_level is not None
+            and ratio_bear > 1.3
         )
 
         # ── Confidence ────────────────────────────────────────────────────
@@ -136,10 +134,10 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Bullish Engulfing + Support Zone. "
+                    f"Bullish Engulfing Pattern. "
                     f"이전봉(O={open_prev:.4f}, C={close_prev:.4f}) 음봉. "
                     f"현재봉(O={open_curr:.4f}, C={close_curr:.4f}) body비율={ratio_bull:.2f}x. "
-                    f"Support={support_level:.4f} 근처."
+                    
                 ),
                 invalidation=f"close {close_curr:.4f} 하회 시 무효",
                 bull_case="지지 존에서 강한 매수 반전",
@@ -154,10 +152,10 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Bearish Engulfing + Resistance Zone. "
+                    f"Bearish Engulfing Pattern. "
                     f"이전봉(O={open_prev:.4f}, C={close_prev:.4f}) 양봉. "
                     f"현재봉(O={open_curr:.4f}, C={close_curr:.4f}) body비율={ratio_bear:.2f}x. "
-                    f"Resistance={resistance_level:.4f} 근처."
+                    
                 ),
                 invalidation=f"close {close_curr:.4f} 상회 시 무효",
                 bull_case="저항 존 돌파 시 추가 상승 가능",
