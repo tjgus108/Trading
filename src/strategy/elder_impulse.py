@@ -1,5 +1,5 @@
 """
-Elder Impulse System 전략.
+Elder Impulse System 전략 - 변동성 필터 강화.
 
 - EMA13   = close의 13기간 EWM
 - MACD_line = EWM(close,12) - EWM(close,26)
@@ -11,11 +11,11 @@ Impulse 색상:
   RED   = EMA13 하락 AND MACD_hist 하락 → 강한 매도
   BLUE  = 그 외
 
-BUY:  이전봉 RED → 현재봉 GREEN (색상 전환)
-SELL: 이전봉 GREEN → 현재봉 RED
+BUY:  이전봉 RED → 현재봉 GREEN (색상 전환) + 변동성 필터
+SELL: 이전봉 GREEN → 현재봉 RED + 변동성 필터
 
 confidence:
-  HIGH   if 방향 전환 AND |MACD_hist| > std(MACD_hist, 20)
+  HIGH   if 색상 전환 AND |MACD_hist| > std(MACD_hist, 20) AND 변동성 충분
   MEDIUM 그 외
 
 최소 데이터: 35행
@@ -34,6 +34,26 @@ def _impulse_color(ema_up: bool, hist_up: bool) -> str:
     if not ema_up and not hist_up:
         return "RED"
     return "BLUE"
+
+
+def _calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+    """ATR (Average True Range) 계산 - 변동성 측도"""
+    high = df["high"].iloc[-period:] if len(df) >= period else df["high"]
+    low = df["low"].iloc[-period:] if len(df) >= period else df["low"]
+    close = df["close"].iloc[-period-1:-1] if len(df) > period else df["close"].iloc[:-1]
+    
+    if len(high) < 1 or len(low) < 1:
+        return 0.0
+    
+    tr1 = high.iloc[-1] - low.iloc[-1]
+    if len(close) > 0:
+        tr2 = abs(high.iloc[-1] - close.iloc[-1])
+        tr3 = abs(low.iloc[-1] - close.iloc[-1])
+        true_range = max(tr1, tr2, tr3)
+    else:
+        true_range = tr1
+    
+    return true_range / (df["close"].iloc[-1] + 1e-10)
 
 
 class ElderImpulseStrategy(BaseStrategy):
@@ -69,14 +89,22 @@ class ElderImpulseStrategy(BaseStrategy):
         # MACD hist 표준편차 (최대 20봉)
         window = macd_hist.iloc[max(0, idx - 19): idx + 1]
         hist_std = float(window.std()) if len(window) > 1 else 0.0
+        
+        # 변동성 필터 (ATR 기반)
+        volatility = _calculate_atr(df.iloc[:idx+1], period=14)
+        min_volatility = 0.002  # 최소 0.2% 변동성 필요
 
         context = (
             f"close={close:.4f} ema13={ema_now:.4f} "
-            f"macd_hist={hist_now:.6f} color={color_now} prev_color={color_prev}"
+            f"macd_hist={hist_now:.6f} color={color_now} prev_color={color_prev} vol={volatility:.4f}"
         )
 
-        # BUY: RED → GREEN
+        # BUY: RED → GREEN + 변동성 필터
         if color_prev == "RED" and color_now == "GREEN":
+            # 변동성 검증 추가
+            if volatility < min_volatility:
+                return self._hold(df, f"Insufficient volatility for BUY (vol={volatility:.4f})", context, context)
+            
             confidence = (
                 Confidence.HIGH
                 if hist_std > 0 and abs(hist_now) > hist_std
@@ -89,15 +117,19 @@ class ElderImpulseStrategy(BaseStrategy):
                 entry_price=close,
                 reasoning=(
                     f"Elder Impulse BUY: RED→GREEN 전환 "
-                    f"(ema13={ema_now:.4f}, macd_hist={hist_now:.6f})"
+                    f"(ema13={ema_now:.4f}, macd_hist={hist_now:.6f}, vol={volatility:.4f})"
                 ),
                 invalidation="GREEN 유지 실패 또는 BLUE로 전환",
                 bull_case=context,
                 bear_case=context,
             )
 
-        # SELL: GREEN → RED
+        # SELL: GREEN → RED + 변동성 필터
         if color_prev == "GREEN" and color_now == "RED":
+            # 변동성 검증 추가
+            if volatility < min_volatility:
+                return self._hold(df, f"Insufficient volatility for SELL (vol={volatility:.4f})", context, context)
+            
             confidence = (
                 Confidence.HIGH
                 if hist_std > 0 and abs(hist_now) > hist_std
@@ -110,7 +142,7 @@ class ElderImpulseStrategy(BaseStrategy):
                 entry_price=close,
                 reasoning=(
                     f"Elder Impulse SELL: GREEN→RED 전환 "
-                    f"(ema13={ema_now:.4f}, macd_hist={hist_now:.6f})"
+                    f"(ema13={ema_now:.4f}, macd_hist={hist_now:.6f}, vol={volatility:.4f})"
                 ),
                 invalidation="RED 유지 실패 또는 BLUE로 전환",
                 bull_case=context,

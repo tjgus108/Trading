@@ -8920,3 +8920,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 10:59 UTC] Cycle 108 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 11:03 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 04:20 UTC] Cycle 109 COMPLETED — A + C + SIM + F
+**[A] Quality:** src/backtest/report.py from_json 에러 처리 3개 (JSONDecodeError, 비dict, 필드 누락). +3 tests.
+**[C] Data:** tests/test_data_health_check.py +1 to_json round-trip.
+**[SIM] elder_impulse 강화:** ATR 변동성 필터 추가 (최소 0.2%). 저변동성 노이즈 제거. 14 tests 유지.
+**[F] Research:** Elder Impulse. EMA(13)+MACD 히스토그램 이중 필터. 승률 55-60%, Sharpe ~1.0 추정. 횡보 지연 취약.
+**Tests:** 6336 passed (+6 from Cycle 108).
+**Next Cycle:** 110 (B+D+SIM+F)
