@@ -64,10 +64,7 @@ class VolTargeting:
     def scalar(self, df: pd.DataFrame) -> float:
         """vol_scalar = target_vol / realized_vol, [min_scalar, max_scalar] 클리핑."""
         rv = self.realized_vol(df)
-        if rv <= 0:
-            return 1.0
-        s = self.target_vol / rv
-        return float(np.clip(s, self.min_scalar, self.max_scalar))
+        return self._scalar_from_rv(rv)
 
     def adjust(self, base_size: float, df: pd.DataFrame) -> float:
         """base_size * vol_scalar 반환.

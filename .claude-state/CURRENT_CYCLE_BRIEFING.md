@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 110 — 2026-04-12T11:14:19.804144Z
+🔄 CYCLE 111 — 2026-04-12T11:26:06.539125Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 110 COMPLETED — B + D + SIM + F** (2026-04-12 04:45 UTC)
-  **[B] Risk:** src/risk/circuit_breaker.py to_dict/from_dict 상태 직렬화 추가. +1 roundtrip test.
-  **[D] ML:** SpecialistEnsemble 2:1 분할 로직 추적 검증 (수정 없음, 소수 의견은 reasoning만).
-  **[SIM] momentum_quality 강화:** consistency 필터(>0.4 BUY, <0.6 SELL) 추가. 성과 유지(+14.38%, Sharpe 3.29). 16 tests 유지.
-  **[F] Research:** Momentum+Quality. 2024 S&P +28% 역대급. 2025 반전 경고(11회 중 7회 이듬해 -). Quality 필터 헤지 필수.
+**Cycle 111 COMPLETED — E + A + SIM + F** (2026-04-12 05:10 UTC)
+  **[E] Execution:** paper_trader position 정리 검증 (Cycle 101 수정 정상). filled_trades 논리 버그 발견 (minor, 범위 외).
+  **[A] Quality:** backtest MAX_HOLD_CANDLES=24 강제 청산 검증 (기존 테스트 통과).
+  **[SIM] linear_channel_rev 강화:** channel_std>=0.2 + deviation 2.5→2.7 + ATR 0.05% 필터. 20 tests 유지.
+  **[F] Research:** Linear Reg Channel. RSI+ATR 조합, slope 추세 필터 필수.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
