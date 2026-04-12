@@ -1,8 +1,14 @@
 """
 EnsembleSignal.conflicts_with() 엣지 케이스 테스트.
 _compute_consensus: both-fail / one-fail edge cases.
+_ask_parallel: 10초 타임아웃 경계값 테스트.
 """
+import time
+from concurrent.futures import Future
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from src.alpha.ensemble import EnsembleSignal, MultiLLMEnsemble
 
 
@@ -117,3 +123,48 @@ class TestComputeConsensus:
         consensus, conf = e._compute_consensus("SELL", "N/A", "SELL")
         assert consensus == "SELL"
         assert conf == 0.65
+
+
+class TestAskParallelTimeout:
+    """_ask_parallel 10초 타임아웃 경계 테스트 (실제 API 호출 없음)."""
+
+    def _ensemble_with_mock_clients(self):
+        """Claude + OpenAI 클라이언트를 mock으로 주입한 인스턴스."""
+        e = MultiLLMEnsemble.__new__(MultiLLMEnsemble)
+        e._claude_model = "claude-haiku-test"
+        e._openai_model = "gpt-4o-mini-test"
+        e._claude_client = MagicMock()
+        e._openai_client = MagicMock()
+        return e
+
+    def test_timeout_boundary_returns_na(self):
+        """future.result(timeout=10) 초과 시 결과가 N/A로 폴백.
+
+        실제 sleep 없이 Future.result 자체를 TimeoutError로 mock — 즉시 실행.
+        """
+        from concurrent.futures import TimeoutError as FutureTimeout
+
+        e = self._ensemble_with_mock_clients()
+
+        timed_out = Future()
+        ok_future = Future()
+        ok_future.set_result("SELL")
+
+        submit_calls = iter([timed_out, ok_future])
+
+        def fake_submit(fn, *args, **kwargs):
+            return next(submit_calls)
+
+        # timed_out future는 result(timeout=10) 호출 시 TimeoutError 발생
+        with patch("src.alpha.ensemble.ThreadPoolExecutor") as MockExec:
+            mock_executor = MagicMock()
+            MockExec.return_value.__enter__ = MagicMock(return_value=mock_executor)
+            MockExec.return_value.__exit__ = MagicMock(return_value=False)
+            mock_executor.submit.side_effect = fake_submit
+
+            # timed_out.result(timeout=10) → TimeoutError
+            with patch.object(timed_out, "result", side_effect=FutureTimeout("timeout")):
+                claude_vote, openai_vote = e._ask_parallel("test prompt")
+
+        assert claude_vote == "N/A"
+        assert openai_vote == "SELL"

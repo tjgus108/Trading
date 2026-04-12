@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 111 — 2026-04-12T11:26:06.539125Z
+🔄 CYCLE 112 — 2026-04-12T11:35:44.075793Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,14 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 111 COMPLETED — E + A + SIM + F** (2026-04-12 05:10 UTC)
-  **[E] Execution:** paper_trader position 정리 검증 (Cycle 101 수정 정상). filled_trades 논리 버그 발견 (minor, 범위 외).
-  **[A] Quality:** backtest MAX_HOLD_CANDLES=24 강제 청산 검증 (기존 테스트 통과).
-  **[SIM] linear_channel_rev 강화:** channel_std>=0.2 + deviation 2.5→2.7 + ATR 0.05% 필터. 20 tests 유지.
-  **[F] Research:** Linear Reg Channel. RSI+ATR 조합, slope 추세 필터 필수.
-
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
+**Cycle 112 COMPLETED — C + B + SIM + F** (2026-04-12 05:35 UTC)
+  **[C] Data:** retry 로깅 검증 (수정 없음, 구현 정상).
+  **[B] Risk:** vol_targeting scalar() 중복 체크 제거 → _scalar_from_rv() 통합.
+  **[SIM] 🎯 order_flow_imbalance_v2 대성공!** 임계값 0.20→0.25 + 거래량 필터. **PF 1.47→1.77 PASS 달성!** Sharpe 3.38→4.26 (+26%). Return 16.45%→17.85%.
+  **[F] Research:** OFI는 HFT 전용 (50ms~5분). 저빈도 봇 단독 비추천. Hawkes+ML 하이브리드만 OOS 우위.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

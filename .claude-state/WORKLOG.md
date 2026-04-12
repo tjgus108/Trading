@@ -9158,3 +9158,6 @@ ImplShortfall: -5.00bps
 **Tests:** 6337 passed.
 **SIM 누적 20개 개선** — Top1 전략까지 PASS 달성!
 **Next Cycle:** 113 (D+E+SIM+F)
+
+## [2026-04-12 11:35 UTC] Cycle 112 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
