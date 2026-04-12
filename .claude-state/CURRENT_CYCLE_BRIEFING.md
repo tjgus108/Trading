@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 115 — 2026-04-12T12:13:43.622434Z
+🔄 CYCLE 116 — 2026-04-12T12:28:04.272825Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 115 COMPLETED — B + D + SIM + F** (2026-04-12 07:00 UTC)
-  **[B] Risk:** RiskManager evaluate APPROVED 경로 추적 검증 (정상).
-  **[D] ML:** WalkForward IS<=0 오분류 버그 발견 (IS Sharpe<0 + OOS>0 → ratio=0 → 과적합 오판). 14번째 CRITICAL 후보.
-  **[SIM] lob_maker 2차 시도 실패:** OFI proxy 구조 한계 (합성 데이터에 실제 bid/ask depth 없음). 실거래 데이터 필요.
-  **[F] Research:** LOB PF 개선. OFI quote skew + HJB 최적제어 + Attn-LOB(CNN+Attention).
+**Cycle 116 COMPLETED — E + A + SIM + F** (2026-04-12 07:30 UTC)
+  **[E] CRITICAL #14:** src/backtest/walk_forward.py IS<=0 오분류 수정. IS<0+OOS>0 → ratio=1.0(non-overfit). +1 test.
+  **[A] Quality:** commission 양방향 검증 (수정 없음, 진입+청산 2회 정확).
+  **[SIM] 🎯 relative_volume 2차 PASS!** RVOL 1.5→1.6 + RSI 동적 + VWAP 필수. **PF 1.26→1.66 PASS!** Sharpe 1.86→2.83.
+  **[F] Research:** RVOL. 임계 2.0+ 급등 탐지. Donchian 돌파 결합 시너지.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
