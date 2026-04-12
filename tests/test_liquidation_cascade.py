@@ -240,21 +240,24 @@ def test_get_recent_retry_fallback():
     """API 재시도 실패 후 fallback 동작 확인."""
     with patch("time.sleep"):
         fetcher = LiquidationFetcher(symbol="BTC/USDT")
-        
-        # 첫 번째 fetch 성공 → fallback 데이터 저장
+
+        # 첫 번째 fetch 성공 → fallback 데이터 저장 (Bybit v5 형식)
         with patch("src.data.liquidation_feed._requests") as mock_req:
-            mock_req.get.return_value.json.return_value = [{"side": "BUY", "price": "50000", "executedQty": "1"}]
+            mock_req.get.return_value.json.return_value = {
+                "retCode": 0,
+                "result": {"list": [{"side": "Buy", "price": "50000", "size": "1", "symbol": "BTCUSDT", "time": "1700000000000"}]}
+            }
             mock_req.get.return_value.raise_for_status.return_value = None
             result1 = fetcher.get_recent()
-        
+
         assert len(result1) == 1
         assert result1[0]["side"] == "BUY"
-        
+
         # 두 번째 fetch 실패 (모든 재시도 후) → fallback 반환
         with patch("src.data.liquidation_feed._requests") as mock_req:
             mock_req.get.side_effect = Exception("network error")
             result2 = fetcher.get_recent()
-        
+
         # fallback 데이터 반환
         assert len(result2) == 1
         assert result2[0]["side"] == "BUY"
@@ -276,9 +279,12 @@ def test_get_recent_retry_success_on_second_attempt():
             call_count += 1
             if call_count == 1:
                 raise Exception("Temporary network error")
-            # 두 번째 호출 성공
+            # 두 번째 호출 성공 (Bybit v5 형식)
             mock_resp = MagicMock()
-            mock_resp.json.return_value = [{"side": "SELL", "price": "50000", "executedQty": "2"}]
+            mock_resp.json.return_value = {
+                "retCode": 0,
+                "result": {"list": [{"side": "Sell", "price": "50000", "size": "2", "symbol": "BTCUSDT", "time": "1700000000000"}]}
+            }
             mock_resp.raise_for_status.return_value = None
             return mock_resp
         
