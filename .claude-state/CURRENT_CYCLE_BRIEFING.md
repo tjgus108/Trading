@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 114 — 2026-04-12T12:00:05.531609Z
+🔄 CYCLE 115 — 2026-04-12T12:13:43.622434Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 114 COMPLETED — A + C + SIM + F (최종 리포트)** (2026-04-12 06:30 UTC)
-  **[A] Quality:** quality_audit 재실행 시도 (결과 미확인).
-  **[C] Data:** DataFeed status 보고 구조 확인 (cache_stats + health_check 조합).
-  **[SIM] 최종 시뮬 리포트:** 전체 22 → 21 흑자 (volatility_cluster SHORT 편향 퇴출 권장).
-    - **포트폴리오 전체 +6.97%**, Top10 **+12.80%**
+**Cycle 115 COMPLETED — B + D + SIM + F** (2026-04-12 07:00 UTC)
+  **[B] Risk:** RiskManager evaluate APPROVED 경로 추적 검증 (정상).
+  **[D] ML:** WalkForward IS<=0 오분류 버그 발견 (IS Sharpe<0 + OOS>0 → ratio=0 → 과적합 오판). 14번째 CRITICAL 후보.
+  **[SIM] lob_maker 2차 시도 실패:** OFI proxy 구조 한계 (합성 데이터에 실제 bid/ask depth 없음). 실거래 데이터 필요.
+  **[F] Research:** LOB PF 개선. OFI quote skew + HJB 최적제어 + Attn-LOB(CNN+Attention).
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

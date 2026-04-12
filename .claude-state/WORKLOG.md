@@ -9389,3 +9389,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** LOB PF 개선. OFI quote skew + HJB 최적제어 + Attn-LOB(CNN+Attention).
 **Tests:** 6340 passed.
 **Next Cycle:** 116 (E+A+SIM+F)
+
+## [2026-04-12 12:13 UTC] Cycle 115 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

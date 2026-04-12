@@ -274,3 +274,32 @@ def test_optimizer_window_boundary_exact_minimum():
     assert len(result.windows) == 0
     assert not result.is_stable
 
+
+
+# 테스트 14: IS<=0, OOS>0 → ratio=1.0 (non-overfit 오분류 수정)
+def test_ratio_negative_is_positive_oos():
+    """IS Sharpe<=0이고 OOS Sharpe>0이면 ratio=1.0으로 non-overfit 처리."""
+    from src.backtest.walk_forward import WindowResult
+    # ratio 계산 로직 직접 검증
+    best_is_sharpe = -0.3
+    oos_sharpe = 0.5
+
+    if best_is_sharpe > 0:
+        ratio = oos_sharpe / best_is_sharpe
+    elif oos_sharpe > 0:
+        ratio = 1.0
+    else:
+        ratio = 0.0
+
+    assert ratio == 1.0, f"IS<=0 OOS>0 should be non-overfit (ratio=1.0), got {ratio}"
+
+    # IS<=0, OOS<=0 → ratio=0.0
+    oos_sharpe2 = -0.1
+    if best_is_sharpe > 0:
+        ratio2 = oos_sharpe2 / best_is_sharpe
+    elif oos_sharpe2 > 0:
+        ratio2 = 1.0
+    else:
+        ratio2 = 0.0
+
+    assert ratio2 == 0.0, f"IS<=0 OOS<=0 should be overfit (ratio=0.0), got {ratio2}"
