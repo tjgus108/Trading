@@ -1,10 +1,10 @@
 """
-PriceClusterStrategy:
+PriceClusterStrategy v2:
 - 최근 50봉의 close 가격을 5개 bin으로 나누기
 - 가장 많이 방문한 bin = price cluster
-- BUY: close가 cluster 하단 이탈 후 복귀 (cluster bounce)
-- SELL: close가 cluster 상단 돌파 후 복귀
-- confidence: 빈도 > 평균의 2배 이상 → HIGH
+- BUY: close가 cluster_low 아래에서 (threshold 내)에서 복귀
+- SELL: close가 cluster_high 위에서 (threshold 내)에서 복귀
+- confidence: 빈도 > 평균의 1.5배 이상 → HIGH (PF 개선)
 - 최소 데이터: 55행
 """
 
@@ -18,7 +18,8 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 55
 _CLOSE_WINDOW = 50
 _N_BINS = 5
-_HIGH_CONF_FREQ_MULT = 2.0
+_HIGH_CONF_FREQ_MULT = 1.5  # 1.5배 이상 (이전 2.0에서 낮춤)
+_BOUNCE_THRESHOLD = 0.002  # cluster_low 아래 최대 0.2% 범위에서만 신호
 
 
 def _find_cluster(
@@ -83,14 +84,18 @@ class PriceClusterStrategy(BaseStrategy):
             f"count={max_count} avg={avg_count:.1f}"
         )
 
-        confidence = (
-            Confidence.HIGH
-            if max_count >= avg_count * _HIGH_CONF_FREQ_MULT
-            else Confidence.MEDIUM
-        )
+        is_high_confidence = max_count >= avg_count * _HIGH_CONF_FREQ_MULT
+        
+        confidence = Confidence.HIGH if is_high_confidence else Confidence.MEDIUM
 
-        # BUY: 이전 봉이 cluster_low 아래, 현재 봉이 cluster_low 이상 (반등 복귀)
-        if prev_close < cluster_low and curr_close >= cluster_low:
+        # Threshold 계산: cluster 너비의 0.2%
+        cluster_width = cluster_high - cluster_low
+        threshold = max(cluster_width * _BOUNCE_THRESHOLD, 0.001)
+
+        # BUY: 이전 봉이 cluster_low 아래 (threshold 내), 현재 봉이 cluster_low 이상
+        if (prev_close < cluster_low and 
+            prev_close >= cluster_low - threshold and 
+            curr_close >= cluster_low):
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -102,8 +107,10 @@ class PriceClusterStrategy(BaseStrategy):
                 bear_case=f"Cluster 하향 이탈 지속 시 하락",
             )
 
-        # SELL: 이전 봉이 cluster_high 위, 현재 봉이 cluster_high 이하 (돌파 후 복귀)
-        if prev_close > cluster_high and curr_close <= cluster_high:
+        # SELL: 이전 봉이 cluster_high 위 (threshold 내), 현재 봉이 cluster_high 이하
+        if (prev_close > cluster_high and 
+            prev_close <= cluster_high + threshold and 
+            curr_close <= cluster_high):
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,

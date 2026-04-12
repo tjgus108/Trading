@@ -8691,3 +8691,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 01:13 UTC] Cycle 105 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 01:21 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 03:00 UTC] Cycle 106 COMPLETED — E + A + SIM + F
+**[E] Execution:** src/exchange/connector.py 주문 로깅 확장 (status+filled+avg_price). +0 tests (로그 변경만).
+**[A] Quality:** tests/test_monte_carlo.py +6 percentile 경계 (99th/1st, 단조성, 극값, Sharpe/MDD).
+**[SIM]:** price_cluster 필터 강화 시도 → 거래 67% 감소, 손실 전환. 구조적 한계. roc_ma_cross ROC 부호 + STD_MULT 2.0 수정.
+**[F] Research:** Price Cluster/Volume Profile POC. POC = 공정가치 기준, 평균회귀 진입. VAH/VAL 결합으로 존 명확화. 승률 70-75%.
+**Tests:** 6327 passed (+6 from Cycle 105).
+**Next Cycle:** 107 (C+B+SIM+F)
