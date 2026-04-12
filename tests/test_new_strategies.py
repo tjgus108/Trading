@@ -289,6 +289,9 @@ def _df_with_bb_squeeze_buy(n: int = 200) -> pd.DataFrame:
     df.iloc[-2, df.columns.get_loc("close")] = 52000.0
     df.iloc[-2, df.columns.get_loc("high")] = 52200.0
     df.iloc[-2, df.columns.get_loc("low")] = 51800.0
+    # Volume spike → vol_confirm=True; RSI below HIGH threshold for BUY
+    df.iloc[-2, df.columns.get_loc("volume")] = 20.0
+    df.iloc[-2, df.columns.get_loc("rsi14")] = 55.0
     return df
 
 
@@ -310,6 +313,9 @@ def _df_with_bb_squeeze_sell(n: int = 200) -> pd.DataFrame:
     df.iloc[-2, df.columns.get_loc("close")] = 48000.0
     df.iloc[-2, df.columns.get_loc("high")] = 48200.0
     df.iloc[-2, df.columns.get_loc("low")] = 47800.0
+    # Volume spike → vol_confirm=True; RSI above HIGH threshold for SELL
+    df.iloc[-2, df.columns.get_loc("volume")] = 20.0
+    df.iloc[-2, df.columns.get_loc("rsi14")] = 45.0
     return df
 
 
