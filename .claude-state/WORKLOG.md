@@ -9332,3 +9332,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 12:00 UTC] Cycle 114 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 12:11 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 07:00 UTC] Cycle 115 COMPLETED — B + D + SIM + F
+**[B] Risk:** RiskManager evaluate APPROVED 경로 추적 검증 (정상).
+**[D] ML:** WalkForward IS<=0 오분류 버그 발견 (IS Sharpe<0 + OOS>0 → ratio=0 → 과적합 오판). 14번째 CRITICAL 후보.
+**[SIM] lob_maker 2차 시도 실패:** OFI proxy 구조 한계 (합성 데이터에 실제 bid/ask depth 없음). 실거래 데이터 필요.
+**[F] Research:** LOB PF 개선. OFI quote skew + HJB 최적제어 + Attn-LOB(CNN+Attention).
+**Tests:** 6340 passed.
+**Next Cycle:** 116 (E+A+SIM+F)

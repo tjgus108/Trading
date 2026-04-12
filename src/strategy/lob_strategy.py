@@ -1,10 +1,11 @@
 """
-LOB OFI Strategy: 최종 개선 Order Flow Imbalance 기반 전략.
+LOB OFI Strategy: 2차 개선 Order Flow Imbalance 기반 전략.
 
-추가 개선:
-- VPIN 최소 임계값 상향: 0.40 → 0.42
-- OFI 임계값 미세 조정: 0.38 → 0.36
-- RSI 극도 임계값 조정: 거짓 신호 더 필터링
+신호 품질 강화 (PF 1.36→1.5+):
+- OFI 임계값 상향: 0.36 → 0.38 (moderate selectivity)
+- VPIN 최소값 상향: 0.42 → 0.43 (mild filter)
+- 볼륨 배수 강화: 1.25 → 1.30 (ensure conviction)
+- RSI 극단값 조정: 거짓 신호 필터링 강화
 """
 
 import pandas as pd
@@ -19,16 +20,16 @@ class LOBOFIStrategy(BaseStrategy):
 
     def __init__(
         self,
-        ofi_buy_threshold: float = 0.36,
-        ofi_sell_threshold: float = -0.36,
+        ofi_buy_threshold: float = 0.38,         # 상향: 0.36 → 0.38
+        ofi_sell_threshold: float = -0.38,       # 상향: -0.36 → -0.38
         vpin_high_threshold: float = 0.60,
-        vpin_low_threshold: float = 0.42,     # 상향: 0.40 → 0.42
+        vpin_low_threshold: float = 0.43,        # 상향: 0.42 → 0.43
         vpin_buckets: int = 50,
-        volume_multiplier: float = 1.25,      # 조정: 1.3 → 1.25
+        volume_multiplier: float = 1.30,         # 상향: 1.25 → 1.30
         volume_window: int = 20,
         rsi_period: int = 14,
-        rsi_extreme_high: float = 80.0,       # 하향: 85 → 80
-        rsi_extreme_low: float = 20.0,        # 상향: 15 → 20
+        rsi_extreme_high: float = 78.0,          # 하향: 80 → 78
+        rsi_extreme_low: float = 22.0,           # 상향: 20 → 22
     ):
         self.ofi_buy_threshold = ofi_buy_threshold
         self.ofi_sell_threshold = ofi_sell_threshold

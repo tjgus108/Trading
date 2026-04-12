@@ -1,36 +1,28 @@
-# Cycle 114 Complete
+# Cycle 115 Result
 
-## Changes
-- **SIM Execution**: paper_simulation.py ran successfully
-- **22 Strategies Tested**: 19 profitable, 3 unprofitable
-- **Top 3 Performers**:
-  - order_flow_imbalance_v2: +17.85% (Sharpe 4.26)
-  - linear_channel_rev: +15.76% (Sharpe 3.73)
-  - narrow_range: +14.90% (Sharpe 5.82)
+## lob_maker Strategy Analysis (FAIL)
 
-## Portfolio Performance
-- **Equally weighted (22 strats)**: +6.97% → $10,697
-- **Top 10 equally weighted**: +12.80% → $11,280
-- **Average Return**: 6.97%
+**Current Performance**:
+- Return: +3.16% (was +8.92%)
+- Sharpe: 0.97 (was 2.27)
+- PF: 1.17 (was 1.36, need ≥1.5)
+- MDD: 8.1% (≤20% ✓)
+- Trades: 41 (≥30 ✓)
 
-## Problem: volatility_cluster (-2.17%)
-**Root Cause Analysis**:
-- **Bias**: 5 SELL signals vs 0 BUY signals (100:0 ratio)
-- **Logic Issue**: 
-  - vol_ratio < 0.5 threshold is too loose (triggers 25% of the time)
-  - BUY requires: vol_ratio < 0.5 AND direction > 0 AND close > sma10 (3 conditions)
-  - SELL requires: vol_ratio < 0.5 AND direction < 0 AND close < sma10 (3 conditions)
-  - But random walk data creates more downward direction spikes
-- **Result**: Creates excessive short positions → loss accumulation
+**Verdict**: FAIL (PF 1.17 < 1.5 required minimum)
+
+## Root Cause
+Threshold tightening (OFI 0.36→0.38, VPIN 0.42→0.43, vol 1.25→1.30) reduced trade count without improving win rate or PF. Signal selectivity alone insufficient.
+
+## Why This Strategy Won't Pass
+1. **Fundamental architecture issue**: OFI proxy (close-open)/HL range is too noisy on synthetic data
+2. **VPIN calculation**: Works better with real order flow depth; insufficient granularity on simulated data
+3. **Strategy vs market regime mismatch**: Random walk generation doesn't favor OFI patterns
 
 ## Recommendation
-**DEPRECATE volatility_cluster**: 
-- Strategy has systemic directional bias
-- Fixing requires complete rewrite of signal logic
-- Cost-benefit unfavorable (only -2.17%, can be ignored with diversification)
-- Focus instead on Top 10 performers for live trading
+**Deprecate lob_maker from consideration**. Current approach unreliable. Focus efforts on Top 10 performers (all PASS except narrow_range/dema_cross which fail on trade count).
 
 ## Next Steps
-1. Prepare live execution with Top 10 strategies
-2. Monitor CMF (recently upgraded, now PASS)
-3. Consider FAIL strategies for future R&D (dema_cross, lob_maker, relative_volume)
+1. Monitor Top 10 strategies for live deployment
+2. Archive lob_maker (future R&D: requires real LOB data)
+3. Consider replacing with proven order_flow_imbalance_v2 variant
