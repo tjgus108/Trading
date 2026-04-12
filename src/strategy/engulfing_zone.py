@@ -1,8 +1,9 @@
 """
 BullishEngulfingZoneStrategy: 지지/저항 존 근처의 Engulfing 패턴 전략.
-IMPROVED v2: Volume surge (1.5x avg) + RSI position filters to reduce false signals.
-- Bullish: RSI < 50 (oversold), vol >= 1.5x avg
-- Bearish: RSI > 50 (overbought), vol >= 1.5x avg
+IMPROVED v3: Relaxed RSI thresholds (55/45) + lower body ratio (1.2) for more signals.
+- Bullish: RSI < 55 (less oversold), vol >= 1.5x avg
+- Bearish: RSI > 45 (less overbought), vol >= 1.5x avg
+- Body ratio: > 1.2 (reduced from 1.3)
 """
 
 from typing import List, Optional
@@ -92,7 +93,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         pivot_lows, pivot_highs = _find_pivots(df, window=20, side=3)
 
         # ── Bullish Engulfing ─────────────────────────────────────────────
-        # 이전봉 음봉, 현재봉 양봉, body 비율 > 1.3
+        # 이전봉 음봉, 현재봉 양봉, body 비율 > 1.2 (RELAXED from 1.3)
         is_bearish_prev = close_prev < open_prev
         is_bullish_curr = close_curr > open_curr
         ratio_bull = (body_curr / body_prev) if body_prev > 0 else 0.0
@@ -101,11 +102,11 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bullish_engulfing = (
             is_bearish_prev
             and is_bullish_curr
-            and ratio_bull > 1.3
+            and ratio_bull > 1.2
         )
 
         # ── Bearish Engulfing ─────────────────────────────────────────────
-        # 이전봉 양봉, 현재봉 음봉, body 비율 > 1.3
+        # 이전봉 양봉, 현재봉 음봉, body 비율 > 1.2 (RELAXED from 1.3)
         is_bullish_prev = close_prev > open_prev
         is_bearish_curr = close_curr < open_curr
         ratio_bear = (body_curr / body_prev) if body_prev > 0 else 0.0
@@ -114,7 +115,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bearish_engulfing = (
             is_bullish_prev
             and is_bearish_curr
-            and ratio_bear > 1.3
+            and ratio_bear > 1.2
         )
 
         # ── Volume Surge Filter (1.5x average) ────────────────────────────
@@ -122,44 +123,49 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         vol_avg = float(df["volume_sma20"].iloc[idx]) if "volume_sma20" in df.columns else 1.0
         vol_surge = vol_curr >= 1.5 * vol_avg if vol_avg > 0 else True
 
-        # ── RSI Position Filter ────────────────────────────────────────────
+        # ── RSI Position Filter (RELAXED thresholds) ──────────────────────
         rsi_curr = float(df["rsi14"].iloc[idx]) if "rsi14" in df.columns else 50.0
+        # Bullish: RSI < 55 (was < 50), Bearish: RSI > 45 (was > 50)
+        rsi_bullish_ok = rsi_curr < 55
+        rsi_bearish_ok = rsi_curr > 45
 
         # ── Confidence ────────────────────────────────────────────────────
-        def _get_confidence(ratio: float) -> Confidence:
-            # engulfing ratio > 1.8 이면 HIGH
-            if ratio > 1.7:
+        def _get_confidence(ratio: float, near_level: bool = False) -> Confidence:
+            # engulfing ratio > 1.7 이면 HIGH (boost if near support/resistance)
+            if ratio > 1.7 or (ratio > 1.5 and near_level):
                 return Confidence.HIGH
             return Confidence.MEDIUM
 
-        if is_bullish_engulfing and vol_surge and rsi_curr < 50:
-            conf = _get_confidence(ratio_bull)
+        if is_bullish_engulfing and vol_surge and rsi_bullish_ok:
+            conf = _get_confidence(ratio_bull, support_level is not None)
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Bullish Engulfing Pattern (RSI<50, vol surge). "
+                    f"Bullish Engulfing Pattern (RSI<55, vol surge). "
                     f"prev_body={body_prev:.2f}, curr_body={body_curr:.2f}, ratio={ratio_bull:.2f}x. "
                     f"RSI={rsi_curr:.1f}, vol_ratio={vol_curr/vol_avg:.2f}x"
+                    + (f", near support {support_level:.4f}" if support_level else "")
                 ),
                 invalidation=f"close {close_curr:.4f} 하회 시 무효",
                 bull_case="지지 존에서 강한 매수 반전",
                 bear_case="지지 존 이탈 시 추가 하락 위험",
             )
 
-        if is_bearish_engulfing and vol_surge and rsi_curr > 50:
-            conf = _get_confidence(ratio_bear)
+        if is_bearish_engulfing and vol_surge and rsi_bearish_ok:
+            conf = _get_confidence(ratio_bear, resistance_level is not None)
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Bearish Engulfing Pattern (RSI>50, vol surge). "
+                    f"Bearish Engulfing Pattern (RSI>45, vol surge). "
                     f"prev_body={body_prev:.2f}, curr_body={body_curr:.2f}, ratio={ratio_bear:.2f}x. "
                     f"RSI={rsi_curr:.1f}, vol_ratio={vol_curr/vol_avg:.2f}x"
+                    + (f", near resistance {resistance_level:.4f}" if resistance_level else "")
                 ),
                 invalidation=f"close {close_curr:.4f} 상회 시 무효",
                 bull_case="저항 존 돌파 시 추가 상승 가능",

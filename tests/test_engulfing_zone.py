@@ -44,7 +44,7 @@ def _neutral(n=30, base=100.0):
 def _build_bullish_zone_df(ratio=1.2, near_support=True):
     """
     Bullish engulfing at support zone 시나리오.
-    - Create downtrending context (RSI < 50) for vol+rsi filters
+    - Create downtrending context (RSI < 55) for vol+rsi filters
     - pivot low: index 11, low=90.0 (좌우 3봉 low=99보다 확연히 낮음)
     - prev (idx-3): 음봉, open=92, close=90.5, body=1.5
     - curr (idx-2): 양봉, open=90.3, close=90.3+1.5*ratio (body=1.5*ratio)
@@ -54,7 +54,7 @@ def _build_bullish_zone_df(ratio=1.2, near_support=True):
     volumes = []
     support = 90.0  # pivot low 가격
     
-    # 0~9: DOWNTRENDING to get RSI < 50
+    # 0~9: DOWNTRENDING to get RSI < 55
     for i in range(10):
         c = 110.0 - i * 1.5
         rows.append((c, c + 1, c - 1, c - 0.5))
@@ -100,14 +100,14 @@ def _build_bullish_zone_df(ratio=1.2, near_support=True):
 def _build_bearish_zone_df(ratio=1.2, near_resistance=True):
     """
     Bearish engulfing at resistance zone 시나리오.
-    - Create uptrending context (RSI > 50) for vol+rsi filters
+    - Create uptrending context (RSI > 45) for vol+rsi filters
     - pivot high: index 11, high=112.0 (좌우 3봉 high=102보다 확연히 높음)
     """
     rows = []
     volumes = []
     resistance = 112.0  # pivot high 가격
     
-    # 0~9: UPTRENDING to get RSI > 50
+    # 0~9: UPTRENDING to get RSI > 45
     for i in range(10):
         c = 100.0 + i * 1.5
         rows.append((c, c + 1, c - 1, c + 0.5))
@@ -178,12 +178,12 @@ def test_bullish_engulfing_zone_buy():
     assert sig.action == Action.BUY
 
 
-# ── 5. Bullish Engulfing + 지지선 없음 → 여전히 BUY ─────────────────────────
+# ── 5. Bullish Engulfing + 지지선 없음 → HOLD ────────────────────────────────
 def test_bullish_engulfing_no_zone_buy():
     rows, volumes = _build_bullish_zone_df(ratio=1.5, near_support=False)
     df = _make_df(rows, volumes)
     sig = strat.generate(df)
-    # Far from support = high price = RSI > 50, so filtered out
+    # Far from support = high price = RSI > 55, so filtered out
     assert sig.action == Action.HOLD
 
 
@@ -195,16 +195,16 @@ def test_bearish_engulfing_zone_sell():
     assert sig.action == Action.SELL
 
 
-# ── 7. Bearish Engulfing + 저항선 없음 → 여전히 SELL ────────────────────────
+# ── 7. Bearish Engulfing + 저항선 없음 → SELL ────────────────────────────────
 def test_bearish_engulfing_no_zone_sell():
     rows, volumes = _build_bearish_zone_df(ratio=1.5, near_resistance=False)
     df = _make_df(rows, volumes)
     sig = strat.generate(df)
-    # Far from resistance = low price = RSI < 50, so filtered out
+    # Far from resistance = low price = RSI < 45, so filtered out
     assert sig.action == Action.HOLD
 
 
-# ── 8. BUY HIGH confidence (ratio > 2.2) ────────────────────────────────────
+# ── 8. BUY HIGH confidence (ratio > 1.7 or 1.5 near support) ───────────────
 def test_bullish_engulfing_high_confidence():
     rows, volumes = _build_bullish_zone_df(ratio=1.8, near_support=True)
     df = _make_df(rows, volumes)
@@ -213,16 +213,16 @@ def test_bullish_engulfing_high_confidence():
     assert sig.confidence == Confidence.HIGH
 
 
-# ── 9. BUY MEDIUM confidence (ratio 1.5~1.8) ────────────────────────────────
+# ── 9. BUY MEDIUM confidence (ratio 1.2~1.5) ─────────────────────────────
 def test_bullish_engulfing_medium_confidence():
-    rows, volumes = _build_bullish_zone_df(ratio=1.5, near_support=True)
+    rows, volumes = _build_bullish_zone_df(ratio=1.3, near_support=True)
     df = _make_df(rows, volumes)
     sig = strat.generate(df)
     assert sig.action == Action.BUY
     assert sig.confidence == Confidence.MEDIUM
 
 
-# ── 10. SELL HIGH confidence (ratio > 2.2) ──────────────────────────────────
+# ── 10. SELL HIGH confidence (ratio > 1.7 or 1.5 near resistance) ─────────
 def test_bearish_engulfing_high_confidence():
     rows, volumes = _build_bearish_zone_df(ratio=1.8, near_resistance=True)
     df = _make_df(rows, volumes)
@@ -231,9 +231,9 @@ def test_bearish_engulfing_high_confidence():
     assert sig.confidence == Confidence.HIGH
 
 
-# ── 11. SELL MEDIUM confidence (ratio 1.5~1.8) ──────────────────────────────
+# ── 11. SELL MEDIUM confidence (ratio 1.2~1.5) ────────────────────────────
 def test_bearish_engulfing_medium_confidence():
-    rows, volumes = _build_bearish_zone_df(ratio=1.5, near_resistance=True)
+    rows, volumes = _build_bearish_zone_df(ratio=1.3, near_resistance=True)
     df = _make_df(rows, volumes)
     sig = strat.generate(df)
     assert sig.action == Action.SELL
@@ -270,11 +270,11 @@ def test_buy_reasoning_contains_engulfing():
     assert "Engulfing" in sig.reasoning
 
 
-# ── 15. body ratio 1.2 (< 1.3) → HOLD (body 조건 미충족) ───────────────────
+# ── 15. body ratio 1.15 (< 1.2) → HOLD (body 조건 미충족) ─────────────────
 def test_body_ratio_too_small_hold():
-    """ratio < 1.3 이면 engulfing 조건 미충족."""
-    rows, volumes = _build_bullish_zone_df(ratio=1.2, near_support=True)
+    """ratio < 1.2 이면 engulfing 조건 미충족."""
+    rows, volumes = _build_bullish_zone_df(ratio=1.15, near_support=True)
     df = _make_df(rows, volumes)
     sig = strat.generate(df)
-    # ratio < 1.3 이므로 BUY 아님
+    # ratio < 1.2 이므로 BUY 아님
     assert sig.action == Action.HOLD
