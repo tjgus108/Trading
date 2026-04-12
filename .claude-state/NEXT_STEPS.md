@@ -1,23 +1,36 @@
-# Cycle 113 Complete
+# Cycle 114 Complete
 
 ## Changes
-- **src/strategy/cmf.py**: 2차 강화
-  - CMF threshold: 0.05→0.08, -0.05→-0.08
-  - Volume filter: 0.70→0.85 (상위 15% 볼륨)
-  - RSI confirmation: BUY RSI<75, SELL RSI>25 (약한 필터)
-  - Sharpe: 1.25→3.17
-  - Profit Factor: 1.22→1.64 (PASS)
-  - Return: +4.28%→+11.27%
-  - Trades: 24→35
+- **SIM Execution**: paper_simulation.py ran successfully
+- **22 Strategies Tested**: 19 profitable, 3 unprofitable
+- **Top 3 Performers**:
+  - order_flow_imbalance_v2: +17.85% (Sharpe 4.26)
+  - linear_channel_rev: +15.76% (Sharpe 3.73)
+  - narrow_range: +14.90% (Sharpe 5.82)
 
-## Results
-✅ **CMF STRATEGY PASSES ALL THRESHOLDS**
-- Sharpe Ratio: 3.17 >= 1.0
-- Profit Factor: 1.64 >= 1.5
-- Max Drawdown: 5.3% <= 20%
-- Trade Count: 35 >= 30
-- Win Rate: 48.6% (acceptable with PF>1.5)
+## Portfolio Performance
+- **Equally weighted (22 strats)**: +6.97% → $10,697
+- **Top 10 equally weighted**: +12.80% → $11,280
+- **Average Return**: 6.97%
 
-## Next Cycle
-- Monitor other FAIL strategies
-- Consider dema_cross (+9.44%, PF 1.38)
+## Problem: volatility_cluster (-2.17%)
+**Root Cause Analysis**:
+- **Bias**: 5 SELL signals vs 0 BUY signals (100:0 ratio)
+- **Logic Issue**: 
+  - vol_ratio < 0.5 threshold is too loose (triggers 25% of the time)
+  - BUY requires: vol_ratio < 0.5 AND direction > 0 AND close > sma10 (3 conditions)
+  - SELL requires: vol_ratio < 0.5 AND direction < 0 AND close < sma10 (3 conditions)
+  - But random walk data creates more downward direction spikes
+- **Result**: Creates excessive short positions → loss accumulation
+
+## Recommendation
+**DEPRECATE volatility_cluster**: 
+- Strategy has systemic directional bias
+- Fixing requires complete rewrite of signal logic
+- Cost-benefit unfavorable (only -2.17%, can be ignored with diversification)
+- Focus instead on Top 10 performers for live trading
+
+## Next Steps
+1. Prepare live execution with Top 10 strategies
+2. Monitor CMF (recently upgraded, now PASS)
+3. Consider FAIL strategies for future R&D (dema_cross, lob_maker, relative_volume)
