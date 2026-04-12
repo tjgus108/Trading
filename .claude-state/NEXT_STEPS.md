@@ -1,3 +1,14 @@
+# Cycle 105 - ML: adaptive_selector tie-break 검증 추가
+
+## 완료 작업
+✅ test_best_strategy_name_tie_break_first_key 추가
+  - 동일 Sharpe(모두 0.0) 시 max() → dict 첫 번째 키 반환 확인
+  - 22/22 테스트 통과
+
+## 파일 변경
+- `/home/user/Trading/tests/test_adaptive_selector.py` (테스트 1개 추가)
+
+---
 # Cycle 104 - SIM: engulfing_zone 개선 완료
 
 ## 완료 작업

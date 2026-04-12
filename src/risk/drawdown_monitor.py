@@ -248,3 +248,43 @@ class DrawdownMonitor:
         self._alert_level = AlertLevel.NONE
         self._halt_reason = ""
         logger.info("DrawdownMonitor: force resume")
+
+    # ── 직렬화 ────────────────────────────────────────────────
+
+    def to_dict(self) -> dict:
+        """런타임 상태를 dict로 직렬화 (재시작 복원용)."""
+        return {
+            "max_drawdown_pct": self.max_drawdown_pct,
+            "recovery_pct": self.recovery_pct,
+            "daily_limit": self.daily_limit,
+            "weekly_limit": self.weekly_limit,
+            "monthly_limit": self.monthly_limit,
+            "_peak": self._peak,
+            "_current": self._current,
+            "_halted": self._halted,
+            "_halt_reason": self._halt_reason,
+            "_alert_level": self._alert_level.value,
+            "_daily_start": self._daily_start,
+            "_weekly_start": self._weekly_start,
+            "_monthly_start": self._monthly_start,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DrawdownMonitor":
+        """to_dict() 결과로 인스턴스 복원."""
+        obj = cls(
+            max_drawdown_pct=data["max_drawdown_pct"],
+            recovery_pct=data["recovery_pct"],
+            daily_limit=data["daily_limit"],
+            weekly_limit=data["weekly_limit"],
+            monthly_limit=data["monthly_limit"],
+        )
+        obj._peak = data["_peak"]
+        obj._current = data["_current"]
+        obj._halted = data["_halted"]
+        obj._halt_reason = data["_halt_reason"]
+        obj._alert_level = AlertLevel(data["_alert_level"])
+        obj._daily_start = data["_daily_start"]
+        obj._weekly_start = data["_weekly_start"]
+        obj._monthly_start = data["_monthly_start"]
+        return obj

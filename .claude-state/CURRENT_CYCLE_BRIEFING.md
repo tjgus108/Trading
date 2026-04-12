@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 103 — 2026-04-12T00:39:59.177690Z
+🔄 CYCLE 104 — 2026-04-12T00:51:09.971896Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 103 COMPLETED — D + E + SIM + F** (2026-04-12 01:40 UTC)
-  **[D] ML:** multi_signal aggregator ratio 경계 검증 (수정 없음).
-  **[E] Execution:** tests/test_kelly_twap.py +1 TWAP partial fill ratio.
-  **[SIM] volume_breakout 필터 강화:** ATR (0.3~5.0) + EMA50 추세 + spike 1.5x. 단, 합성 데이터에선 조건 불충족으로 신호 0. 실제 거래소 데이터 필요.
-  **[F] Research:** Volume breakout 진위성. 1.5x 볼륨 + 종가 유지, 거짓 돌파는 역전 캔들 + divergence.
+**Cycle 104 COMPLETED — A + C + SIM + F** (2026-04-12 02:05 UTC)
+  **[A] Quality:** BacktestEngine slippage_pct vs slippage 동일성 검증 +1.
+  **[C] Data:** OrderFlow VPIN n_buckets<=0 ValueError +1.
+  **[SIM] 🎯 engulfing_zone 대성공!** RSI 완화(50→55/45) + body ratio 1.3→1.2 + S/R 신뢰도 부스트. **-2.53% → +9.22% (+11.75%p)**. Sharpe 3.30, PF 1.90. PASS 달성!
+  **[F] Research:** Dev success 2026. LLM 프롬프트 튜닝 + Multi-Agent + 감성 분석 조합이 성공 패턴.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

@@ -235,6 +235,17 @@ def test_low_sharpe_reduces_selection_weight():
     )
 
 
+def test_best_strategy_name_tie_break_first_key():
+    """동일 Sharpe(모두 0)일 때 best_strategy_name은 dict 첫 번째 키를 반환."""
+    strats = {
+        "alpha": _make_strategy("alpha"),
+        "beta": _make_strategy("beta"),
+    }
+    sel = AdaptiveStrategySelector(strats, window=20)
+    # 데이터 없음 → sharpe=0.0 동일 → max() tie-break → 첫 번째 키 "alpha"
+    assert sel.best_strategy_name() == "alpha"
+
+
 def test_select_weight_proportional_after_reversal():
     """가중치 역전 후 select() 선택 빈도가 바뀐다."""
     sel = _make_selector()

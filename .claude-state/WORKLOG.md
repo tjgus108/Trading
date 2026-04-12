@@ -8530,3 +8530,6 @@ ImplShortfall: -5.00bps
 **Tests:** 6318 passed (+2 from Cycle 103).
 **SIM 누적 15개 개선** (+engulfing_zone 최종 완료)
 **Next Cycle:** 105 (B+D+SIM+F)
+
+## [2026-04-12 00:51 UTC] Cycle 104 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

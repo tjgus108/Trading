@@ -223,3 +223,38 @@ def test_reset_clears_all_period_starts():
     assert status.daily_drawdown_pct == 0.0
     assert status.weekly_drawdown_pct == 0.0
     assert status.monthly_drawdown_pct == 0.0
+
+
+# ── 직렬화 round-trip ─────────────────────────────────────────
+
+def test_to_dict_from_dict_roundtrip():
+    """to_dict → from_dict 후 상태 동일."""
+    m = DrawdownMonitor(max_drawdown_pct=0.15, daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+    m.update(10000)
+    m.update(9650)  # WARNING 발생
+
+    d = m.to_dict()
+    m2 = DrawdownMonitor.from_dict(d)
+
+    assert m2.is_halted() == m.is_halted()
+    assert m2.alert_level() == m.alert_level()
+    assert m2.current_drawdown() == m.current_drawdown()
+    assert m2._peak == m._peak
+    assert m2._daily_start == m._daily_start
+    assert m2._weekly_start == m._weekly_start
+    assert m2._monthly_start == m._monthly_start
+
+
+def test_from_dict_halted_force_liquidate():
+    """FORCE_LIQUIDATE 상태도 복원된다."""
+    m = DrawdownMonitor(monthly_limit=0.15)
+    m.set_monthly_start(10000)
+    m.update(8400)
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.is_halted() is True
+    assert m2.alert_level() == AlertLevel.FORCE_LIQUIDATE
