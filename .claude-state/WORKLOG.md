@@ -8748,3 +8748,6 @@ ImplShortfall: -5.00bps
 **[F] Research:** Price Cluster/Volume Profile POC. POC = 공정가치 기준, 평균회귀 진입. VAH/VAL 결합으로 존 명확화. 승률 70-75%.
 **Tests:** 6327 passed (+6 from Cycle 105).
 **Next Cycle:** 107 (C+B+SIM+F)
+
+## [2026-04-12 01:24 UTC] Cycle 106 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

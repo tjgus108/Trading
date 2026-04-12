@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 105 — 2026-04-12T01:13:12.067357Z
+🔄 CYCLE 106 — 2026-04-12T01:24:10.835939Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 105 COMPLETED — B + D + SIM + F** (2026-04-12 02:30 UTC)
-  **[B] Risk:** src/risk/drawdown_monitor.py to_dict/from_dict 상태 직렬화 추가. WARNING/FORCE_LIQUIDATE 복원 검증 +2.
-  **[D] ML:** tests/test_adaptive_selector.py +1 tie-break (동일 Sharpe 시 삽입 순서 보장).
-  **[SIM] No-op:** positional_scaling 3가지 완화 시도 → 모두 성능 악화 또는 미개선. 원복. 구조적 한계 (3-AND 조건).
-  **[F] Research:** Pyramiding. 추세장 수익 극대화하나 MDD 급증 (~48%). 진입 규모 체감 + 트렌드 필터 필수.
+**Cycle 106 COMPLETED — E + A + SIM + F** (2026-04-12 03:00 UTC)
+  **[E] Execution:** src/exchange/connector.py 주문 로깅 확장 (status+filled+avg_price). +0 tests (로그 변경만).
+  **[A] Quality:** tests/test_monte_carlo.py +6 percentile 경계 (99th/1st, 단조성, 극값, Sharpe/MDD).
+  **[SIM]:** price_cluster 필터 강화 시도 → 거래 67% 감소, 손실 전환. 구조적 한계. roc_ma_cross ROC 부호 + STD_MULT 2.0 수정.
+  **[F] Research:** Price Cluster/Volume Profile POC. POC = 공정가치 기준, 평균회귀 진입. VAH/VAL 결합으로 존 명확화. 승률 70-75%.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
