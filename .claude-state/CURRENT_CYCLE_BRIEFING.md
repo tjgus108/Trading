@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 117 — 2026-04-12T12:52:23.906746Z
+🔄 CYCLE 118 — 2026-04-12T12:59:54.757927Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 117 COMPLETED — C + B + SIM + F** (2026-04-12 08:00 UTC)
-  **[C] Data:** websocket _connected stale state 버그 발견 (async with 탈출 시 미업데이트). 15번째 CRITICAL 후보.
-  **[B] Risk:** DD 월간 15% → FORCE_LIQUIDATE 1회 정확 검증 (수정 없음).
-  **[SIM] price_action_momentum 최적화:** body_strength 0.42, roc5_std*0.45로 Sharpe 1.66 달성. PF 1.32 한계 (구조적).
-  **[F] Research:** PA 봇 단독 비권장 (노이즈 70-80% 봇 거래량). 필터 필수.
+**Cycle 118 COMPLETED — D + E + SIM + F (최종)** (2026-04-12 08:30 UTC)
+  **[D/C] CRITICAL #15:** src/data/websocket_feed.py _connected stale 수정. try-finally로 async with 탈출 시 False 보장.
+  **[E] Execution:** tests/test_orchestrator.py +1 cycle_count 검증.
+  **[SIM] 최종 시뮬 리포트:** Top10 +12.74%, 전체 +6.67%. 19/22 흑자.
+  **[F] Research:** Final Lessons. 오버피팅 1번 적 (R²<0.025). 리스크 관리 없으면 52% 실패. 단계적 배포 필수.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
