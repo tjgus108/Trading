@@ -245,11 +245,11 @@ class TestPairTradingStrategy:
         assert PairTradingStrategy.name == "pair_trading"
 
     def test_hold_without_eth_data(self):
-        """ETH 데이터 없으면 HOLD (pair 불가)."""
+        """ETH 데이터 없으면 RSI heuristic fallback 신호 반환."""
         btc_df = _make_df(120, start_price=50000.0)
         strategy = PairTradingStrategy()
         signal = strategy.generate(btc_df)
-        assert signal.action == Action.HOLD
+        assert signal.action in (Action.BUY, Action.SELL, Action.HOLD)
         assert signal.confidence == Confidence.LOW
 
     def test_with_eth_data_returns_signal(self):
@@ -295,13 +295,13 @@ class TestPairTradingStrategy:
         assert strategy._eth_df is not None
 
     def test_insufficient_eth_data_returns_hold(self):
-        """ETH 데이터 너무 짧으면 HOLD."""
+        """ETH 데이터 너무 짧으면 RSI heuristic fallback 신호 반환."""
         btc_df = _make_df(120)
         eth_df = _make_df(30, start_price=3000.0)  # spread_window=60보다 짧음
         strategy = PairTradingStrategy(spread_window=60)
         strategy.set_eth_data(eth_df)
         signal = strategy.generate(btc_df)
-        assert signal.action == Action.HOLD
+        assert signal.action in (Action.BUY, Action.SELL, Action.HOLD)
 
     def test_signal_has_required_fields(self):
         btc_df = _make_df(120, start_price=50000.0, seed=40)
@@ -332,3 +332,65 @@ class TestPairTradingStrategy:
         signal = strategy.generate(btc_df)
         # 타이트한 공적분이면 z-score가 낮아 HOLD 가능성 높음
         assert signal.action in (Action.HOLD, Action.BUY, Action.SELL)
+
+    def test_fallback_buy_signal_rsi_oversold(self):
+        """ETH 없을 때 RSI < 30이면 BUY 신호 생성."""
+        rng = np.random.default_rng(123)
+        n = 120
+        # 하락 후 RSI 과매도 유도
+        close = 50000 - np.cumsum(np.abs(rng.standard_normal(n)) * 500)
+        close = np.maximum(close, 1000)
+        high = close + np.abs(rng.standard_normal(n) * 100)
+        low = close - np.abs(rng.standard_normal(n) * 100)
+        low = np.maximum(low, close * 0.9)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low,
+                           "close": close, "volume": np.ones(n) * 1000.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        # RSI가 30 미만인 경우를 강제로 설정
+        df.iloc[-2, df.columns.get_loc("rsi14")] = 20.0
+        strategy = PairTradingStrategy()
+        assert strategy._eth_df is None
+        signal = strategy.generate(df)
+        assert signal.action == Action.BUY
+        assert signal.confidence == Confidence.LOW
+
+    def test_fallback_sell_signal_rsi_overbought(self):
+        """ETH 없을 때 RSI > 70이면 SELL 신호 생성."""
+        rng = np.random.default_rng(456)
+        n = 120
+        close = 50000 + np.cumsum(np.abs(rng.standard_normal(n)) * 500)
+        high = close + np.abs(rng.standard_normal(n) * 100)
+        low = close - np.abs(rng.standard_normal(n) * 100)
+        low = np.maximum(low, close * 0.9)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low,
+                           "close": close, "volume": np.ones(n) * 1000.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        # RSI > 70 강제 설정
+        df.iloc[-2, df.columns.get_loc("rsi14")] = 80.0
+        strategy = PairTradingStrategy()
+        assert strategy._eth_df is None
+        signal = strategy.generate(df)
+        assert signal.action == Action.SELL
+        assert signal.confidence == Confidence.LOW

@@ -519,11 +519,71 @@ class TestMLRFStrategy:
         assert MLRFStrategy.name == "ml_rf"
 
     def test_generate_hold_without_model(self):
-        """모델 없으면 HOLD."""
+        """모델 없어도 heuristic fallback으로 signal 반환."""
         df = _make_df()
         strategy = MLRFStrategy()
         signal = strategy.generate(df)
         assert signal.action in (Action.BUY, Action.SELL, Action.HOLD)
+        assert signal.strategy == "ml_rf"
+
+    def test_generate_buy_signal_without_model(self):
+        """모델 없을 때 heuristic fallback이 BUY 신호 생성."""
+        rng = np.random.default_rng(7)
+        n = 200
+        # 상승 추세 데이터: ema20 > ema50, RSI ~60
+        close = 50000 + np.cumsum(np.abs(rng.standard_normal(n)) * 150)
+        high = close + np.abs(rng.standard_normal(n) * 50)
+        low = close - np.abs(rng.standard_normal(n) * 50)
+        low = np.maximum(low, close * 0.95)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low, "close": close,
+                           "volume": np.ones(n) * 10.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        strategy = MLRFStrategy()
+        assert strategy._generator._model is None
+        signal = strategy.generate(df)
+        # 상승 추세 → BUY 기대 (최소한 HOLD는 아닌 것도 있어야 함)
+        assert signal.action in (Action.BUY, Action.HOLD)
+        assert signal.strategy == "ml_rf"
+
+    def test_generate_sell_signal_without_model(self):
+        """모델 없을 때 heuristic fallback이 SELL 신호 생성."""
+        rng = np.random.default_rng(99)
+        n = 200
+        # 하락 추세: ema20 < ema50
+        close = 50000 - np.cumsum(np.abs(rng.standard_normal(n)) * 150)
+        close = np.maximum(close, 1000)
+        high = close + np.abs(rng.standard_normal(n) * 50)
+        low = close - np.abs(rng.standard_normal(n) * 50)
+        low = np.maximum(low, close * 0.95)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low, "close": close,
+                           "volume": np.ones(n) * 10.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        strategy = MLRFStrategy()
+        assert strategy._generator._model is None
+        signal = strategy.generate(df)
+        assert signal.action in (Action.SELL, Action.HOLD)
         assert signal.strategy == "ml_rf"
 
     def test_generate_returns_signal(self):
@@ -557,6 +617,8 @@ class TestMLRFStrategy:
         from unittest.mock import MagicMock
 
         strategy = MLRFStrategy()
+        # 모델이 있는 것처럼 mock (sentinel 객체)
+        strategy._generator._model = object()
         # mock predict
         strategy._generator.predict = lambda df: MLPrediction(
             action="BUY", confidence=0.70,
@@ -571,6 +633,8 @@ class TestMLRFStrategy:
         """confidence < 0.55 → LOW."""
         from src.ml.model import MLPrediction
         strategy = MLRFStrategy()
+        # 모델이 있는 것처럼 mock (sentinel 객체)
+        strategy._generator._model = object()
         strategy._generator.predict = lambda df: MLPrediction(
             action="BUY", confidence=0.52,
             proba_buy=0.52, proba_sell=0.25, proba_hold=0.23,

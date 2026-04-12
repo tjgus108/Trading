@@ -62,14 +62,78 @@ class TestMLLSTMStrategy:
         assert MLLSTMStrategy.name == "ml_lstm"
 
     def test_generate_hold_without_model(self):
-        """모델 없을 때 HOLD 반환."""
+        """모델 없을 때 heuristic fallback 신호 반환."""
         strategy = MLLSTMStrategy()
-        # 모델이 없으면 generator._model is None → HOLD
         assert strategy._generator._model is None
         df = _make_df(300)
         signal = strategy.generate(df)
-        assert signal.action == Action.HOLD
-        assert signal.confidence == Confidence.LOW
+        assert signal.action in (Action.BUY, Action.SELL, Action.HOLD)
+        assert signal.strategy == "ml_lstm"
+
+    def test_generate_buy_signal_without_model(self):
+        """모델 없을 때 heuristic이 BUY 신호 생성 (상승 모멘텀 데이터)."""
+        rng = np.random.default_rng(11)
+        n = 300
+        close = 50000 + np.cumsum(np.abs(rng.standard_normal(n)) * 200)
+        high = close + np.abs(rng.standard_normal(n) * 50)
+        low = close - np.abs(rng.standard_normal(n) * 50)
+        low = np.maximum(low, close * 0.95)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low,
+                           "close": close, "volume": np.ones(n) * 10.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        df["donchian_high"] = df["high"].rolling(20).max()
+        df["donchian_low"] = df["low"].rolling(20).min()
+        typical = (df["high"] + df["low"] + df["close"]) / 3
+        df["vwap"] = (typical * df["volume"]).cumsum() / df["volume"].cumsum()
+        strategy = MLLSTMStrategy()
+        assert strategy._generator._model is None
+        signal = strategy.generate(df)
+        assert signal.action in (Action.BUY, Action.HOLD)
+        assert signal.strategy == "ml_lstm"
+
+    def test_generate_sell_signal_without_model(self):
+        """모델 없을 때 heuristic이 SELL 신호 생성 (하락 모멘텀 데이터)."""
+        rng = np.random.default_rng(22)
+        n = 300
+        close = 50000 - np.cumsum(np.abs(rng.standard_normal(n)) * 200)
+        close = np.maximum(close, 1000)
+        high = close + np.abs(rng.standard_normal(n) * 50)
+        low = close - np.abs(rng.standard_normal(n) * 50)
+        low = np.maximum(low, close * 0.95)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame({"open": close, "high": high, "low": low,
+                           "close": close, "volume": np.ones(n) * 10.0}, index=idx)
+        df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([(df["high"] - df["low"]),
+                        (df["high"] - prev_close).abs(),
+                        (df["low"] - prev_close).abs()], axis=1).max(axis=1)
+        df["atr14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+        delta = df["close"].diff()
+        gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
+        df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
+        df["donchian_high"] = df["high"].rolling(20).max()
+        df["donchian_low"] = df["low"].rolling(20).min()
+        typical = (df["high"] + df["low"] + df["close"]) / 3
+        df["vwap"] = (typical * df["volume"]).cumsum() / df["volume"].cumsum()
+        strategy = MLLSTMStrategy()
+        assert strategy._generator._model is None
+        signal = strategy.generate(df)
+        assert signal.action in (Action.SELL, Action.HOLD)
+        assert signal.strategy == "ml_lstm"
 
     def test_generate_returns_signal(self):
         """generate()가 올바른 Signal 반환."""

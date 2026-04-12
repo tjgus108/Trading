@@ -73,21 +73,9 @@ class PairTradingStrategy(BaseStrategy):
                 bull_case="",
                 bear_case="",
             )
-        if self._eth_df is None or len(self._eth_df) < min_rows:
-            return Signal(
-                action=Action.HOLD,
-                confidence=Confidence.LOW,
-                strategy=self.name,
-                entry_price=0.0,
-                reasoning="데이터 부족",
-                invalidation="",
-                bull_case="",
-                bear_case="",
-            )
-
         last = self._last(df)
         entry = last["close"]
-        rsi = last["rsi14"]
+        rsi = float(last["rsi14"]) if "rsi14" in df.columns else 50.0
 
         if self._eth_df is not None and len(self._eth_df) >= self.spread_window + 2:
             return self._signal_with_eth(df, entry, rsi)
@@ -204,13 +192,35 @@ class PairTradingStrategy(BaseStrategy):
     # ------------------------------------------------------------------
 
     def _fallback_signal(self, entry: float, rsi: float) -> Signal:
-        """ETH 데이터 없을 때 HOLD 반환 (pair 전략 특성상 단독 신호 불가)."""
+        """ETH 데이터 없을 때 RSI 기반 heuristic 신호 생성."""
+        if rsi > 70:
+            return Signal(
+                action=Action.SELL,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"ETH 데이터 없음 — RSI fallback: rsi={rsi:.1f} > 70 과매수 → SELL",
+                invalidation="rsi < 60",
+                bull_case="ETH 데이터 주입 시 pair spread 기반 신호 전환",
+                bear_case=f"RSI={rsi:.1f} 과매수 구간",
+            )
+        if rsi < 30:
+            return Signal(
+                action=Action.BUY,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=entry,
+                reasoning=f"ETH 데이터 없음 — RSI fallback: rsi={rsi:.1f} < 30 과매도 → BUY",
+                invalidation="rsi > 40",
+                bull_case=f"RSI={rsi:.1f} 과매도 구간",
+                bear_case="ETH 데이터 주입 시 pair spread 기반 신호 전환",
+            )
         return Signal(
             action=Action.HOLD,
             confidence=Confidence.LOW,
             strategy=self.name,
             entry_price=entry,
-            reasoning="ETH 데이터 미제공: pair trading 신호 생성 불가 → HOLD",
+            reasoning=f"ETH 데이터 없음 — RSI fallback: rsi={rsi:.1f} 중립 구간 → HOLD",
             invalidation="",
             bull_case="set_eth_data()로 ETH DataFrame 주입 필요",
             bear_case="set_eth_data()로 ETH DataFrame 주입 필요",
