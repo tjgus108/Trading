@@ -177,8 +177,15 @@ class BacktestReport:
         
         Raises:
             ValueError: JSON 파싱 실패 또는 필드 누락 시
+            TypeError: 필드 타입 불일치 시
         """
-        d = json.loads(json_str)
+        try:
+            d = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}") from e
+        
+        if not isinstance(d, dict):
+            raise ValueError(f"Expected JSON object, got {type(d).__name__}")
         
         # inf/nan 문자열을 float로 역변환
         for key, val in d.items():
@@ -190,7 +197,11 @@ class BacktestReport:
                 elif val == "nan":
                     d[key] = float("nan")
         
-        return cls(**d)
+        try:
+            return cls(**d)
+        except TypeError as e:
+            raise ValueError(f"Missing or invalid fields: {e}") from e
+
 
 
 

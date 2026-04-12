@@ -380,3 +380,64 @@ class TestDataHealthCheckExport:
         # Indented JSON should have newlines and spaces
         assert "\n" in json_str
         assert "  " in json_str  # 2-space indent
+
+    def test_to_json_round_trip(self):
+        """to_json() → json.loads() → to_dict() round-trip validation."""
+        import json
+        
+        # Create original health check with multiple feeds
+        reports = {
+            "rest": FeedHealthReport(
+                "rest",
+                FeedStatus.LIVE,
+                True,
+                latency_ms=5.2,
+                last_update="2024-01-01T10:00:00Z",
+                metadata={"cache_size": 100}
+            ),
+            "websocket": FeedHealthReport(
+                "websocket",
+                FeedStatus.FALLBACK,
+                True,
+                latency_ms=2.1,
+                error_msg=None,
+                metadata={"candle_count": 50, "retry_count": 2}
+            ),
+        }
+        original_health = DataHealthCheck(
+            feeds=reports,
+            live_count=1,
+            fallback_count=1,
+            disconnected_count=0,
+            total_feeds=2,
+            primary_feed="rest",
+            anomalies=["operating_in_degraded_mode"]
+        )
+        
+        # Step 1: to_json()
+        json_str = original_health.to_json()
+        
+        # Step 2: parse JSON back
+        parsed_dict = json.loads(json_str)
+        
+        # Step 3: compare key fields
+        assert parsed_dict["live_count"] == 1
+        assert parsed_dict["fallback_count"] == 1
+        assert parsed_dict["disconnected_count"] == 0
+        assert parsed_dict["total_feeds"] == 2
+        assert parsed_dict["primary_feed"] == "rest"
+        assert parsed_dict["is_healthy"] is True
+        assert parsed_dict["anomalies"] == ["operating_in_degraded_mode"]
+        
+        # Step 4: verify feed details preserved
+        rest_feed = parsed_dict["feeds"]["rest"]
+        assert rest_feed["status"] == "LIVE"
+        assert rest_feed["is_available"] is True
+        assert rest_feed["latency_ms"] == 5.2
+        assert rest_feed["last_update"] == "2024-01-01T10:00:00Z"
+        assert rest_feed["metadata"]["cache_size"] == 100
+        
+        ws_feed = parsed_dict["feeds"]["websocket"]
+        assert ws_feed["status"] == "FALLBACK"
+        assert ws_feed["latency_ms"] == 2.1
+        assert ws_feed["metadata"]["candle_count"] == 50

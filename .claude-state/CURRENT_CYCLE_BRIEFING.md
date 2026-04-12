@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 107 — 2026-04-12T10:50:17.678567Z
+🔄 CYCLE 108 — 2026-04-12T10:59:11.871562Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,14 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 107 COMPLETED — C + B + SIM + F (리포트 갱신)** (2026-04-12 03:30 UTC)
-  **[C] Data:** onchain _score_from_fields 극단 검증 (코드 안전, 수정 없음).
-  **[B] Risk:** kelly from_trade_history 빈 → 0.0 반환 기존 통과 확인.
-  **[SIM] 시뮬 리포트 갱신:** 22개 PASS 중 19/22 흑자 (86.4%). 균등배분 +6.50%, Top10 +12.11%.
-  **[F] Research:** 봇 시장 2026. $54B 규모, 거래의 65% 자동화. 평균 ROI 25-40% 목표 (보장 X).
+**Cycle 108 COMPLETED — D + E + SIM + F** (2026-04-12 04:00 UTC)
+  **[D] ML CRITICAL:** src/ml/features.py inf→NaN 방어 추가. close=0 시 log(0/prev)=-inf 발생 → replace([inf,-inf], nan). 13번째 CRITICAL.
+  **[E] Execution:** config env override 검증 (수정 없음).
+  **[SIM] supertrend_multi 강화:** ATR 필터 0.8→0.9. Sharpe 3.77→3.85 (+2.1%), PF 1.75→1.80 (+2.9%). 거짓 신호 3개 제거.
+  **[F] Research:** Supertrend Multi-TF. 상위 TF 추세 필터 + 하위 TF 진입. ATR adaptive 핵심.
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)
