@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 100 — 2026-04-11T23:25:11.623892Z
+🔄 CYCLE 101 — 2026-04-12T00:02:55.367486Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -26,6 +26,9 @@
   **[A] Quality:** tests/test_walk_forward.py +1 WF 윈도우 최소 경계 검증.
   **[SIM] Auto-improve:** frama 2차 개선. ATR 필터 + Adaptive RSI (gap>=1% 완화, 약한 신호 엄격). **-3.77% → +1.02% 흑자 전환!** (+4.79%p, Sharpe -0.69→0.38). 17 tests 유지.
   **[F] Research:** FRAMA noise filter + FRAMA-RSI hybrid. 131일 파라미터 최적.
+
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

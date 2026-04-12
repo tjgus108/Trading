@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.base import Action
+from src.strategy.base import Action, Confidence, Signal, REASONING_MAX_LEN
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -101,3 +101,26 @@ def test_ema_cross_buy_on_crossover():
     df.iloc[-2, df.columns.get_loc("vwap")] = close_val * 0.99  # close > vwap
     signal = EmaCrossStrategy().generate(df)
     assert signal.action == Action.BUY
+
+
+def test_signal_reasoning_max_length():
+    """reasoning이 REASONING_MAX_LEN 초과 시 ValueError를 발생시킨다."""
+    with pytest.raises(ValueError, match="reasoning exceeds"):
+        Signal(
+            action=Action.HOLD,
+            confidence=Confidence.LOW,
+            strategy="test",
+            entry_price=100.0,
+            reasoning="x" * (REASONING_MAX_LEN + 1),
+            invalidation="i",
+        )
+    # 경계값: 정확히 REASONING_MAX_LEN 길이는 통과해야 한다
+    sig = Signal(
+        action=Action.HOLD,
+        confidence=Confidence.LOW,
+        strategy="test",
+        entry_price=100.0,
+        reasoning="x" * REASONING_MAX_LEN,
+        invalidation="i",
+    )
+    assert len(sig.reasoning) == REASONING_MAX_LEN

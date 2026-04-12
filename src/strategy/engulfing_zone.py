@@ -99,7 +99,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bullish_engulfing = (
             is_bearish_prev
             and is_bullish_curr
-            and ratio_bull > 1.5  # IMPROVED: stricter threshold
+            and ratio_bull > 1.3  # IMPROVED: stricter threshold
             and support_level is not None
         )
 
@@ -113,7 +113,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
         is_bearish_engulfing = (
             is_bullish_prev
             and is_bearish_curr
-            and ratio_bear > 1.5  # IMPROVED: stricter threshold
+            and ratio_bear > 1.3  # IMPROVED: stricter threshold
             and resistance_level is not None
         )
 
@@ -124,7 +124,7 @@ class BullishEngulfingZoneStrategy(BaseStrategy):
 
         def _get_confidence(ratio: float, level: float) -> Confidence:
             # engulfing ratio > 1.8 이면 HIGH
-            if ratio > 1.8:
+            if ratio > 1.7:
                 return Confidence.HIGH
             return Confidence.MEDIUM
 

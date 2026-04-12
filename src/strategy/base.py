@@ -24,6 +24,9 @@ class Confidence(str, Enum):
     LOW = "LOW"
 
 
+REASONING_MAX_LEN = 500
+
+
 @dataclass
 class Signal:
     action: Action
@@ -35,6 +38,13 @@ class Signal:
     bull_case: str = ""
     bear_case: str = ""
     metadata: Optional[Dict[str, Any]] = field(default=None)
+
+    def __post_init__(self) -> None:
+        if len(self.reasoning) > REASONING_MAX_LEN:
+            raise ValueError(
+                f"reasoning exceeds {REASONING_MAX_LEN} chars "
+                f"(got {len(self.reasoning)})"
+            )
 
 
 class SessionType(str, Enum):

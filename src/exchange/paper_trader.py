@@ -135,7 +135,7 @@ class PaperTrader:
             self.account.balance += proceeds
             self.account.total_pnl += pnl
             new_qty = held - sell_qty
-            if new_qty <= 0:
+            if new_qty < 1e-9:  # float precision guard
                 self.account.positions.pop(symbol, None)
                 self.account.avg_entry.pop(symbol, None)
             else:
