@@ -195,17 +195,20 @@ class BinanceWebSocketFeed:
         url = f"{BINANCE_WS_BASE}/{self.symbol}@kline_{self.interval}"
         logger.info("Connecting to %s", url)
 
-        async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
-            self._connected = True
-            logger.info("WebSocket connected: %s", url)
+        try:
+            async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+                self._connected = True
+                logger.info("WebSocket connected: %s", url)
 
-            async for msg in ws:
-                if self._stop_event.is_set():
-                    break
-                try:
-                    self._process_message(json.loads(msg))
-                except Exception as e:
-                    logger.debug("Message parse error: %s", e)
+                async for msg in ws:
+                    if self._stop_event.is_set():
+                        break
+                    try:
+                        self._process_message(json.loads(msg))
+                    except Exception as e:
+                        logger.debug("Message parse error: %s", e)
+        finally:
+            self._connected = False
 
     def _process_message(self, data: dict) -> None:
         """kline 메시지 파싱 → 완성 캔들 저장."""

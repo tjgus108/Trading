@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 116 — 2026-04-12T12:28:04.272825Z
+🔄 CYCLE 117 — 2026-04-12T12:52:23.906746Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 116 COMPLETED — E + A + SIM + F** (2026-04-12 07:30 UTC)
-  **[E] CRITICAL #14:** src/backtest/walk_forward.py IS<=0 오분류 수정. IS<0+OOS>0 → ratio=1.0(non-overfit). +1 test.
-  **[A] Quality:** commission 양방향 검증 (수정 없음, 진입+청산 2회 정확).
-  **[SIM] 🎯 relative_volume 2차 PASS!** RVOL 1.5→1.6 + RSI 동적 + VWAP 필수. **PF 1.26→1.66 PASS!** Sharpe 1.86→2.83.
-  **[F] Research:** RVOL. 임계 2.0+ 급등 탐지. Donchian 돌파 결합 시너지.
+**Cycle 117 COMPLETED — C + B + SIM + F** (2026-04-12 08:00 UTC)
+  **[C] Data:** websocket _connected stale state 버그 발견 (async with 탈출 시 미업데이트). 15번째 CRITICAL 후보.
+  **[B] Risk:** DD 월간 15% → FORCE_LIQUIDATE 1회 정확 검증 (수정 없음).
+  **[SIM] price_action_momentum 최적화:** body_strength 0.42, roc5_std*0.45로 Sharpe 1.66 달성. PF 1.32 한계 (구조적).
+  **[F] Research:** PA 봇 단독 비권장 (노이즈 70-80% 봇 거래량). 필터 필수.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지

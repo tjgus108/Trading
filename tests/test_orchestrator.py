@@ -709,3 +709,23 @@ def test_regime_detection_exception_is_non_fatal(cfg):
     # regime detection 실패에도 pipeline은 실행되어야 한다
     orch._pipeline.run.assert_called_once()
     assert result.status == "NO_ACTION"
+
+
+# ── cycle_count 추적 테스트 ──────────────────────────────────────────────────
+
+def test_cycle_count_increments_on_run_once(cfg, mock_connector):
+    """run_once 호출마다 _cycle_count가 1씩 증가한다."""
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+    assert orch._cycle_count == 0
+
+    ok_status = MagicMock()
+    ok_status.halted = False
+    ok_status.alert_level = AlertLevel.NONE
+
+    with patch.object(orch._drawdown_monitor, "update", return_value=ok_status):
+        orch.run_once()
+        assert orch._cycle_count == 1
+        orch.run_once()
+        assert orch._cycle_count == 2
