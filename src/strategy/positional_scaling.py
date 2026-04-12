@@ -1,5 +1,5 @@
 """
-PositionalScalingStrategy: 추세 지속 중 분할 진입 전략 (개선).
+PositionalScalingStrategy: 추세 지속 중 분할 진입 전략 (원본 복원).
 
 - 상승 추세: EMA20 > EMA50 > EMA100 (bullish alignment)
 - 하락 추세: EMA20 < EMA50 < EMA100 (bearish alignment)

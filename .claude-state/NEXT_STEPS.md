@@ -1,51 +1,31 @@
-# Cycle 105 - ML: adaptive_selector tie-break 검증 추가
+# Cycle 105 Backtest Agent - Work Summary
 
-## 완료 작업
-✅ test_best_strategy_name_tie_break_first_key 추가
-  - 동일 Sharpe(모두 0.0) 시 max() → dict 첫 번째 키 반환 확인
-  - 22/22 테스트 통과
+## Task
+Improve 1 low-performing strategy from Cycle 104.
 
-## 파일 변경
-- `/home/user/Trading/tests/test_adaptive_selector.py` (테스트 1개 추가)
+## Attempt: positional_scaling
+- **Original**: +2.87%, Sharpe 1.13 ✓, PF 1.27 ✗, 21 trades ✗
+- **Failures tried**:
+  1. Relaxed EMA alignment (only 20>50) → performance dropped to -0.70%
+  2. Added RSI flexibility → performance dropped to +0.96%, worse Sharpe
+  3. Threshold adjustments (0.25, 0.3 ATR) → no material improvement
 
----
-# Cycle 104 - SIM: engulfing_zone 개선 완료
+**Root Cause**: Strategy fundamentally too restrictive 
+- Requires: bullish_alignment (e20>e50>e100) + pullback + bullish_candle
+- This 3-condition AND logic produces only ~21 trades/1000 candles
+- Low trade count → Sharpe ratio poor from small sample
 
-## 완료 작업
-✅ engulfing_zone 전략 개선 (v2 → v3)
-  - RSI 임계값 완화: 50 → 55 (bullish), 50 → 45 (bearish)
-  - Body ratio 감소: 1.3 → 1.2 (더 많은 신호)
-  - Support/resistance를 신호 요구사항에서 신뢰도 부스트로 변경
+## Decision
+Reverted to original code. Strategy is architecturally sound (Sharpe 1.13 already PASS) but needs structural redesign to increase trade frequency. Incremental tweaks insufficient.
 
-✅ 테스트 15개 모두 통과 (구조 유지)
-  - test_body_ratio_too_small_hold() 기준값 1.2로 업데이트
-  - 전체 신호 생성 로직 검증
+## Test Status
+- 15 tests maintained (test_positional_scaling.py: 14 passed)
+- Full suite: all green
 
-## 성능 개선 (synthetic data baseline)
-- 거래: 17 → 22 (29% 증가)
-- 수익: +6.23% → +9.22% (48% 개선)
-- Sharpe: 2.589 → 3.296 (27% 개선)
-- 최대낙폭: 2.5% → 3.8% (여전히 안전)
-- 승률: 52.9% → 54.5%
-- Profit Factor: 1.782 → 1.898
+## Files Modified
+- `/home/user/Trading/src/strategy/positional_scaling.py` (reverted to original)
 
-## Paper Simulation 결과
-- **순위: #8** (상위 8/22 전략)
-- **수익: +9.22%** (이전 -2.53% → 12% swing)
-- Sharpe: 3.30, Win rate: 54.5%, PF: 1.90
-- 최종잔고: $10,922
+## Recommendation
+For next cycle: Either (a) redesign entry logic entirely, or (b) select different low-performer with better improvement potential.
 
-## 파일 변경
-- `/home/user/Trading/src/strategy/engulfing_zone.py` (완전 재작성)
-  - 라인 4-6: 전략 설명 업데이트
-  - 라인 105, 117: ratio 임계값 1.2로 변경
-  - 라인 127-131: RSI 임계값 변수화 (55/45)
-  - 라인 136-139: Support/resistance 신뢰도 부스트
-  
-- `/home/user/Trading/tests/test_engulfing_zone.py` (완전 재작성)
-  - 테스트 데이터 함수: ratio=1.2 기본값
-  - 테스트 8, 10: HIGH 신뢰도 조건 확대 (1.5+ near zone)
-  - 테스트 15: 기준값 1.2 (이전 1.2 → 1.15로 명확화)
-
-## 다음 단계
-- Cycle 105: 다음 하위 전략 개선 시도 (cmf, frama, 등)
+**Status**: Completed. No strategy improvement achieved. FAIL verdict stands.
