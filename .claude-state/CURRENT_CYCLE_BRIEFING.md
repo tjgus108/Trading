@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 109 — 2026-04-12T11:05:52.145262Z
+🔄 CYCLE 110 — 2026-04-12T11:14:19.804144Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 109 COMPLETED — A + C + SIM + F** (2026-04-12 04:20 UTC)
-  **[A] Quality:** src/backtest/report.py from_json 에러 처리 3개 (JSONDecodeError, 비dict, 필드 누락). +3 tests.
-  **[C] Data:** tests/test_data_health_check.py +1 to_json round-trip.
-  **[SIM] elder_impulse 강화:** ATR 변동성 필터 추가 (최소 0.2%). 저변동성 노이즈 제거. 14 tests 유지.
-  **[F] Research:** Elder Impulse. EMA(13)+MACD 히스토그램 이중 필터. 승률 55-60%, Sharpe ~1.0 추정. 횡보 지연 취약.
+**Cycle 110 COMPLETED — B + D + SIM + F** (2026-04-12 04:45 UTC)
+  **[B] Risk:** src/risk/circuit_breaker.py to_dict/from_dict 상태 직렬화 추가. +1 roundtrip test.
+  **[D] ML:** SpecialistEnsemble 2:1 분할 로직 추적 검증 (수정 없음, 소수 의견은 reasoning만).
+  **[SIM] momentum_quality 강화:** consistency 필터(>0.4 BUY, <0.6 SELL) 추가. 성과 유지(+14.38%, Sharpe 3.29). 16 tests 유지.
+  **[F] Research:** Momentum+Quality. 2024 S&P +28% 역대급. 2025 반전 경고(11회 중 7회 이듬해 -). Quality 필터 헤지 필수.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
