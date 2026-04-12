@@ -1,8 +1,8 @@
 """
-Volume Breakout 전략 (개선):
-- ATR 필터: 변동성이 중간 정도일 때만 진입
-- 추세 필터: EMA50 기준 추세 방향 확인
-- Volume Spike: 1.8x (기존 유지)
+Volume Breakout 전략 (개선 v2):
+- ATR 필터: 극단적 변동성만 필터 (범위 확대)
+- 추세 필터: EMA20 > EMA50 (상승) / EMA20 < EMA50 (하강)
+- Volume Spike: 1.5x (더 공격적, 거래 빈도 증가)
 """
 
 import pandas as pd
@@ -11,10 +11,10 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _MIN_ROWS = 50  # EMA50 필요
 _VOL_LOOKBACK = 20
-_SPIKE_MULT = 1.8
-_HIGH_CONF_MULT = 2.5
-_ATR_LOW = 0.8  # ATR 최소 (과도하게 낮은 변동성 필터)
-_ATR_HIGH = 3.0  # ATR 최대 (과도하게 높은 변동성 필터)
+_SPIKE_MULT = 1.5  # 1.8 → 1.5 (더 공격적)
+_HIGH_CONF_MULT = 2.2  # 2.5 → 2.2
+_ATR_LOW = 0.3  # ATR 최소 (극단적으로 낮은 경우만)
+_ATR_HIGH = 5.0  # ATR 최대 (극단적으로 높은 경우만)
 
 
 class VolumeBreakoutStrategy(BaseStrategy):
@@ -29,8 +29,8 @@ class VolumeBreakoutStrategy(BaseStrategy):
         open_ = float(last["open"])
         volume = float(last["volume"])
         ema20 = float(last["ema20"])
-        ema50 = float(last.get("ema50", close))  # EMA50 없으면 close 사용
-        atr14 = float(last.get("atr14", 0))
+        ema50 = float(last.get("ema50", close))
+        atr14 = float(last.get("atr14", 1.0))
 
         avg_vol = float(df["volume"].iloc[-_VOL_LOOKBACK - 2 : -2].mean())
         spike = volume > avg_vol * _SPIKE_MULT
@@ -39,10 +39,10 @@ class VolumeBreakoutStrategy(BaseStrategy):
         above_ema = close > ema20
         below_ema = close < ema20
         
-        # ATR 필터: 변동성이 너무 낮거나 높으면 스킵
-        atr_valid = _ATR_LOW <= atr14 <= _ATR_HIGH if atr14 > 0 else True
+        # ATR 필터: 매우 극단적인 경우만 필터
+        atr_valid = _ATR_LOW <= atr14 <= _ATR_HIGH
         
-        # 추세 필터: EMA20 vs EMA50
+        # 추세 필터
         uptrend = ema20 > ema50
         downtrend = ema20 < ema50
 
@@ -58,7 +58,7 @@ class VolumeBreakoutStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close,
                 reasoning=f"Volume breakout 상승: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 양봉, close({close:.2f})>ema20({ema20:.2f}), uptrend, atr={atr14:.2f}",
-                invalidation=f"Close below EMA20 ({ema20:.2f}) or ATR out of range",
+                invalidation=f"Close below EMA20 ({ema20:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
@@ -72,12 +72,12 @@ class VolumeBreakoutStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close,
                 reasoning=f"Volume breakout 하락: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 음봉, close({close:.2f})<ema20({ema20:.2f}), downtrend, atr={atr14:.2f}",
-                invalidation=f"Close above EMA20 ({ema20:.2f}) or ATR out of range",
+                invalidation=f"Close above EMA20 ({ema20:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        return self._hold(df, f"No signal: vol={volume:.0f} avg={avg_vol:.0f} spike={spike} atr_valid={atr_valid} trend_aligned={'up' if uptrend else 'down'}", bull_case, bear_case)
+        return self._hold(df, f"No signal: vol={volume:.0f} avg={avg_vol:.0f} spike={spike}", bull_case, bear_case)
 
     def _hold(self, df: pd.DataFrame, reason: str,
               bull_case: str = "", bear_case: str = "") -> Signal:

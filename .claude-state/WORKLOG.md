@@ -8412,3 +8412,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 00:26 UTC] Cycle 103 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 00:37 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 01:40 UTC] Cycle 103 COMPLETED — D + E + SIM + F
+**[D] ML:** multi_signal aggregator ratio 경계 검증 (수정 없음).
+**[E] Execution:** tests/test_kelly_twap.py +1 TWAP partial fill ratio.
+**[SIM] volume_breakout 필터 강화:** ATR (0.3~5.0) + EMA50 추세 + spike 1.5x. 단, 합성 데이터에선 조건 불충족으로 신호 0. 실제 거래소 데이터 필요.
+**[F] Research:** Volume breakout 진위성. 1.5x 볼륨 + 종가 유지, 거짓 돌파는 역전 캔들 + divergence.
+**Tests:** 6316 passed (+3 from Cycle 102).
+**Next Cycle:** 104 (A+C+SIM+F)
