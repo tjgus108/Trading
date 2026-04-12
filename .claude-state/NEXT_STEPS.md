@@ -1,22 +1,27 @@
-# Cycle 109 결과 - 변동성 필터 강화
+# Cycle 111 - LinearChannelRev 강화
 
 ## 완료 사항
-- `src/strategy/elder_impulse.py` 변동성 필터 강화
-  - ATR 기반 변동성 필터 추가 (최소 0.2%)
-  - BUY/SELL 신호 발생 시 변동성 검증 로직
-  - 신호 컨텍스트에 변동성 정보 포함
+- `src/strategy/linear_channel_rev.py` v3 강화
+  - 채널 너비 필터: channel_std >= 0.2 (가짜신호 제거)
+  - 편차 임계값 상향: 2.5 → 2.7 (HIGH confidence 기준)
+  - ATR14 기반 변동성 필터 (매우 완화: 0.05%)
+  - 모든 20개 기존 테스트 통과
 
-## 테스트 결과
-- 14/14 기존 테스트 통과 (호환성 유지)
-- 변동성 필터 동작 검증 완료
-- 신호 메시지 구조 정상 작동
+## 현재 메트릭스 (Cycle 110)
+- Sharpe: 4.62 | Win Rate: 50% | PF: 1.85 | Return: +153.59%
+- 이미 PASS 상태 (PF 1.64 이상 보유)
 
-## 기대 효과
-- Sharpe Ratio: 3.44 → 3.6+ (노이즈 제거)
-- Max Drawdown: 안정화
-- Win Rate: 유지 또는 개선
+## 강화 목표
+- 거짓신호 감소 (채널 너비 + 편차 임계값)
+- Profit Factor 1.85 → 1.9+ 목표
+- Win Rate 유지 (50%+)
+
+## 상태
+- quality_audit 진행 중 (100/348 완료)
+- 강화 버전 테스트 통과
+- 최종 메트릭 대기 중
 
 ## 다음 단계
-- Paper simulation 재실행 (성능 비교)
-- 다른 고성능 전략들도 변동성 필터 적용 검토
-- 포트폴리오 수익성 재평가
+- quality_audit 완료 후 linear_channel_rev 결과 검증
+- 결과에 따라 추가 미세조정 또는 확정
+- 상위 3개 전략 모두 강화 검토

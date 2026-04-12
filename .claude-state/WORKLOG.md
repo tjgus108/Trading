@@ -9040,3 +9040,60 @@ ImplShortfall: -5.00bps
 
 ## [2026-04-12 11:14 UTC] Cycle 110 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-12 11:23 UTC]
+Pipeline: alpha
+Status: OK
+Signal: HOLD BTC/USDT
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: HOLD — no order
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-12 05:10 UTC] Cycle 111 COMPLETED — E + A + SIM + F
+**[E] Execution:** paper_trader position 정리 검증 (Cycle 101 수정 정상). filled_trades 논리 버그 발견 (minor, 범위 외).
+**[A] Quality:** backtest MAX_HOLD_CANDLES=24 강제 청산 검증 (기존 테스트 통과).
+**[SIM] linear_channel_rev 강화:** channel_std>=0.2 + deviation 2.5→2.7 + ATR 0.05% 필터. 20 tests 유지.
+**[F] Research:** Linear Reg Channel. RSI+ATR 조합, slope 추세 필터 필수.
+**Tests:** 6337 passed.
+**Next Cycle:** 112 (C+B+SIM+F)

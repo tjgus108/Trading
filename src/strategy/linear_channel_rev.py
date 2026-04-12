@@ -1,16 +1,9 @@
 """
 LinearChannelReversionStrategy: Linear Regression Channel 이탈 후 복귀 (mean reversion).
-
-- 최근 30봉 선형 회귀: numpy polyfit degree=1
-- predicted = np.polyval(np.polyfit(range(30), close_30, 1), range(30))
-- residuals = close_30 - predicted
-- channel_std = residuals.std()
-- upper = predicted[-1] + 2 * channel_std
-- lower = predicted[-1] - 2 * channel_std
-- BUY:  prev_close < lower AND curr_close >= lower (채널 하단 이탈 후 복귀)
-- SELL: prev_close > upper AND curr_close <= upper (채널 상단 이탈 후 복귀)
-- confidence: deviation > 2.5 * channel_std → HIGH, else MEDIUM
-- 최소 데이터: 35행
+ENHANCED v3:
+- 변동성 필터: ATR14 기반 (더 완화된 임계값)
+- 편차 임계값: 2.7 (원래 2.5 대비 강화)
+- 채널 너비 체크: channel_std > 0.2 (거짓신호 필터)
 """
 
 from typing import Optional
@@ -23,7 +16,9 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 35
 _PERIOD = 30
 _BAND_MULT = 2.0
-_HIGH_CONF_MULT = 2.5
+_HIGH_CONF_MULT = 2.7  # 2.5 → 2.7: 중간 강화
+_MIN_CHANNEL_STD = 0.2  # 완화된 채널 너비 (가짜신호 방지는 하되 과도하지 않음)
+_MIN_ATR_RATIO = 0.0005  # 매우 완화 (거의 모든 상황 허용)
 
 
 def _calc_channel(close_30: np.ndarray):
@@ -44,7 +39,7 @@ def _calc_channel(close_30: np.ndarray):
 
 
 class LinearChannelReversionStrategy(BaseStrategy):
-    """Linear Regression Channel 복귀 전략."""
+    """Linear Regression Channel 복귀 전략 (Enhanced v3)."""
 
     name = "linear_channel_rev"
 
@@ -67,6 +62,23 @@ class LinearChannelReversionStrategy(BaseStrategy):
         curr_close = float(df["close"].iloc[idx])
         prev_close = float(df["close"].iloc[prev_idx])
 
+        # ✅ ATR14 변동성 필터 (매우 완화)
+        atr_ratio = 0.0  # 기본값
+        if "atr14" in df.columns:
+            atr_val = float(df["atr14"].iloc[idx])
+            atr_ratio = atr_val / curr_close if not np.isnan(atr_val) and curr_close > 0 else 0.0
+        
+        # 변동성 필터를 거의 무시 (매우 낮은 임계값)
+        if atr_ratio < _MIN_ATR_RATIO and atr_ratio != 0.0:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=curr_close,
+                reasoning=f"극저 변동성: ATR14/close={atr_ratio:.6f}",
+                invalidation="변동성 증가 후 재시도",
+            )
+
         # 최근 30봉 (현재봉 기준)
         window_start = max(0, idx - _PERIOD + 1)
         close_30 = df["close"].iloc[window_start: idx + 1].values.astype(float)
@@ -83,6 +95,17 @@ class LinearChannelReversionStrategy(BaseStrategy):
 
         upper, lower, channel_std, deviation = _calc_channel(close_30)
 
+        # ✅ 채널 너비 필터: 최소한의 볼라틱만 필요
+        if channel_std < _MIN_CHANNEL_STD:
+            return Signal(
+                action=Action.HOLD,
+                confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=curr_close,
+                reasoning=f"채널 너비 미달: channel_std={channel_std:.4f} < {_MIN_CHANNEL_STD:.4f}",
+                invalidation="채널 너비 증가 후 재시도",
+            )
+
         # prev_close 기준 채널 계산 (이전 봉의 채널)
         prev_window_start = max(0, prev_idx - _PERIOD + 1)
         prev_close_30 = df["close"].iloc[prev_window_start: prev_idx + 1].values.astype(float)
@@ -96,7 +119,7 @@ class LinearChannelReversionStrategy(BaseStrategy):
         context = (
             f"curr_close={curr_close:.4f} prev_close={prev_close:.4f} "
             f"upper={upper:.4f} lower={lower:.4f} channel_std={channel_std:.4f} "
-            f"deviation={deviation:.4f}"
+            f"deviation={deviation:.4f} atr_ratio={atr_ratio:.6f}"
         )
 
         # BUY: prev_close < lower AND curr_close >= lower
