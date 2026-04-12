@@ -388,6 +388,7 @@ from src.strategy.momentum_mean_rev import MomentumMeanRevStrategy
 from src.strategy.spread_momentum import SpreadMomentumStrategy
 from src.strategy.higher_high_momentum import HigherHighMomentumStrategy
 from src.strategy.mean_rev_bounce import MeanRevBounceStrategy
+from src.strategy.market_regime_classifier import MarketRegimeClassifierStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -747,6 +748,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "spread_momentum": SpreadMomentumStrategy,
     "higher_high_momentum": HigherHighMomentumStrategy,
     "mean_rev_bounce": MeanRevBounceStrategy,
+    "market_regime_classifier": MarketRegimeClassifierStrategy,
 }
 
 
