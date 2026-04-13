@@ -12,6 +12,8 @@
 - **`.claude-state/NEXT_STEPS.md` 지시사항 반드시 준수** — 이 파일의 작업 방향을 무시하지 마세요.
 - **`.claude-state/MASTER_PLAN.md` 로테이션 규칙 준수** — 카테고리 로테이션을 따르세요.
 - 기존 테스트를 깨뜨리는 변경 금지.
+- **합성 데이터만으로 전략 최적화 금지** — 반드시 실제 거래소(Bybit) 데이터로 검증 후 판단.
+- **실전 데이터 PASS 전략 기준**: Sharpe ≥ 1.0, PF ≥ 1.5, Trades ≥ 15, MDD ≤ 20%
 
 ## Stack
 - Python 3.11+

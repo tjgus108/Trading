@@ -108,12 +108,20 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_pass_strategies() -> list[tuple[str, str]]:
-    """QUALITY_AUDIT.csv에서 PASS 전략 목록 로드."""
-    if not CSV_PATH.exists():
-        return []
-    df = pd.read_csv(CSV_PATH)
-    passed = df[df["passed"]]
-    return list(zip(passed["module"].tolist(), passed["class"].tolist()))
+    """QUALITY_AUDIT.csv에서 PASS 전략 목록 로드.
+    CSV가 없거나 PASS가 0이면 전체 전략을 로드하되 최대 50개로 제한."""
+    if CSV_PATH.exists():
+        df = pd.read_csv(CSV_PATH)
+        passed = df[df["passed"] == True]  # noqa: E712
+        if len(passed) > 0:
+            return list(zip(passed["module"].tolist(), passed["class"].tolist()))
+        print("[WARN] QUALITY_AUDIT.csv에 PASS 전략 0개. 전체 전략 로드 (최대 50개)")
+
+    # CSV 없거나 PASS 0 → 전체 전략 중 상위 50개만
+    from scripts.quality_audit import find_strategy_classes
+    all_strats = find_strategy_classes()
+    print(f"[INFO] 전체 전략 {len(all_strats)}개 중 상위 50개 로드")
+    return [(mod, cls_name) for mod, cls_name, _ in all_strats[:50]]
 
 
 def load_strategy_class(module_name: str, class_name: str):
