@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Next Steps
 
 _Last updated: 2026-04-12_
@@ -2716,39 +2717,49 @@ pip install anthropic
 # Cycle 121 Todo (Remote)
 
 # Cycle 121 Todo
+=======
+# 실전 Bybit 데이터 시뮬레이션 결과 기반 — 작업 방향 전환
+>>>>>>> claude/view-research-report-MgcA0
 
-## wick_reversal 2차 강화 결과 (Cycle 120)
-- Sharpe 0.49 (< 1.0) ❌
-- Profit Factor 1.10 (< 1.5) ❌
-- Trades 48 (>= 30) ✅
-- **Verdict: FAIL** — 라이브 실행 금지
+_Updated: 2026-04-13_
 
-### 개선 사항 (Cycle 120)
-1. RSI 오버부스트/오버셀드 필터 추가 (선택적)
-2. 기본 거래 조건 유지 (0.8배 볼륨)
-3. 추세 필터 강화 (14기간 고점/저점)
+## ⛔ 핵심 교훈: 합성 데이터 과적합 확인
 
-### 근본 원인
-- 패턴 기반 신호만으로는 신뢰도 부족
-- 모멘텀/추세 강도 지표 부재
-- Sharpe 개선을 위해 승률 향상 또는 손실 관리 필요
+합성 데이터 Sharpe 4.26이었던 OFI_v2가 실제 Bybit에서 **-12.65%**.
+합성 데이터 +15.76%였던 linear_channel_rev가 실제에서 **-18.85%**.
 
-## Cycle 121 옵션
-1. **wick_reversal 3차 개선**
-   - MACD 신호 추가 (추세 확인)
-   - Bollinger Band 밴드폭 필터 (변동성 확인)
-   - 거래당 조정 손절/익절 동적 계산
+**합성 데이터 기반 SIM 개선 대부분이 과적합이었음.**
 
-2. **신 전략 개발** (더 우선)
-   - Volume Cluster + Support/Resistance
-   - RSI Divergence 감지
-   - 다중 시간틀 확인
+## ✅ 실제 Bybit 데이터에서 살아남은 전략 (3 PASS)
 
-3. **포트폴리오 최적화**
-   - 상위 전략들의 상관관계 분석
-   - 균등/가중 배분 vs 최적화 배분
+| 전략 | Return | Sharpe | PF | Trades |
+|------|--------|--------|-----|--------|
+| **trima** | +11.28% | 3.74 | 2.21 | 28 |
+| **bull_bear_power** | +9.56% | 2.47 | 1.56 | 49 |
+| **adaptive_ma_cross** | +8.57% | 3.17 | 2.05 | 27 |
 
-## 파일 경로
-- 전략: /home/user/Trading/src/strategy/wick_reversal.py
-- 테스트: /home/user/Trading/tests/test_wick_reversal.py
-- 시뮬 리포트: /home/user/Trading/.claude-state/PAPER_SIMULATION_REPORT.md
+## 🎯 다음 작업 (우선순위)
+
+### 1. 실전 데이터 기반 품질 감사 재실행 (최우선)
+- `scripts/quality_audit.py`를 실제 Bybit 데이터로 재실행
+- 합성 데이터 PASS 22개 vs 실전 PASS 비교
+- 실전 PASS 전략만 STRATEGY_REGISTRY에 활성화
+
+### 2. 실전 PASS 3개 전략 심층 분석
+- trima, bull_bear_power, adaptive_ma_cross의 공통점 파악
+- 왜 이 3개만 실전에서 살아남았는지 분석
+- Walk-Forward 검증 (IS/OOS 70/30)
+
+### 3. 실전 유망 전략 (근접 PASS) 개선
+- engulfing_zone (+5.42%, PF 3.48 but 8 trades)
+- relative_volume (+5.07%, PF 1.45)
+- vol_adj_trend (+4.43%, PF 2.44 but 11 trades)
+
+### 4. 과적합된 전략 분석 및 원인 규명
+- 합성에서 +17.85% → 실전 -12.65%가 된 OFI_v2 분석
+- 과적합 공통 패턴 도출 → 향후 방지
+
+## ⛔ 금지
+- 합성 데이터만으로 전략 최적화 금지
+- 새 전략 파일 생성 금지
+- 실전 데이터 검증 없이 PASS 판정 금지

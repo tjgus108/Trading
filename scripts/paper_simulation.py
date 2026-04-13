@@ -113,33 +113,20 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_pass_strategies() -> list[tuple[str, str]]:
-    """QUALITY_AUDIT.csv PASS 전략 + STRATEGY_REGISTRY 전략 합산 로드."""
-    seen: set[str] = set()
-    result: list[tuple[str, str]] = []
-
-    # 1. QUALITY_AUDIT.csv PASS 전략
+    """QUALITY_AUDIT.csv에서 PASS 전략만 로드.
+    CSV가 없거나 PASS가 0이면 전체 전략 중 상위 50개로 제한."""
     if CSV_PATH.exists():
         df = pd.read_csv(CSV_PATH)
-        for _, row in df[df["passed"]].iterrows():
-            key = f"{row['module']}.{row['class']}"
-            if key not in seen:
-                seen.add(key)
-                result.append((row["module"], row["class"]))
+        passed = df[df["passed"] == True]  # noqa: E712
+        if len(passed) > 0:
+            return list(zip(passed["module"].tolist(), passed["class"].tolist()))
+        print("[WARN] QUALITY_AUDIT.csv에 PASS 전략 0개. 전체 전략 로드 (최대 50개)")
 
-    # 2. STRATEGY_REGISTRY에 있는 전략 추가 (CSV 미포함분)
-    try:
-        from src.orchestrator import STRATEGY_REGISTRY
-        for name, cls in STRATEGY_REGISTRY.items():
-            mod_name = cls.__module__.replace("src.strategy.", "")
-            cls_name = cls.__name__
-            key = f"{mod_name}.{cls_name}"
-            if key not in seen:
-                seen.add(key)
-                result.append((mod_name, cls_name))
-    except Exception:
-        pass
-
-    return result
+    # CSV 없거나 PASS 0 → 전체 전략 중 상위 50개만
+    from scripts.quality_audit import find_strategy_classes
+    all_strats = find_strategy_classes()
+    print(f"[INFO] 전체 전략 {len(all_strats)}개 중 상위 50개 로드")
+    return [(mod, cls_name) for mod, cls_name, _ in all_strats[:50]]
 
 
 def load_strategy_class(module_name: str, class_name: str):
