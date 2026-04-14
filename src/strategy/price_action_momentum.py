@@ -1,19 +1,18 @@
 """
-PriceActionMomentumStrategy: Cycle 117 최종 (body 0.40 + 강한 roc5).
+PriceActionMomentumStrategy: Cycle 121 v2 (body 0.50 + ROC5 + optional SMA200).
 
-개선 사항:
-- body_strength: 0.40 (균형)
-- roc5 절대값: > 0.005 (0.5% 최소)
-- roc5 상대값: roc5_std*0.6 (강함)
-- SMA50 (원래대로)
-- 목표: PF >= 1.5, Sharpe >= 1.0
+개선 사항 (Cycle 121):
+- body_strength: 0.40 → 0.50 (더 강한 바디 요구)
+- roc5 필터: 강화된 momentum 요구사항
+- SMA200 추가: 장기 추세 확인 (선택적, 없으면 무시)
+- 목표: -13.69% → positive return, PF >= 1.5
 """
 
 import pandas as pd
 import math
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
-_MIN_ROWS = 35
+_MIN_ROWS = 35  # Keep original for test compatibility
 
 
 class PriceActionMomentumStrategy(BaseStrategy):
@@ -38,6 +37,7 @@ class PriceActionMomentumStrategy(BaseStrategy):
         roc5_std = roc5.rolling(20, min_periods=1).std()
         
         sma50 = close.rolling(50, min_periods=1).mean()
+        sma200 = close.rolling(200, min_periods=1).mean() if len(df) >= 200 else None
 
         idx = len(df) - 2
 
@@ -48,9 +48,17 @@ class PriceActionMomentumStrategy(BaseStrategy):
         v_roc5_std = float(roc5_std.iloc[idx])
         v_close = float(close.iloc[idx])
         v_sma50 = float(sma50.iloc[idx])
+        v_sma200 = None
+        if sma200 is not None:
+            v_sma200_raw = float(sma200.iloc[idx])
+            if not math.isnan(v_sma200_raw):
+                v_sma200 = v_sma200_raw
 
         if any(math.isnan(x) for x in [v_body, v_body_strength, v_roc5, v_roc5_ma]):
             return self._hold(df, "NaN in indicators")
+
+        # SMA200 trend check (optional)
+        sma200_ok = v_sma200 is None or v_close > v_sma200 > 0
 
         context = (
             f"close={v_close:.4f} body={v_body:.4f} "
@@ -63,13 +71,14 @@ class PriceActionMomentumStrategy(BaseStrategy):
             and abs(v_roc5) > v_roc5_std * 1.5
         )
 
-        # BUY: body 0.40 + 강한 roc5
+        # BUY: strong body + uptrend momentum + optional long-term trend
         if (
             v_body > 0
-            and v_body_strength >= 0.40
+            and v_body_strength >= 0.50  # 0.40 → 0.50: 강화됨
             and v_roc5 > 0.005
             and v_roc5 > v_roc5_ma - (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
             and v_close > v_sma50
+            and sma200_ok  # SMA200 없으면 무시
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
             return Signal(
@@ -78,21 +87,22 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=v_close,
                 reasoning=(
-                    f"PA Momentum BUY: body_strength={v_body_strength:.3f} "
+                    f"PA Momentum BUY: body_strength={v_body_strength:.3f} (>=0.50) "
                     f"roc5={v_roc5:.4f}, sma50 uptrend"
                 ),
-                invalidation="body<=0 or body_strength<0.40 or close<=sma50",
+                invalidation="body<=0 or body_strength<0.50 or close<=sma50",
                 bull_case=context,
                 bear_case=context,
             )
 
-        # SELL: body 0.40 + 강한 roc5
+        # SELL: strong body + downtrend momentum + optional long-term trend
         if (
             v_body < 0
-            and v_body_strength >= 0.40
+            and v_body_strength >= 0.50  # 0.40 → 0.50: 강화됨
             and v_roc5 < -0.005
             and v_roc5 < v_roc5_ma + (v_roc5_std * 0.6 if not math.isnan(v_roc5_std) else 0)
             and v_close < v_sma50
+            and (v_sma200 is None or v_close < v_sma200)  # SMA200 없으면 무시
         ):
             confidence = Confidence.HIGH if is_high_conf else Confidence.MEDIUM
             return Signal(
@@ -101,10 +111,10 @@ class PriceActionMomentumStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=v_close,
                 reasoning=(
-                    f"PA Momentum SELL: body_strength={v_body_strength:.3f} "
+                    f"PA Momentum SELL: body_strength={v_body_strength:.3f} (>=0.50) "
                     f"roc5={v_roc5:.4f}, sma50 downtrend"
                 ),
-                invalidation="body>=0 or body_strength<0.40 or close>=sma50",
+                invalidation="body>=0 or body_strength<0.50 or close>=sma50",
                 bull_case=context,
                 bear_case=context,
             )

@@ -1,9 +1,10 @@
 """
 LinearChannelReversionStrategy: Linear Regression Channel 이탈 후 복귀 (mean reversion).
-ENHANCED v3:
-- 변동성 필터: ATR14 기반 (더 완화된 임계값)
-- 편차 임계값: 2.7 (원래 2.5 대비 강화)
-- 채널 너비 체크: channel_std > 0.2 (거짓신호 필터)
+ENHANCED v4 (Cycle 121 improvement):
+- 추세 필터: EMA50 기반 (downtrend 진입/uptrend 공매도 방지, 선택적)
+- 편차 임계값: 3.0 (2.7 → 3.0, 과도한 신호 감소)
+- 채널 너비: 0.3 (0.2 → 0.3, 명확한 채널만 거래)
+- 결과: -20.39% → 개선 목표
 """
 
 from typing import Optional
@@ -16,9 +17,9 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 35
 _PERIOD = 30
 _BAND_MULT = 2.0
-_HIGH_CONF_MULT = 2.7  # 2.5 → 2.7: 중간 강화
-_MIN_CHANNEL_STD = 0.2  # 완화된 채널 너비 (가짜신호 방지는 하되 과도하지 않음)
-_MIN_ATR_RATIO = 0.0005  # 매우 완화 (거의 모든 상황 허용)
+_HIGH_CONF_MULT = 3.0  # 2.7 → 3.0: 신호 엄격화
+_MIN_CHANNEL_STD = 0.3  # 0.2 → 0.3: 더 명확한 채널만
+_MIN_ATR_RATIO = 0.002  # 0.0005 → 0.002: 변동성 요구
 
 
 def _calc_channel(close_30: np.ndarray):
@@ -39,7 +40,7 @@ def _calc_channel(close_30: np.ndarray):
 
 
 class LinearChannelReversionStrategy(BaseStrategy):
-    """Linear Regression Channel 복귀 전략 (Enhanced v3)."""
+    """Linear Regression Channel 복귀 전략 (Enhanced v4)."""
 
     name = "linear_channel_rev"
 
@@ -62,20 +63,20 @@ class LinearChannelReversionStrategy(BaseStrategy):
         curr_close = float(df["close"].iloc[idx])
         prev_close = float(df["close"].iloc[prev_idx])
 
-        # ✅ ATR14 변동성 필터 (매우 완화)
+        # ✅ ATR14 변동성 필터 (강화)
         atr_ratio = 0.0  # 기본값
         if "atr14" in df.columns:
             atr_val = float(df["atr14"].iloc[idx])
             atr_ratio = atr_val / curr_close if not np.isnan(atr_val) and curr_close > 0 else 0.0
         
-        # 변동성 필터를 거의 무시 (매우 낮은 임계값)
+        # 변동성 필터 (더 엄격)
         if atr_ratio < _MIN_ATR_RATIO and atr_ratio != 0.0:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.LOW,
                 strategy=self.name,
                 entry_price=curr_close,
-                reasoning=f"극저 변동성: ATR14/close={atr_ratio:.6f}",
+                reasoning=f"저 변동성: ATR14/close={atr_ratio:.6f}",
                 invalidation="변동성 증가 후 재시도",
             )
 
@@ -95,7 +96,7 @@ class LinearChannelReversionStrategy(BaseStrategy):
 
         upper, lower, channel_std, deviation = _calc_channel(close_30)
 
-        # ✅ 채널 너비 필터: 최소한의 볼라틱만 필요
+        # ✅ 채널 너비 필터 (강화됨)
         if channel_std < _MIN_CHANNEL_STD:
             return Signal(
                 action=Action.HOLD,
@@ -105,6 +106,15 @@ class LinearChannelReversionStrategy(BaseStrategy):
                 reasoning=f"채널 너비 미달: channel_std={channel_std:.4f} < {_MIN_CHANNEL_STD:.4f}",
                 invalidation="채널 너비 증가 후 재시도",
             )
+
+        # ✅ NEW (optional): EMA50 추세 필터 (downtrend 진입/uptrend 공매도 방지)
+        ema50 = None
+        use_ema50_filter = False
+        if "ema50" in df.columns:
+            ema50_val = float(df["ema50"].iloc[idx])
+            if not np.isnan(ema50_val):
+                ema50 = ema50_val
+                use_ema50_filter = True
 
         # prev_close 기준 채널 계산 (이전 봉의 채널)
         prev_window_start = max(0, prev_idx - _PERIOD + 1)
@@ -124,6 +134,18 @@ class LinearChannelReversionStrategy(BaseStrategy):
 
         # BUY: prev_close < lower AND curr_close >= lower
         if prev_close < prev_lower and curr_close >= lower:
+            # Check EMA50 filter (optional)
+            if use_ema50_filter and curr_close <= ema50:
+                # Downtrend, skip BUY
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.LOW,
+                    strategy=self.name,
+                    entry_price=curr_close,
+                    reasoning=f"채널 신호 있으나 downtrend (below EMA50): {context}",
+                    invalidation="uptrend 재진입 시 재평가",
+                )
+            
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -140,6 +162,18 @@ class LinearChannelReversionStrategy(BaseStrategy):
 
         # SELL: prev_close > upper AND curr_close <= upper
         if prev_close > prev_upper and curr_close <= upper:
+            # Check EMA50 filter (optional)
+            if use_ema50_filter and curr_close >= ema50:
+                # Uptrend, skip SELL
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.LOW,
+                    strategy=self.name,
+                    entry_price=curr_close,
+                    reasoning=f"채널 신호 있으나 uptrend (above EMA50): {context}",
+                    invalidation="downtrend 재진입 시 재평가",
+                )
+            
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
