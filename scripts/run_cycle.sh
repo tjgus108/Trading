@@ -34,16 +34,33 @@ git checkout main
 git pull origin main
 
 # 2. Paper Simulation (실제 Bybit 데이터 수익률 테스트)
-# - 아직 PAPER_SIMULATION_REPORT.md가 실제 데이터로 안 돌았으면 먼저 실행
-# - 이미 실제 데이터 리포트가 있어도 매일 한 번은 재실행 (Paper 모니터링)
+# - 리포트가 없거나, 24시간 이상 지났거나, --force 옵션 시 재실행
+# - 그 외에는 스킵 (6시간마다 재실행은 rate-limit/CPU 낭비)
 REPORT=".claude-state/PAPER_SIMULATION_REPORT.md"
+FORCE_SIM=false
+[ "${1:-}" = "--force" ] && FORCE_SIM=true
+
+RUN_SIM=false
 if [ ! -f "$REPORT" ] || ! grep -q "Bybit BTC/USDT" "$REPORT" 2>/dev/null; then
-    echo "--- Running Paper Simulation (Real Bybit data) ---"
+    RUN_SIM=true
+    echo "--- Paper Simulation: 리포트 없음/마커 없음 → 실행 ---"
+elif $FORCE_SIM; then
+    RUN_SIM=true
+    echo "--- Paper Simulation: --force 플래그 → 강제 실행 ---"
+elif [ -n "$(find "$REPORT" -mmin +1440 2>/dev/null)" ]; then
+    RUN_SIM=true
+    echo "--- Paper Simulation: 리포트 24h 초과 → 재실행 ---"
+else
+    AGE_MIN=$(( ($(date +%s) - $(stat -f %m "$REPORT" 2>/dev/null || stat -c %Y "$REPORT")) / 60 ))
+    echo "--- Paper Simulation: 최근 실행 ${AGE_MIN}분 전 → 스킵 (24h 주기) ---"
+fi
+
+if $RUN_SIM; then
     python3 scripts/paper_simulation.py || echo "Paper sim failed — continuing cycle"
     if [ -f "$REPORT" ] && grep -q "Bybit" "$REPORT" 2>/dev/null; then
-        git add "$REPORT" .claude-state/
-        git commit -m "paper: 실제 Bybit 데이터 시뮬레이션 결과" || true
-        git push origin main || true
+        git add "$REPORT" .claude-state/ 2>/dev/null || true
+        git commit -m "paper: 실제 Bybit 데이터 시뮬레이션 결과 ($(date -u +'%Y-%m-%dT%H:%MZ'))" || true
+        git push origin main || echo "paper sim push 실패 — 나중에 sweep에서 재시도"
     fi
 fi
 
