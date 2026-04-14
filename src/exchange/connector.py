@@ -7,7 +7,7 @@ import os
 import time
 import logging
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 import ccxt
 
@@ -57,7 +57,7 @@ class ExchangeConnector:
         logger.critical("Failed to reconnect after %d attempts", max_retries)
         return False
 
-    def sync_positions(self, symbol: str = "BTC/USDT") -> list[dict]:
+    def sync_positions(self, symbol: str = "BTC/USDT") -> List[dict]:
         """거래소에서 실제 열린 포지션을 조회해 동기화."""
         try:
             positions = self.exchange.fetch_positions([symbol])

@@ -102,7 +102,7 @@ class RsiDivergenceStrategy(BaseStrategy):
 
     # ── Divergence detection ─────────────────────────────────────────────────
 
-    def _check_bearish_divergence(self, window: pd.DataFrame) -> "tuple[bool, float]":
+    def _check_bearish_divergence(self, window: pd.DataFrame) -> "Tuple[bool, float]":
         """
         price: higher high (current > earlier swing high)
         rsi:   lower high  (current rsi < earlier rsi at that swing high)
@@ -146,7 +146,7 @@ class RsiDivergenceStrategy(BaseStrategy):
             return True, best_div
         return False, 0.0
 
-    def _check_bullish_divergence(self, window: pd.DataFrame) -> "tuple[bool, float]":
+    def _check_bullish_divergence(self, window: pd.DataFrame) -> "Tuple[bool, float]":
         """
         price: lower low  (current < earlier swing low)
         rsi:   higher low (current rsi > earlier rsi at that swing low)

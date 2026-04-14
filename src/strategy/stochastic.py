@@ -21,7 +21,7 @@ _HIGH_CONF_LOW = 10.0
 _HIGH_CONF_HIGH = 90.0
 
 
-def _calc_stochastic(df: pd.DataFrame) -> "tuple[float, float]":
+def _calc_stochastic(df: pd.DataFrame) -> "Tuple[float, float]":
     """마지막 완성 캔들(-2) 기준 %K, %D 계산."""
     # 최근 _K_PERIOD + _D_PERIOD - 1 봉만 사용 (신호 봉 -2 포함)
     # -1 은 현재 진행 중 캔들 제외

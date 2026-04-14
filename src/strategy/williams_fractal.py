@@ -14,7 +14,7 @@ _MIN_ROWS = 15
 _FRACTAL_LOOKBACK = 5  # 최근 5봉 내 fractal 탐색
 
 
-def _has_bullish_fractal(df: pd.DataFrame, idx: int) -> "tuple[bool, object]":
+def _has_bullish_fractal(df: pd.DataFrame, idx: int) -> "Tuple[bool, object]":
     """idx-2 위치가 5봉 중 중심인 bullish fractal 탐지."""
     if idx < 4:
         return False, None
@@ -26,7 +26,7 @@ def _has_bullish_fractal(df: pd.DataFrame, idx: int) -> "tuple[bool, object]":
     return True, low_c
 
 
-def _has_bearish_fractal(df: pd.DataFrame, idx: int) -> "tuple[bool, object]":
+def _has_bearish_fractal(df: pd.DataFrame, idx: int) -> "Tuple[bool, object]":
     """idx-2 위치가 5봉 중 중심인 bearish fractal 탐지."""
     if idx < 4:
         return False, None

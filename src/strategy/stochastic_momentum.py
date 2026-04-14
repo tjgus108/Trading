@@ -19,7 +19,7 @@ _HIGH_CONF_BUY = -60.0
 _HIGH_CONF_SELL = 60.0
 
 
-def _calc_smi(df: pd.DataFrame) -> "tuple[float, float]":
+def _calc_smi(df: pd.DataFrame) -> "Tuple[float, float]":
     """마지막 완성 캔들(-2) 기준 SMI, smi_signal 계산."""
     window = df.iloc[:-1]  # 진행 중 캔들 제외
     high = window["high"]

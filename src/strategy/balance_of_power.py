@@ -12,7 +12,7 @@ BalanceOfPowerStrategy:
 - 최소 데이터: 30행
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 
@@ -22,7 +22,7 @@ _MIN_ROWS = 30
 _CROSS_THRESHOLD = 0.3
 
 
-def _calc_bop_lines(df: pd.DataFrame) -> "tuple[float, float, float, float]":
+def _calc_bop_lines(df: pd.DataFrame) -> "Tuple[float, float, float, float]":
     """idx = len(df) - 2 기준 bop_sma_now, bop_sma_prev, bop_sig_now, bop_sig_prev 반환."""
     idx = len(df) - 2
 

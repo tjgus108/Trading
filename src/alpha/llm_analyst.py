@@ -15,7 +15,7 @@ C2. LLMAnalyst: Claude API를 호출해 시장 분석 메모를 생성.
 import logging
 import os
 import time
-from typing import Optional
+from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ _RETRY_ATTEMPTS = 3
 _RETRY_BACKOFF = [0.5, 1.0]   # seconds between attempt 1→2, 2→3
 
 
-def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: list[float] = _RETRY_BACKOFF):
+def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: List[float] = _RETRY_BACKOFF):
     """Simple retry wrapper for transient API errors."""
     last_exc: Exception | None = None
     for i in range(attempts):

@@ -24,7 +24,7 @@ import os
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 import yaml
 from dotenv import load_dotenv
@@ -165,13 +165,13 @@ def _validate_config(cfg: AppConfig) -> None:
 # ---------------------------------------------------------------------------
 # Migration helper
 # ---------------------------------------------------------------------------
-_RISK_KEY_ALIASES: dict[str, str] = {
+_RISK_KEY_ALIASES: Dict[str, str] = {
     # old key → new key (for raw["risk"] dict)
     "stop_loss": "stop_loss_atr_multiplier",
     "take_profit": "take_profit_atr_multiplier",
 }
 
-_RISK_DEFAULTS: dict[str, object] = {
+_RISK_DEFAULTS: Dict[str, object] = {
     "max_drawdown": 0.20,
     "max_daily_loss": 0.05,
     "stop_loss_atr_multiplier": 1.5,
@@ -181,7 +181,7 @@ _RISK_DEFAULTS: dict[str, object] = {
     "flash_crash_pct": 0.10,
 }
 
-_TRADING_DEFAULTS: dict[str, object] = {
+_TRADING_DEFAULTS: Dict[str, object] = {
     "max_position_size": 0.10,
     "limit": 500,
 }

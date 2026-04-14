@@ -21,13 +21,13 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple, List, Dict
 
 _RETRY_ATTEMPTS = 3
 _RETRY_BACKOFF = [0.5, 1.0]
 
 
-def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: list[float] = _RETRY_BACKOFF):
+def _with_retry(fn, attempts: int = _RETRY_ATTEMPTS, backoff: List[float] = _RETRY_BACKOFF):
     """Simple retry wrapper for transient API errors."""
     last_exc: Exception | None = None
     for i in range(attempts):
@@ -58,7 +58,7 @@ class EnsembleSignal:
     claude_vote: str        # Claude의 판단
     openai_vote: str        # OpenAI의 판단 ("N/A" if unavailable)
     reasoning: str
-    models_used: list[str]
+    models_used: List[str]
 
     def agrees_with(self, action: str) -> bool:
         """규칙 기반 신호와 LLM 앙상블이 일치하는지."""
@@ -180,9 +180,9 @@ class MultiLLMEnsemble:
             f"(NEUTRAL = no strong opinion)"
         )
 
-    def _ask_parallel(self, prompt: str) -> tuple[str, str]:
+    def _ask_parallel(self, prompt: str) -> Tuple[str, str]:
         """Claude + OpenAI를 ThreadPoolExecutor로 병렬 호출."""
-        results: dict[str, str] = {}
+        results: Dict[str, str] = {}
         tasks = {}
         with ThreadPoolExecutor(max_workers=2) as executor:
             if self._claude_client:
@@ -229,7 +229,7 @@ class MultiLLMEnsemble:
 
     def _compute_consensus(
         self, rule: str, claude: str, openai: str
-    ) -> tuple[str, float]:
+    ) -> Tuple[str, float]:
         """
         합의 계산.
 

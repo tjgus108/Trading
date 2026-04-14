@@ -19,7 +19,7 @@ import pickle
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -40,10 +40,16 @@ class TrainingResult:
     train_accuracy: float
     val_accuracy: float
     test_accuracy: float
-    feature_importances: dict[str, float]
+    feature_importances: Dict[str, float]
     passed: bool
-    fail_reasons: list[str]
+    fail_reasons: List[str]
     model_path: Optional[str] = None
+    # Walk-forward 구간 정보 (선택)
+    split_info: Optional[dict] = None
+    # 클래스별 분포 (선택)
+    class_distribution: Optional[dict] = None
+    # Validation 성능 기반 앙상블 가중치
+    ensemble_weight: float = 0.0
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -54,12 +60,26 @@ class TrainingResult:
             f"  train_accuracy: {self.train_accuracy:.3f}",
             f"  val_accuracy: {self.val_accuracy:.3f}",
             f"  test_accuracy: {self.test_accuracy:.3f}",
+            f"  ensemble_weight: {self.ensemble_weight:.4f}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         if self.model_path:
             lines.append(f"  saved: {self.model_path}")
+        # Walk-forward 구간 정보
+        if self.split_info:
+            lines.append(
+                f"  split: train={self.split_info.get('n_train')} "
+                f"val={self.split_info.get('n_val')} "
+                f"test={self.split_info.get('n_test')}"
+            )
+        # 클래스별 분포
+        if self.class_distribution:
+            dist_str = "  ".join(
+                f"{k}={v:.1%}" for k, v in sorted(self.class_distribution.items())
+            )
+            lines.append(f"  class_dist: {dist_str}")
         # 상위 5개 피처 중요도
         top5 = sorted(self.feature_importances.items(), key=lambda x: x[1], reverse=True)[:5]
         if top5:
@@ -118,8 +138,8 @@ class WalkForwardTrainer:
         self.max_depth = max_depth
         self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
         self._trained_model = None
-        self._class_order: Optional[list[int]] = None
-        self._feature_names: list[str] = []
+        self._class_order: Optional[List[int]] = None
+        self._feature_names: List[str] = []
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
@@ -148,6 +168,8 @@ class WalkForwardTrainer:
         # 반면 분할 후 각 구간에서 피처 계산 시 val/test 구간 앞부분의
         # rolling warm-up NaN으로 유효 샘플이 크게 줄어드는 문제 방지.
         X_all, y_all = self.feature_builder.build(df)
+        # Int64 (nullable) → int64: sklearn 호환성 보장
+        y_all = y_all.astype(int)
 
         n_total = len(X_all)
         train_end = int(n_total * 0.60)
@@ -160,6 +182,12 @@ class WalkForwardTrainer:
         X_test = X_all.iloc[val_end:]
         y_test = y_all.iloc[val_end:]
 
+        split_info = {
+            "n_total": n_total,
+            "n_train": len(X_train),
+            "n_val": len(X_val),
+            "n_test": len(X_test),
+        }
         logger.info(
             "Walk-forward split: n_total=%d train=%d val=%d test=%d",
             n_total, len(X_train), len(X_val), len(X_test),
@@ -205,11 +233,24 @@ class WalkForwardTrainer:
         # 피처 중요도 (base estimator에서 추출)
         feat_importance = dict(zip(X_train.columns, base_clf.feature_importances_))
 
+        # 클래스별 분포 (test 구간 기준)
+        y_all_concat = pd.concat([y_train, y_val, y_test])
+        total_labels = len(y_all_concat)
+        class_distribution = {
+            str(cls): (y_all_concat == cls).sum() / total_labels
+            for cls in sorted(y_all_concat.unique())
+        }
+
         fail_reasons = []
         if test_acc < MIN_ACCURACY:
             fail_reasons.append(f"test_accuracy {test_acc:.3f} < {MIN_ACCURACY}")
         if val_acc < MIN_ACCURACY:
             fail_reasons.append(f"val_accuracy {val_acc:.3f} < {MIN_ACCURACY}")
+
+        # 앙상블 가중치: val + test 평균 성능에서 기준선(0.5) 초과분 기반
+        # 범위 [0, 1], PASS 기준 미달 시 0으로 패널티
+        raw_weight = (val_acc + test_acc) / 2.0 - 0.50
+        ensemble_weight = round(max(0.0, raw_weight), 4) if len(fail_reasons) == 0 else 0.0
 
         self._trained_model = clf
         self._class_order = list(base_clf.classes_)
@@ -226,12 +267,15 @@ class WalkForwardTrainer:
             feature_importances=feat_importance,
             passed=len(fail_reasons) == 0,
             fail_reasons=fail_reasons,
+            split_info=split_info,
+            class_distribution=class_distribution,
+            ensemble_weight=ensemble_weight,
         )
         logger.info(result.summary())
         logger.info(result.feature_importance_report())
         return result
 
-    def get_feature_importances(self, top_n: Optional[int] = None) -> list[tuple[str, float]]:
+    def get_feature_importances(self, top_n: Optional[int] = None) -> List[Tuple[str, float]]:
         """
         학습된 모델의 피처 중요도를 내림차순으로 반환.
 
@@ -255,6 +299,45 @@ class WalkForwardTrainer:
         if top_n is not None:
             ranked = ranked[:top_n]
         return ranked
+
+    def compute_ensemble_weight(
+        self,
+        results: List["TrainingResult"],
+        baseline: float = 0.50,
+    ) -> List[float]:
+        """
+        여러 TrainingResult로부터 validation 성능 기반 정규화된 앙상블 가중치 계산.
+
+        각 모델의 가중치 = (val_acc + test_acc) / 2 - baseline (음수 → 0 클리핑).
+        전체 합이 1이 되도록 정규화. PASS 모델만 가중치 부여.
+
+        Args:
+            results: TrainingResult 리스트 (복수 모델 비교 시 활용)
+            baseline: 기준 정확도 (기본 0.50 = 랜덤 수준)
+
+        Returns:
+            List[float]: 각 모델의 정규화 가중치 (합=1.0, 또는 전부 0이면 균등 분배)
+
+        Example:
+            r1 = trainer1.train(df1)
+            r2 = trainer2.train(df2)
+            weights = trainer1.compute_ensemble_weight([r1, r2])
+            # → [0.6, 0.4] 등
+        """
+        raw = []
+        for r in results:
+            if not r.passed:
+                raw.append(0.0)
+            else:
+                score = (r.val_accuracy + r.test_accuracy) / 2.0 - baseline
+                raw.append(max(0.0, score))
+
+        total = sum(raw)
+        if total <= 0.0:
+            # 모두 FAIL이면 균등 분배
+            n = len(results)
+            return [1.0 / n if n > 0 else 0.0] * n
+        return [round(w / total, 6) for w in raw]
 
     def save(self, path: Optional[str] = None) -> str:
         """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""

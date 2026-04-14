@@ -18,7 +18,7 @@ K1. Anomaly Detector — 가격/거래량 이상치 실시간 감지.
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -51,7 +51,7 @@ class AnomalyDetector:
         z_threshold: float = 3.0,       # Z-score 이상치 임계값
         iqr_k: float = 3.0,             # IQR 이상치 배수
         return_spike_threshold: float = 0.05,  # 단일 캔들 수익률 5% 초과
-        columns: Optional[list[str]] = None,   # 감지할 컬럼 (None=자동)
+        columns: Optional[List[str]] = None,   # 감지할 컬럼 (None=자동)
         window: int = 50,               # rolling 통계 창
         volume_surge_multiplier: float = 3.0,  # 거래량 평균 대비 급증 배수
     ) -> None:
@@ -62,9 +62,9 @@ class AnomalyDetector:
         self.window = window
         self.volume_surge_multiplier = volume_surge_multiplier
 
-    def detect(self, df: pd.DataFrame) -> list[AnomalyEvent]:
+    def detect(self, df: pd.DataFrame) -> List[AnomalyEvent]:
         """DataFrame에서 이상치 감지. 이상치 이벤트 리스트 반환."""
-        events: list[AnomalyEvent] = []
+        events: List[AnomalyEvent] = []
 
         # 감지 대상 컬럼 결정
         cols = self.columns or [c for c in ["close", "volume"] if c in df.columns]
@@ -89,7 +89,7 @@ class AnomalyDetector:
 
         return events
 
-    def detect_latest(self, df: pd.DataFrame) -> list[AnomalyEvent]:
+    def detect_latest(self, df: pd.DataFrame) -> List[AnomalyEvent]:
         """최신 캔들만 감지 (실시간 스캔용)."""
         all_events = self.detect(df)
         last_idx = len(df) - 2  # _last 패턴과 동일
@@ -97,7 +97,7 @@ class AnomalyDetector:
 
     def _detect_zscore(
         self, series: pd.Series, col: str, df: pd.DataFrame
-    ) -> list[AnomalyEvent]:
+    ) -> List[AnomalyEvent]:
         events = []
         # rolling mean/std
         rolling_mean = series.rolling(self.window, min_periods=5).mean()
@@ -121,7 +121,7 @@ class AnomalyDetector:
 
     def _detect_iqr(
         self, series: pd.Series, col: str, df: pd.DataFrame
-    ) -> list[AnomalyEvent]:
+    ) -> List[AnomalyEvent]:
         events = []
         q1 = series.quantile(0.25)
         q3 = series.quantile(0.75)
@@ -143,7 +143,7 @@ class AnomalyDetector:
                 ))
         return events
 
-    def _detect_return_spike(self, df: pd.DataFrame) -> list[AnomalyEvent]:
+    def _detect_return_spike(self, df: pd.DataFrame) -> List[AnomalyEvent]:
         events = []
         closes = df["close"].values
         for i in range(1, len(closes)):
@@ -160,7 +160,7 @@ class AnomalyDetector:
                 ))
         return events
 
-    def _detect_volume_surge(self, df: pd.DataFrame) -> list[AnomalyEvent]:
+    def _detect_volume_surge(self, df: pd.DataFrame) -> List[AnomalyEvent]:
         """거래량 3배 이상 급증 감지 (크립토 특화).
 
         rolling 평균 대비 volume_surge_multiplier 배 초과 시 이상치로 판단.

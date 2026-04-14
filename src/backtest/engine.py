@@ -6,7 +6,7 @@ backtest-agent가 이 모듈을 사용한다.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -43,7 +43,7 @@ class BacktestResult:
     max_drawdown: float
     total_return: float
     passed: bool
-    fail_reasons: list[str]
+    fail_reasons: List[str]
     total_fees: float = 0.0
     total_slippage_cost: float = 0.0
     deflated_sharpe_ratio: float = 0.0  # DSR (과최적화 보정)
@@ -51,7 +51,7 @@ class BacktestResult:
     avg_loss: float = 0.0  # 평균 손실 거래 (양수)
     win_loss_ratio: float = 0.0  # avg_win / avg_loss
     max_consecutive_losses: int = 0  # 최대 연속 손실
-    trades: list[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
+    trades: List[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -208,7 +208,7 @@ class BacktestEngine:
 
         return self._compute_metrics(strategy.name, trades, equity_curve, total_fees, total_slippage_cost)
 
-    def _check_exit(self, position: dict, candle: pd.Series) -> tuple[float, bool, float, float]:
+    def _check_exit(self, position: dict, candle: pd.Series) -> Tuple[float, bool, float, float]:
         """반환: (pnl, closed, fee, slippage_cost)"""
         side = position["side"]
         sl, tp, size, entry = position["sl"], position["tp"], position["size"], position["entry"]
@@ -237,7 +237,7 @@ class BacktestEngine:
                 return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost
         return 0.0, False, 0.0, 0.0
 
-    def _market_close(self, position: dict, close_price: float) -> tuple[float, float, float]:
+    def _market_close(self, position: dict, close_price: float) -> Tuple[float, float, float]:
         """반환: (pnl, fee, slippage_cost)"""
         entry, size, side = position["entry"], position["size"], position["side"]
         if side == "BUY":

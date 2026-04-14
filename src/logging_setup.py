@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 import os
 from pathlib import Path
+from typing import List
 
 
 def setup_logging(level: str = "INFO", log_file: str = "logs/trading.log") -> None:
@@ -20,7 +21,7 @@ def setup_logging(level: str = "INFO", log_file: str = "logs/trading.log") -> No
         log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8",
     )
 
-    handlers: list[logging.Handler] = [
+    handlers: List[logging.Handler] = [
         logging.StreamHandler(),
         file_handler,
     ]

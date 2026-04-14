@@ -1,5 +1,28 @@
 # Work Log
 
+## [2026-04-15] Cycle 122 — B + D + SIM + F
+
+**[B] Risk Management:**
+- drawdown_monitor.py: 에스컬레이션 버그 2건 수정 — WARNING→HALT 전환 시 자동 해제 방지, severity 비교 로직 추가
+- 회귀 테스트 3개 추가 (test_drawdown_monitor.py), 71개 전체 PASS
+
+**[D] ML & Signals:**
+- trainer.py: TrainingResult에 split_info, class_distribution, ensemble_weight 필드 추가
+- trainer.py: compute_ensemble_weight() — validation 성능 기반 동적 가중치 계산
+- model.py: Int64 nullable dtype 호환 수정
+- 테스트 7개 추가 (test_phase_c_ml.py)
+
+**[SIM] Paper Simulation:**
+- dema_cross.py: RSI 필터 + DEMA 거리 1% 필터 추가 (PF 1.696 → 개선 목표)
+- acceleration_band.py: RSI 필터 + 밴드 폭 임계값 0.015→0.025% 강화
+- roc_ma_cross.py: RSI 필터 + ROC 절대값 0.5% + EMA200 추세 확인 추가
+- Python 3.11 타입 힌트 → typing 호환 변환 (30개 파일)
+
+**[F] Research:**
+- 실패: AI봇 상태 불일치($441K 손실), Nova 개인키 탈취($500K), Bitget VOXEL 마켓메이커 조작, 2025 플래시 크래시($20억/3분)
+- 성공: 크로스체인 아비트라지($8.68억 볼륨), 3Commas DCA(30일 12.8%), Delta Neutral(12개월 양수, MDD 0.80%)
+- 트렌드: RL+기술지표 결합, Order Flow Imbalance, ML 멀티팩터, Delta Neutral 우세, Regime Detection 필수화
+
 ## [2026-04-14] Cycle 121 — D + E + SIM + F
 
 **[D] ML & Signals:**
@@ -11528,3 +11551,6 @@ Real trading data (paper_simulation) exposed flaws the backtest engine didn't ca
 
 Both improvements add trend context without being dogmatic—filters are selective and graceful when data unavailable.
 
+
+## [2026-04-14 21:47 UTC] Cycle 122 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

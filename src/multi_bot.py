@@ -10,7 +10,7 @@ MultiBot: 여러 심볼을 병렬로 운용하는 오케스트레이터 풀.
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Dict
 
 from src.config import AppConfig
 from src.orchestrator import BotOrchestrator, OrchestratorError
@@ -43,14 +43,14 @@ class MultiBot:
     def __init__(
         self,
         base_cfg: AppConfig,
-        symbols: list[SymbolConfig],
+        symbols: List[SymbolConfig],
         max_total_exposure: float = 0.30,   # 전체 포트폴리오 최대 노출 30%
     ):
         self._base_cfg = base_cfg
         self._symbols = symbols
         self._max_total_exposure = max_total_exposure
-        self._bots: dict[str, BotOrchestrator] = {}
-        self._threads: dict[str, threading.Thread] = {}
+        self._bots: Dict[str, BotOrchestrator] = {}
+        self._threads: Dict[str, threading.Thread] = {}
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
 
@@ -103,7 +103,7 @@ class MultiBot:
         for bot in self._bots.values():
             bot.stop()
 
-    def run_once_all(self) -> dict[str, object]:
+    def run_once_all(self) -> Dict[str, object]:
         """모든 봇을 병렬로 1회 실행. 결과 딕셔너리 반환."""
         results = {}
         with threading.Lock():

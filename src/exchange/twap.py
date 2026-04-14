@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 
@@ -81,11 +81,11 @@ class TWAPExecutor:
             TWAPResult (부분 체결/타임아웃 정보 포함)
         """
         slice_qty = total_qty / self.n_slices
-        filled_prices: list[float] = []
-        filled_quantities: list[float] = []
+        filled_prices: List[float] = []
+        filled_quantities: List[float] = []
         partial_fills = 0
         timeout_occurred = False
-        slice_times: list[float] = []
+        slice_times: List[float] = []
         start_time = time.time()
 
         for i in range(self.n_slices):

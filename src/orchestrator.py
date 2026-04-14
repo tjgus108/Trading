@@ -16,7 +16,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from src.alpha.context import MarketContextBuilder
 from src.analysis.strategy_correlation import SignalCorrelationTracker
@@ -392,7 +392,7 @@ from src.strategy.market_regime_classifier import MarketRegimeClassifierStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
+STRATEGY_REGISTRY: Dict[str, type[BaseStrategy]] = {
     "ema_cross": EmaCrossStrategy,
     "donchian_breakout": DonchianBreakoutStrategy,
     "funding_rate": FundingRateStrategy,
@@ -760,7 +760,7 @@ class OrchestratorError(Exception):
 class TournamentResult:
     winner: str                          # 전략 이름
     winner_sharpe: float
-    rankings: list[dict]                 # [{name, sharpe, passed, fail_reasons}]
+    rankings: List[dict]                 # [{name, sharpe, passed, fail_reasons}]
     wf_stable: Optional[bool] = None    # Walk-Forward 안정성 (None=미실행)
     wf_fallback: bool = False            # True면 1위 불안정 → 2위로 fallback
 
@@ -984,7 +984,7 @@ class BotOrchestrator:
         self._assert_ready()
         return self._run_backtest(self._strategy)
 
-    def run_tournament(self, candidates: Optional[list[str]] = None) -> TournamentResult:
+    def run_tournament(self, candidates: Optional[List[str]] = None) -> TournamentResult:
         """
         여러 전략을 병렬 백테스트 후 Sharpe 기준으로 순위를 매기고 승자를 반환.
         승자 전략으로 파이프라인을 재구성한다.
@@ -1025,7 +1025,7 @@ class BotOrchestrator:
             raise OrchestratorError("No valid strategies for tournament")
 
         # 병렬 백테스트
-        results: dict[str, BacktestResult] = {}
+        results: Dict[str, BacktestResult] = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(strategies), 6)) as pool:
             futures = {pool.submit(self._run_backtest, s): s.name for s in strategies}
             for fut in concurrent.futures.as_completed(futures):

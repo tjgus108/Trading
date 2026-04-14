@@ -13,7 +13,7 @@ A1. Funding Rate 역추세 전략.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -57,7 +57,7 @@ class FundingRateStrategy(BaseStrategy):
         self.bearish_mean_threshold = bearish_mean_threshold  # BUY 억제 평균 임계값
         self.spike_zscore_threshold = spike_zscore_threshold  # 급변 서킷 Z-score 임계값
         self._funding_rate: Optional[float] = None
-        self._funding_rate_history: list[float] = []
+        self._funding_rate_history: List[float] = []
 
     def update_funding_rate(self, rate: float) -> None:
         """외부(orchestrator/data-agent)에서 최신 펀딩비 주입."""

@@ -23,7 +23,7 @@ F3. DEX 가격 피드.
 
 import logging
 import time
-from typing import Optional
+from typing import Optional, Tuple, Dict
 
 import requests
 
@@ -46,8 +46,8 @@ ARB_THRESHOLD_PCT = 0.3
 
 class DEXPriceFeed:
     def __init__(self, max_retries: int = _MAX_RETRIES):
-        self._cache: dict[str, tuple[float, float]] = {}  # symbol → (price, timestamp)
-        self._last_successful: dict[str, float] = {}  # symbol → last_price (fallback)
+        self._cache: Dict[str, Tuple[float, float]] = {}  # symbol → (price, timestamp)
+        self._last_successful: Dict[str, float] = {}  # symbol → last_price (fallback)
         self.max_retries = max_retries
 
     def get_price(self, symbol: str = "BTC") -> float:

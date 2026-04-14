@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 try:
     import requests as _requests
@@ -46,15 +46,15 @@ class LiquidationFetcher:
     def __init__(self, symbol: str = "BTC/USDT", max_retries: int = _MAX_RETRIES):
         self.symbol = symbol
         self._ccxt_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
-        self._mock_data: Optional[list[dict]] = None
+        self._mock_data: Optional[List[dict]] = None
         self.max_retries = max_retries
-        self._last_successful: Optional[list[dict]] = None
+        self._last_successful: Optional[List[dict]] = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def get_recent(self, limit: int = 50) -> list[dict]:
+    def get_recent(self, limit: int = 50) -> List[dict]:
         """Bybit v5 recent-trade 엔드포인트 호출. 재시도 + fallback 포함."""
         if self._mock_data is not None:
             return self._mock_data
@@ -128,8 +128,8 @@ class LiquidationFetcher:
 
         long_liq_usd = 0.0
         short_liq_usd = 0.0
-        recent_usd_values: list[float] = []
-        older_usd_values: list[float] = []
+        recent_usd_values: List[float] = []
+        older_usd_values: List[float] = []
 
         for o in orders:
             try:
@@ -182,7 +182,7 @@ class LiquidationFetcher:
         """테스트/데모용: 고정값 반환."""
         fetcher = cls()
         now_ms = int(time.time() * 1000)
-        orders: list[dict] = []
+        orders: List[dict] = []
 
         if long_liq > 0:
             orders.append({

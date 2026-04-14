@@ -17,7 +17,7 @@ Risk-Constrained Kelly (max_drawdown 제약):
 from __future__ import annotations
 
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 
 
 class KellySizer:
@@ -106,7 +106,7 @@ class KellySizer:
     @classmethod
     def from_trade_history(
         cls,
-        trades: list[dict],
+        trades: List[dict],
         capital: float,
         price: float,
         atr: Optional[float] = None,

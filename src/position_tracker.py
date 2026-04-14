@@ -11,7 +11,7 @@ PositionTracker: 열린 포지션과 일일 P&L 추적.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +98,9 @@ class DailyPnL:
 
 class PositionTracker:
     def __init__(self):
-        self._open: dict[str, Position] = {}   # symbol → Position
+        self._open: Dict[str, Position] = {}   # symbol → Position
         self._daily = DailyPnL()
-        self._history: list[ClosedTrade] = []
+        self._history: List[ClosedTrade] = []
 
     # ── Public API ────────────────────────────────────────────────────────
 

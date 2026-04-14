@@ -19,7 +19,7 @@ circuit_breaker 패턴으로 거래 차단.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -132,11 +132,27 @@ class DrawdownMonitor:
             daily_dd, weekly_dd, monthly_dd, drawdown
         )
 
-        if new_level != AlertLevel.NONE and not self._halted:
-            self._halted = True
-            self._alert_level = new_level
-            self._halt_reason = new_reason
-            logger.warning("DrawdownMonitor: HALTED [%s] — %s", new_level.value, new_reason)
+        # ── 티어드 서킷브레이커: 항상 적용 (이미 halted여도 심각도 상향 가능) ──
+        _severity = {AlertLevel.NONE: 0, AlertLevel.WARNING: 1,
+                     AlertLevel.HALT: 2, AlertLevel.FORCE_LIQUIDATE: 3}
+        if new_level != AlertLevel.NONE:
+            if _severity[new_level] > _severity[self._alert_level]:
+                # 새 레벨이 더 심각 → 즉시 적용 (신규 halt 또는 에스컬레이션)
+                self._halted = True
+                self._alert_level = new_level
+                self._halt_reason = new_reason
+                logger.warning(
+                    "DrawdownMonitor: HALTED [%s] — %s", new_level.value, new_reason
+                )
+            elif not self._halted:
+                # 동일 심각도, 아직 미halt → halt 시작
+                self._halted = True
+                self._alert_level = new_level
+                self._halt_reason = new_reason
+                logger.warning(
+                    "DrawdownMonitor: HALTED [%s] — %s", new_level.value, new_reason
+                )
+            # 이미 halt + 동일/더 낮은 레벨 → 유지 (no change)
 
         # legacy MDD 체크 (기준 잔고 미설정 시 폴백)
         elif not self._halted and drawdown >= self.max_drawdown_pct:
@@ -148,7 +164,8 @@ class DrawdownMonitor:
             )
             logger.warning("DrawdownMonitor: HALTED — %s", self._halt_reason)
 
-        # 차단 해제 체크 (FORCE_LIQUIDATE는 수동 해제만)
+        # 차단 해제 체크: tiered 조건 해소 + MDD 회복 기준 충족 시만 재개
+        # FORCE_LIQUIDATE는 수동 해제(force_resume)만 허용
         elif self._halted and self._alert_level != AlertLevel.FORCE_LIQUIDATE:
             if drawdown < (self.max_drawdown_pct - self.recovery_pct):
                 self._halted = False
@@ -178,7 +195,7 @@ class DrawdownMonitor:
         weekly_dd: float,
         monthly_dd: float,
         total_dd: float,
-    ) -> tuple[AlertLevel, str]:
+    ) -> Tuple[AlertLevel, str]:
         """3층 서킷브레이커 체크. 가장 심각한 레벨 반환."""
         if monthly_dd >= self.monthly_limit:
             return (

@@ -18,7 +18,7 @@ import pickle
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -75,8 +75,8 @@ class MLSignalGenerator:
         self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
         self._model = None
         self._model_name: str = "no model"
-        self._label_map: dict[int, str] = {1: "BUY", -1: "SELL", 0: "HOLD"}
-        self._class_order: Optional[list[int]] = None  # 모델의 class 순서
+        self._label_map: Dict[int, str] = {1: "BUY", -1: "SELL", 0: "HOLD"}
+        self._class_order: Optional[List[int]] = None  # 모델의 class 순서
 
     def load(self, path: str) -> bool:
         """모델 파일 로드. 실패 시 False 반환."""

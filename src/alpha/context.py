@@ -14,7 +14,7 @@ HIGH 이벤트 발생 시 포지션 축소를 권고한다.
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from src.data.sentiment import SentimentData, SentimentFetcher
 from src.data.onchain import OnchainData, OnchainFetcher
@@ -66,7 +66,7 @@ class MarketContext:
             return self.composite_score <= -0.5
         return False
 
-    def adjust_signal(self, signal: Signal) -> tuple[Signal, list[str]]:
+    def adjust_signal(self, signal: Signal) -> Tuple[Signal, List[str]]:
         """
         MarketContext 기반으로 신호 confidence 조정 + 메모 반환.
         신호 객체는 불변 — 새 Signal 반환.
@@ -133,7 +133,7 @@ class MarketContext:
 
         return signal, notes
 
-    def summary_lines(self) -> list[str]:
+    def summary_lines(self) -> List[str]:
         lines = []
         if self.sentiment:
             lines.append(self.sentiment.summary())

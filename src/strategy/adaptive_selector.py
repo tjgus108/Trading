@@ -15,7 +15,7 @@ Tournament(백테스트 기반)와 달리 라이브 거래 성과를 반영.
 import random
 import logging
 from collections import deque
-from typing import Optional
+from typing import Optional, List, Dict
 
 import numpy as np
 
@@ -31,7 +31,7 @@ class AdaptiveStrategySelector:
 
     def __init__(
         self,
-        strategies: dict[str, BaseStrategy],
+        strategies: Dict[str, BaseStrategy],
         window: int = 20,
     ) -> None:
         """
@@ -41,7 +41,7 @@ class AdaptiveStrategySelector:
         """
         self._strategies = strategies
         self._window = window
-        self._pnl_history: dict[str, deque] = {
+        self._pnl_history: Dict[str, deque] = {
             k: deque(maxlen=window) for k in strategies
         }
 
@@ -86,11 +86,11 @@ class AdaptiveStrategySelector:
             raise ValueError("No strategies registered")
         return max(self._strategies, key=lambda k: self.sharpe(k))
 
-    def summary(self) -> dict[str, float]:
+    def summary(self) -> Dict[str, float]:
         """전략별 rolling Sharpe dict 반환."""
         return {k: self.sharpe(k) for k in self._strategies}
 
-    def strategy_names(self) -> list[str]:
+    def strategy_names(self) -> List[str]:
         return list(self._strategies.keys())
 
     def rolling_consistency(self, strategy_name: str, window: int = 30) -> float:
@@ -119,7 +119,7 @@ class AdaptiveStrategySelector:
         dominant = max(counts.values())
         return dominant / len(recent)
 
-    def consistency_summary(self, window: int = 30) -> dict[str, float]:
+    def consistency_summary(self, window: int = 30) -> Dict[str, float]:
         """전략별 rolling 일관성 점수 dict 반환."""
         return {k: self.rolling_consistency(k, window=window) for k in self._strategies}
 

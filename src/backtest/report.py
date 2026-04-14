@@ -21,7 +21,7 @@ BacktestEngine 결과(trades list + equity curve)로부터
 import json
 import logging
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -230,7 +230,7 @@ class BacktestReport:
     @classmethod
     def from_trades(
         cls,
-        trades: list[dict],
+        trades: List[dict],
         annualization: int = 252 * 24,
         risk_free_rate: float = 0.05,
     ) -> "BacktestReport":

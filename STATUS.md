@@ -1,6 +1,6 @@
 # 🤖 트레이딩 봇 진행 상황
 
-## 📅 최근 업데이트: 2026-04-11
+## 📅 최근 업데이트: 2026-04-15
 
 ---
 
@@ -106,7 +106,8 @@
 - ✅ Cycle 98 완료 (SIM ema_stack/trend_follow 구조적 한계 확인)
 - ✅ **Cycle 99 완료** (E+A+**SIM**+F: XSS javascript + WF boundary + **frama -3.77%→+1.02% 흑자 전환!**)
 - ✅ **Cycle 100 완료** 🎯🎉 **100 사이클 마일스톤 달성!** (C+B+SIM+F: health_check to_json + Dashboard 🎯 금배지 + **volatility_cluster -6.32%→-2.17%**)
-- Cycle 5: D+E+F (ML+실행+리서치)
+- ✅ Cycle 121 완료 (D+E+SIM+F: ML 피처 2개 추가 + 슬리피지 bps + 전략 튜닝 + 리서치 5건)
+- ✅ **Cycle 122 완료** (B+D+SIM+F: **DrawdownMonitor 에스컬레이션 버그 수정** + 앙상블 가중치 + RSI 필터 3전략 + 리서치 7건)
 
 ---
 

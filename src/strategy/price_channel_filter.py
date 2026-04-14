@@ -21,7 +21,7 @@ _HIGH_CONF_HIGH = 0.95
 _HIGH_CONF_LOW = 0.05
 
 
-def _calc_channel_position(df: pd.DataFrame) -> "tuple[float, float, float]":
+def _calc_channel_position(df: pd.DataFrame) -> "Tuple[float, float, float]":
     """마지막 완성 캔들(-2) 기준 채널 내 위치 반환."""
     window = df.iloc[:-1]  # 진행 중 캔들 제외
     high = window["high"]

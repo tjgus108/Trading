@@ -84,7 +84,7 @@ class DoubleTopBottomStrategy(BaseStrategy):
 
     # ── Double Bottom ────────────────────────────────────────────────────────
 
-    def _check_double_bottom(self, window: pd.DataFrame) -> "tuple[bool, float]":
+    def _check_double_bottom(self, window: pd.DataFrame) -> "Tuple[bool, float]":
         lows = window["low"].reset_index(drop=True)
         closes = window["close"].reset_index(drop=True)
         n = len(lows)
@@ -130,7 +130,7 @@ class DoubleTopBottomStrategy(BaseStrategy):
 
     # ── Double Top ───────────────────────────────────────────────────────────
 
-    def _check_double_top(self, window: pd.DataFrame) -> "tuple[bool, float]":
+    def _check_double_top(self, window: pd.DataFrame) -> "Tuple[bool, float]":
         highs = window["high"].reset_index(drop=True)
         closes = window["close"].reset_index(drop=True)
         n = len(highs)

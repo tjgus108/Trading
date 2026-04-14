@@ -258,3 +258,49 @@ def test_from_dict_halted_force_liquidate():
     m2 = DrawdownMonitor.from_dict(m.to_dict())
     assert m2.is_halted() is True
     assert m2.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+
+# ── 에스컬레이션 (WARNING -> HALT -> FORCE_LIQUIDATE) ──────────────────────────
+
+def test_warning_escalates_to_halt():
+    """WARNING 상태에서 주간 낙폭 초과 시 HALT로 에스컬레이션 (이전 버그: 잘못 해제됨)."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+
+    s1 = m.update(9650)   # daily 3.5% -> WARNING
+    assert s1.alert_level == AlertLevel.WARNING
+    assert s1.halted is True
+
+    s2 = m.update(9200)   # weekly 8% -> 에스컬레이션 HALT
+    assert s2.halted is True, "halted이어야 함 — 이전 버그: 잘못 해제됨"
+    assert s2.alert_level == AlertLevel.HALT
+
+
+def test_halt_escalates_to_force_liquidate():
+    """HALT 상태에서 월간 낙폭 초과 시 FORCE_LIQUIDATE로 에스컬레이션."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+
+    # 주간 8% -> HALT
+    m.update(9200)
+    assert m.alert_level() == AlertLevel.HALT
+
+    # 월간 16% -> FORCE_LIQUIDATE
+    s = m.update(8400)
+    assert s.alert_level == AlertLevel.FORCE_LIQUIDATE
+    assert s.halted is True
+
+
+def test_no_false_resume_when_conditions_still_active():
+    """기존 티어드 조건이 활성인 동안 자동 해제되지 않는다."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15,
+                        max_drawdown_pct=0.20, recovery_pct=0.05)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+
+    m.update(9650)   # WARNING (daily 3.5%)
+    s = m.update(9200)  # weekly 8% -> should escalate, NOT resume
+    assert s.halted is True
+    assert s.alert_level == AlertLevel.HALT

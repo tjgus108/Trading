@@ -11,12 +11,12 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Callable
+from typing import Callable, Dict
 
 logger = logging.getLogger(__name__)
 
 # 지원 타임프레임 → 초 단위 간격
-TIMEFRAME_SECONDS: dict[str, int] = {
+TIMEFRAME_SECONDS: Dict[str, int] = {
     "1m":  60,
     "5m":  5 * 60,
     "15m": 15 * 60,

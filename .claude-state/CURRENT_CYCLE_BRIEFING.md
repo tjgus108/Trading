@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 120 — 2026-04-14T13:59:39.480366Z
+🔄 CYCLE 122 — 2026-04-14T21:47:09.769982Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+
 ### [D] ML & Signals
 - **Agent**: ml-agent
 - **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
-
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -26,6 +26,9 @@
   **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
   **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
   **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
+
+**[!] 감지된 이슈:**
+  - FAIL 기록 존재
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

@@ -20,7 +20,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 50
 
 
-def _calc_tsi(df: pd.DataFrame) -> "tuple[float, float, float, float]":
+def _calc_tsi(df: pd.DataFrame) -> "Tuple[float, float, float, float]":
     """idx = len(df) - 2 기준 TSI, Signal, prev_TSI, prev_Signal 계산."""
     idx = len(df) - 2
 

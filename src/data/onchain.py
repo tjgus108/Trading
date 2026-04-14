@@ -21,7 +21,7 @@ import os
 import time
 import urllib.request
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ class OnchainFetcher:
             source="blockchain.info" + ("+glassnode" if self._glassnode_key else ""),
         )
 
-    def _fetch_glassnode_signals(self) -> tuple[str, str]:
+    def _fetch_glassnode_signals(self) -> Tuple[str, str]:
         """Glassnode API로 exchange flow + whale 데이터 조회 (부분 실패 허용)."""
         try:
             base = "https://api.glassnode.com/v1/metrics"

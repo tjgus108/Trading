@@ -509,6 +509,85 @@ class TestWalkForwardTrainer:
         trainer.train(df)
         assert isinstance(trainer._trained_model, CalibratedClassifierCV)
 
+    def test_result_split_info_populated(self):
+        """학습 결과에 split_info(n_train/n_val/n_test)가 채워지는지 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        assert result.split_info is not None
+        assert result.split_info["n_train"] > 0
+        assert result.split_info["n_val"] > 0
+        assert result.split_info["n_test"] > 0
+        assert (
+            result.split_info["n_train"]
+            + result.split_info["n_val"]
+            + result.split_info["n_test"]
+            == result.n_samples
+        )
+
+    def test_result_class_distribution_sums_to_one(self):
+        """class_distribution 비율 합이 1.0 (±1e-6)."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        assert result.class_distribution is not None
+        total = sum(result.class_distribution.values())
+        assert abs(total - 1.0) < 1e-6
+
+    def test_ensemble_weight_pass_model(self):
+        """PASS 모델의 ensemble_weight > 0."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        if result.passed:
+            assert result.ensemble_weight > 0.0
+        else:
+            assert result.ensemble_weight == 0.0
+
+    def test_compute_ensemble_weight_normalizes(self):
+        """compute_ensemble_weight()가 합=1.0으로 정규화."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer, TrainingResult
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        r1 = trainer.train(df)
+        r2 = trainer.train(df)
+        weights = trainer.compute_ensemble_weight([r1, r2])
+        assert len(weights) == 2
+        assert abs(sum(weights) - 1.0) < 1e-6
+
+    def test_compute_ensemble_weight_all_fail_uniform(self):
+        """모두 FAIL이면 균등 분배."""
+        from src.ml.trainer import WalkForwardTrainer, TrainingResult
+        trainer = WalkForwardTrainer()
+        # FAIL 결과 2개 수동 생성
+        fail_result = TrainingResult(
+            model_name="test", n_samples=0, n_features=0,
+            train_accuracy=0.0, val_accuracy=0.0, test_accuracy=0.0,
+            feature_importances={}, passed=False, fail_reasons=["test"],
+        )
+        weights = trainer.compute_ensemble_weight([fail_result, fail_result])
+        assert abs(weights[0] - 0.5) < 1e-6
+        assert abs(weights[1] - 0.5) < 1e-6
+
+    def test_summary_includes_new_fields(self):
+        """summary()에 ensemble_weight, split, class_dist 포함 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+        s = result.summary()
+        assert "ensemble_weight" in s
+        assert "split:" in s
+        assert "class_dist:" in s
+
 
 # ---------------------------------------------------------------------------
 # C1: MLRFStrategy

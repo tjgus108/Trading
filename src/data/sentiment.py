@@ -14,7 +14,7 @@ import time
 import urllib.request
 import json
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class SentimentFetcher:
     # Internal fetchers (각각 독립 실패 처리 + 재시도)
     # ------------------------------------------------------------------
 
-    def _fetch_fear_greed(self) -> tuple[Optional[int], str]:
+    def _fetch_fear_greed(self) -> Tuple[Optional[int], str]:
         for attempt in range(self.max_retries + 1):
             try:
                 req = urllib.request.Request(

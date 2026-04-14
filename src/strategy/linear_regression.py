@@ -22,7 +22,7 @@ _R2_MEDIUM = 0.7
 _R2_HIGH = 0.9
 
 
-def _linear_regression(y: np.ndarray) -> tuple[float, float, float]:
+def _linear_regression(y: np.ndarray) -> Tuple[float, float, float]:
     """기울기, 마지막 예측값, R² 반환."""
     period = len(y)
     x = np.arange(period)

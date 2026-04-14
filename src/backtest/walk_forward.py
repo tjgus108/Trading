@@ -19,7 +19,7 @@ D3. WalkForwardOptimizer: 전략 파라미터 자동 최적화.
 import itertools
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 
 import pandas as pd
 
@@ -29,7 +29,7 @@ from src.strategy.base import BaseStrategy
 logger = logging.getLogger(__name__)
 
 # 기본 최적화 파라미터 그리드
-DEFAULT_GRIDS: dict[str, dict] = {
+DEFAULT_GRIDS: Dict[str, dict] = {
     "ema_cross": {
         "fast_span": [10, 15, 20],
         "slow_span": [40, 50, 60],
@@ -67,12 +67,12 @@ class WalkForwardResult:
     """전체 walk-forward 최적화 결과."""
     strategy_name: str
     best_params: dict           # 최종 추천 파라미터
-    windows: list[WindowResult]
+    windows: List[WindowResult]
     avg_oos_sharpe: float
     oos_sharpe_std: float
     is_stable: bool             # 안정성 기준 통과 여부
     overfit_windows: int        # 과최적화 의심 윈도우 수
-    fail_reasons: list[str] = field(default_factory=list)
+    fail_reasons: List[str] = field(default_factory=list)
 
     def summary(self) -> str:
         verdict = "STABLE" if self.is_stable else "UNSTABLE"
@@ -172,8 +172,8 @@ class WalkForwardOptimizer:
             self.strategy_name, len(windows), len(all_combinations),
         )
 
-        window_results: list[WindowResult] = []
-        param_oos_map: dict[str, list[float]] = {}
+        window_results: List[WindowResult] = []
+        param_oos_map: Dict[str, List[float]] = {}
 
         for i, (is_df, oos_df) in enumerate(windows):
             # IS 최적화
@@ -257,7 +257,7 @@ class WalkForwardOptimizer:
     # Internal
     # ------------------------------------------------------------------
 
-    def _split_windows(self, df: pd.DataFrame) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    def _split_windows(self, df: pd.DataFrame) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
         """Walk-forward 윈도우 분할."""
         n = len(df)
         window_size = n // (self.n_windows + 1)
@@ -279,8 +279,8 @@ class WalkForwardOptimizer:
         return windows
 
     def _optimize_in_sample(
-        self, is_df: pd.DataFrame, combinations: list[dict]
-    ) -> tuple[dict, float]:
+        self, is_df: pd.DataFrame, combinations: List[dict]
+    ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색."""
         best_params = combinations[0]
         best_sharpe = -999.0
@@ -370,7 +370,7 @@ def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardRe
 # ------------------------------------------------------------------
 
 from dataclasses import dataclass as _dataclass
-from typing import List as _List
+from typing import List as _List, Tuple
 import numpy as _np
 
 

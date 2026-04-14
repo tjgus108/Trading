@@ -17,7 +17,7 @@ Confidence 가중치:
 
 import logging
 from collections import deque
-from typing import Optional
+from typing import Optional, Tuple, List, Dict
 
 import pandas as pd
 
@@ -52,8 +52,8 @@ class MultiStrategyAggregator:
 
     def __init__(
         self,
-        strategies: list[BaseStrategy],
-        weights: Optional[dict[str, float]] = None,
+        strategies: List[BaseStrategy],
+        weights: Optional[Dict[str, float]] = None,
         perf_window: int = 20,
     ) -> None:
         """
@@ -66,7 +66,7 @@ class MultiStrategyAggregator:
         self._weights = weights or {}
         self._perf_window = perf_window
         # {strategy_name: deque of 0/1 (0=오답, 1=정답)}
-        self._outcomes: dict[str, deque] = {
+        self._outcomes: Dict[str, deque] = {
             s.name: deque(maxlen=perf_window) for s in strategies
         }
 
@@ -113,7 +113,7 @@ class MultiStrategyAggregator:
         weight = _PERF_WEIGHT_MIN + acc * (_PERF_WEIGHT_MAX - _PERF_WEIGHT_MIN)
         return float(weight)
 
-    def performance_summary(self) -> dict[str, dict]:
+    def performance_summary(self) -> Dict[str, dict]:
         """전략별 성과 요약 반환."""
         result = {}
         for s in self._strategies:
@@ -130,7 +130,7 @@ class MultiStrategyAggregator:
         if not self._strategies:
             return self._hold(df, "No strategies configured")
 
-        votes: list[tuple[str, Action, Confidence, float]] = []  # (name, action, conf, weight)
+        votes: List[Tuple[str, Action, Confidence, float]] = []  # (name, action, conf, weight)
 
         for strat in self._strategies:
             try:
@@ -155,7 +155,7 @@ class MultiStrategyAggregator:
     def _aggregate(
         self,
         df: pd.DataFrame,
-        votes: list[tuple[str, Action, Confidence, float]],
+        votes: List[Tuple[str, Action, Confidence, float]],
     ) -> Signal:
         buy_score = 0.0
         sell_score = 0.0

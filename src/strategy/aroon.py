@@ -17,7 +17,7 @@ _MIN_ROWS = 30
 _PERIOD = 25
 
 
-def _aroon(df: pd.DataFrame, idx: int, period: int = _PERIOD) -> tuple[float, float]:
+def _aroon(df: pd.DataFrame, idx: int, period: int = _PERIOD) -> Tuple[float, float]:
     """idx 위치 기준 25봉 슬라이스에서 Aroon Up/Down 계산."""
     high_slice = df["high"].iloc[idx - period + 1: idx + 1]
     low_slice = df["low"].iloc[idx - period + 1: idx + 1]

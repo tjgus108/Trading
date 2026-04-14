@@ -8,7 +8,7 @@ FibRetracementStrategy:
 - 최소 데이터: 55행
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ _GOLDEN_TOLERANCE = 0.005  # ±0.5%
 _BOUNCE_WINDOW = 3
 
 
-def _calc_fibs(swing_low: float, swing_high: float) -> "dict[float, float]":
+def _calc_fibs(swing_low: float, swing_high: float) -> "Dict[float, float]":
     """주어진 swing_low/swing_high로 각 Fibonacci 레벨의 가격 계산."""
     rng = swing_high - swing_low
     return {lvl: swing_low + lvl * rng for lvl in _FIB_LEVELS}

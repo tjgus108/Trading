@@ -20,7 +20,7 @@ import urllib.request
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict
 import re
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class NewsEvent:
     event: str              # 1줄 요약
     action: str             # "REDUCE_POSITION" | "HOLD_NEW_ENTRIES" | "MONITOR" | "NONE"
     expires_at: str         # UTC 시각 (ISO 8601)
-    keywords_matched: list[str]
+    keywords_matched: List[str]
     source: str = "live"    # "live" | "fallback" | "unavailable"
     title_hash: str = ""    # 중복 감지용
 
@@ -89,7 +89,7 @@ class NewsMonitor:
         self._cache: Optional[NewsEvent] = None
         self._cache_time: float = 0.0
         self._last_successful: Optional[NewsEvent] = None  # fallback 데이터
-        self._seen_hashes: dict[str, float] = {}  # title_hash -> timestamp
+        self._seen_hashes: Dict[str, float] = {}  # title_hash -> timestamp
         self.on_high_risk_callback = None  # orchestrator가 설정
 
     def fetch(self) -> NewsEvent:
@@ -156,7 +156,7 @@ class NewsMonitor:
     # Internal
     # ------------------------------------------------------------------
 
-    def _fetch_headlines_with_retry(self) -> list[str]:
+    def _fetch_headlines_with_retry(self) -> List[str]:
         """CryptoPanic API에서 최신 뉴스 헤드라인 반환. 재시도 포함."""
         for attempt in range(self.max_retries):
             try:
@@ -169,7 +169,7 @@ class NewsMonitor:
         logger.warning("CryptoPanic API failed after %d retries", self.max_retries)
         return []
 
-    def _fetch_headlines(self) -> list[str]:
+    def _fetch_headlines(self) -> List[str]:
         """CryptoPanic API에서 최신 뉴스 헤드라인 반환."""
         req = urllib.request.Request(
             CRYPTOPANIC_RSS,
@@ -180,7 +180,7 @@ class NewsMonitor:
         results = data.get("results", [])
         return [r.get("title", "") for r in results[:30]]
 
-    def _classify(self, headlines: list[str]) -> NewsEvent:
+    def _classify(self, headlines: List[str]) -> NewsEvent:
         """헤드라인 리스트를 키워드 분류 → NewsEvent 반환."""
         if not headlines:
             return NewsEvent(
@@ -276,7 +276,7 @@ class NewsMonitor:
         if expired:
             logger.debug(f"Cleaned up {len(expired)} old news hashes")
 
-    def _best_headline(self, headlines: list[str], keywords: list[str]) -> str:
+    def _best_headline(self, headlines: List[str], keywords: List[str]) -> str:
         """키워드 가장 많이 포함된 헤드라인 반환."""
         best, best_count = headlines[0], 0
         for h in headlines:

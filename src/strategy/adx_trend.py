@@ -18,7 +18,7 @@ class ADXTrendStrategy(BaseStrategy):
         self.adx_threshold = adx_threshold
         self.adx_high = adx_high
 
-    def _compute_adx(self, df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
+    def _compute_adx(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """
         Returns (adx, plus_di, minus_di) as pandas Series.
         """

@@ -27,7 +27,7 @@ _HIGH_CONF_BUY = -60.0
 _HIGH_CONF_SELL = 60.0
 
 
-def _calc_smi(df: pd.DataFrame) -> "tuple[float, float]":
+def _calc_smi(df: pd.DataFrame) -> "Tuple[float, float]":
     """idx = len(df) - 2 기준 SMI, Signal 계산."""
     period = _PERIOD
     smooth = _SMOOTH

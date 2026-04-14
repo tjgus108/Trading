@@ -7,6 +7,7 @@ RSI14 확인으로 HIGH/MEDIUM confidence 구분.
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
+from typing import List
 
 
 class ParabolicSARStrategy(BaseStrategy):
@@ -17,7 +18,7 @@ class ParabolicSARStrategy(BaseStrategy):
         self.af_step = af_step
         self.af_max = af_max
 
-    def _compute_sar(self, df: pd.DataFrame) -> tuple[list[float], list[bool]]:
+    def _compute_sar(self, df: pd.DataFrame) -> Tuple[List[float], List[bool]]:
         """
         전체 시리즈에 대해 Parabolic SAR 계산.
         Returns:

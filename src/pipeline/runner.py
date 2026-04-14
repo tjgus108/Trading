@@ -6,7 +6,7 @@ data → context(B1~B3) → signal → risk → execution 순서를 강제한다
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from src.data.feed import DataFeed, DataSummary
 from src.exchange.connector import ExchangeConnector
@@ -30,7 +30,7 @@ class PipelineResult:
     risk: Optional[RiskResult] = None
     execution: Optional[dict] = None
     error: Optional[str] = None
-    notes: list[str] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
     context_score: Optional[float] = None   # MarketContext composite score
     news_risk: str = "NONE"                 # HIGH | MEDIUM | LOW | NONE
     pnl: float = 0.0                        # 거래 손익 (USD)
@@ -90,13 +90,13 @@ class TradingPipeline:
         self.kelly_sizer: Optional[KellySizer] = None       # H1: Kelly position sizer
         self.twap_executor: Optional[TWAPExecutor] = None   # H4: TWAP order execution
         self.vol_targeting: Optional[VolTargeting] = None   # I3: Vol-targeted sizing
-        self._trade_history: list[dict] = []               # H1: 거래 기록 (kelly 계산용)
+        self._trade_history: List[dict] = []               # H1: 거래 기록 (kelly 계산용)
         # 세무/감사 대비: 모든 체결을 append-only CSV에 기록
         self.trade_logger: Optional[TradeLogger] = (
             None if dry_run else TradeLogger("logs/trades.csv")
         )
 
-    def preflight_check(self) -> list[str]:
+    def preflight_check(self) -> List[str]:
         """실행 전 안전 점검. 문제 발견 시 경고 메시지 리스트 반환."""
         warnings = []
 

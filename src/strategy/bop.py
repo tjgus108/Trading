@@ -17,7 +17,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 20
 
 
-def _calc_bop(df: pd.DataFrame) -> "tuple[float, float]":
+def _calc_bop(df: pd.DataFrame) -> "Tuple[float, float]":
     """idx = len(df) - 2 기준 bop_now, bop_prev 계산."""
     idx = len(df) - 2
 

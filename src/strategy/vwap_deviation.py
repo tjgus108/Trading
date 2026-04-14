@@ -13,7 +13,7 @@ VWAPDeviationStrategy:
 - 최소 데이터: 25행
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 
@@ -24,7 +24,7 @@ _ZSCORE_THRESHOLD = 1.5
 _ZSCORE_HIGH = 2.0
 
 
-def _calc_zscore(df: pd.DataFrame) -> "tuple[float, float]":
+def _calc_zscore(df: pd.DataFrame) -> "Tuple[float, float]":
     """idx = len(df) - 2 기준 zscore_now, zscore_prev 반환."""
     idx = len(df) - 2
 

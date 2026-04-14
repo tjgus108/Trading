@@ -8,7 +8,7 @@ OscillatorBandStrategy:
 - 최소 데이터: 20행
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 _MIN_ROWS = 20
 
 
-def _calc_indicators(df: pd.DataFrame) -> "Optional[tuple[pd.Series, pd.Series, pd.Series]]":
+def _calc_indicators(df: pd.DataFrame) -> "Optional[Tuple[pd.Series, pd.Series, pd.Series]]":
     """osc, stoch_k, stoch_d 시리즈 반환. 실패 시 None."""
     close = df["close"].astype(float)
 

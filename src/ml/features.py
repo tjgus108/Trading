@@ -20,7 +20,7 @@ walk-forward validation: 시계열 순서 반드시 유지.
 
 import numpy as np
 import pandas as pd
-from typing import Optional
+from typing import Optional, Tuple, List
 
 
 DEFAULT_FORWARD_N = 5       # 5캔들 후 수익률로 레이블 생성
@@ -45,7 +45,7 @@ class FeatureBuilder:
         self.forward_n = forward_n
         self.threshold = threshold
 
-    def build(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
         피처 + 레이블 반환.
 
@@ -191,7 +191,7 @@ class FeatureBuilder:
         return label.astype("Int64")
 
     @property
-    def feature_names(self) -> list[str]:
+    def feature_names(self) -> List[str]:
         """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정)."""
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",

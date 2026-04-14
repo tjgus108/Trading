@@ -18,7 +18,7 @@ _PERIOD = 20
 _HIGH_CONF_GAP = 0.01  # 1% 이격률
 
 
-def _calc_trima(df: pd.DataFrame) -> "tuple[float, float, float, float, bool, bool, bool]":
+def _calc_trima(df: pd.DataFrame) -> "Tuple[float, float, float, float, bool, bool, bool]":
     """idx = len(df) - 2 기준 TRIMA 관련 값 계산."""
     period = _PERIOD
     idx = len(df) - 2

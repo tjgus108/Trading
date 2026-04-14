@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 
 # (regex_pattern, description)
-_RISK_PATTERNS: list[tuple[str, str]] = [
+_RISK_PATTERNS: List[Tuple[str, str]] = [
     (r"shift\s*\(\s*-\d+", "shift(-N): 미래 데이터 참조 (lookahead bias)"),
     (r"\.iloc\s*\[\s*-1\s*\]", "iloc[-1]: 마지막 행 직접 접근 (미완성 캔들 위험)"),
     (r"\.tail\s*\(\s*1\s*\)", ".tail(1): 마지막 행 직접 접근 (미완성 캔들 위험)"),
@@ -43,7 +43,7 @@ def audit_strategy(strategy_file: str) -> dict:
     except Exception as e:
         return {"file": strategy_file, "risks": [], "risk_count": 0, "error": str(e)}
 
-    risks: list[dict] = []
+    risks: List[dict] = []
     for lineno, line in enumerate(lines, start=1):
         # 주석 줄은 건너뜀
         stripped = line.strip()
@@ -67,13 +67,13 @@ def audit_strategy(strategy_file: str) -> dict:
     }
 
 
-def audit_all_strategies(strategy_dir: str = "src/strategy") -> list[dict]:
+def audit_all_strategies(strategy_dir: str = "src/strategy") -> List[dict]:
     """모든 전략 파일을 감사하고 위험 목록 반환."""
     base = Path(strategy_dir)
     if not base.exists():
         return []
 
-    results: list[dict] = []
+    results: List[dict] = []
     for py_file in sorted(base.glob("**/*.py")):
         if py_file.name.startswith("__"):
             continue

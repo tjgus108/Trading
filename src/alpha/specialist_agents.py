@@ -16,6 +16,7 @@ import os
 from dataclasses import dataclass
 
 import pandas as pd
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +240,7 @@ class SpecialistEnsemble:
             (self.sentiment, "analyze", (df,), {"sentiment_score": sentiment_score}),
             (self.onchain, "analyze", (df,), {"onchain_score": onchain_score}),
         ]
-        votes: list[SpecialistVote] = []
+        votes: List[SpecialistVote] = []
         for agent, method, args, kwargs in agent_calls:
             try:
                 vote = getattr(agent, method)(*args, **kwargs)
@@ -268,7 +269,7 @@ class SpecialistEnsemble:
             )
         return self._compute_consensus(votes)
 
-    def _compute_consensus(self, votes: list[SpecialistVote]) -> SpecialistVote:
+    def _compute_consensus(self, votes: List[SpecialistVote]) -> SpecialistVote:
         from collections import Counter
 
         actions = [v.action for v in votes]

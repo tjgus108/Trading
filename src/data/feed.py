@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from src.exchange.connector import ExchangeConnector
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,8 @@ class DataSummary:
     start: str
     end: str
     missing: int
-    indicators: list[str]
-    anomalies: list[str]
+    indicators: List[str]
+    anomalies: List[str]
     df: pd.DataFrame = field(repr=False)
 
 
@@ -156,11 +157,11 @@ class DataFeed:
 
     def fetch_multiple(
         self,
-        symbols: list[str],
+        symbols: List[str],
         timeframe: str,
         limit: int = 500,
         max_workers: int = None,
-    ) -> dict[str, DataSummary]:
+    ) -> Dict[str, DataSummary]:
         """
         여러 심볼을 병렬로 fetch.
         
@@ -289,7 +290,7 @@ class DataFeed:
         expected = pd.date_range(start=df.index[0], end=df.index[-1], freq=freq)
         return len(expected) - len(df)
 
-    def _detect_anomalies(self, df: pd.DataFrame) -> list[str]:
+    def _detect_anomalies(self, df: pd.DataFrame) -> List[str]:
         anomalies = []
         # OHLC 관계 검증
         anomalies.extend(self._validate_ohlc_relationships(df))
@@ -303,7 +304,7 @@ class DataFeed:
             anomalies.append(f"price spike >10% at {spikes.index[0]}")
         return anomalies
 
-    def _validate_ohlc_relationships(self, df: pd.DataFrame) -> list[str]:
+    def _validate_ohlc_relationships(self, df: pd.DataFrame) -> List[str]:
         """
         OHLC 관계 검증: high >= max(open,close), low <= min(open,close)
         

@@ -16,7 +16,7 @@ Pearson 상관계수 행렬을 계산한다.
 
 import logging
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Tuple, List, Dict
 
 import numpy as np
 import pandas as pd
@@ -35,10 +35,10 @@ _ACTION_VALUE = {
 class SignalCorrelationTracker:
     """전략별 신호 시계열을 추적하고 상관행렬을 계산."""
 
-    def __init__(self, strategy_names: list[str], window: int = 100) -> None:
+    def __init__(self, strategy_names: List[str], window: int = 100) -> None:
         self._names = list(strategy_names)
         self._window = window
-        self._signals: dict[str, list[int]] = defaultdict(list)
+        self._signals: Dict[str, List[int]] = defaultdict(list)
 
     def record(self, strategy_name: str, action: Action) -> None:
         """신호 기록. window 초과 시 오래된 항목 제거."""
@@ -47,7 +47,7 @@ class SignalCorrelationTracker:
         if len(self._signals[strategy_name]) > self._window:
             self._signals[strategy_name].pop(0)
 
-    def record_many(self, signals: dict[str, Action]) -> None:
+    def record_many(self, signals: Dict[str, Action]) -> None:
         """동시 신호 일괄 기록."""
         for name, action in signals.items():
             self.record(name, action)
@@ -78,7 +78,7 @@ class SignalCorrelationTracker:
         corr = df.corr()
         return corr
 
-    def high_correlation_pairs(self, threshold: float = 0.7) -> list[tuple[str, str, float]]:
+    def high_correlation_pairs(self, threshold: float = 0.7) -> List[Tuple[str, str, float]]:
         """상관계수 절댓값 > threshold인 전략 쌍 반환."""
         corr = self.correlation_matrix()
         if corr is None:
