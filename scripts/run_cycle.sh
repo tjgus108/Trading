@@ -29,6 +29,12 @@ echo "🔄 Cycle run: $(date -u +'%Y-%m-%d %H:%M:%SZ')"
 echo "==================================="
 
 # 1. 최신 코드 pull
+# 1-pre: 이전 사이클이 중단돼 남긴 변경사항 자동 커밋 (pull --rebase 실패 방지)
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "--- 이전 사이클 잔재 감지 → 자동 커밋 후 pull 진행 ---"
+    git add -A
+    git commit -m "chore: pre-cycle cleanup (auto) $(date -u +'%Y-%m-%dT%H:%MZ')" || true
+fi
 git fetch origin main
 git checkout main
 git pull origin main
