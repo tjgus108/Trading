@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 119 — 2026-04-12T13:14:20.239923Z
+🔄 CYCLE 120 — 2026-04-14T13:59:39.480366Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent
@@ -21,11 +21,11 @@
 - **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
 ## 이전 사이클 현황
-**Cycle 119 COMPLETED — A + C + SIM + F** (2026-04-12 09:00 UTC)
-  **[A] Quality:** 6342 tests 확인. 1 warning은 의도적 inf 방어 테스트 (정상).
-  **[C] Data:** src/data/__init__.py export 누락 13개 발견. 향후 정리 필요.
-  **[SIM] htf_ema 2차:** RSI 필터 추가. Sharpe 0.60→0.71, PF 1.12→1.14. 구조적 한계 (EMA cross 단순성).
-  **[F] Research:** HTF EMA. 일봉 21/50 + 1H 크로스 표준. RSI/MACD 보조 필수.
+**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
+  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
+  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
+  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
+  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

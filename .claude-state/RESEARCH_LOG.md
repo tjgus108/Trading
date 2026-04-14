@@ -682,3 +682,61 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - 업계 표준: 봇 crash 시 30초 내 재시작 + 포지션 일치 검증 필수
 
 (F 리서치 에이전트가 중단되어 기본 지식 기반으로 작성)
+
+## [2026-04-14] Cycle 121 — Failure/Success Cases & 2025-2026 Quant Trends
+
+### 실패 케이스
+
+**사례 1: AI 봇 집단 패닉셀 (2025년 5월)**
+- 암호화폐 플래시 크래시 시 AI 봇들이 3분 만에 20억 달러 매도 실행
+- 정상 시장 조건 전용으로 설계되어 급격한 변동성에 대응 불가
+- 교훈: 레짐 전환 감지 로직과 서킷브레이커 없으면 군집 손실 발생
+
+**사례 2: dogwifhat 대형 슬리피지 손실 (2024년 1월)**
+- 900만 달러 시장가 주문이 오더북 얕아 570만 달러 슬리피지 발생 (60% 체결가 급등)
+- 교훈: 유동성 필터 없는 대형 주문은 치명적, 분할 주문·TWAP 필수
+
+**사례 3: Kronos Research API 해킹 (2024년)**
+- API 키 유출로 2,600만 달러 손실
+- 교훈: API 키 권한 최소화(거래 전용, 출금 불허), 주기적 키 교체, IP 화이트리스트 필수
+
+**공통 실패 패턴:**
+- 과최적화: 15개 이상 파라미터 전략은 라이브에서 거의 실패
+- 실제 백테스트 대비 30~50% 성과 저하 (슬리피지·수수료 미반영)
+- 6개월 내 73%의 자동화 계좌가 실패
+
+### 성공 케이스
+
+**사례 1: Bitsgap GRID/DCA 봇 커뮤니티 사례**
+- 4개월 125% + 2개월 추가 23% 수익 달성
+- 성공 요인: 커뮤니티 전략 공유, 명확한 시장 레짐(횡보장) 활용
+
+**사례 2: Hummingbot 마켓메이킹 봇**
+- 2021년부터 운영, 알고트레이딩 스타트업으로 발전한 사례
+- 오픈소스 기반 반복 개선 + 커뮤니티 피드백 루프가 핵심
+
+### 2025~2026 퀀트 전략 트렌드
+
+**트렌드 1: ML 다중 팩터 모델 (Ethereum/Crypto 적용)**
+- RSI·모멘텀 기술 지표 + 온체인 데이터(가스비, 활성 주소) + ML 파생 팩터 결합
+- 500~1,000개 팩터를 롤링 윈도우(5~252일)로 처리, 강세장에서 연 130% 달성 사례
+- 바이어스 보정(bias correction)을 적용한 크로스섹션 포트폴리오 최적화가 주목받는 중
+
+**트렌드 2: LLM/멀티에이전트 자동화 파이프라인**
+- QuantEvolve 등 멀티에이전트 진화 프레임워크로 알파 팩터 자동 발굴
+- GPT-4/5 기반 봇이 고변동성 구간에서 인간 트레이더 대비 15~25% 아웃퍼폼 보고
+- 인텐트 기반 온체인 자동 실행으로 CEX→DEX 확장 가속화
+
+### 핵심 교훈 3줄
+
+1. **슬리피지·유동성 필터는 선택 아닌 필수** — 대형 주문 전 오더북 깊이 확인, TWAP/분할 주문 적용
+2. **과최적화 방지가 수익률보다 우선** — 파라미터 수 최소화 + walk-forward 검증 통과 전략만 배포
+3. **보안과 서킷브레이커 없으면 전략 성능은 무의미** — API 권한 최소화, 일일 MDD 한도, 레짐 감지 필수
+
+### 참고 출처
+- [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [Common Pitfalls in Crypto Bot Trading — Bitunix](https://blog.bitunix.com/en/common-pitfalls-crypto-trading-bots/)
+- [7 Hidden Risks of Crypto Bots — Altrady](https://www.altrady.com/blog/crypto-bots/7-hidden-risks)
+- [Hummingbot Open Source Framework](https://hummingbot.org/)
+- [ML Multi-Factor Quantitative Model: Ethereum — ACM 2025](https://dl.acm.org/doi/10.1145/3766918.3766922)
+- [QuantEvolve: Multi-Agent Strategy Discovery — arXiv](https://arxiv.org/html/2510.18569v1)

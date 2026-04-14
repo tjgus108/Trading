@@ -1,5 +1,26 @@
 # Work Log
 
+## [2026-04-14] Cycle 121 — D + E + SIM + F
+
+**[D] ML & Signals:**
+- features.py: macd_hist, bb_position 피처 2개 추가 (총 15→17개, shift(1) look-ahead bias 없음)
+- trainer.py: walk-forward 분할 로직 개선 — 전체 df 피처 계산 후 분할로 NaN 손실 제거
+- 테스트: 37 passed, 9 skipped
+
+**[E] Execution:**
+- paper_trader.py: 슬리피지 추적 % → bps(basis points) 정밀화
+- connector.py: wait_for_fill()에 expected_price 파라미터 추가, 자동 slippage_bps 계산
+- test_paper_trader.py: avg_slippage_bps 검증 추가
+
+**[SIM] Paper Simulation:**
+- linear_channel_rev.py: EMA50 트렌드 필터, deviation 2.7→3.0, channel width 0.2→0.3, ATR 0.0005→0.002
+- price_action_momentum.py: body strength 0.40→0.50, SMA200 확인 필터 추가
+
+**[F] Research:**
+- 실패: AI봇 집단 패닉셀($20억/3분), dogwifhat 슬리피지($5.7M 손실), Kronos 해킹($26M)
+- 성공: Bitsgap GRID봇 4개월 125%, Hummingbot 오픈소스 마켓메이킹
+- 교훈: 슬리피지 필터 필수, 과최적화 방지 우선, 보안+서킷브레이커 필수
+
 ## 2026-04-07
 - 프로젝트 구조 초기화
 - CLAUDE.md, settings.json, skills, agents 세팅 완료 (9 agents)

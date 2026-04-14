@@ -125,9 +125,9 @@ class WalkForwardTrainer:
         """
         walk-forward 학습 실행 (데이터 누출 방지).
         df: DataFeed.fetch() 반환 DataFrame (지표 포함, 최소 200 캔들 권장)
-        
-        중요: 시계열 분할을 먼저 한 후, 각 구간에서만 피처 계산
-        (rolling/ewm은 미래 데이터 포함 금지)
+
+        중요: 전체 df로 피처 계산 후 시계열 분할 (shift(1) 기반 피처는 look-ahead 없음).
+        이 방식으로 val/test 구간의 rolling warm-up NaN으로 인한 유효 샘플 손실 방지.
         """
         try:
             from sklearn.calibration import CalibratedClassifierCV
@@ -142,26 +142,29 @@ class WalkForwardTrainer:
                 fail_reasons=["scikit-learn not installed"],
             )
 
-        # 데이터 누출 방지: raw df를 먼저 분할
-        n_total = len(df)
+        # Walk-forward 분할 전략:
+        # 피처를 전체 df로 계산한 후 시계열 순서대로 분할.
+        # 이유: 모든 rolling/ewm 피처는 shift(1) 기반 → 현재 바 미래 데이터 누출 없음.
+        # 반면 분할 후 각 구간에서 피처 계산 시 val/test 구간 앞부분의
+        # rolling warm-up NaN으로 유효 샘플이 크게 줄어드는 문제 방지.
+        X_all, y_all = self.feature_builder.build(df)
+
+        n_total = len(X_all)
         train_end = int(n_total * 0.60)
         val_end = int(n_total * 0.80)
 
-        df_train = df.iloc[:train_end].copy()
-        df_val = df.iloc[train_end:val_end].copy()
-        df_test = df.iloc[val_end:].copy()
+        X_train = X_all.iloc[:train_end]
+        y_train = y_all.iloc[:train_end]
+        X_val = X_all.iloc[train_end:val_end]
+        y_val = y_all.iloc[train_end:val_end]
+        X_test = X_all.iloc[val_end:]
+        y_test = y_all.iloc[val_end:]
 
         logger.info(
             "Walk-forward split: n_total=%d train=%d val=%d test=%d",
-            n_total, len(df_train), len(df_val), len(df_test),
+            n_total, len(X_train), len(X_val), len(X_test),
         )
 
-        # 각 구간별로 피처 계산 (rolling/ewm이 미래 데이터 포함 금지)
-        X_train, y_train = self.feature_builder.build(df_train)
-        X_val, y_val = self.feature_builder.build(df_val)
-        X_test, y_test = self.feature_builder.build(df_test)
-
-        # 전체 샘플 수
         n = len(X_train) + len(X_val) + len(X_test)
         
         if n < 100:

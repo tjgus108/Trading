@@ -152,6 +152,22 @@ class FeatureBuilder:
         else:
             feat["price_vs_vwap"] = 0.0
 
+        # MACD 히스토그램: 이전 바 기준 (shift(1) 적용)
+        close_prev = close.shift(1)
+        ema12 = close_prev.ewm(span=12, adjust=False).mean()
+        ema26 = close_prev.ewm(span=26, adjust=False).mean()
+        macd_line = ema12 - ema26
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        feat["macd_hist"] = (macd_line - signal_line) / (close + 1e-9)
+
+        # Bollinger Band 위치: 이전 20바 기준 (0~1, 밴드 내 상대 위치)
+        bb_mid = close_prev.rolling(20).mean()
+        bb_std = close_prev.rolling(20).std()
+        bb_upper = bb_mid + 2 * bb_std
+        bb_lower = bb_mid - 2 * bb_std
+        bb_range = bb_upper - bb_lower
+        feat["bb_position"] = (close - bb_lower) / (bb_range + 1e-9)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -185,4 +201,6 @@ class FeatureBuilder:
             "volume_ratio_20",
             "donchian_pct",
             "price_vs_vwap",
+            "macd_hist",
+            "bb_position",
         ]
