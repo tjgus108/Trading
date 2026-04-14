@@ -87,9 +87,16 @@ class PaperTrader:
         is_partial = random.random() < self.partial_fill_prob
         actual_qty = quantity * random.uniform(0.5, 0.8) if is_partial else quantity
 
-        # 슬리피지 계산: 음수면 BUY에 유리, 양수면 SELL에 유리
-        # slippage_range: % (e.g., 0.05 = 0.05%)
-        slippage_range = random.uniform(-self.slippage_pct, self.slippage_pct)
+        # 슬리피지 계산: 시장 충격 반영 (adverse direction)
+        # BUY → 가격 상승 방향, SELL → 가격 하락 방향으로 편향
+        # base_slip: 항상 불리한 방향의 기본 슬리피지 (시장 충격)
+        # noise: ±random 노이즈 (호가 스프레드 변동)
+        base_slip = self.slippage_pct * 0.6  # 60%는 adverse 방향 고정
+        noise = random.uniform(-self.slippage_pct * 0.4, self.slippage_pct * 0.4)
+        if action == "BUY":
+            slippage_range = base_slip + noise   # 양수 → 가격 상승 (불리)
+        else:
+            slippage_range = -(base_slip + noise)  # 음수 → 가격 하락 (불리)
         actual_price = price * (1 + slippage_range / 100)
         # 슬리피지를 basis points (bps)로 계산: (actual - expected) / expected * 10000
         slippage_bps = (actual_price - price) / price * 10000 if price > 0 else 0.0
@@ -174,8 +181,7 @@ class PaperTrader:
             / self.account.initial_balance
         )
         # 체결된 거래만 통계 (부분체결 포함). slippage는 basis points.
-        filled_trades = [t for t in trades if not t.is_partial or t.is_partial]
-        total_slippage_bps = sum(t.slippage_pct for t in filled_trades) if filled_trades else 0.0
+        total_slippage_bps = sum(t.slippage_pct for t in trades) if trades else 0.0
         
         return {
             "initial_balance": self.account.initial_balance,
@@ -185,7 +191,7 @@ class PaperTrader:
             "trade_count": trade_count,
             "sell_count": len(sell_trades),
             "win_rate": round(win_rate, 4),
-            "avg_slippage_bps": round(total_slippage_bps / len(filled_trades), 2) if filled_trades else 0.0,
+            "avg_slippage_bps": round(total_slippage_bps / len(trades), 2) if trades else 0.0,
             "open_positions": dict(self.account.positions),
             "open_position_value": round(
                 sum(self.account.positions.get(sym, 0) * self.account.avg_entry.get(sym, 0) 

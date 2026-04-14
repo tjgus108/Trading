@@ -740,3 +740,39 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Hummingbot Open Source Framework](https://hummingbot.org/)
 - [ML Multi-Factor Quantitative Model: Ethereum — ACM 2025](https://dl.acm.org/doi/10.1145/3766918.3766922)
 - [QuantEvolve: Multi-Agent Strategy Discovery — arXiv](https://arxiv.org/html/2510.18569v1)
+
+
+## [2026-04-15] Cycle 123 Research
+
+### 실패 사례
+
+1. **AI 봇 $441K 토큰 오발송 (Lobstar Wilde, 2026년 2월)** — OpenAI 개발자가 만든 자율 에이전트가 상태 손실 + 잔고 오판으로 5,243만 LOBSTAR 토큰(약 $250K~$441K 상당)을 임의 사용자에게 전송. 원인: 크래시 후 컨텍스트 복구 실패, 지갑 잔고 모델 오작동. 교훈: 자율 에이전트에 불가역 트랜잭션 전 인간 확인 단계 필수.
+
+2. **Bitget 내부 봇 로직 익스플로잇 (2025년)** — 8개 계정이 거래소 마켓메이커 봇의 비정상 호가 취약점을 파악, VOXEL 토큰을 과매도 가격에 매수 후 과매수 가격에 매도해 약 $1억 이득. 원인: 봇 호가 로직 결함 + front-running. 교훈: 거래소 봇의 호가 범위 이상 탐지 + rate anomaly 모니터링 필수.
+
+3. **DeBot AI DeFi 툴 해킹 ($255K, 2025년)** — 일본 서버 익스플로잇으로 $255K 손실. 원인: 서버 보안 취약점. 교훈: 봇 서버 접근 최소화, API 키 권한 제한, 거래 전용 키 분리 운영.
+
+4. **Nova Trading Platform 보안 침해 ($500K, 2025년 9월)** — 수동 공격으로 $50만 상당 암호화폐 탈취. 교훈: 플랫폼 수준 보안도 단일 장애점 — 다중 인증 + 출금 화이트리스트 필수.
+
+5. **May 2025 AI 봇 플래시 크래시 가속** — 갑작스러운 변동성에 적응하지 못한 AI 봇들이 3분 내 $20억 자산 매도. 원인: 레짐 감지 로직 부재. 교훈: 고변동성 레짐 진입 시 봇 일시 중단 또는 포지션 크기 자동 축소 필수.
+
+### 성공 사례
+
+1. **보수적 AI DCA 전략 (2025년)** — 변동성 구간에서 30일 12.8% 수익, 성공률 100%. 6개월 누적 193% ROI 사례도 존재. 핵심: 명확한 진입·청산 규칙 + 포지션 제한으로 드로다운 최소화.
+
+2. **커스텀 퀀트 봇 다중 거래소 운영** — 연환산 42% 수익, Sharpe 2.3, MDD 9% 달성. 핵심 요인: 24/7 다중 거래소 분산 + 엄격한 1% 포지션 룰 + 낮은 레버리지.
+
+3. **Qwen 기반 소형 LLM 봇** — GPT-5보다 높은 성과. 핵심 요인: 더 작은 포지션 사이징 + 빠른 손절 실행. 지능보다 규율(discipline)이 우선임을 입증.
+
+### 트렌드
+
+- **Hybrid RL + Transformer**: CNN-PPO·Attention-DDPG 등 RL+Transformer 하이브리드가 순수 RL 대비 15~20% 성과 향상. 하이브리드 채택률 2020년 15% → 2025년 42%로 급증.
+- **LLM-DRL 통합 파이프라인**: PrimoGPT(금융 텍스트 파인튜닝) + PrimoRL(DRL 상태 공간 확장) 결합 방식이 주목. NLP 감성·트렌드 피처를 DRL 의사결정에 통합.
+
+### 참고 출처
+- [AI Trading Bots Lost $441K — Medium/Pump Parade](https://pumpparade.medium.com/ai-trading-bots-lost-441k-in-one-error-heres-what-actually-works-and-what-doesn-t-4f04f890c189)
+- [Crypto Hacking Incidents 2025 — DeepStrike](https://deepstrike.io/blog/crypto-hacking-incidents-statistics-2025-losses-trends)
+- [Biggest Crypto Hacks 2025 — The Block](https://www.theblock.co/post/380992/biggest-crypto-hacks-2025)
+- [Ethereum MEV Bot Exploit 2025 — Gate.com](https://www.gate.com/crypto-wiki/article/ethereum-mev-bot-exploit-impact-on-defi-and-mitigation-strategies-in-2025)
+- [Deep Learning for Algo Trading Review — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S2590005625000177)
+- [LLM-Driven DRL Trading Framework — MDPI](https://www.mdpi.com/2504-2289/9/12/317)

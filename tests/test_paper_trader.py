@@ -162,9 +162,9 @@ def test_slippage_recorded_in_trade():
     trades = [t for t in pt.account.trades if t.slippage_pct != 0.0]
     # 슬리피지 범위는 ±0.1%이므로 일부 거래는 0이 아닌 슬리피지를 기록
     assert len(trades) > 0 or len(pt.account.trades) > 0
-    # 슬리피지 범위 확인
+    # 슬리피지 범위 확인: 0.1% = 10 bps, BUY는 adverse 방향(양수 편향)
     for trade in pt.account.trades:
-        assert -0.1 <= trade.slippage_pct <= 0.1
+        assert -10.0 <= trade.slippage_pct <= 10.0
 
 
 def test_timeout_returns_timeout_status():

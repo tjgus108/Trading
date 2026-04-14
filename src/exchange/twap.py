@@ -51,6 +51,8 @@ class TWAPExecutor:
             dry_run: True이면 실제 주문 없이 시뮬레이션
             timeout_per_slice: 슬라이스당 타임아웃 (초). None이면 무제한.
         """
+        if n_slices < 1:
+            raise ValueError(f"n_slices must be >= 1, got {n_slices}")
         self.n_slices = n_slices
         self.interval_seconds = interval_seconds
         self.dry_run = dry_run
@@ -79,7 +81,16 @@ class TWAPExecutor:
 
         Returns:
             TWAPResult (부분 체결/타임아웃 정보 포함)
+
+        Raises:
+            ValueError: total_qty <= 0 또는 dry_run에서 price_limit이 None/0
         """
+        if total_qty <= 0:
+            raise ValueError(f"total_qty must be > 0, got {total_qty}")
+        if self.dry_run and (price_limit is None or price_limit <= 0):
+            raise ValueError(
+                f"price_limit must be > 0 in dry_run mode, got {price_limit}"
+            )
         slice_qty = total_qty / self.n_slices
         filled_prices: List[float] = []
         filled_quantities: List[float] = []
@@ -189,10 +200,13 @@ class TWAPExecutor:
             if i < self.n_slices - 1 and not self.dry_run:
                 time.sleep(self.interval_seconds)
 
-        # 결과 계산
-        avg_price = (
-            float(np.mean(filled_prices)) if filled_prices else 0.0
-        )
+        # 결과 계산: 수량 가중 평균 가격 (부분 체결 반영)
+        if filled_prices and filled_quantities:
+            total_cost = sum(p * q for p, q in zip(filled_prices, filled_quantities))
+            total_filled_for_avg = sum(filled_quantities)
+            avg_price = total_cost / total_filled_for_avg if total_filled_for_avg > 0 else 0.0
+        else:
+            avg_price = 0.0
         total_filled = sum(filled_quantities) if filled_quantities else 0.0
         slippage = self.estimate_slippage(total_filled, price_limit or avg_price)
 
