@@ -73,24 +73,38 @@ def fetch_real_data_paginated(
         now_ms = int(time.time() * 1000)
         since = now_ms - (total_candles * tf_ms)
 
-        remaining = total_candles
         print(f"[DATA] Fetching {symbol} {timeframe} x{total_candles} from Bybit (paginated)...", flush=True)
 
-        while remaining > 0:
-            batch = min(batch_size, remaining)
-            ohlcv = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=batch)
+        seen_ts: set = set()
+        stall_count = 0  # 진전 없는 페이지 연속 횟수 (3회 시 중단)
+        while len(all_data) < total_candles:
+            ohlcv = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=batch_size)
             if not ohlcv:
                 break
 
-            all_data.extend(ohlcv)
-            # 다음 페이지: 마지막 캔들 timestamp + 1 간격
+            # 중복 제거하며 추가 (Bybit은 since와 겹치는 첫 봉을 반환할 수 있음)
+            new_count = 0
+            for row in ohlcv:
+                if row[0] not in seen_ts:
+                    seen_ts.add(row[0])
+                    all_data.append(row)
+                    new_count += 1
+
+            if new_count == 0:
+                stall_count += 1
+                if stall_count >= 3:
+                    break
+            else:
+                stall_count = 0
+
+            # 다음 페이지: 마지막 캔들 + tf_ms
             since = ohlcv[-1][0] + tf_ms
-            remaining -= len(ohlcv)
 
-            if len(ohlcv) < batch:
-                break  # 더 이상 데이터 없음
+            # 현재 시각 넘어가면 종료
+            if since >= now_ms:
+                break
 
-            # Rate limit 존중
+            # Rate limit
             time.sleep(0.3)
 
         if not all_data:
@@ -373,7 +387,7 @@ def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, win
 
 # ── 메인 ──────────────────────────────────────────────────
 
-SYMBOLS = ["BTC/USDT", "ETH/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
+SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
 def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str:

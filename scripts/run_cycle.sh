@@ -86,28 +86,43 @@ fi
 # 3. 새 사이클 브리핑 생성
 "$PY_BIN" scripts/cycle_dispatcher.py
 
-# 4. Claude Code 세션 실행 (브리핑을 읽고 agent 배정)
+# 4. Claude Code 세션 실행 — 토큰 사용량 50% 도달까지 사이클 반복
 #    --permission-mode=acceptEdits : 확인 없이 진행
-#    --dangerously-skip-permissions : 완전 자동 (주의)
 PROMPT="$(cat <<'EOF'
-.claude-state/CURRENT_CYCLE_BRIEFING.md를 읽고 지시사항대로 진행해.
+너는 지금부터 "토큰 사용량 50% 소진"에 도달할 때까지 사이클을 반복해서 돌린다.
+매 사이클 끝나면 종료하지 말고, 새 사이클 브리핑을 만들어 다음 사이클을 계속 돌려라.
 
-핵심:
-1. 브리핑에 나열된 3개 카테고리를 Agent tool로 병렬 실행
-2. 각 에이전트에게 명확한 작업 지시 (focus 항목 중 1~2개 실제 개선)
-3. F 카테고리 (Research)는 트레이딩봇 실패/성공 케이스 리서치 필수 포함
-4. 모든 에이전트 완료 후:
-   - .claude-state/WORKLOG.md 업데이트
-   - STATUS.md 업데이트
-   - .claude-state/NEXT_STEPS.md 업데이트
-5. git add -A && git commit -m "[Cycle N] 요약" && git push origin main
-6. 완료 후 종료
+── 메인 루프 ──────────────────────────────────────────────────
+REPEAT:
+  1. .claude-state/CURRENT_CYCLE_BRIEFING.md 읽기
+  2. 브리핑에 나열된 3~4개 카테고리를 Agent tool로 *병렬* 실행
+     - 각 에이전트에 focus 항목 중 1~2개 실제 개선을 지시
+     - F(Research) 카테고리는 트레이딩봇 실패/성공 사례 리서치 필수
+  3. 모든 에이전트 완료 후:
+     - .claude-state/WORKLOG.md 업데이트 (이번 사이클 기록)
+     - .claude-state/STATUS.md 업데이트 (전체 현황)
+     - .claude-state/NEXT_STEPS.md 업데이트 (포인터만, 히스토리는 WORKLOG)
+     - .claude-state/CYCLE_STATE.txt 다음 사이클 번호로 증가
+     - git add -A && git commit -m "[Cycle N] 카테고리 요약" && git push origin main
+  4. 토큰 사용량 확인:
+     - 누적 사용량이 전체 예산의 **50% 이상**이면 루프 종료, 아래 FINALIZE로 이동
+     - 50% 미만이면 cycle_dispatcher.py를 Bash로 다시 실행해 새 브리핑 생성 후 REPEAT
 
-금지: 새 전략 파일 생성, 한 카테고리 집중, 실패 사례 리서치 스킵
+── FINALIZE ──────────────────────────────────────────────────
+- 마지막 사이클 결과가 commit+push 되었는지 확인
+- .claude-state/NEXT_STEPS.md에 "다음 세션이 이어받을 지점" 기록
+- 종료
+
+── 강제 규칙 ──────────────────────────────────────────────────
+- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
+- 한 카테고리에 2 사이클 연속 집중 금지 (MASTER_PLAN 로테이션 준수)
+- 실패 사례 리서치 없이 코드만 작성 금지
+- 매 사이클마다 반드시 commit + push (중간 결과 보존)
+- 토큰 50% 도달 시점 판단은 스스로. 모호하면 45%에서 안전하게 종료
 EOF
 )"
 
-# Claude CLI 실행 (home laptop에서 실제 동작)
+# Claude CLI 실행 — 내부에서 자가 반복 루프 수행
 claude -p "$PROMPT" \
     --allowedTools "Edit,Write,Read,Bash,Glob,Grep,Agent" \
     --permission-mode=acceptEdits \
