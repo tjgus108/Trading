@@ -80,6 +80,19 @@ claude -p "$PROMPT" \
     --permission-mode=acceptEdits \
     || echo "Claude session failed — check logs"
 
+# 5. Claude 세션이 커밋만 하고 push 못 한 경우 대비 — 마지막 안전망
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    git add -A
+    git commit -m "cycle: 자동 개선 결과 (post-session sweep) $(date -u +'%Y-%m-%dT%H:%MZ')" || true
+fi
+# origin에 반영 (이미 push 됐으면 no-op)
+if git rev-list --count @{u}..HEAD 2>/dev/null | grep -qv '^0$'; then
+    echo "--- Pushing unpushed commits to origin/main ---"
+    git push origin main || echo "git push failed — check auth/network"
+else
+    echo "origin/main 동기화 완료 (push 대상 없음)"
+fi
+
 echo "==================================="
 echo "✅ Cycle completed: $(date -u +'%Y-%m-%d %H:%M:%SZ')"
 echo "==================================="
