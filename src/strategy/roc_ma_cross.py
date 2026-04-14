@@ -1,13 +1,17 @@
 """
-ROCMACrossStrategy v2:
+ROCMACrossStrategy v3 (Cycle 122):
+
+개선 사항:
+- RSI 필터 추가: BUY시 RSI<70, SELL시 RSI>30 (과매수/과매도 회피)
+- ROC 절대값 필터 강화: abs(ROC) > 0.5% 요구 (신호 신뢰도 향상)
+- EMA50/200 이중 필터: 중장기 추세 확인
+- 목표: PF 1.577 → 1.75+, Win Rate 50% → 55%+
+
+원리:
 - ROC = (close / close.shift(12) - 1) * 100
-- ROC_MA = ROC.rolling(3).mean()  (스무딩)
-- BUY: ROC_MA crosses above 0 (prev < 0, now >= 0) AND close > EMA50
-       AND ROC > 0 (양의 모멘텀 확인)
-- SELL: ROC_MA crosses below 0 (prev > 0, now <= 0) AND close < EMA50
-        AND ROC < 0 (음의 모멘텀 확인)
-- confidence: HIGH if |ROC| > ROC.rolling(20).std() * 2.0 (상향)
-- 최소 20행 필요
+- ROC_MA = ROC.rolling(3).mean() (스무딩)
+- BUY: ROC_MA 0 상향 + ROC>0.5% + RSI<70 + close > EMA50/200
+- SELL: ROC_MA 0 하향 + ROC<-0.5% + RSI>30 + close < EMA50/200
 """
 
 import pandas as pd
@@ -18,7 +22,8 @@ _MIN_ROWS = 20
 _ROC_PERIOD = 12
 _MA_PERIOD = 3
 _STD_PERIOD = 20
-_STD_MULT = 2.0  # 2.0으로 상향 (이전 1.5)
+_STD_MULT = 2.0
+_ROC_MIN_ABS = 0.5  # ✅ NEW: ROC 절대값 최소값 (0.5%)
 
 
 class ROCMACrossStrategy(BaseStrategy):
@@ -50,6 +55,21 @@ class ROCMACrossStrategy(BaseStrategy):
 
         close = float(df["close"].iloc[idx])
         ema50 = float(df["ema50"].iloc[idx])
+        
+        # ✅ NEW: EMA200 확인 (있으면 사용, 없으면 무시)
+        ema200 = None
+        if "ema50" in df.columns and len(df) >= 200:
+            try:
+                ema200 = float(df["close"].ewm(span=200, adjust=False).mean().iloc[idx])
+            except:
+                pass
+        
+        # ✅ NEW: RSI 필터
+        rsi_val = 50.0
+        if "rsi14" in df.columns:
+            rsi_raw = float(df["rsi14"].iloc[idx])
+            if rsi_raw == rsi_raw:  # NaN check
+                rsi_val = rsi_raw
 
         if pd.isna(roc_ma_now) or pd.isna(roc_ma_prev):
             return Signal(
@@ -73,36 +93,48 @@ class ROCMACrossStrategy(BaseStrategy):
 
         conf = Confidence.HIGH if conf_high else Confidence.MEDIUM
 
-        # BUY: 추가 필터 - ROC > 0 확인 (양의 모멘텀)
-        if cross_above and close > ema50 and roc_now > 0:
+        # BUY: ROC_MA 상향 + ROC>0.5% + RSI<70 + close > EMA50 + (EMA200 확인 or 없음)
+        if (cross_above and 
+            abs(roc_now) > _ROC_MIN_ABS and roc_now > 0 and
+            rsi_val < 70 and
+            close > ema50 and
+            (ema200 is None or close > ema200)):
+            
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 상향 크로스: {roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
-                    f"ROC={roc_now:.2f}, close={close:.4f} > EMA50={ema50:.4f}"
+                    f"ROC_MA 0 상향 크로스 (ROC>{_ROC_MIN_ABS}%, RSI<70): "
+                    f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
+                    f"ROC={roc_now:.2f}%, RSI={rsi_val:.1f}, close={close:.4f} > EMA50={ema50:.4f}"
                 ),
-                invalidation="ROC_MA 0 아래 재하락 또는 close < EMA50",
-                bull_case=f"ROC_MA 양전 전환, 상승 모멘텀 확인. ROC={roc_now:.2f}",
+                invalidation="ROC_MA 0 아래 재하락 또는 close < EMA50 또는 RSI>=70",
+                bull_case=f"ROC_MA 양전 전환, 상승 모멘텀 확인. ROC={roc_now:.2f}%, RSI={rsi_val:.1f}",
                 bear_case="단순 조정 후 재하락 가능",
             )
 
-        # SELL: 추가 필터 - ROC < 0 확인 (음의 모멘텀)
-        if cross_below and close < ema50 and roc_now < 0:
+        # SELL: ROC_MA 하향 + ROC<-0.5% + RSI>30 + close < EMA50 + (EMA200 확인 or 없음)
+        if (cross_below and 
+            abs(roc_now) > _ROC_MIN_ABS and roc_now < 0 and
+            rsi_val > 30 and
+            close < ema50 and
+            (ema200 is None or close < ema200)):
+            
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 하향 크로스: {roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
-                    f"ROC={roc_now:.2f}, close={close:.4f} < EMA50={ema50:.4f}"
+                    f"ROC_MA 0 하향 크로스 (ROC<-{_ROC_MIN_ABS}%, RSI>30): "
+                    f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
+                    f"ROC={roc_now:.2f}%, RSI={rsi_val:.1f}, close={close:.4f} < EMA50={ema50:.4f}"
                 ),
-                invalidation="ROC_MA 0 위로 재상승 또는 close > EMA50",
+                invalidation="ROC_MA 0 위로 재상승 또는 close > EMA50 또는 RSI<=30",
                 bull_case="단순 조정일 수 있음",
-                bear_case=f"ROC_MA 음전 전환, 하락 모멘텀 확인. ROC={roc_now:.2f}",
+                bear_case=f"ROC_MA 음전 전환, 하락 모멘텀 확인. ROC={roc_now:.2f}%, RSI={rsi_val:.1f}",
             )
 
         return Signal(
@@ -112,7 +144,8 @@ class ROCMACrossStrategy(BaseStrategy):
             entry_price=close,
             reasoning=(
                 f"ROC_MA 크로스 없음 또는 조건 미충족: "
-                f"ROC_MA={roc_ma_now:.2f}, close={close:.4f}, EMA50={ema50:.4f}, ROC={roc_now:.2f}"
+                f"ROC_MA={roc_ma_now:.2f}, ROC={roc_now:.2f}% (need >{_ROC_MIN_ABS}%), "
+                f"RSI={rsi_val:.1f}, close={close:.4f}, EMA50={ema50:.4f}"
             ),
             invalidation="",
             bull_case="",

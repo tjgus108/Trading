@@ -17,7 +17,7 @@ ETH 데이터 없으면 BTC/ETH 내재 비율 proxy로 fallback.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -86,7 +86,7 @@ class PairTradingStrategy(BaseStrategy):
     # Spread computation
     # ------------------------------------------------------------------
 
-    def _compute_spread_zscore(self, btc_df: pd.DataFrame, eth_df: pd.DataFrame) -> tuple[float, float]:
+    def _compute_spread_zscore(self, btc_df: pd.DataFrame, eth_df: pd.DataFrame) -> Tuple[float, float]:
         """
         log-spread z-score와 beta 반환.
         spread = log(BTC) - beta * log(ETH)
