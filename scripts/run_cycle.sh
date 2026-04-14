@@ -16,6 +16,16 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOM
 
 cd "$(dirname "$0")/.."
 
+# Python 인터프리터 선택: 프로젝트 venv 우선, 없으면 시스템 python3
+if [ -x ".venv/bin/python3" ]; then
+    PY_BIN=".venv/bin/python3"
+elif [ -x ".venv/bin/python" ]; then
+    PY_BIN=".venv/bin/python"
+else
+    PY_BIN="python3"
+fi
+echo "[PY] Using interpreter: $PY_BIN ($($PY_BIN --version 2>&1))"
+
 # .env 자동 로드 (EXCHANGE_API_KEY, TELEGRAM_BOT_TOKEN 등)
 if [ -f .env ]; then
     set -a
@@ -62,7 +72,7 @@ else
 fi
 
 if $RUN_SIM; then
-    python3 scripts/paper_simulation.py || echo "Paper sim failed — continuing cycle"
+    "$PY_BIN" scripts/paper_simulation.py || echo "Paper sim failed — continuing cycle"
     if [ -f "$REPORT" ] && grep -q "Bybit" "$REPORT" 2>/dev/null; then
         git add "$REPORT" .claude-state/ 2>/dev/null || true
         git commit -m "paper: 실제 Bybit 데이터 시뮬레이션 결과 ($(date -u +'%Y-%m-%dT%H:%MZ'))" || true
@@ -74,7 +84,7 @@ fi
 # CYCLE_STATE.txt는 이미 다음 사이클 번호를 가리키고 있음
 
 # 3. 새 사이클 브리핑 생성
-python3 scripts/cycle_dispatcher.py
+"$PY_BIN" scripts/cycle_dispatcher.py
 
 # 4. Claude Code 세션 실행 (브리핑을 읽고 agent 배정)
 #    --permission-mode=acceptEdits : 확인 없이 진행
