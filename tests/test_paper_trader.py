@@ -198,7 +198,7 @@ def test_partial_fill_records_actual_quantity():
 
 
 def test_summary_includes_slippage_stats():
-    """요약에 평균 슬리피지가 포함됨"""
+    """요약에 평균 슬리피지가 포함됨 (now in bps)"""
     pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.05, fee_rate=0.0,
                      partial_fill_prob=0.0, timeout_prob=0.0)
     for _ in range(5):
@@ -208,10 +208,10 @@ def test_summary_includes_slippage_stats():
                          strategy="s", confidence="H")
     
     summary = pt.get_summary()
-    assert "avg_slippage_pct" in summary
+    assert "avg_slippage_bps" in summary  # Updated to bps
     assert "open_position_value" in summary
-    # 슬리피지는 ±0.05% 범위
-    assert -0.05 <= summary["avg_slippage_pct"] <= 0.05
+    # 슬리피지는 ±5 bps 범위 (0.05% = 5 bps)
+    assert -5 <= summary["avg_slippage_bps"] <= 5
 
 
 def test_reset_clears_trades_and_positions():

@@ -88,8 +88,11 @@ class PaperTrader:
         actual_qty = quantity * random.uniform(0.5, 0.8) if is_partial else quantity
 
         # 슬리피지 계산: 음수면 BUY에 유리, 양수면 SELL에 유리
+        # slippage_range: % (e.g., 0.05 = 0.05%)
         slippage_range = random.uniform(-self.slippage_pct, self.slippage_pct)
         actual_price = price * (1 + slippage_range / 100)
+        # 슬리피지를 basis points (bps)로 계산: (actual - expected) / expected * 10000
+        slippage_bps = (actual_price - price) / price * 10000 if price > 0 else 0.0
 
         fee = actual_price * actual_qty * self.fee_rate
         trade = PaperTrade(
@@ -101,7 +104,7 @@ class PaperTrader:
             actual_quantity=actual_qty,
             strategy=strategy,
             confidence=confidence,
-            slippage_pct=slippage_range,
+            slippage_pct=slippage_bps,  # Now in basis points (bps)
             is_partial=is_partial,
         )
 
@@ -154,12 +157,13 @@ class PaperTrader:
             "actual_quantity": round(actual_qty, 8),
             "fee": round(fee, 8),
             "pnl": round(trade.pnl, 8),
-            "slippage_pct": round(slippage_range, 4),
+            "slippage_bps": round(slippage_bps, 2),  # Basis points for accuracy
+            "slippage_pct": round(slippage_range, 4),  # % for backwards compatibility
             "balance": round(self.account.balance, 2),
         }
 
     def get_summary(self) -> dict:
-        """모의거래 요약: total_return%, trade_count, win_rate"""
+        """모의거래 요약: total_return%, trade_count, win_rate. slippage in basis points."""
         trades = self.account.trades
         sell_trades = [t for t in trades if t.action == "SELL"]
         win_count = sum(1 for t in sell_trades if t.pnl > 0)
@@ -169,9 +173,9 @@ class PaperTrader:
             (self.account.balance - self.account.initial_balance)
             / self.account.initial_balance
         )
-        # 체결된 거래만 통계 (부분체결 포함)
+        # 체결된 거래만 통계 (부분체결 포함). slippage는 basis points.
         filled_trades = [t for t in trades if not t.is_partial or t.is_partial]
-        total_slippage = sum(t.slippage_pct for t in filled_trades) if filled_trades else 0.0
+        total_slippage_bps = sum(t.slippage_pct for t in filled_trades) if filled_trades else 0.0
         
         return {
             "initial_balance": self.account.initial_balance,
@@ -181,7 +185,7 @@ class PaperTrader:
             "trade_count": trade_count,
             "sell_count": len(sell_trades),
             "win_rate": round(win_rate, 4),
-            "avg_slippage_pct": round(total_slippage / len(filled_trades), 4) if filled_trades else 0.0,
+            "avg_slippage_bps": round(total_slippage_bps / len(filled_trades), 2) if filled_trades else 0.0,
             "open_positions": dict(self.account.positions),
             "open_position_value": round(
                 sum(self.account.positions.get(sym, 0) * self.account.avg_entry.get(sym, 0) 

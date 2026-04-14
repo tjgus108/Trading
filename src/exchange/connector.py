@@ -285,11 +285,15 @@ class ExchangeConnector:
         logger.warning("Cancelling order %s", order_id)
         return self.exchange.cancel_order(order_id, symbol)
 
-    def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60) -> dict:
+    def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60, 
+                      expected_price: Optional[float] = None) -> dict:
         """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환.
 
         반환 시 filled/amount를 포함해 partial fill 수량을 보존한다.
         cancel 실패 시에도 최종 주문 상태를 반환한다.
+        
+        슬리피지 추적: expected_price 제공 시 actual_price와 비교해 slippage_bps 계산.
+        slippage_bps = (actual - expected) / expected * 10000
         """
         deadline = time.time() + timeout
         last_order: dict = {}
@@ -302,6 +306,11 @@ class ExchangeConnector:
                 continue
             status = last_order.get("status")
             if status == "closed":
+                # 체결 시 슬리피지 계산
+                if expected_price and expected_price > 0:
+                    actual_price = last_order.get("average", 0.0) or expected_price
+                    slippage_bps = (actual_price - expected_price) / expected_price * 10000
+                    last_order["slippage_bps"] = round(slippage_bps, 2)
                 return last_order
             if status == "canceled":
                 return last_order
@@ -320,7 +329,7 @@ class ExchangeConnector:
             pass
 
         filled = last_order.get("filled", 0.0) or 0.0
-        return {
+        result = {
             "status": "timeout",
             "id": order_id,
             "symbol": symbol,
@@ -328,3 +337,9 @@ class ExchangeConnector:
             "amount": last_order.get("amount", 0.0),
             "partial": filled > 0,
         }
+        # 부분 체결 시 슬리피지 계산
+        if filled > 0 and expected_price and expected_price > 0:
+            actual_price = last_order.get("average", 0.0) or expected_price
+            slippage_bps = (actual_price - expected_price) / expected_price * 10000
+            result["slippage_bps"] = round(slippage_bps, 2)
+        return result
