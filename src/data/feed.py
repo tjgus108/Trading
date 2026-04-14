@@ -358,8 +358,27 @@ class DataFeed:
         df["donchian_high"] = high.shift(1).rolling(20).max()
         df["donchian_low"] = low.shift(1).rolling(20).min()
 
+        # SMA
+        df["sma20"] = close.rolling(20, min_periods=1).mean()
+        df["sma50"] = close.rolling(50, min_periods=1).mean()
+
+        # Bollinger Bands
+        df["bb_upper"] = df["sma20"] + 2 * close.rolling(20, min_periods=1).std()
+        df["bb_lower"] = df["sma20"] - 2 * close.rolling(20, min_periods=1).std()
+
+        # MACD
+        df["macd"] = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
+        df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+
         # VWAP (rolling session)
         typical = (high + low + close) / 3
         df["vwap"] = (typical * df["volume"]).cumsum() / df["volume"].cumsum()
+        df["vwap20"] = (typical * df["volume"]).rolling(20, min_periods=1).sum() / df["volume"].rolling(20, min_periods=1).sum()
+
+        # Volume SMA
+        df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
+
+        # Momentum
+        df["return_5"] = close.pct_change(5)
 
         return df

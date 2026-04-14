@@ -7,6 +7,8 @@ TRIMA (Triangular Moving Average) 전략:
 - 최소 데이터: 45행
 """
 
+import math
+
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
@@ -52,6 +54,15 @@ class TRIMAStrategy(BaseStrategy):
 
         trima_now, trima_prev, close_now, close_prev, cross_up, cross_down, vol_surge = _calc_trima(df)
         entry = close_now
+
+        # NaN 방어: 지표 계산이 아직 수렴하지 않은 경우
+        if any(not math.isfinite(v) for v in (trima_now, trima_prev, close_now, close_prev)):
+            return Signal(
+                action=Action.HOLD, confidence=Confidence.LOW,
+                strategy=self.name, entry_price=entry if math.isfinite(entry) else 0.0,
+                reasoning="NaN detected in TRIMA indicators",
+                invalidation="지표 수렴 후 재평가",
+            )
 
         # 이격률 계산
         gap_pct = abs(close_now - trima_now) / trima_now if trima_now != 0 else 0.0

@@ -11,6 +11,8 @@ HIGH confidence: |fast_ma - slow_ma| > ATR14 * 0.3
 최소 45행 필요
 """
 
+import math
+
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
@@ -38,6 +40,16 @@ class AdaptiveMACrossStrategy(BaseStrategy):
 
         close = float(last["close"])
         atr14 = float(last["atr14"]) if "atr14" in df.columns else _calc_atr(df)
+
+        # NaN 방어
+        if not math.isfinite(close) or not math.isfinite(atr14) or atr14 <= 0:
+            return Signal(
+                action=Action.HOLD, confidence=Confidence.LOW,
+                strategy=self.name,
+                entry_price=close if math.isfinite(close) else 0.0,
+                reasoning="NaN/invalid detected in price or ATR",
+                invalidation="",
+            )
 
         # ── ATR ratio & 변동성 판단 ───────────────────────────────────────────
         atr_ratio_series = df["atr14"] / df["close"] if "atr14" in df.columns else (

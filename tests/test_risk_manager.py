@@ -855,3 +855,46 @@ def test_risk_manager_zero_balance_with_circuit_breaker():
     rm = _make_rm(circuit_breaker=cb)
     result = rm.evaluate(action="BUY", entry_price=50000, atr=500, account_balance=0.0)
     assert result.status == RiskStatus.BLOCKED
+
+
+# ── Confidence-based sizing ──────────────────────────────────────────────────
+
+def _sized(confidence: str, **kw):
+    # 포지션 상한에 걸리지 않도록 고ATR/저balance로 설정 (risk_amount/SL로 자연 산출)
+    rm = _make_rm(risk_per_trade=0.01, max_position_size=1.0)
+    return rm.evaluate(
+        action="BUY", entry_price=50000, atr=1000, account_balance=10000,
+        confidence=confidence, **kw,
+    )
+
+
+def test_confidence_high_is_1_5x_medium():
+    med = _sized("MEDIUM")
+    high = _sized("HIGH")
+    assert med.status == RiskStatus.APPROVED
+    assert high.status == RiskStatus.APPROVED
+    assert high.position_size == pytest.approx(med.position_size * 1.5, rel=1e-3)
+
+
+def test_confidence_low_is_0_5x_medium():
+    med = _sized("MEDIUM")
+    low = _sized("LOW")
+    assert low.position_size == pytest.approx(med.position_size * 0.5, rel=1e-3)
+
+
+def test_confidence_none_defaults_to_medium():
+    med = _sized("MEDIUM")
+    default = _sized(None)  # type: ignore[arg-type]
+    assert default.position_size == pytest.approx(med.position_size, rel=1e-3)
+
+
+def test_confidence_unknown_value_defaults_to_medium():
+    med = _sized("MEDIUM")
+    weird = _sized("BANANA")
+    assert weird.position_size == pytest.approx(med.position_size, rel=1e-3)
+
+
+def test_confidence_lowercase_accepted():
+    med = _sized("MEDIUM")
+    high_lower = _sized("high")
+    assert high_lower.position_size == pytest.approx(med.position_size * 1.5, rel=1e-3)

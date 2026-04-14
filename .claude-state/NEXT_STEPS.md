@@ -1,7 +1,78 @@
-<<<<<<< HEAD
 # Next Steps
 
-_Last updated: 2026-04-12_
+_Last updated: 2026-04-14_
+
+## [2026-04-14] Round 4 — 세무/감사·지연·안전장치 보강
+
+### 변경 사항
+- **`src/utils/trade_logger.py` (NEW)**: append-only CSV 거래 로거 (세무 대비)
+  - 13개 필드(timestamp, symbol, side, order_id, client_order_id, price, amount, cost, fee, fee_currency, status, strategy, note), thread-safe
+- **`src/pipeline/runner.py`**:
+  - live 모드 시 `TradeLogger("logs/trades.csv")` 자동 활성화
+  - 엔트리 체결 / emergency close 모두 CSV 기록
+  - emergency close마저 실패하면 `connector._consecutive_failures`를 max로 밀어 **is_halted=True** → 다음 엔트리 자동 차단
+- **`src/exchange/connector.py`**:
+  - `fetch_ohlcv` / `fetch_balance` / `fetch_ticker`에 `_timed_call` 래핑 적용 (5s 경고, 15s halt 카운트)
+- **tests**:
+  - `tests/test_trade_logger.py` (NEW, 4 cases)
+  - `tests/test_risk_manager.py`에 confidence 기반 사이징 5건 추가 (HIGH 1.5x / LOW 0.5x / None·미지정 → MEDIUM / 대소문자)
+
+## [2026-04-14] 실전 배포 전 코드 안전성 강화 (Round 3 — 14+ 에이전트 병렬 점검)
+
+### Round 3 변경 사항
+- **`src/pipeline/runner.py`**:
+  - `preflight_check()` 추가 — 매 실행 전 거래소 상태, 포지션 동기화 점검
+  - `_has_unsynced_positions` 가드 — 미동기화 포지션 있으면 신규 진입 차단
+  - SL 실패 시 2회 재시도 후 **emergency close** (포지션 보호 불가 → 즉시 시장가 청산)
+  - confidence → risk_manager.evaluate()에 전달
+- **`src/exchange/connector.py`**:
+  - `reconnect()` 메서드 (exponential backoff, 최대 3회)
+  - `sync_positions()` — 거래소 실제 포지션 조회
+  - `is_halted` — 연속 5회 API 실패 시 halt, 새 주문 거부
+  - 성공 시 `_consecutive_failures` 리셋
+- **`src/backtest/engine.py`**: confidence 기반 포지션 사이징 (HIGH=1.5x, MEDIUM=1.0x, LOW=0.5x)
+- **`src/risk/manager.py`**: CONFIDENCE_MULTIPLIER 도입, None 안전 처리
+- **`src/strategy/bull_bear_power.py`**: NaN 방어 추가
+- **`src/logging_setup.py`**: FileHandler → RotatingFileHandler (10MB x 5)
+- **`deploy/trading-bot.service`**: systemd 서비스 파일 (자동 재시작, watchdog)
+- **`deploy/GO_LIVE_CHECKLIST.md`**: 실전 배포 전 체크리스트
+
+## [2026-04-14] 실전 배포 전 코드 안전성 강화 (6개 에이전트 병렬 점검)
+
+### 변경 사항
+- **`src/exchange/connector.py`**:
+  - `create_order`: clientOrderId 추가로 중복 주문 방지 (멱등성)
+  - `wait_for_fill`: cancel 실패 처리, partial fill 보존, fetch_order 예외 처리
+  - `fetch_balance`: 실패 시 마지막 성공 값 캐싱 (stale balance로 과다 주문 방지)
+- **`src/pipeline/runner.py`**:
+  - `_submit_sl_tp_orders()` 메서드 추가 — 체결 후 SL/TP 보호 주문을 거래소에 실제 제출
+  - 기존엔 SL/TP를 기록만 하고 거래소 주문 미제출이었음 (critical fix)
+- **`src/data/feed.py`**:
+  - `_add_indicators`에 BB, MACD, SMA, VWAP20, volume_sma20, return_5 추가
+  - paper_simulation과 지표 불일치 해소 (백테스트/라이브 괴리 방지)
+- **`src/strategy/trima.py`**: NaN 방어 추가
+- **`src/strategy/adaptive_ma_cross.py`**: NaN/invalid ATR 방어 추가
+
+## [2026-04-14] 시뮬레이터 대폭 개선: Walk-Forward + 6개월 데이터 + 장기 실행
+
+### 변경 사항
+- **`scripts/paper_simulation.py`**: 전면 리팩토링
+  - 페이지네이션 데이터 수집: 1000봉(41일) → 4320봉(6개월) 자동 페이지네이션
+  - Walk-Forward 평가: 훈련 4개월 + 테스트 1개월, 1개월씩 롤링 (최소 2윈도우)
+  - 전략 제거 정책: 1회 FAIL → 즉시 제거 대신, 윈도우 50%+ 통과해야 PASS
+  - 일관성 점수(consistency_score) 도입
+- **`scripts/live_paper_trader.py`**: 신규 생성
+  - 며칠간 연속 운영하는 실시간 모의거래 시뮬레이터
+  - 매 1시간마다 Bybit에서 새 캔들 수집 → 전략 신호 → PaperTrader로 모의 실행
+  - 24시간마다 성과 리포트 자동 생성
+  - 상태 파일(`live_paper_state.json`)로 중단 후 재시작 가능
+  - Ctrl+C graceful shutdown
+  - 사용법: `python3 scripts/live_paper_trader.py --days 7 --interval 3600`
+
+### 다음 할 일
+1. **live_paper_trader를 실제로 며칠 돌려서 데이터 수집**
+2. Walk-Forward 결과로 최종 10~20개 핵심 전략 선별
+3. 선별된 전략으로 포트폴리오 최적화 (비중 조절)
 
 ## [2026-04-12] pair_trading/ml_rf/ml_lstm zero-trade 버그 수정 완료 (28 passed)
 - **원인**: 세 전략 모두 모델/데이터 없을 때 항상 HOLD → Sharpe=0.000
@@ -2714,14 +2785,11 @@ pip install anthropic
 
 ---
 
-# Cycle 121 Todo (Remote)
+---
 
-# Cycle 121 Todo
-=======
 # 실전 Bybit 데이터 시뮬레이션 결과 기반 — 작업 방향 전환
->>>>>>> claude/view-research-report-MgcA0
 
-_Updated: 2026-04-13_
+_Updated: 2026-04-14_
 
 ## ⛔ 핵심 교훈: 합성 데이터 과적합 확인
 

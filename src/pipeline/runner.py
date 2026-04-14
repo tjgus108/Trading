@@ -15,6 +15,7 @@ from src.risk.kelly_sizer import KellySizer
 from src.risk.vol_targeting import VolTargeting
 from src.exchange.twap import TWAPExecutor
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
+from src.utils.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +91,52 @@ class TradingPipeline:
         self.twap_executor: Optional[TWAPExecutor] = None   # H4: TWAP order execution
         self.vol_targeting: Optional[VolTargeting] = None   # I3: Vol-targeted sizing
         self._trade_history: list[dict] = []               # H1: 거래 기록 (kelly 계산용)
+        # 세무/감사 대비: 모든 체결을 append-only CSV에 기록
+        self.trade_logger: Optional[TradeLogger] = (
+            None if dry_run else TradeLogger("logs/trades.csv")
+        )
+
+    def preflight_check(self) -> list[str]:
+        """실행 전 안전 점검. 문제 발견 시 경고 메시지 리스트 반환."""
+        warnings = []
+
+        # 1. 거래소 연결 상태
+        if self.connector.is_halted:
+            warnings.append("CRITICAL: Connector is halted due to consecutive failures")
+
+        # 2. 실전 모드에서 포지션 동기화
+        if not self.dry_run:
+            try:
+                open_pos = self.connector.sync_positions(self.symbol)
+                if open_pos:
+                    warnings.append(
+                        f"WARNING: {len(open_pos)} open position(s) found on exchange. "
+                        f"New entries will be blocked until positions are resolved."
+                    )
+                    self._has_unsynced_positions = True
+                else:
+                    self._has_unsynced_positions = False
+            except Exception as e:
+                warnings.append(f"WARNING: Position sync failed: {e}")
+                self._has_unsynced_positions = True
+
+        return warnings
 
     def run(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         result = PipelineResult(timestamp=ts, symbol=self.symbol, pipeline_step="start", status="OK")
+
+        # ── Step 0: Preflight Check ─────────────────────────────────────
+        preflight_warnings = self.preflight_check()
+        for w in preflight_warnings:
+            result.notes.append(w)
+            logger.warning("[pipeline] preflight: %s", w)
+
+        if any("CRITICAL" in w for w in preflight_warnings):
+            result.status = "ERROR"
+            result.error = "Preflight check failed"
+            result.pipeline_step = "preflight"
+            return result
 
         # ── Step 1: Data ────────────────────────────────────────────────
         try:
@@ -122,6 +165,14 @@ class TradingPipeline:
                     result.notes.append(line)
             except Exception as e:
                 logger.warning("[pipeline] context build failed (non-fatal): %s", e)
+
+        # ── Step 1c: Unsynced Position Guard ───────────────────────────
+        if getattr(self, '_has_unsynced_positions', False) and not self.dry_run:
+            result.status = "BLOCKED"
+            result.pipeline_step = "preflight"
+            result.notes.append("BLOCKED: Unsynced positions on exchange — resolve before new entries")
+            logger.warning("[pipeline] BLOCKED: unsynced positions — skipping signal generation")
+            return result
 
         # ── Step 2: Signal (Alpha) ──────────────────────────────────────
         try:
@@ -229,6 +280,7 @@ class TradingPipeline:
                 account_balance=balance,
                 last_candle_pct_change=last_candle_pct,
                 candle_df=summary.df,
+                confidence=str(signal.confidence.name) if hasattr(signal.confidence, 'name') else str(signal.confidence),
             )
             result.risk = risk_result
             result.pipeline_step = "risk"
@@ -335,6 +387,25 @@ class TradingPipeline:
                 }
                 result.pipeline_step = "execution"
                 logger.info("[pipeline] execution status=%s", fill.get("status"))
+
+                # 세무 대비: 체결 내역 CSV 기록
+                if self.trade_logger and fill.get("filled"):
+                    self.trade_logger.log_fill(
+                        order=fill, symbol=self.symbol, side=side,
+                        strategy=getattr(self.strategy, "name", type(self.strategy).__name__),
+                        note="entry",
+                    )
+
+                # SL/TP 보호 주문 거래소 제출
+                if fill.get("status") == "closed" and fill.get("filled"):
+                    self._submit_sl_tp_orders(
+                        symbol=self.symbol,
+                        side=side,
+                        filled_size=float(fill["filled"]),
+                        stop_loss=risk_result.stop_loss,
+                        take_profit=risk_result.take_profit,
+                    )
+
                 avg_price = fill.get("average")
                 if signal.entry_price and avg_price:
                     result.impl_shortfall_bps = (
@@ -348,6 +419,92 @@ class TradingPipeline:
             logger.error("[pipeline] execution FAILED: %s", e)
 
         return result
+
+    def _submit_sl_tp_orders(
+        self,
+        symbol: str,
+        side: str,
+        filled_size: float,
+        stop_loss: float | None,
+        take_profit: float | None,
+    ) -> None:
+        """체결 후 SL/TP 보호 주문을 거래소에 제출."""
+        close_side = "sell" if side == "buy" else "buy"
+
+        sl_ok = False
+        if stop_loss and stop_loss > 0:
+            for attempt in range(1, 3):
+                try:
+                    sl_order = self.connector.create_order(
+                        symbol=symbol,
+                        side=close_side,
+                        amount=filled_size,
+                        order_type="market",
+                        price=None,
+                        params={
+                            "stopLossPrice": stop_loss,
+                            "triggerPrice": stop_loss,
+                            "reduceOnly": True,
+                        },
+                    )
+                    logger.info(
+                        "[pipeline] SL order submitted: id=%s trigger=$%.2f",
+                        sl_order.get("id"), stop_loss,
+                    )
+                    sl_ok = True
+                    break
+                except Exception as e:
+                    logger.error("[pipeline] SL order attempt %d FAILED: %s", attempt, e)
+
+            if not sl_ok:
+                # SL 제출 실패 → 포지션 보호 불가, 즉시 시장가 청산
+                logger.critical(
+                    "[pipeline] SL order FAILED after retries — emergency close position"
+                )
+                try:
+                    self.connector.create_order(
+                        symbol=symbol, side=close_side,
+                        amount=filled_size, order_type="market",
+                    )
+                    logger.warning("[pipeline] Emergency close executed")
+                    if self.trade_logger:
+                        self.trade_logger.log_fill(
+                            order={"status": "emergency_close",
+                                   "amount": filled_size, "filled": filled_size},
+                            symbol=symbol, side=close_side,
+                            strategy=getattr(self.strategy, "name",
+                                             type(self.strategy).__name__),
+                            note="emergency_close_after_sl_fail",
+                        )
+                except Exception as e2:
+                    logger.critical("[pipeline] Emergency close ALSO FAILED: %s", e2)
+                    # 보호 불가능한 포지션이 남았음 → 커넥터 halt로 다음 엔트리 차단
+                    self.connector._consecutive_failures = max(
+                        self.connector._consecutive_failures,
+                        self.connector._max_consecutive_failures,
+                    )
+                return
+
+        if take_profit and take_profit > 0:
+            try:
+                tp_order = self.connector.create_order(
+                    symbol=symbol,
+                    side=close_side,
+                    amount=filled_size,
+                    order_type="market",
+                    price=None,
+                    params={
+                        "takeProfitPrice": take_profit,
+                        "triggerPrice": take_profit,
+                        "reduceOnly": True,
+                    },
+                )
+                logger.info(
+                    "[pipeline] TP order submitted: id=%s trigger=$%.2f",
+                    tp_order.get("id"), take_profit,
+                )
+            except Exception as e:
+                logger.error("[pipeline] TP order FAILED: %s (SL is active, continuing)", e)
 
     def _fetch_balance_usd(self) -> float:
         try:

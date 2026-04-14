@@ -1,0 +1,35 @@
+[Unit]
+Description=Crypto Trading Bot (Live Paper Trader)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trading
+Group=trading
+WorkingDirectory=/opt/trading-bot
+ExecStart=/opt/trading-bot/venv/bin/python3 scripts/live_paper_trader.py --days 30 --interval 3600
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Environment
+EnvironmentFile=/opt/trading-bot/.env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/trading-bot/logs /opt/trading-bot/.claude-state
+
+# Watchdog: 5분 이내에 응답 없으면 재시작
+WatchdogSec=300
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trading-bot
+
+[Install]
+WantedBy=multi-user.target

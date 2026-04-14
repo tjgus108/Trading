@@ -5,6 +5,7 @@
 config/secrets.json
 config/secrets/
 logs/
+.claude-state/live_paper_state.json
 __pycache__/
 *.pyc
 .venv/

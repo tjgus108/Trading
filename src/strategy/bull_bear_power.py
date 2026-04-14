@@ -16,6 +16,8 @@ confidence:
 최소 데이터: 20행
 """
 
+import math
+
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
@@ -43,6 +45,11 @@ class BullBearPowerStrategy(BaseStrategy):
         bear_now = float(bear_power.iloc[idx])
         bear_prev = float(bear_power.iloc[idx - 1])
         close = float(df["close"].iloc[idx])
+
+        # NaN 방어
+        vals = [ema_now, ema_prev, bull_now, bull_prev, bear_now, bear_prev, close]
+        if any(not math.isfinite(v) for v in vals):
+            return self._hold(df, "NaN detected in BullBearPower indicators")
 
         threshold = abs(ema_now) * 0.01
 

@@ -4,6 +4,7 @@ logs/ 디렉토리는 .gitignore에 포함된다.
 """
 
 import logging
+import logging.handlers
 import os
 from pathlib import Path
 
@@ -14,9 +15,14 @@ def setup_logging(level: str = "INFO", log_file: str = "logs/trading.log") -> No
     fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
 
+    # RotatingFileHandler: 10MB per file, 5 backups (총 ~50MB)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8",
+    )
+
     handlers: list[logging.Handler] = [
         logging.StreamHandler(),
-        logging.FileHandler(log_file, encoding="utf-8"),
+        file_handler,
     ]
 
     logging.basicConfig(

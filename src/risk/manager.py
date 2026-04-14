@@ -193,6 +193,9 @@ class RiskManager:
         if self.circuit_breaker:
             self.circuit_breaker.reset_daily()
 
+    # Confidence → 포지션 사이징 배율 (HIGH=1.5x, MEDIUM=1.0x, LOW=0.5x)
+    CONFIDENCE_MULTIPLIER = {"HIGH": 1.5, "MEDIUM": 1.0, "LOW": 0.5}
+
     def evaluate(
         self,
         action: str,           # "BUY" | "SELL" | "HOLD"
@@ -203,6 +206,7 @@ class RiskManager:
         candle_df: Optional[pd.DataFrame] = None,  # adaptive multiplier용
         timestamp: Union[datetime, None] = None,  # 세션 필터용 UTC 시각
         open_positions: Optional[list] = None,  # 다중 포지션 total exposure 체크용
+        confidence: str = "MEDIUM",  # 전략 신뢰도 → 포지션 사이징 반영
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -290,7 +294,8 @@ class RiskManager:
         else:
             sl_mult = self.atr_multiplier_sl
         sl_distance = atr * sl_mult
-        risk_amount = account_balance * self.risk_per_trade
+        conf_mult = self.CONFIDENCE_MULTIPLIER.get((confidence or "MEDIUM").upper(), 1.0)
+        risk_amount = account_balance * self.risk_per_trade * conf_mult
         position_size = risk_amount / sl_distance
 
         # 최대 포지션 한도 클램프

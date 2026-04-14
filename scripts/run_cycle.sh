@@ -1,12 +1,28 @@
 #!/bin/bash
 # 5시간마다 Claude Code 세션을 열어 cycle_dispatcher → agent 작업 → commit+push 진행
 #
-# cron 등록 예시:
-#   0 */5 * * * cd ~/Trading && bash scripts/run_cycle.sh >> /tmp/cycle.log 2>&1
+# cron 등록 예시 (경로는 실제 프로젝트 위치로):
+#   0 */5 * * * cd ~/Desktop/AgentTest/Trading && bash scripts/run_cycle.sh >> /tmp/cycle.log 2>&1
+#
+# macOS 주의:
+#   1) 시스템 설정 → 개인정보보호 → 전체 디스크 접근 권한에 /usr/sbin/cron 추가
+#   2) chmod +x scripts/run_cycle.sh
+#   3) claude/python3/git 경로는 아래 PATH export로 보정
 
 set -e
 
+# cron 환경의 최소 PATH 보정 (homebrew + 시스템 + 사용자 bin)
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/bin:$PATH"
+
 cd "$(dirname "$0")/.."
+
+# .env 자동 로드 (EXCHANGE_API_KEY, TELEGRAM_BOT_TOKEN 등)
+if [ -f .env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+fi
 
 echo "==================================="
 echo "🔄 Cycle run: $(date -u +'%Y-%m-%d %H:%M:%SZ')"
