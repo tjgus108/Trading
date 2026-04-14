@@ -4,6 +4,8 @@ ADX >= 25일 때 +DI/-DI 방향과 EMA50 위치로 BUY/SELL 신호 생성.
 ADX < 25 (횡보장)이면 HOLD.
 """
 
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
 
