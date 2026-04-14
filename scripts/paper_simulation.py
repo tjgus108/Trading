@@ -299,11 +299,12 @@ def evaluate_strategy_walk_forward(
 
 # ── 리포트 ──────────────────────────────────────────────────
 
-def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, windows_count: int) -> str:
+def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT") -> str:
     results.sort(key=lambda x: x["avg_return"], reverse=True)
     lines = []
-    lines.append("# Paper Trading 시뮬레이션 리포트 (Walk-Forward)\n")
+    lines.append(f"# Paper Trading 시뮬레이션 리포트 — {symbol} (Walk-Forward)\n")
     lines.append(f"_Generated: {datetime.utcnow().isoformat()}Z_")
+    lines.append(f"_Symbol: {symbol}_")
     lines.append(f"_Data Source: {data_source}_")
     lines.append(f"_Data Range: {df.index[0]} ~ {df.index[-1]} ({(df.index[-1] - df.index[0]).days}일)_")
     lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={TRAIN_HOURS}h, test={TEST_HOURS}h)_")
@@ -372,43 +373,28 @@ def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, win
 
 # ── 메인 ──────────────────────────────────────────────────
 
-def run_simulation():
-    print("=" * 70)
-    print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
-    print("=" * 70)
+SYMBOLS = ["BTC/USDT", "ETH/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
-    # 1. 6개월 데이터 페이지네이션 수집
-    df = fetch_real_data_paginated("BTC/USDT", "1h", total_candles=4320)
-    data_source = "Bybit BTC/USDT 1h (paginated)"
+
+def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str:
+    """단일 심볼에 대한 walk-forward 시뮬을 돌리고 리포트 섹션을 반환."""
+    print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
+
+    df = fetch_real_data_paginated(symbol, "1h", total_candles=4320)
+    data_source = f"Bybit {symbol} 1h (paginated)"
 
     if df is None:
-        print("[FALLBACK] Using synthetic data (Bybit API inaccessible)")
+        print(f"[{symbol}][FALLBACK] Using synthetic data (Bybit API inaccessible)")
         from scripts.quality_audit import make_synthetic_data
         df = make_synthetic_data(4320)
-        data_source = "Synthetic GBM x4320 (BTC-like)"
+        data_source = f"Synthetic GBM x4320 ({symbol}-like)"
     else:
         df = enrich_indicators(df)
 
-    print(f"[DATA] Total candles: {len(df)}")
+    print(f"[{symbol}][DATA] Total candles: {len(df)}")
 
-    # 2. Walk-Forward 윈도우 생성
     windows = make_walk_forward_windows(df)
 
-    # 3. PASS 전략 로드
-    pass_list = load_pass_strategies()
-    if not pass_list:
-        print("[ERROR] 전략 없음. quality_audit.py 먼저 실행.")
-        return 1
-    print(f"[STRATEGIES] Loaded {len(pass_list)} strategies")
-
-    # 4. 백테스트 엔진
-    engine = BacktestEngine(
-        initial_balance=10_000,
-        fee_rate=0.001,
-        slippage_pct=0.0005,
-    )
-
-    # 5. Walk-Forward 평가
     results = []
     for idx, (mod_name, cls_name) in enumerate(pass_list):
         cls = load_strategy_class(mod_name, cls_name)
@@ -418,22 +404,52 @@ def run_simulation():
             result = evaluate_strategy_walk_forward(cls, windows, engine)
             results.append(result)
             if (idx + 1) % 50 == 0:
-                print(f"[PROGRESS] {idx + 1}/{len(pass_list)} strategies evaluated", flush=True)
+                print(f"[{symbol}][PROGRESS] {idx + 1}/{len(pass_list)} evaluated", flush=True)
         except Exception as e:
-            print(f"[ERROR] {mod_name}: {str(e)[:80]}")
+            print(f"[{symbol}][ERROR] {mod_name}: {str(e)[:80]}")
 
-    # 6. 리포트 생성
-    report = generate_report(results, data_source, df, len(windows))
-    REPORT_PATH.write_text(report)
-    print(f"\n[REPORT] Saved to {REPORT_PATH}")
-
-    # 요약 출력
     passed = [r for r in results if r["overall_passed"]]
-    print(f"\n[SUMMARY] {len(passed)}/{len(results)} strategies PASSED (consistency >= {PASS_RATIO:.0%})")
+    print(f"[{symbol}][SUMMARY] {len(passed)}/{len(results)} PASSED (consistency >= {PASS_RATIO:.0%})")
     for r in sorted(passed, key=lambda x: x["avg_return"], reverse=True)[:5]:
         print(f"  {r['name']:<30} avg_return={r['avg_return']:+.2%} "
               f"sharpe={r['avg_sharpe']:.2f} consistency={r['passed_windows']}/{r['total_windows']}")
 
+    return generate_report(results, data_source, df, len(windows), symbol=symbol)
+
+
+def run_simulation():
+    print("=" * 70)
+    print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
+    print(f"Symbols: {', '.join(SYMBOLS)}")
+    print("=" * 70)
+
+    pass_list = load_pass_strategies()
+    if not pass_list:
+        print("[ERROR] 전략 없음. quality_audit.py 먼저 실행.")
+        return 1
+    print(f"[STRATEGIES] Loaded {len(pass_list)} strategies")
+
+    engine = BacktestEngine(
+        initial_balance=10_000,
+        fee_rate=0.001,
+        slippage_pct=0.0005,
+    )
+
+    sections = []
+    for symbol in SYMBOLS:
+        try:
+            sections.append(simulate_symbol(symbol, pass_list, engine))
+        except Exception as e:
+            print(f"[{symbol}][FATAL] {e}")
+            sections.append(f"# {symbol} 시뮬 실패\n\n{e}\n")
+
+    header = (
+        f"# Paper Trading 시뮬레이션 통합 리포트\n\n"
+        f"_Generated: {datetime.utcnow().isoformat()}Z_\n"
+        f"_Symbols: {', '.join(SYMBOLS)}_\n\n---\n\n"
+    )
+    REPORT_PATH.write_text(header + "\n\n---\n\n".join(sections))
+    print(f"\n[REPORT] Saved to {REPORT_PATH}")
     return 0
 
 
