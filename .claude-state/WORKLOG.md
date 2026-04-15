@@ -11560,3 +11560,6 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-14 22:11 UTC] Cycle 124 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-15 03:00 UTC] Cycle 125 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
