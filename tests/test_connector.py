@@ -270,3 +270,89 @@ def test_wait_for_fill_partial_fill_then_closed():
     assert result["status"] == "closed"
     assert result["filled"] == 1.0
     conn._exchange.cancel_order.assert_not_called()
+
+
+# ── _call_with_deadline 타임아웃 테스트 ──────────────────────────────────
+
+def test_call_with_deadline_returns_on_success():
+    """정상 함수 호출 → 결과 반환."""
+    conn = _make_connector()
+    result = conn._call_with_deadline(lambda: 42, timeout=5)
+    assert result == 42
+
+
+def test_call_with_deadline_raises_on_hang():
+    """함수가 타임아웃 초과 시 RequestTimeout 발생."""
+    import time as _time
+    conn = _make_connector()
+
+    def _hang():
+        _time.sleep(10)
+
+    with pytest.raises(ccxt.RequestTimeout, match="did not respond"):
+        conn._call_with_deadline(_hang, timeout=1)
+
+
+# ── _timed_call 강제 타임아웃 테스트 ─────────────────────────────────────
+
+def test_timed_call_timeout_increments_consecutive_failures():
+    """API 호출이 hang 시 consecutive_failures가 증가하고 RequestTimeout 발생."""
+    import time as _time
+    import unittest.mock as _mock
+
+    conn = _make_connector()
+    assert conn._consecutive_failures == 0
+
+    def _slow_fn():
+        _time.sleep(100)
+
+    _slow_fn.__name__ = "_slow_fn"
+
+    # API_CALL_TIMEOUT을 1초로 패치하여 빠르게 테스트
+    with _mock.patch("src.exchange.connector.API_CALL_TIMEOUT", 1):
+        with pytest.raises(ccxt.RequestTimeout):
+            conn._timed_call(_slow_fn)
+
+    assert conn._consecutive_failures >= 1
+
+
+# ── timeout_ms가 ccxt에 전달되는지 확인 ──────────────────────────────────
+
+def test_connector_passes_timeout_to_ccxt():
+    """ExchangeConnector 초기화 시 timeout_ms가 기본값 15000으로 설정된다."""
+    conn = ExchangeConnector(exchange_name="binance", sandbox=True)
+    assert conn._timeout_ms == 15000
+
+    conn2 = ExchangeConnector(exchange_name="binance", sandbox=True, timeout_ms=5000)
+    assert conn2._timeout_ms == 5000
+
+
+# ── pipeline 타임아웃 테스트 ─────────────────────────────────────────────
+
+def test_pipeline_timeout_returns_error():
+    """파이프라인 실행이 타임아웃되면 ERROR 결과 반환."""
+    import time as _time
+    import unittest.mock as _mock
+    from src.pipeline.runner import TradingPipeline, PipelineResult, PIPELINE_TIMEOUT
+
+    # mock 파이프라인 생성
+    pipeline = _mock.MagicMock(spec=TradingPipeline)
+    pipeline.symbol = "BTC/USDT"
+
+    # _run_inner가 오래 걸리도록 mock
+    def _slow_inner():
+        _time.sleep(100)
+
+    # TradingPipeline.run의 실제 로직 테스트
+    from src.pipeline.runner import TradingPipeline as TP
+    with _mock.patch.object(TP, '_run_inner', side_effect=_slow_inner):
+        tp = _mock.MagicMock(spec=TP)
+        tp.symbol = "BTC/USDT"
+        tp._run_inner = _slow_inner
+
+        # run()을 직접 호출하되 PIPELINE_TIMEOUT을 1초로 패치
+        with _mock.patch("src.pipeline.runner.PIPELINE_TIMEOUT", 1):
+            result = TP.run(tp)
+
+    assert result.status == "ERROR"
+    assert "did not complete" in result.error

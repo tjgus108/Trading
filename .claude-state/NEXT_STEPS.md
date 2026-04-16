@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-04-15 (Cycle 123 E 완료)_
+_Last updated: 2026-04-16 (세션 프리즈 수정 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관. 100줄 초과 시 요약/정리.
 
@@ -8,6 +8,10 @@ _Last updated: 2026-04-15 (Cycle 123 E 완료)_
 
 ### 로테이션 기준 다음 카테고리
 - MASTER_PLAN 로테이션에 따라 A(품질) + C(데이터) + E(실행) 예상
+
+### 완료된 핫픽스
+- **세션 프리즈 수정**: connector/pipeline에 강제 타임아웃 추가 (ccxt timeout, _call_with_deadline, PIPELINE_TIMEOUT)
+- `ThreadPoolExecutor.shutdown(wait=False, cancel_futures=True)` — hang 스레드 대기 제거
 
 ### 우선 작업
 1. **[A] 품질**: PASS 전략 22개 중 실전 FAIL 20개 재검증 — 과최적화 원인 분석

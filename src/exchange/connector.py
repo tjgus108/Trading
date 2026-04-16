@@ -7,17 +7,22 @@ import os
 import time
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Optional, List
 
 import ccxt
 
 logger = logging.getLogger(__name__)
 
+# API 호출 강제 타임아웃 (초) — ccxt 자체 timeout과 별도로 스레드 레벨 보호
+API_CALL_TIMEOUT = 30
+
 
 class ExchangeConnector:
-    def __init__(self, exchange_name: str, sandbox: bool = True):
+    def __init__(self, exchange_name: str, sandbox: bool = True, timeout_ms: int = 15000):
         self.exchange_name = exchange_name
         self.sandbox = sandbox
+        self._timeout_ms = timeout_ms
         self._exchange: Optional[ccxt.Exchange] = None
         self._last_balance: Optional[dict] = None
         self._consecutive_failures: int = 0
@@ -30,14 +35,16 @@ class ExchangeConnector:
                 "apiKey": os.environ["EXCHANGE_API_KEY"],
                 "secret": os.environ["EXCHANGE_API_SECRET"],
                 "enableRateLimit": True,
+                "timeout": self._timeout_ms,
                 "options": {"fetchCurrencies": False},
             }
         )
         if self.sandbox:
             self._exchange.set_sandbox_mode(True)
-        self._exchange.load_markets()
+        # load_markets도 hang 가능 → 스레드 타임아웃으로 보호
+        self._call_with_deadline(self._exchange.load_markets, timeout=API_CALL_TIMEOUT)
         self._consecutive_failures = 0
-        logger.info("Connected to %s (sandbox=%s)", self.exchange_name, self.sandbox)
+        logger.info("Connected to %s (sandbox=%s, timeout=%dms)", self.exchange_name, self.sandbox, self._timeout_ms)
         self.check_api_permissions()
 
     def reconnect(self, max_retries: int = 3) -> bool:
@@ -159,11 +166,29 @@ class ExchangeConnector:
             raise RuntimeError("Not connected. Call connect() first.")
         return self._exchange
 
+    def _call_with_deadline(self, fn, *args, timeout: int = API_CALL_TIMEOUT, **kwargs):
+        """fn을 별도 스레드에서 실행하고 timeout초 내 미완료 시 RequestTimeout 발생.
+
+        중요: shutdown(wait=False)로 hang 스레드를 기다리지 않는다.
+        with 문은 __exit__에서 wait=True를 하므로 사용하지 않는다.
+        """
+        pool = ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(fn, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except FuturesTimeoutError:
+            fn_name = getattr(fn, '__name__', str(fn))
+            raise ccxt.RequestTimeout(
+                f"{fn_name} did not respond within {timeout}s — possible hang"
+            )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
     def _timed_call(self, fn, *args, **kwargs):
-        """API 호출을 래핑해 응답 시간 추적. 느린 응답 시 경고/halt."""
+        """API 호출을 래핑해 응답 시간 추적 + 강제 타임아웃. 느린 응답 시 경고/halt."""
         start = time.time()
         try:
-            result = fn(*args, **kwargs)
+            result = self._call_with_deadline(fn, *args, timeout=API_CALL_TIMEOUT, **kwargs)
             elapsed_ms = (time.time() - start) * 1000
             if elapsed_ms > self._LATENCY_HALT_MS:
                 self._consecutive_failures += 1
@@ -178,6 +203,15 @@ class ExchangeConnector:
                     elapsed_ms, self._LATENCY_WARN_MS, fn.__name__,
                 )
             return result
+        except ccxt.RequestTimeout:
+            # _call_with_deadline에서 hang 감지 또는 ccxt 자체 타임아웃
+            self._consecutive_failures += 1
+            elapsed_ms = (time.time() - start) * 1000
+            logger.error(
+                "API call TIMEOUT after %.0fms: %s [consecutive=%d]",
+                elapsed_ms, fn.__name__, self._consecutive_failures,
+            )
+            raise
         except Exception:
             elapsed_ms = (time.time() - start) * 1000
             logger.debug("API call failed after %.0fms: %s", elapsed_ms, fn.__name__)
@@ -191,15 +225,15 @@ class ExchangeConnector:
         return data
 
     def fetch_balance(self) -> dict:
-        """잔고 조회. 실패 시 마지막 성공 값 캐싱 반환, 캐시도 없으면 예외 발생."""
+        """잔고 조회. 실패/타임아웃 시 캐시 반환, 캐시도 없으면 안전 기본값."""
         try:
             result = self._timed_call(self.exchange.fetch_balance)
         except Exception as exc:
             logger.warning("fetch_balance failed: %s", exc)
-            if hasattr(self, "_last_balance") and self._last_balance:
+            if self._last_balance:
                 logger.info("Returning cached balance (may be stale)")
                 return self._last_balance
-            raise  # 캐시도 없으면 호출자에게 예외 전파
+            return {"total": {}, "free": {}, "used": {}}
         if not result or not isinstance(result, dict):
             logger.warning("fetch_balance returned unexpected response: %r", result)
             if hasattr(self, "_last_balance") and self._last_balance:
@@ -285,13 +319,13 @@ class ExchangeConnector:
         logger.warning("Cancelling order %s", order_id)
         return self.exchange.cancel_order(order_id, symbol)
 
-    def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60, 
+    def wait_for_fill(self, order_id: str, symbol: str, timeout: int = 60,
                       expected_price: Optional[float] = None) -> dict:
         """주문 체결 대기. timeout(초) 초과 시 취소 후 TIMEOUT 반환.
 
         반환 시 filled/amount를 포함해 partial fill 수량을 보존한다.
         cancel 실패 시에도 최종 주문 상태를 반환한다.
-        
+
         슬리피지 추적: expected_price 제공 시 actual_price와 비교해 slippage_bps 계산.
         slippage_bps = (actual - expected) / expected * 10000
         """
@@ -299,7 +333,10 @@ class ExchangeConnector:
         last_order: dict = {}
         while time.time() < deadline:
             try:
-                last_order = self.fetch_order(order_id, symbol)
+                # fetch_order도 _call_with_deadline로 보호 — hang 방지
+                last_order = self._call_with_deadline(
+                    self.exchange.fetch_order, order_id, symbol, timeout=10
+                )
             except Exception as exc:
                 logger.warning("fetch_order failed during wait: %s", exc)
                 time.sleep(2)

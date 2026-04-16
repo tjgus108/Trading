@@ -4,6 +4,7 @@ data → context(B1~B3) → signal → risk → execution 순서를 강제한다
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -18,6 +19,9 @@ from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 from src.utils.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
+
+# 파이프라인 전체 실행 타임아웃 (초) — 어떤 단계든 hang 시 복구
+PIPELINE_TIMEOUT = 120
 
 
 @dataclass
@@ -123,6 +127,33 @@ class TradingPipeline:
         return warnings
 
     def run(self) -> PipelineResult:
+        """파이프라인 실행. PIPELINE_TIMEOUT 초 내 미완료 시 ERROR 반환."""
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        pool = ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(self._run_inner)
+        try:
+            return future.result(timeout=PIPELINE_TIMEOUT)
+        except FuturesTimeoutError:
+            logger.critical(
+                "[pipeline] TIMEOUT after %ds — possible hang in data/signal/risk/execution",
+                PIPELINE_TIMEOUT,
+            )
+            return PipelineResult(
+                timestamp=ts, symbol=self.symbol,
+                pipeline_step="timeout", status="ERROR",
+                error=f"Pipeline did not complete within {PIPELINE_TIMEOUT}s",
+            )
+        except Exception as e:
+            logger.error("[pipeline] unexpected error: %s", e)
+            return PipelineResult(
+                timestamp=ts, symbol=self.symbol,
+                pipeline_step="unknown", status="ERROR",
+                error=str(e),
+            )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    def _run_inner(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         result = PipelineResult(timestamp=ts, symbol=self.symbol, pipeline_step="start", status="OK")
 
