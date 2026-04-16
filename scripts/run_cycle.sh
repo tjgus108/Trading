@@ -1,18 +1,20 @@
 #!/bin/bash
-# 5시간마다 Claude Code 세션을 열어 cycle_dispatcher → agent 작업 → commit+push 진행
+# 수동 실행: 터미널에서 아래 명령으로 사이클 시작
+#   cd ~/Desktop/AgentTest/Trading && bash scripts/run_cycle.sh
+#   (로그 저장: bash scripts/run_cycle.sh >> /tmp/cycle.log 2>&1)
 #
-# cron 등록 예시 (경로는 실제 프로젝트 위치로):
-#   0 */5 * * * cd ~/Desktop/AgentTest/Trading && bash scripts/run_cycle.sh >> /tmp/cycle.log 2>&1
-#
-# macOS 주의:
-#   1) 시스템 설정 → 개인정보보호 → 전체 디스크 접근 권한에 /usr/sbin/cron 추가
-#   2) chmod +x scripts/run_cycle.sh
-#   3) claude/python3/git 경로는 아래 PATH export로 보정
+# --force 옵션: Paper Simulation 24h 미만이어도 강제 재실행
+#   bash scripts/run_cycle.sh --force
 
 set -e
 
 # cron 환경의 최소 PATH 보정 (homebrew + 시스템 + 사용자 bin)
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/bin:$PATH"
+
+# cron은 headless → interactive prompt 차단 + gh credential helper 보장
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=""
+
 
 cd "$(dirname "$0")/.."
 
@@ -136,7 +138,7 @@ fi
 # origin에 반영 (이미 push 됐으면 no-op)
 if git rev-list --count @{u}..HEAD 2>/dev/null | grep -qv '^0$'; then
     echo "--- Pushing unpushed commits to origin/main ---"
-    git push origin main || echo "git push failed — check auth/network"
+    git push origin main 2>&1 || echo "git push failed — check auth/network"
 else
     echo "origin/main 동기화 완료 (push 대상 없음)"
 fi
