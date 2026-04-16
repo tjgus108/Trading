@@ -588,6 +588,83 @@ class TestWalkForwardTrainer:
         assert "split:" in s
         assert "class_dist:" in s
 
+    def test_recency_weighted_ensemble_favors_latest(self):
+        """recency-weighted 앙상블: 최신(뒤쪽) 모델 가중치가 더 높음."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer, TrainingResult
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        # 동일 성능의 PASS 결과 3개 (시간순)
+        r = TrainingResult(
+            model_name="test", n_samples=200, n_features=17,
+            train_accuracy=0.65, val_accuracy=0.60, test_accuracy=0.60,
+            feature_importances={}, passed=True, fail_reasons=[],
+        )
+        weights = trainer.compute_ensemble_weight_recency([r, r, r], decay=0.8)
+        assert len(weights) == 3
+        assert abs(sum(weights) - 1.0) < 1e-6
+        # 최신(마지막)이 가장 높아야 함
+        assert weights[2] > weights[1] > weights[0]
+
+    def test_recency_weighted_all_fail_uniform(self):
+        """모두 FAIL → 균등 분배."""
+        from src.ml.trainer import WalkForwardTrainer, TrainingResult
+        trainer = WalkForwardTrainer()
+        fail = TrainingResult(
+            model_name="f", n_samples=0, n_features=0,
+            train_accuracy=0, val_accuracy=0, test_accuracy=0,
+            feature_importances={}, passed=False, fail_reasons=["test"],
+        )
+        weights = trainer.compute_ensemble_weight_recency([fail, fail])
+        assert abs(weights[0] - 0.5) < 1e-6
+
+    def test_recency_weighted_decay_one_equals_original(self):
+        """decay=1.0이면 기존 compute_ensemble_weight와 동일."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        r1 = trainer.train(df)
+        r2 = trainer.train(df)
+        w_orig = trainer.compute_ensemble_weight([r1, r2])
+        w_recency = trainer.compute_ensemble_weight_recency([r1, r2], decay=1.0)
+        for a, b in zip(w_orig, w_recency):
+            assert abs(a - b) < 1e-5
+
+    def test_recency_weighted_empty_list(self):
+        """빈 리스트 → 빈 리스트 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer()
+        assert trainer.compute_ensemble_weight_recency([]) == []
+
+    def test_save_load_preserves_feature_importances(self, tmp_path):
+        """저장된 모델에 feature_importances가 포함되는지 확인."""
+        pytest.importorskip("sklearn")
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
+        df = _make_df(300)
+        result = trainer.train(df)
+
+        path = str(tmp_path / "model_fi.pkl")
+        trainer.save(path)
+
+        gen = MLSignalGenerator()
+        gen.load(path)
+        fi = gen.get_feature_importances()
+        assert len(fi) > 0
+        # 중요도 합이 ~1.0
+        total = sum(v for _, v in fi)
+        assert abs(total - 1.0) < 0.01
+        # top_n 동작
+        top3 = gen.get_feature_importances(top_n=3)
+        assert len(top3) == 3
+        assert top3[0][1] >= top3[1][1] >= top3[2][1]
+
+    def test_load_no_fi_returns_empty(self):
+        """feature_importances 없는 구형 모델 로드 시 빈 리스트."""
+        gen = MLSignalGenerator()
+        # 모델 미로드 상태
+        assert gen.get_feature_importances() == []
+
 
 # ---------------------------------------------------------------------------
 # C1: MLRFStrategy

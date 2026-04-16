@@ -221,8 +221,29 @@ class ExchangeConnector:
             logger.debug("API call failed after %.0fms: %s", elapsed_ms, fn.__name__)
             raise
 
+    def _retry(self, fn, *args, max_retries: int = 2, **kwargs):
+        """Retryable API 호출 래퍼. NetworkError/RequestTimeout 시 exponential backoff 재시도."""
+        last_exc: Exception = RuntimeError("max_retries must be >= 1")
+        for attempt in range(1, max_retries + 1):
+            try:
+                return self._timed_call(fn, *args, **kwargs)
+            except self._RETRYABLE as exc:
+                self._consecutive_failures += 1
+                last_exc = exc
+                fn_name = getattr(fn, '__name__', str(fn))
+                logger.warning(
+                    "%s attempt %d/%d failed (%s): %s [consecutive=%d]",
+                    fn_name, attempt, max_retries,
+                    type(exc).__name__, str(exc)[:100],
+                    self._consecutive_failures,
+                )
+                if attempt < max_retries:
+                    backoff = min(2 ** (attempt - 1), 8)
+                    time.sleep(backoff)
+        raise last_exc
+
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500) -> list:
-        data = self._timed_call(self.exchange.fetch_ohlcv, symbol, timeframe, limit=limit)
+        data = self._retry(self.exchange.fetch_ohlcv, symbol, timeframe, limit=limit)
         if not data:
             raise ValueError(f"No OHLCV data returned for {symbol} {timeframe}")
         logger.debug("Fetched %d candles for %s %s", len(data), symbol, timeframe)
@@ -247,7 +268,7 @@ class ExchangeConnector:
         return result
 
     def fetch_ticker(self, symbol: str) -> dict:
-        return self._timed_call(self.exchange.fetch_ticker, symbol)
+        return self._retry(self.exchange.fetch_ticker, symbol)
 
     @property
     def _RETRYABLE(self):
@@ -315,7 +336,8 @@ class ExchangeConnector:
                     client_order_id, self._consecutive_failures,
                 )
                 if attempt < max_retries:
-                    time.sleep(1)
+                    backoff = min(2 ** (attempt - 1), 8)
+                    time.sleep(backoff)
         raise last_exc
 
     def fetch_order(self, order_id: str, symbol: str) -> dict:

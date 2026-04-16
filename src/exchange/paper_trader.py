@@ -37,8 +37,10 @@ class PaperAccount:
 class PaperTrader:
     """
     시뮬레이션 거래 엔진.
-    - 슬리피지: BUY/SELL 신호 가격에서 percent_range 내 변동
-    - 부분체결: 확률 partial_fill_prob로 최대 80% 만 채워짐
+    - 슬리피지: BUY/SELL 신호 가격에서 slippage_pct 범위 내 변동
+      + 주문 크기(notional value) 비례 시장 충격: √(notional / $10k)
+      + 60% adverse 방향 편향 + 40% 랜덤 노이즈
+    - 부분체결: 확률 partial_fill_prob로 50~80% 만 채워짐
     - 타임아웃: timeout_prob 확률로 타임아웃 (잔량은 취소됨)
     """
     
@@ -91,8 +93,14 @@ class PaperTrader:
         # BUY → 가격 상승 방향, SELL → 가격 하락 방향으로 편향
         # base_slip: 항상 불리한 방향의 기본 슬리피지 (시장 충격)
         # noise: ±random 노이즈 (호가 스프레드 변동)
-        base_slip = self.slippage_pct * 0.6  # 60%는 adverse 방향 고정
-        noise = random.uniform(-self.slippage_pct * 0.4, self.slippage_pct * 0.4)
+        # volume_impact: 주문 크기에 비례한 시장 충격 (√ 모델)
+        #   - 주문 금액 $10k 기준 impact=1.0, 금액이 커질수록 √비례 증가
+        #   - ex) $40k → impact=2.0, $90k → impact=3.0
+        order_notional = price * actual_qty
+        volume_impact = max(1.0, (order_notional / 10_000) ** 0.5)
+        effective_slip = self.slippage_pct * volume_impact
+        base_slip = effective_slip * 0.6  # 60%는 adverse 방향 고정
+        noise = random.uniform(-effective_slip * 0.4, effective_slip * 0.4)
         if action == "BUY":
             slippage_range = base_slip + noise   # 양수 → 가격 상승 (불리)
         else:

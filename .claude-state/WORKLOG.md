@@ -1,5 +1,32 @@
 # Work Log
 
+## [2026-04-16] Cycle 135 — D + E + SIM + F
+
+**[D] ML & Signals:**
+- RF 피처 중요도 영속화: save()에 feature_importances/names/train_date 포함, load() 시 top-3 자동 로깅
+- 앙상블 가중치 시간 감쇠: compute_ensemble_weight_recency(decay=0.85) 추가
+- CalibratedClassifierCV 속성 버그 수정 (estimator/base_estimator fallback)
+- 테스트 7개 추가, 전체 55+15개 PASS
+
+**[E] Execution:**
+- Telegram _send 재시도 (max 3, exponential backoff, 4xx 즉시 포기)
+- create_order exponential backoff (고정 1초 → 2^n초)
+- fetch_ohlcv/fetch_ticker에 _retry() 래퍼 추가 (NetworkError/RequestTimeout 자동 재시도)
+- 테스트 9개 추가 (notifier 5 + connector 4)
+
+**[SIM] Paper Simulation:**
+- 시뮬레이션 결과 JSON/CSV 저장 (PAPER_SIMULATION_RESULTS.json/.csv)
+- paper_trader: 주문 크기 비례 슬리피지 (√(notional/$10k) square-root impact model)
+
+**[F] Research — 과최적화 방지:**
+- DSR(Deflated Sharpe Ratio)/PBO(Probability of Backtest Overfitting) 방법론 조사
+- WFO 함정: 윈도우/피트니스 함수 메타 과최적화, WFE > 0.5 기준 필요
+- CPCV가 WFO보다 우월 (mlfinlab 구현체 존재)
+- 최소 거래 수: 15회 불충분, 통계적 최소 30회, 실용 50회+ 권장
+- 즉시 조치: WFE > 0.5 + Trades >= 50 상향이 가장 효과적 필터
+
+---
+
 ## [2026-04-16] Cycle 134 — C + B + SIM + F
 
 **[C] Data & Infrastructure:**
@@ -11786,3 +11813,6 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-04-16 14:29 UTC] Cycle 134 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-16 14:36 UTC] Cycle 135 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

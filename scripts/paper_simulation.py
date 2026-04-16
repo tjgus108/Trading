@@ -14,6 +14,7 @@ Paper Trading 시뮬레이션 — 실제 Bybit 데이터로 전략들을 Walk-Fo
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import sys
 import time
@@ -35,6 +36,8 @@ from src.backtest.engine import BacktestEngine
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / ".claude-state"
 REPORT_PATH = STATE_DIR / "PAPER_SIMULATION_REPORT.md"
+RESULTS_JSON_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.json"
+RESULTS_CSV_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.csv"
 CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 
 # Walk-Forward 설정
@@ -385,13 +388,74 @@ def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, win
     return "\n".join(lines)
 
 
+# ── 구조화 데이터 저장 ──────────────────────────────────────
+
+
+def export_results_json(all_symbol_results: dict[str, list[dict]], metadata: dict) -> None:
+    """심볼별 전략 결과를 JSON으로 저장. 윈도우별 상세 포함."""
+    output = {
+        "metadata": metadata,
+        "symbols": {},
+    }
+    for symbol, results in all_symbol_results.items():
+        symbol_data = []
+        for r in results:
+            entry = {
+                "name": r["name"],
+                "overall_passed": r["overall_passed"],
+                "consistency_score": round(r["consistency_score"], 4),
+                "passed_windows": r["passed_windows"],
+                "total_windows": r["total_windows"],
+                "avg_sharpe": round(r["avg_sharpe"], 4),
+                "avg_return": round(r["avg_return"], 6),
+                "avg_max_dd": round(r["avg_max_dd"], 6),
+                "avg_profit_factor": round(r["avg_profit_factor"], 4),
+                "avg_trades": round(r["avg_trades"], 1),
+                "avg_win_rate": round(r["avg_win_rate"], 4),
+                "avg_final_balance": round(r["avg_final_balance"], 2),
+                "window_results": r["window_results"],
+            }
+            symbol_data.append(entry)
+        output["symbols"][symbol] = symbol_data
+
+    RESULTS_JSON_PATH.write_text(json.dumps(output, indent=2, ensure_ascii=False, default=str))
+    print(f"[EXPORT] JSON saved to {RESULTS_JSON_PATH}")
+
+
+def export_results_csv(all_symbol_results: dict[str, list[dict]]) -> None:
+    """심볼별 전략 요약을 flat CSV로 저장 (한 행 = 한 전략×심볼)."""
+    rows = []
+    for symbol, results in all_symbol_results.items():
+        for r in results:
+            rows.append({
+                "symbol": symbol,
+                "strategy": r["name"],
+                "overall_passed": r["overall_passed"],
+                "consistency_score": round(r["consistency_score"], 4),
+                "passed_windows": r["passed_windows"],
+                "total_windows": r["total_windows"],
+                "avg_sharpe": round(r["avg_sharpe"], 4),
+                "avg_return": round(r["avg_return"], 6),
+                "avg_max_dd": round(r["avg_max_dd"], 6),
+                "avg_profit_factor": round(r["avg_profit_factor"], 4),
+                "avg_trades": round(r["avg_trades"], 1),
+                "avg_win_rate": round(r["avg_win_rate"], 4),
+                "avg_final_balance": round(r["avg_final_balance"], 2),
+            })
+
+    if rows:
+        df_out = pd.DataFrame(rows)
+        df_out.to_csv(RESULTS_CSV_PATH, index=False)
+        print(f"[EXPORT] CSV saved to {RESULTS_CSV_PATH} ({len(rows)} rows)")
+
+
 # ── 메인 ──────────────────────────────────────────────────
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
-def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str:
-    """단일 심볼에 대한 walk-forward 시뮬을 돌리고 리포트 섹션을 반환."""
+def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> tuple[str, list[dict]]:
+    """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
     df = fetch_real_data_paginated(symbol, "1h", total_candles=8760)
@@ -439,7 +503,8 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str
         print(f"  {r['name']:<30} avg_return={r['avg_return']:+.2%} "
               f"sharpe={r['avg_sharpe']:.2f} consistency={r['passed_windows']}/{r['total_windows']}")
 
-    return generate_report(results, data_source, df, len(windows), symbol=symbol)
+    report = generate_report(results, data_source, df, len(windows), symbol=symbol)
+    return report, results
 
 
 def run_simulation():
@@ -461,15 +526,19 @@ def run_simulation():
     )
 
     sections = []
+    all_symbol_results: dict[str, list[dict]] = {}
     fatal_count = 0
     for symbol in SYMBOLS:
         try:
-            sections.append(simulate_symbol(symbol, pass_list, engine))
+            report_text, results = simulate_symbol(symbol, pass_list, engine)
+            sections.append(report_text)
+            all_symbol_results[symbol] = results
         except Exception as e:
             fatal_count += 1
             print(f"[{symbol}][FATAL] {e}")
             sections.append(f"# {symbol} 시뮬 실패\n\n{e}\n")
 
+    # Markdown 리포트 저장
     header = (
         f"# Paper Trading 시뮬레이션 통합 리포트\n\n"
         f"_Generated: {datetime.utcnow().isoformat()}Z_\n"
@@ -477,6 +546,24 @@ def run_simulation():
     )
     REPORT_PATH.write_text(header + "\n\n---\n\n".join(sections))
     print(f"\n[REPORT] Saved to {REPORT_PATH}")
+
+    # 구조화 데이터 저장 (JSON + CSV)
+    if all_symbol_results:
+        metadata = {
+            "generated": datetime.utcnow().isoformat() + "Z",
+            "symbols": list(all_symbol_results.keys()),
+            "strategies_loaded": len(pass_list),
+            "train_hours": TRAIN_HOURS,
+            "test_hours": TEST_HOURS,
+            "step_hours": STEP_HOURS,
+            "pass_ratio": PASS_RATIO,
+            "initial_balance": 10_000,
+            "fee_rate": 0.001,
+            "slippage_pct": 0.0005,
+        }
+        export_results_json(all_symbol_results, metadata)
+        export_results_csv(all_symbol_results)
+
     if fatal_count:
         print(f"[WARN] {fatal_count}/{len(SYMBOLS)} symbols failed fatally")
     return 1 if fatal_count == len(SYMBOLS) else 0

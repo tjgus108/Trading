@@ -7,6 +7,7 @@ Notification failures never raise; they are logged and silently skipped.
 import html
 import logging
 import os
+import time
 from typing import Optional
 
 import requests
@@ -80,22 +81,49 @@ class TelegramNotifier:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _send(self, text: str) -> None:
-        """POST a message to the Telegram Bot API. Never raises."""
+    def _send(self, text: str, max_retries: int = 3) -> None:
+        """POST a message to the Telegram Bot API. Never raises.
+
+        Retries up to *max_retries* times with exponential backoff on transient
+        network errors (ConnectionError, Timeout).  Non-retryable HTTP errors
+        (4xx) are logged once and abandoned immediately.
+        """
         url = _TELEGRAM_API.format(token=self._token)
         payload = {
             "chat_id": self._chat_id,
             "text": text,
             "parse_mode": "HTML",
         }
-        try:
-            resp = requests.post(url, json=payload, timeout=10)
-            if not resp.ok:
+        for attempt in range(1, max_retries + 1):
+            try:
+                resp = requests.post(url, json=payload, timeout=10)
+                if resp.ok:
+                    return
+                # 4xx → 재시도 무의미 (잘못된 토큰/채팅 ID 등)
+                if 400 <= resp.status_code < 500:
+                    logger.warning(
+                        "Telegram send failed (%s, non-retryable): %s",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                    return
+                # 5xx → 서버 오류, 재시도 가능
                 logger.warning(
-                    "Telegram send failed (%s): %s", resp.status_code, resp.text[:200]
+                    "Telegram send failed (%s, attempt %d/%d): %s",
+                    resp.status_code,
+                    attempt,
+                    max_retries,
+                    resp.text[:200],
                 )
-        except requests.RequestException as exc:
-            logger.warning("Telegram send error: %s", exc)
+            except requests.RequestException as exc:
+                logger.warning(
+                    "Telegram send error (attempt %d/%d): %s",
+                    attempt,
+                    max_retries,
+                    exc,
+                )
+            if attempt < max_retries:
+                time.sleep(min(2 ** (attempt - 1), 4))
 
 
 # ------------------------------------------------------------------

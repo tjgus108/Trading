@@ -77,6 +77,8 @@ class MLSignalGenerator:
         self._model_name: str = "no model"
         self._label_map: Dict[int, str] = {1: "BUY", -1: "SELL", 0: "HOLD"}
         self._class_order: Optional[List[int]] = None  # 모델의 class 순서
+        self._feature_importances: Dict[str, float] = {}
+        self._train_date: Optional[str] = None
 
     def load(self, path: str) -> bool:
         """모델 파일 로드. 실패 시 False 반환."""
@@ -86,7 +88,16 @@ class MLSignalGenerator:
             self._model = data["model"]
             self._model_name = data.get("name", Path(path).stem)
             self._class_order = data.get("class_order", [-1, 0, 1])
-            logger.info("ML model loaded: %s", self._model_name)
+            self._feature_importances = data.get("feature_importances", {})
+            self._train_date = data.get("train_date")
+            if self._feature_importances:
+                top3 = sorted(
+                    self._feature_importances.items(),
+                    key=lambda x: x[1], reverse=True,
+                )[:3]
+                top3_str = ", ".join(f"{n}={v:.3f}" for n, v in top3)
+                logger.info("Top features: %s", top3_str)
+            logger.info("ML model loaded: %s (trained: %s)", self._model_name, self._train_date or "unknown")
             return True
         except Exception as e:
             logger.warning("ML model load failed (%s): %s", path, e)
@@ -150,6 +161,23 @@ class MLSignalGenerator:
         except Exception as e:
             logger.error("ML predict error: %s", e)
             return self._hold(f"예측 오류: {e}")
+
+    def get_feature_importances(self, top_n: Optional[int] = None) -> List[tuple]:
+        """
+        로드된 모델의 피처 중요도 반환 (내림차순).
+
+        Returns:
+            list of (feature_name, importance). 모델 미로드 시 빈 리스트.
+        """
+        if not self._feature_importances:
+            return []
+        ranked = sorted(
+            self._feature_importances.items(),
+            key=lambda x: x[1], reverse=True,
+        )
+        if top_n is not None:
+            ranked = ranked[:top_n]
+        return ranked
 
     def _hold(self, note: str) -> MLPrediction:
         """note와 함께 HOLD 신호(confidence=0)를 반환하는 내부 헬퍼."""

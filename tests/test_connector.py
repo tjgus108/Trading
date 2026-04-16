@@ -199,6 +199,76 @@ def test_fetch_balance_exception(caplog):
     assert any("fetch_balance failed" in r.message for r in caplog.records)
 
 
+# ── fetch_ohlcv / fetch_ticker 재시도 테스트 ──────────────────────────────
+
+def test_fetch_ohlcv_retries_on_network_error():
+    """fetch_ohlcv: NetworkError 1회 후 성공 → 재시도로 정상 반환."""
+    conn = _make_connector()
+    fake_data = [[1, 100, 105, 95, 102, 1000]]
+    conn._exchange.fetch_ohlcv.side_effect = [
+        ccxt.NetworkError("timeout"),
+        fake_data,
+    ]
+
+    import unittest.mock as _mock
+    with _mock.patch("src.exchange.connector.time.sleep"):
+        result = conn.fetch_ohlcv("BTC/USDT", "1h")
+
+    assert result == fake_data
+    assert conn._exchange.fetch_ohlcv.call_count == 2
+
+
+def test_fetch_ohlcv_raises_after_retries():
+    """fetch_ohlcv: 모든 재시도 실패 → 예외 전파."""
+    conn = _make_connector()
+    conn._exchange.fetch_ohlcv.side_effect = ccxt.NetworkError("persistent")
+
+    import unittest.mock as _mock
+    with _mock.patch("src.exchange.connector.time.sleep"):
+        with pytest.raises(ccxt.NetworkError):
+            conn.fetch_ohlcv("BTC/USDT", "1h")
+
+    assert conn._exchange.fetch_ohlcv.call_count == 2
+
+
+def test_fetch_ticker_retries_on_timeout():
+    """fetch_ticker: RequestTimeout 1회 후 성공."""
+    conn = _make_connector()
+    fake_ticker = {"last": 65000.0, "bid": 64999.0, "ask": 65001.0}
+    conn._exchange.fetch_ticker.side_effect = [
+        ccxt.RequestTimeout("slow"),
+        fake_ticker,
+    ]
+
+    import unittest.mock as _mock
+    with _mock.patch("src.exchange.connector.time.sleep"):
+        result = conn.fetch_ticker("BTC/USDT")
+
+    assert result == fake_ticker
+    assert conn._exchange.fetch_ticker.call_count == 2
+
+
+def test_create_order_exponential_backoff():
+    """create_order: 재시도 시 exponential backoff 적용 확인."""
+    conn = _make_connector()
+    fake_order = {"id": "456", "status": "open"}
+    conn._exchange.create_market_order.side_effect = [
+        ccxt.NetworkError("err1"),
+        ccxt.NetworkError("err2"),
+        fake_order,
+    ]
+
+    import unittest.mock as _mock
+    with _mock.patch("src.exchange.connector.time.sleep") as mock_sleep:
+        result = conn.create_order("BTC/USDT", "buy", 0.01, max_retries=3)
+
+    assert result == fake_order
+    # backoff: 1s, 2s (min(2^0,8)=1, min(2^1,8)=2)
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_any_call(1)
+    mock_sleep.assert_any_call(2)
+
+
 # ── cancel_order 경계 테스트 ───────────────────────────────────────────────
 
 def test_cancel_order_success():

@@ -301,3 +301,95 @@ class TestHTMLEscape:
         assert "<a href=" not in msg
         assert "&lt;a href=&quot;javascript:alert(1)&quot;" in msg
         assert "onerror=alert(2)" not in msg or "&lt;a" in msg
+
+
+# ---------------------------------------------------------------------------
+# Retry behavior
+# ---------------------------------------------------------------------------
+
+class TestSendRetry:
+    """_send retries on transient errors with backoff."""
+
+    def _notifier(self) -> TelegramNotifier:
+        return TelegramNotifier(bot_token="testtoken", chat_id="987654")
+
+    def test_retries_on_connection_error(self):
+        """ConnectionError triggers retry; 3rd attempt succeeds."""
+        import requests as req_lib
+
+        notifier = self._notifier()
+        mock_ok = MagicMock()
+        mock_ok.ok = True
+
+        with patch("src.notifier.requests.post") as mock_post, \
+             patch("src.notifier.time.sleep") as mock_sleep:
+            mock_post.side_effect = [
+                req_lib.ConnectionError("refused"),
+                req_lib.ConnectionError("refused"),
+                mock_ok,
+            ]
+            notifier._send("hello", max_retries=3)
+
+        assert mock_post.call_count == 3
+        assert mock_sleep.call_count == 2  # backoff between retries
+
+    def test_no_retry_on_4xx(self):
+        """4xx HTTP error is not retried (non-retryable)."""
+        notifier = self._notifier()
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_resp.status_code = 403
+        mock_resp.text = "Forbidden"
+
+        with patch("src.notifier.requests.post", return_value=mock_resp) as mock_post:
+            notifier._send("hello", max_retries=3)
+
+        assert mock_post.call_count == 1  # no retry
+
+    def test_retries_on_5xx(self):
+        """5xx server error triggers retry."""
+        notifier = self._notifier()
+        mock_500 = MagicMock()
+        mock_500.ok = False
+        mock_500.status_code = 500
+        mock_500.text = "Internal Server Error"
+        mock_ok = MagicMock()
+        mock_ok.ok = True
+
+        with patch("src.notifier.requests.post") as mock_post, \
+             patch("src.notifier.time.sleep"):
+            mock_post.side_effect = [mock_500, mock_ok]
+            notifier._send("hello", max_retries=3)
+
+        assert mock_post.call_count == 2
+
+    def test_retries_on_timeout(self):
+        """Timeout triggers retry."""
+        import requests as req_lib
+
+        notifier = self._notifier()
+        mock_ok = MagicMock()
+        mock_ok.ok = True
+
+        with patch("src.notifier.requests.post") as mock_post, \
+             patch("src.notifier.time.sleep"):
+            mock_post.side_effect = [
+                req_lib.Timeout("read timeout"),
+                mock_ok,
+            ]
+            notifier._send("hello", max_retries=3)
+
+        assert mock_post.call_count == 2
+
+    def test_all_retries_exhausted_no_raise(self):
+        """All retries fail → still does not raise."""
+        import requests as req_lib
+
+        notifier = self._notifier()
+
+        with patch("src.notifier.requests.post") as mock_post, \
+             patch("src.notifier.time.sleep"):
+            mock_post.side_effect = req_lib.ConnectionError("refused")
+            notifier._send("hello", max_retries=3)  # must not raise
+
+        assert mock_post.call_count == 3

@@ -140,6 +140,7 @@ class WalkForwardTrainer:
         self._trained_model = None
         self._class_order: Optional[List[int]] = None
         self._feature_names: List[str] = []
+        self._last_feature_importances: Dict[str, float] = {}
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
@@ -255,6 +256,7 @@ class WalkForwardTrainer:
         self._trained_model = clf
         self._class_order = list(base_clf.classes_)
         self._feature_names = list(X_train.columns)
+        self._last_feature_importances = feat_importance
         model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
 
         result = TrainingResult(
@@ -283,7 +285,7 @@ class WalkForwardTrainer:
             top_n: 상위 N개만 반환. None이면 전체.
 
         Returns:
-            list of (feature_name, importance) �ples, 내림차순.
+            list of (feature_name, importance) tuples, 내림차순.
 
         Raises:
             RuntimeError: 모델이 학습되지 않은 경우.
@@ -291,8 +293,22 @@ class WalkForwardTrainer:
         if self._trained_model is None:
             raise RuntimeError("모델이 학습되지 않음 — train() 먼저 호출")
 
-        # CalibratedClassifierCV는 feature_importances_ 없음 → base estimator에서 추출
-        base = getattr(self._trained_model, "estimator", self._trained_model)
+        # 캐시된 피처 중요도 우선 사용
+        if self._last_feature_importances:
+            ranked = sorted(
+                self._last_feature_importances.items(),
+                key=lambda x: x[1], reverse=True,
+            )
+            if top_n is not None:
+                ranked = ranked[:top_n]
+            return ranked
+
+        # fallback: base estimator에서 추출
+        # CalibratedClassifierCV: sklearn <1.2 → base_estimator, >=1.2 → estimator
+        base = getattr(
+            self._trained_model, "estimator",
+            getattr(self._trained_model, "base_estimator", self._trained_model),
+        )
         importances = base.feature_importances_
         names = getattr(self, "_feature_names", [f"f{i}" for i in range(len(importances))])
         ranked = sorted(zip(names, importances), key=lambda x: x[1], reverse=True)
@@ -339,6 +355,46 @@ class WalkForwardTrainer:
             return [1.0 / n if n > 0 else 0.0] * n
         return [round(w / total, 6) for w in raw]
 
+    def compute_ensemble_weight_recency(
+        self,
+        results: List["TrainingResult"],
+        baseline: float = 0.50,
+        decay: float = 0.85,
+    ) -> List[float]:
+        """
+        시간 순서를 반영한 앙상블 가중치 계산.
+
+        리스트의 뒤쪽(최신) 모델에 더 높은 가중치를 부여.
+        decay=0.85이면 한 단계 이전 모델은 85%만큼 가중치 감소.
+
+        Args:
+            results: TrainingResult 리스트 (시간 순서: 오래된→최신)
+            baseline: 기준 정확도 (기본 0.50)
+            decay: 시간 감쇠율 (0~1). 1이면 감쇠 없음.
+
+        Returns:
+            List[float]: 정규화 가중치 (합=1.0)
+        """
+        n = len(results)
+        if n == 0:
+            return []
+
+        raw = []
+        for i, r in enumerate(results):
+            if not r.passed:
+                raw.append(0.0)
+                continue
+            perf = (r.val_accuracy + r.test_accuracy) / 2.0 - baseline
+            perf = max(0.0, perf)
+            # 시간 가중치: 마지막(최신)이 가장 큼
+            time_weight = decay ** (n - 1 - i)
+            raw.append(perf * time_weight)
+
+        total = sum(raw)
+        if total <= 0.0:
+            return [1.0 / n] * n
+        return [round(w / total, 6) for w in raw]
+
     def save(self, path: Optional[str] = None) -> str:
         """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""
         if self._trained_model is None:
@@ -354,6 +410,9 @@ class WalkForwardTrainer:
             "name": Path(path).stem,
             "class_order": self._class_order,
             "symbol": self.symbol,
+            "feature_names": self._feature_names,
+            "feature_importances": self._last_feature_importances,
+            "train_date": str(date.today()),
         }
         with open(path, "wb") as f:
             pickle.dump(payload, f)
