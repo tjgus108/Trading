@@ -7,12 +7,12 @@ from src.strategy.candle_pattern import CandlePatternStrategy
 from src.strategy.base import Action, Confidence
 
 
-def _make_df(rows: list[dict]) -> pd.DataFrame:
+def _make_df(rows) -> pd.DataFrame:
     """각 row: open, high, low, close, volume, rsi"""
     return pd.DataFrame(rows)
 
 
-def _base_rows(n: int = 22) -> list[dict]:
+def _base_rows(n: int = 22):
     """기본 HOLD 캔들 (neutral) n개."""
     return [
         {"open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000, "rsi": 50}

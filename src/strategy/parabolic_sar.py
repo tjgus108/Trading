@@ -7,7 +7,7 @@ RSI14 확인으로 HIGH/MEDIUM confidence 구분.
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
-from typing import List
+from typing import List, Tuple
 
 
 class ParabolicSARStrategy(BaseStrategy):

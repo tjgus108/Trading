@@ -1,27 +1,24 @@
 # Next Steps
 
-_Last updated: 2026-04-16 (세션 프리즈 수정 완료)_
+_Last updated: 2026-04-16 (Cycle 133 완료)_
 
-> **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관. 100줄 초과 시 요약/정리.
+> **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
-## 다음 사이클 (Cycle 123) 힌트
+## 다음 사이클 (Cycle 134) 힌트
 
 ### 로테이션 기준 다음 카테고리
-- MASTER_PLAN 로테이션에 따라 A(품질) + C(데이터) + E(실행) 예상
-
-### 완료된 핫픽스
-- **세션 프리즈 수정**: connector/pipeline에 강제 타임아웃 추가 (ccxt timeout, _call_with_deadline, PIPELINE_TIMEOUT)
-- `ThreadPoolExecutor.shutdown(wait=False, cancel_futures=True)` — hang 스레드 대기 제거
+- 134 mod 5 = 4 → **C(데이터) + B(리스크) + SIM + F(리서치)**
 
 ### 우선 작업
-1. **[A] 품질**: PASS 전략 22개 중 실전 FAIL 20개 재검증 — 과최적화 원인 분석
-2. **[C] 데이터**: WebSocket feed 안정성 점검, OrderFlow/VPIN 정확도 검증
-3. **[E] 실행**: ~~슬리피지 bps 추적 결과 분석, 체결 최적화~~ (Cycle 123 완료: 비대칭 슬리피지 모델 + TWAP edge case 검증 추가)
+1. **[C] 데이터**: WebSocket feed 안정성 점검, OrderFlow/VPIN 정확도 검증
+2. **[B] 리스크**: DrawdownMonitor 실전 검증, Kelly Sizer 파라미터 재튜닝
+3. **[SIM]**: paper_simulation 실행 → 결과 분석
+4. **[F] 리서치**: Regime Detection HMM/GMM 구현 방향 구체화 리서치
 
-### Cycle 122에서 남긴 후속 과제
-- DrawdownMonitor 수정 → 실전 paper trading에서 에스컬레이션 시나리오 검증 필요
-- 앙상블 가중치 compute_ensemble_weight() → 실제 Bybit 데이터로 모델 재학습 후 검증
-- dema_cross, acceleration_band, roc_ma_cross RSI 필터 추가 → 실전 데이터 재백테스트 필요
-- Regime Detection 로직 설계 검토 (리서치에서 필수성 확인됨)
-- Delta Neutral 전략 구조 연구 (성공 사례에서 MDD 0.80% 기록)
+### Cycle 133 후속 과제
+- 테스트 33개 실패 — 다음 A(품질) 사이클에서 수정
+- Regime Detection 구현 필요 (리서치에서 업계 표준 확인)
+- engulfing_zone/relative_volume 2개 전략 심화 개선 대기
+- TWAP 비대칭 슬리피지 모델 실전 데이터 검증 필요
+- paper_connector balance 수정 후 실제 paper trading 검증 필요
 - Python 환경: 3.7→3.11+ 업그레이드 또는 docker/venv 격리 필요

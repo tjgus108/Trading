@@ -11,6 +11,8 @@ Linear Regression Slope 전략:
 - 최소 25행 필요, idx = len(df) - 2
 """
 
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
 

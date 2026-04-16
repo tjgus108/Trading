@@ -2,6 +2,7 @@
 Exchange connector: ccxt 기반 거래소 연결 및 주문 실행 레이어.
 모든 거래소 접근은 이 모듈을 통한다.
 """
+from __future__ import annotations
 
 import os
 import time
@@ -10,7 +11,10 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Optional, List
 
-import ccxt
+try:
+    import ccxt
+except ImportError:
+    ccxt = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +249,9 @@ class ExchangeConnector:
     def fetch_ticker(self, symbol: str) -> dict:
         return self._timed_call(self.exchange.fetch_ticker, symbol)
 
-    _RETRYABLE = (ccxt.NetworkError, ccxt.RequestTimeout)
+    @property
+    def _RETRYABLE(self):
+        return (ccxt.NetworkError, ccxt.RequestTimeout)
 
     def create_order(
         self,

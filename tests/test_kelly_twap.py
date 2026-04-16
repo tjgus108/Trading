@@ -224,7 +224,7 @@ class TestTWAPExecutor:
 
     def test_twap_result_fields(self):
         """TWAPResult 필드 모두 존재."""
-        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run", "filled_qty", "partial_fills", "timeout_occurred", "avg_execution_time"}
+        required = {"slices_executed", "avg_price", "total_qty", "estimated_slippage_pct", "dry_run", "filled_qty", "partial_fills", "timeout_occurred", "avg_execution_time", "errors"}
         actual = {f.name for f in fields(TWAPResult)}
         assert required == actual, f"Missing fields: {required - actual}"
 
@@ -507,7 +507,7 @@ class TestTWAPSliceSum:
 class TestKellyTWAPPipelineIntegration:
     """KellySizer가 산출한 position_size를 TWAPExecutor가 실행하는 통합 경로 검증."""
 
-    def _build_trades(self, n: int = 12, win_rate: float = 0.6) -> list[dict]:
+    def _build_trades(self, n: int = 12, win_rate: float = 0.6):
         """재현 가능한 거래 이력 생성."""
         trades = []
         for i in range(n):

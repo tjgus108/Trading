@@ -16,7 +16,11 @@ G3. 멀티에셋 포트폴리오 최적화기.
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import Dict, Literal, Optional
+from typing import Dict, Optional
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 
 @dataclass

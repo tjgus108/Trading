@@ -38,7 +38,7 @@ REPORT_PATH = STATE_DIR / "PAPER_SIMULATION_REPORT.md"
 CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 
 # Walk-Forward 설정
-TRAIN_HOURS = 24 * 120   # 훈련: 4개월 (120일)
+TRAIN_HOURS = 24 * 180   # 훈련: 6개월 (180일)
 TEST_HOURS = 24 * 30     # 테스트: 1개월 (30일)
 STEP_HOURS = 24 * 30     # 롤링 간격: 1개월
 MIN_WINDOWS = 2          # 최소 테스트 윈도우 수
@@ -58,7 +58,7 @@ TIMEFRAME_MS = {
 def fetch_real_data_paginated(
     symbol: str = "BTC/USDT",
     timeframe: str = "1h",
-    total_candles: int = 4320,  # 6개월 (180일 * 24h)
+    total_candles: int = 8760,  # 1년 (365일 * 24h)
     batch_size: int = 1000,
 ) -> pd.DataFrame | None:
     """Bybit에서 페이지네이션으로 장기 OHLCV 데이터 수집. 실패 시 None."""
@@ -394,14 +394,17 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 리포트 섹션을 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
-    df = fetch_real_data_paginated(symbol, "1h", total_candles=4320)
+    df = fetch_real_data_paginated(symbol, "1h", total_candles=8760)
     data_source = f"Bybit {symbol} 1h (paginated)"
 
     if df is None:
         print(f"[{symbol}][FALLBACK] Using synthetic data (Bybit API inaccessible)")
         from scripts.quality_audit import make_synthetic_data
-        df = make_synthetic_data(4320)
-        data_source = f"Synthetic GBM x4320 ({symbol}-like)"
+        df = make_synthetic_data(8760)
+        data_source = f"Synthetic GBM x8760 ({symbol}-like)"
+        # 합성 데이터에도 enrich_indicators 적용 — make_synthetic_data에 없는
+        # ema20, donchian_high/low, vwap, vwap20 등의 지표를 추가
+        df = enrich_indicators(df)
     else:
         df = enrich_indicators(df)
 

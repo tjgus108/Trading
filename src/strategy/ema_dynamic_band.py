@@ -39,7 +39,9 @@ class EMADynamicBandStrategy(BaseStrategy):
 
         returns = close_series.pct_change()
         rv = returns.rolling(20).std()
-        rv_percentile = rv.rolling(50).rank(pct=True)  # 0~1
+        rv_percentile = rv.rolling(50).apply(
+            lambda x: pd.Series(x).rank(pct=True).iloc[-1], raw=False
+        )  # 0~1
 
         band_mult = 0.01 + 0.02 * rv_percentile  # 0.01 ~ 0.03
 

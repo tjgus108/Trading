@@ -9,6 +9,8 @@ Aroon Oscillator 기반 추세 전환 전략.
 - 최소 데이터: 30행
 """
 
+from typing import Tuple
+
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal

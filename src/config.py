@@ -27,7 +27,12 @@ from pathlib import Path
 from typing import Optional, Dict
 
 import yaml
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*args, **kwargs):
+        """Stub when python-dotenv is not installed."""
+        pass
 
 logger = logging.getLogger(__name__)
 

@@ -45,12 +45,13 @@ class PaperConnector:
         logger.info("PaperConnector.connect() - no-op for paper trading")
 
     def fetch_balance(self) -> dict:
-        """현재 계좌 잔액 반환"""
+        """현재 계좌 잔액 반환 (open position value 포함)"""
         summary = self.paper_trader.get_summary()
+        open_value = summary.get("open_position_value", 0.0)
         return {
             "free": summary["current_balance"],
-            "used": 0.0,
-            "total": summary["current_balance"],
+            "used": open_value,
+            "total": summary["current_balance"] + open_value,
         }
 
     def fetch_ticker(self, symbol: str) -> dict:

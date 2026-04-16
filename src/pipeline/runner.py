@@ -151,7 +151,10 @@ class TradingPipeline:
                 error=str(e),
             )
         finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+            try:
+                pool.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                pool.shutdown(wait=False)
 
     def _run_inner(self) -> PipelineResult:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -456,8 +459,8 @@ class TradingPipeline:
         symbol: str,
         side: str,
         filled_size: float,
-        stop_loss: float | None,
-        take_profit: float | None,
+        stop_loss: Optional[float],
+        take_profit: Optional[float],
     ) -> None:
         """체결 후 SL/TP 보호 주문을 거래소에 제출."""
         close_side = "sell" if side == "buy" else "buy"

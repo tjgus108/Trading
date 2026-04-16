@@ -16,7 +16,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import date
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Type
 
 from src.alpha.context import MarketContextBuilder
 from src.analysis.strategy_correlation import SignalCorrelationTracker
@@ -392,7 +392,7 @@ from src.strategy.market_regime_classifier import MarketRegimeClassifierStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_REGISTRY: Dict[str, type[BaseStrategy]] = {
+STRATEGY_REGISTRY: Dict[str, Type[BaseStrategy]] = {
     "ema_cross": EmaCrossStrategy,
     "donchian_breakout": DonchianBreakoutStrategy,
     "funding_rate": FundingRateStrategy,

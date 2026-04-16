@@ -32,10 +32,13 @@ class TWAPResult:
     partial_fills: int = 0  # 부분 체결된 슬라이스 개수
     timeout_occurred: bool = False  # 타임아웃 여부
     avg_execution_time: float = 0.0  # 슬라이스당 평균 실행 시간 (초)
+    errors: int = 0  # 슬라이스 실행 중 발생한 에러 수
 
 
 class TWAPExecutor:
     """TWAP 실행기."""
+
+    _VALID_SIDES = {"buy", "sell"}
 
     def __init__(
         self,
@@ -43,6 +46,7 @@ class TWAPExecutor:
         interval_seconds: float = 60.0,
         dry_run: bool = True,
         timeout_per_slice: Optional[float] = None,
+        max_retries_per_slice: int = 2,
     ) -> None:
         """
         Args:
@@ -50,6 +54,7 @@ class TWAPExecutor:
             interval_seconds: 슬라이스 간격 (초)
             dry_run: True이면 실제 주문 없이 시뮬레이션
             timeout_per_slice: 슬라이스당 타임아웃 (초). None이면 무제한.
+            max_retries_per_slice: 라이브 모드에서 슬라이스 실패 시 재시도 횟수.
         """
         if n_slices < 1:
             raise ValueError(f"n_slices must be >= 1, got {n_slices}")
@@ -57,6 +62,7 @@ class TWAPExecutor:
         self.interval_seconds = interval_seconds
         self.dry_run = dry_run
         self.timeout_per_slice = timeout_per_slice
+        self.max_retries_per_slice = max_retries_per_slice
 
     # ------------------------------------------------------------------
     # Public API
@@ -87,6 +93,11 @@ class TWAPExecutor:
         """
         if total_qty <= 0:
             raise ValueError(f"total_qty must be > 0, got {total_qty}")
+        side_lower = side.lower()
+        if side_lower not in self._VALID_SIDES:
+            raise ValueError(
+                f"side must be 'buy' or 'sell', got {side!r}"
+            )
         if self.dry_run and (price_limit is None or price_limit <= 0):
             raise ValueError(
                 f"price_limit must be > 0 in dry_run mode, got {price_limit}"
@@ -96,6 +107,7 @@ class TWAPExecutor:
         filled_quantities: List[float] = []
         partial_fills = 0
         timeout_occurred = False
+        errors = 0
         slice_times: List[float] = []
         start_time = time.time()
 
@@ -146,53 +158,76 @@ class TWAPExecutor:
                         simulated_price,
                     )
             else:
-                try:
-                    slice_start = time.time()
-                    result = connector.place_order(
-                        symbol=symbol,
-                        side=side,
-                        qty=slice_qty,
-                        price=price_limit,
-                    )
-                    filled_price = result.get("price", price_limit or 0.0)
-                    filled_qty = result.get("filled", slice_qty)  # 부분 체결 반영
-                    filled_prices.append(filled_price)
-                    filled_quantities.append(filled_qty)
-
-                    if filled_qty < slice_qty - 1e-8:
-                        partial_fills += 1
-                        logger.warning(
-                            "slice %d/%d PARTIAL: %s @ %.4f (%.1f%% filled)",
-                            i + 1,
-                            self.n_slices,
-                            symbol,
-                            filled_price,
-                            (filled_qty / slice_qty) * 100,
+                slice_start = time.time()
+                slice_success = False
+                for attempt in range(1, self.max_retries_per_slice + 1):
+                    try:
+                        result = connector.place_order(
+                            symbol=symbol,
+                            side=side,
+                            qty=slice_qty,
+                            price=price_limit,
                         )
-                    else:
-                        logger.info(
-                            "slice %d/%d filled: %s @ %.4f",
-                            i + 1,
-                            self.n_slices,
-                            symbol,
-                            filled_price,
-                        )
-
-                    # 타임아웃 체크
-                    if self.timeout_per_slice is not None:
-                        slice_elapsed = time.time() - slice_start
-                        if slice_elapsed > self.timeout_per_slice:
+                        if result is None:
+                            raise ValueError("connector.place_order returned None (empty orderbook?)")
+                        filled_price = result.get("price", price_limit or 0.0)
+                        if filled_price is None or filled_price <= 0:
                             logger.warning(
-                                "slice %d timeout: %.2f sec > %.2f sec limit",
-                                i + 1,
-                                slice_elapsed,
-                                self.timeout_per_slice,
+                                "slice %d/%d: invalid price %s in result, using price_limit",
+                                i + 1, self.n_slices, filled_price,
                             )
-                            timeout_occurred = True
-                            break
-                except Exception as e:
-                    logger.error("slice %d execution failed: %s", i + 1, str(e))
-                    timeout_occurred = True
+                            filled_price = price_limit or 0.0
+                        filled_qty = result.get("filled", slice_qty)  # 부분 체결 반영
+                        filled_prices.append(filled_price)
+                        filled_quantities.append(filled_qty)
+
+                        if filled_qty < slice_qty - 1e-8:
+                            partial_fills += 1
+                            logger.warning(
+                                "slice %d/%d PARTIAL: %s @ %.4f (%.1f%% filled)",
+                                i + 1,
+                                self.n_slices,
+                                symbol,
+                                filled_price,
+                                (filled_qty / slice_qty) * 100,
+                            )
+                        else:
+                            logger.info(
+                                "slice %d/%d filled: %s @ %.4f",
+                                i + 1,
+                                self.n_slices,
+                                symbol,
+                                filled_price,
+                            )
+
+                        # 슬라이스별 타임아웃 체크
+                        if self.timeout_per_slice is not None:
+                            slice_elapsed = time.time() - slice_start
+                            if slice_elapsed > self.timeout_per_slice:
+                                logger.warning(
+                                    "slice %d timeout: %.2f sec > %.2f sec limit",
+                                    i + 1,
+                                    slice_elapsed,
+                                    self.timeout_per_slice,
+                                )
+                                timeout_occurred = True
+                        slice_success = True
+                        break  # 성공 시 retry 루프 탈출
+                    except Exception as e:
+                        logger.error(
+                            "slice %d/%d attempt %d/%d failed: %s",
+                            i + 1, self.n_slices, attempt,
+                            self.max_retries_per_slice, str(e),
+                        )
+                        if attempt < self.max_retries_per_slice:
+                            time.sleep(1)  # 재시도 전 짧은 대기
+                if not slice_success:
+                    errors += 1
+                    logger.error(
+                        "slice %d/%d FAILED after %d retries — skipping",
+                        i + 1, self.n_slices, self.max_retries_per_slice,
+                    )
+                if timeout_occurred:
                     break
 
             slice_times.append(time.time() - _slice_t0)
@@ -208,7 +243,7 @@ class TWAPExecutor:
         else:
             avg_price = 0.0
         total_filled = sum(filled_quantities) if filled_quantities else 0.0
-        slippage = self.estimate_slippage(total_filled, price_limit or avg_price)
+        slippage = self.estimate_slippage(total_filled, price_limit or avg_price, side=side)
 
         avg_exec_time = float(np.mean(slice_times)) if slice_times else 0.0
 
@@ -222,6 +257,7 @@ class TWAPExecutor:
             partial_fills=partial_fills,
             timeout_occurred=timeout_occurred,
             avg_execution_time=avg_exec_time,
+            errors=errors,
         )
 
     def estimate_slippage(
@@ -229,23 +265,45 @@ class TWAPExecutor:
         qty: float,
         price: float,
         daily_volume: Optional[float] = None,
+        side: Optional[str] = None,
+        spread_bps: float = 0.0,
     ) -> float:
-        """Almgren-Chriss 간소화 슬리피지 추정.
+        """Almgren-Chriss 간소화 슬리피지 추정 (비대칭 지원).
 
-        slippage = 0.1 * (qty / daily_volume) ** 0.5
+        base_slippage = 0.1 * (qty / daily_volume) ** 0.5
+
+        비대칭 보정: buy 주문은 ask쪽 스프레드(+), sell 주문은 bid쪽 스프레드(+)를
+        반영해 각각 half-spread를 추가. 이는 시장 충격이 항상 불리한 방향으로
+        작용하는 현실을 반영한다.
 
         daily_volume 없으면 0.0005 (0.05%) 반환.
 
         Args:
             qty: 주문 수량
-            price: 현재 가격 (미사용, 확장 고려)
+            price: 현재 가격
             daily_volume: 일 거래량 (수량 단위). None이면 기본값 사용.
+            side: "buy" | "sell" | None. None이면 방향 보정 없이 대칭 추정.
+            spread_bps: 현재 bid-ask 스프레드 (basis points). 0이면 무시.
 
         Returns:
-            슬리피지 비율 (소수, e.g. 0.001 = 0.1%)
+            슬리피지 비율 (소수, e.g. 0.001 = 0.1%). 항상 양수 (불리한 방향).
         """
         if daily_volume is None or daily_volume <= 0:
-            return 0.0005
+            base = 0.0005
+        else:
+            ratio = qty / daily_volume
+            base = 0.1 * float(np.sqrt(ratio))
 
-        ratio = qty / daily_volume
-        return 0.1 * float(np.sqrt(ratio))
+        # half-spread 보정: 스프레드의 절반만큼 추가 (주문이 호가를 건너뛸 때)
+        half_spread = (spread_bps / 10000.0) / 2.0 if spread_bps > 0 else 0.0
+
+        # buy/sell 비대칭: buy는 시장 충격이 크고(얇은 ask), sell은 약간 작은 경향
+        # 경험적 계수: buy +10%, sell -5% (Almgren 2005 실증)
+        if side is not None:
+            side_lower = side.lower()
+            if side_lower == "buy":
+                base *= 1.10  # 매수 시 시장 충격 가중
+            elif side_lower == "sell":
+                base *= 0.95  # 매도 시 약간 완화
+
+        return base + half_spread

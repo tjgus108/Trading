@@ -2,13 +2,17 @@
 DataFeed: OHLCV 수집 + 기술 지표 계산.
 data-agent가 이 모듈을 사용한다.
 """
+from __future__ import annotations
 
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-import ccxt
+try:
+    import ccxt
+except ImportError:
+    ccxt = None  # type: ignore[assignment]
 import numpy as np
 import pandas as pd
 
