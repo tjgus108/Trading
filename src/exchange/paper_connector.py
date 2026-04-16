@@ -80,8 +80,10 @@ class PaperConnector:
             {"id": order_id, "status": "closed", "filled": amount, ...}
         """
         if price is None:
-            # 현재가 없으면 임의로 설정 (실제로는 마켓 데이터에서 가져와야 함)
-            price = 1.0
+            raise ValueError(
+                "PaperConnector.create_order() requires an explicit price. "
+                "Market orders must pass the current market price."
+            )
         
         result = self.paper_trader.execute_signal(
             symbol=symbol,

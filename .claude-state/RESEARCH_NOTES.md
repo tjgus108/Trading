@@ -28,3 +28,37 @@
 - **구조적 엣지 집중**: 성공 사례 공통점 — 방향 예측보다 구조적 비효율(price lag, liquidity gap) 익스플로잇. engulfing_zone, relative_volume이 PASS인 것도 같은 이유.
 - **파라미터 단순화**: 현재 22개 PASS 전략 중 20개 실전 FAIL = 파라미터 과다. Walk-Forward 검증 + 파라미터 수 최소화 필요.
 - **인간 감독 체계**: AI 단독 운용 실패 사례 반복. 알림/모니터링 강화 및 자동 손절 로직 필수.
+
+---
+
+## Cycle 134 Research Notes — Regime Detection Deep Dive
+
+### Regime Detection 구현 사례
+
+1. **MarketRegimeTrader (GitHub: 0x596173736972)** — HMM 기반 레짐 탐지 + 자동 전략 생성을 결합한 퀀트 플랫폼. 구조: `data_loader.py` → `features.py` (수익률/변동성/기술지표) → `hmm_regime.py` → `strategy.py` (레짐별 전략 선택) → `backtest.py`. Walk-Forward Validation과 Topological Data Analysis(TDA) 포함. hmmlearn 라이브러리 사용. 레짐: bullish/bearish/range-bound 3분류.
+
+2. **market-regime-detection (GitHub: Sakeeb91)** — HMM + GMM 이중 탐지 + Change Point Detection 조합. 전략 엔진에 포지션 사이징·리스크 관리 내장. Walk-Forward 검증 프레임워크 포함. 특징: HMM만으로 부족한 급변점을 Change Point Detection으로 보완하는 앙상블 접근.
+
+3. **PyQuantLab GMM Regime-Switching Momentum (Medium/GitHub)** — GMM으로 크립토 시장을 저변동성/고변동성 레짐으로 분류 후 모멘텀 전략 온/오프 전환. 핵심 아이디어: 고변동성 레짐에서는 포지션 축소 또는 HOLD, 저변동성 추세 레짐에서만 진입. GMM이 HMM보다 Markovian 제약 없어 크립토 급변 구간에 유리하다는 주장.
+
+### 실패 사례
+
+1. **Static Trend-Following Bot의 레짐 전환 실패 (2024 Flash Crash 사례)** — 원인: 2024년 6월 경제 지표 발표 후 AI 알고리즘들이 일제히 대규모 매도 주문 실행. 레짐 감지 없이 동일 로직으로 운용되던 봇들이 급변동 구간에서 같은 방향으로 연쇄 반응 → 플래시 크래시 가속. 고주파 봇들이 유동성 공급자에서 유동성 소비자로 순간 전환되는 레짐 변화를 인식 못함. 교훈: 레짐 변화 시 전략을 일시 중단하거나 포지션 사이즈 축소 로직 필수.
+
+2. **HMM 상태 수(k) 과다 설정으로 인한 과최적화** — 원인: HMM의 hidden state 수를 AIC/BIC 없이 임의 설정(예: k=5~7)할 경우 in-sample에서는 완벽한 레짐 분류가 가능하나 out-of-sample에서 레짐 라벨이 일치하지 않는 문제 발생. 연구 결과 λ 하이퍼파라미터를 크게 설정해도 HMM 구조에서 과적합 위험이 잔존. 표준 권장: k=2~3 (bull/bear/neutral)으로 단순하게 유지, BIC로 검증.
+
+### 우리 프로젝트 적용 방안
+
+- **통합 위치**: `src/data/feed.py`의 `fetch_ohlcv` 반환 DataFrame에 `regime` 컬럼 추가. `DataFeed.get_df()` 호출 후 regime detector가 컬럼을 붙이면 모든 전략이 `df["regime"]`을 참조 가능.
+- **단계적 구현**: 1단계는 변동성 기반 단순 레짐(rolling ATR 분위수로 low/mid/high 3분류) — 외부 라이브러리 불필요. 2단계는 hmmlearn GaussianHMM(n_components=2~3, features: returns + log_volume + ATR). 3단계는 GMM(BayesianGaussianMixture) + Change Point Detection 앙상블.
+- **전략 필터 패턴**: 기존 BaseStrategy.generate()에서 `df["regime"].iloc[-1]` 조회 후 레짐 불일치 시 `Action.HOLD` 반환. 추세 전략은 trending 레짐에서만, 횡보 전략은 ranging 레짐에서만 신호 허용.
+- **새 파일 최소화**: `src/data/regime_detector.py` 1개만 추가. feed.py에서 import해 DataFrame에 컬럼 주입. 전략 파일 수정 없이 BaseStrategy 레벨에서 레짐 필터 적용 가능하면 이상적.
+- **Walk-Forward 검증 필수**: 레짐 탐지 모델 자체도 in-sample 학습 후 out-of-sample로 검증. 레짐 라벨 일관성 확인(bull 레짐 라벨이 학습 구간과 테스트 구간에서 동일한 의미인지).
+
+### 핵심 교훈
+
+- HMM/GMM 레짐 탐지는 전략 수 추가보다 실전 성과 개선에 효과적이나, 상태 수(k) 과다 설정 시 오히려 과적합 악화.
+- 크립토 고주파 시장에서는 Markovian 제약이 없는 GMM이 HMM보다 급변 구간 포착에 유리.
+- 레짐 감지 없는 정적 봇은 2024 플래시 크래시처럼 레짐 전환 시 연쇄 손실 위험.
+- 우리 프로젝트 최우선 과제: `src/data/regime_detector.py` 단일 파일로 변동성 기반 레짐 컬럼 주입, 기존 전략 코드 변경 최소화.
+- 레짐 탐지 모델도 Walk-Forward 검증 필수 — 없으면 레짐 탐지 자체가 과최적화 원인이 됨.

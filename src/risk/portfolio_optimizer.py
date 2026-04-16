@@ -148,6 +148,9 @@ class PortfolioOptimizer:
     ) -> tuple:
         """VaR과 CVaR 계산 (손실 기준, 양수 반환).
 
+        Historical simulation 방식. 소표본(T < 30)일 경우
+        parametric (정규분포 가정) VaR/CVaR과 비교하여 보수적(큰) 값을 사용.
+
         Args:
             port_returns: 포트폴리오 수익률 배열
             confidence: 신뢰 수준 (0.95 = 95%)
@@ -162,10 +165,53 @@ class PortfolioOptimizer:
         # 하위 (1-confidence) 분위수 인덱스
         cutoff_idx = max(1, int(T * (1 - confidence)))
         # VaR: 5번째 퍼센타일 (cutoff_idx - 1번째 값)
-        var = -float(sorted_r[cutoff_idx - 1])
+        hist_var = -float(sorted_r[cutoff_idx - 1])
         # CVaR: 하위 cutoff_idx개 수익률의 평균
-        cvar = -float(sorted_r[:cutoff_idx].mean())
-        return max(0.0, var), max(0.0, cvar)
+        hist_cvar = -float(sorted_r[:cutoff_idx].mean())
+
+        var = max(0.0, hist_var)
+        cvar = max(0.0, hist_cvar)
+
+        # 소표본 보정: T < 30이면 parametric VaR/CVaR과 비교, 보수적(큰) 값 선택
+        if T < 30:
+            param_var, param_cvar = PortfolioOptimizer._parametric_var_cvar(
+                port_returns, confidence
+            )
+            var = max(var, param_var)
+            cvar = max(cvar, param_cvar)
+
+        return var, cvar
+
+    @staticmethod
+    def _parametric_var_cvar(
+        port_returns: np.ndarray, confidence: float = 0.95
+    ) -> tuple:
+        """정규분포 가정 Parametric VaR/CVaR (Cornish-Fisher 보정 없이).
+
+        소표본에서 historical VaR의 불안정성을 보완하기 위한 크로스체크 용도.
+
+        Args:
+            port_returns: 수익률 배열
+            confidence: 신뢰 수준
+
+        Returns:
+            (var, cvar) — 양수 (손실)
+        """
+        if len(port_returns) < 2:
+            return 0.0, 0.0
+        from scipy.stats import norm
+        mu = float(np.mean(port_returns))
+        sigma = float(np.std(port_returns, ddof=1))
+        if sigma <= 0:
+            return 0.0, 0.0
+        # z-score for the (1-confidence) quantile
+        z = norm.ppf(1.0 - confidence)  # e.g. -1.645 for 95%
+        # Parametric VaR = -(mu + z * sigma)
+        p_var = -(mu + z * sigma)
+        # Parametric CVaR (Expected Shortfall under normal)
+        # ES = -(mu - sigma * pdf(z) / (1-confidence))
+        p_cvar = -(mu - sigma * norm.pdf(z) / (1.0 - confidence))
+        return max(0.0, p_var), max(0.0, p_cvar)
 
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
         """min/max 제약을 유지하면서 합=1.0 보장 (iterative projection).

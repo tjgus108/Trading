@@ -178,3 +178,111 @@ def test_kelly_sizer_default_fraction_is_half_kelly():
     qty_quarter = quarter.compute(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
     # Half은 Quarter의 2배여야 함
     assert abs(qty_half / qty_quarter - 2.0) < 1e-9
+
+
+# ── Kelly input validation 테스트 ──────────────────────────────────────────────
+
+def test_compute_clips_win_rate_above_one():
+    """win_rate > 1.0 전달 시 1.0으로 클리핑되어 정상 수량 반환."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.10)
+    qty_clipped = sizer.compute(win_rate=1.5, avg_win=0.02, avg_loss=0.01,
+                                capital=10000, price=100)
+    qty_one = sizer.compute(win_rate=1.0, avg_win=0.02, avg_loss=0.01,
+                            capital=10000, price=100)
+    assert qty_clipped == pytest.approx(qty_one)
+    assert qty_clipped > 0
+
+
+def test_compute_clips_win_rate_below_zero():
+    """win_rate < 0 전달 시 0.0으로 클리핑 → kelly_f <= 0 → 0 반환."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.10)
+    qty = sizer.compute(win_rate=-0.5, avg_win=0.02, avg_loss=0.01,
+                        capital=10000, price=100)
+    assert qty == 0.0
+
+
+def test_compute_nan_inputs_return_zero():
+    """NaN 입력 시 0 반환 (예외 없음)."""
+    sizer = KellySizer()
+    assert sizer.compute(float("nan"), 0.02, 0.01, 10000, 100) == 0.0
+    assert sizer.compute(0.6, float("nan"), 0.01, 10000, 100) == 0.0
+    assert sizer.compute(0.6, 0.02, float("nan"), 10000, 100) == 0.0
+
+
+def test_compute_inf_inputs_return_zero():
+    """inf 입력 시 0 반환 (예외 없음)."""
+    sizer = KellySizer()
+    assert sizer.compute(float("inf"), 0.02, 0.01, 10000, 100) == 0.0
+    assert sizer.compute(0.6, float("inf"), 0.01, 10000, 100) == 0.0
+
+
+def test_compute_negative_capital_returns_zero():
+    """capital <= 0 시 0 반환."""
+    sizer = KellySizer()
+    assert sizer.compute(0.6, 0.02, 0.01, -100, 100) == 0.0
+    assert sizer.compute(0.6, 0.02, 0.01, 0, 100) == 0.0
+
+
+def test_compute_negative_price_returns_zero():
+    """price <= 0 시 0 반환."""
+    sizer = KellySizer()
+    assert sizer.compute(0.6, 0.02, 0.01, 10000, -50) == 0.0
+    assert sizer.compute(0.6, 0.02, 0.01, 10000, 0) == 0.0
+
+
+# ── from_trade_history 소표본 shrinkage 테스트 ────────────────────────────────
+
+def test_small_sample_shrinks_win_rate():
+    """거래 수 < MIN_TRADES_FOR_KELLY(10): Bayesian shrinkage로 size가 줄어야 함."""
+    # 3개 거래(전부 승) → raw win_rate=1.0
+    # shrinkage: 3/(3+10)*1.0 + 7/10*0.5 = 0.231 + 0.385 = 약 0.615
+    small_trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 50}]
+    qty_small = KellySizer.from_trade_history(
+        small_trades, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50,
+    )
+
+    # 30개 거래(전부 승) → raw win_rate=1.0, shrinkage 미적용
+    # shrink_factor = 30/(30+10) = 0.75 → 적용 안됨 (n >= threshold)
+    large_trades = [{"pnl": 100}] * 30
+    qty_large = KellySizer.from_trade_history(
+        large_trades, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50,
+    )
+
+    # 소표본은 win_rate shrinkage로 인해 대표본보다 작거나 같아야 함
+    assert qty_small <= qty_large + 1e-9
+
+
+def test_all_breakeven_returns_zero():
+    """모든 거래가 pnl=0(break-even) → edge 없음 → 0 반환."""
+    trades = [{"pnl": 0.0}, {"pnl": 0.0}, {"pnl": 0.0}]
+    qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
+    assert qty == 0.0
+
+
+def test_nan_pnl_filtered():
+    """pnl에 NaN이 포함되면 해당 거래는 제외되어야 함."""
+    trades = [
+        {"pnl": 100}, {"pnl": float("nan")}, {"pnl": -50}, {"pnl": 80},
+    ]
+    # NaN 제거 후 3개 거래로 계산
+    qty = KellySizer.from_trade_history(trades, capital=10000, price=1000)
+    assert qty >= 0  # 예외 없이 정상 반환
+
+
+def test_custom_min_trades():
+    """min_trades 파라미터로 shrinkage 임계값 조정."""
+    trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 150}, {"pnl": -30}, {"pnl": 80}]
+    # min_trades=5 → n=5, shrink_factor=5/(5+5)=0.5
+    qty_strict = KellySizer.from_trade_history(
+        trades, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50, min_trades=5,
+    )
+    # min_trades=3 → n=5 >= 3 → shrinkage 미적용
+    qty_lenient = KellySizer.from_trade_history(
+        trades, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50, min_trades=3,
+    )
+    # strict 버전은 shrinkage로 인해 더 작거나 같아야 함
+    assert qty_strict <= qty_lenient + 1e-9

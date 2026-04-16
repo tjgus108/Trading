@@ -413,9 +413,12 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str
     windows = make_walk_forward_windows(df)
 
     results = []
+    load_failures = 0
+    eval_errors = 0
     for idx, (mod_name, cls_name) in enumerate(pass_list):
         cls = load_strategy_class(mod_name, cls_name)
         if cls is None:
+            load_failures += 1
             continue
         try:
             result = evaluate_strategy_walk_forward(cls, windows, engine)
@@ -423,7 +426,12 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> str
             if (idx + 1) % 50 == 0:
                 print(f"[{symbol}][PROGRESS] {idx + 1}/{len(pass_list)} evaluated", flush=True)
         except Exception as e:
+            eval_errors += 1
             print(f"[{symbol}][ERROR] {mod_name}: {str(e)[:80]}")
+
+    if load_failures or eval_errors:
+        print(f"[{symbol}][WARN] load_failures={load_failures}, eval_errors={eval_errors} "
+              f"(of {len(pass_list)} total)")
 
     passed = [r for r in results if r["overall_passed"]]
     print(f"[{symbol}][SUMMARY] {len(passed)}/{len(results)} PASSED (consistency >= {PASS_RATIO:.0%})")
@@ -453,10 +461,12 @@ def run_simulation():
     )
 
     sections = []
+    fatal_count = 0
     for symbol in SYMBOLS:
         try:
             sections.append(simulate_symbol(symbol, pass_list, engine))
         except Exception as e:
+            fatal_count += 1
             print(f"[{symbol}][FATAL] {e}")
             sections.append(f"# {symbol} 시뮬 실패\n\n{e}\n")
 
@@ -467,7 +477,9 @@ def run_simulation():
     )
     REPORT_PATH.write_text(header + "\n\n---\n\n".join(sections))
     print(f"\n[REPORT] Saved to {REPORT_PATH}")
-    return 0
+    if fatal_count:
+        print(f"[WARN] {fatal_count}/{len(SYMBOLS)} symbols failed fatally")
+    return 1 if fatal_count == len(SYMBOLS) else 0
 
 
 if __name__ == "__main__":

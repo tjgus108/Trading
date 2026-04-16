@@ -146,8 +146,9 @@ class VPINCalculator:
         sell_vol = df["volume"] * (1 - buy_frac)
         imbalance = (buy_vol - sell_vol).abs()
         total_vol = df["volume"]
-        vpin = (imbalance.rolling(self.n_buckets).sum() /
-                total_vol.rolling(self.n_buckets).sum().replace(0, 1))
+        rolling_vol = total_vol.rolling(self.n_buckets).sum()
+        # 거래량 0인 윈도우는 NaN 처리 (replace(0,1)은 오류값 생성)
+        vpin = imbalance.rolling(self.n_buckets).sum() / rolling_vol.replace(0, float('nan'))
         return vpin.clip(0, 1)
 
 

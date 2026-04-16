@@ -76,6 +76,15 @@ class KellySizer:
         if avg_win <= 0:
             return 0.0
 
+        # NaN / inf 방어 (클리핑 전에 수행: np.clip(inf)=1.0 통과 방지)
+        if not np.isfinite(win_rate) or not np.isfinite(avg_win) or not np.isfinite(avg_loss):
+            return 0.0
+        if capital <= 0 or price <= 0:
+            return 0.0
+
+        # win_rate 범위 클리핑: [0, 1] 바깥 값 방어
+        win_rate = float(np.clip(win_rate, 0.0, 1.0))
+
         # Full Kelly
         kelly_f = (win_rate * avg_win - (1.0 - win_rate) * avg_loss) / avg_win
 
@@ -103,6 +112,9 @@ class KellySizer:
         qty = position_capital / price
         return qty
 
+    # 최소 거래 수: 이보다 적으면 Kelly 추정이 통계적으로 불안정
+    MIN_TRADES_FOR_KELLY: int = 10
+
     @classmethod
     def from_trade_history(
         cls,
@@ -116,8 +128,13 @@ class KellySizer:
         min_fraction: float = 0.001,
         max_drawdown: Optional[float] = None,
         leverage: float = 1.0,
+        min_trades: Optional[int] = None,
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.
+
+        소표본 방어: 거래 수가 min_trades(기본 MIN_TRADES_FOR_KELLY=10) 미만이면
+        win_rate를 50%로 축소(Bayesian shrinkage)하여 과적합 방지.
+        거래 기록이 비어있거나 모든 pnl이 0이면 0.0 반환.
 
         Args:
             trades: [{"pnl": float}, ...] 형태의 거래 기록
@@ -130,6 +147,7 @@ class KellySizer:
             min_fraction: 최소 자본 비율
             max_drawdown: 허용 최대 낙폭 (선택)
             leverage: 레버리지 배수 (기본 1.0)
+            min_trades: Kelly 추정에 필요한 최소 거래 수 (None이면 클래스 기본값 사용)
 
         Returns:
             포지션 사이즈 (수량)
@@ -138,12 +156,32 @@ class KellySizer:
             return 0.0
 
         pnls = np.array([t["pnl"] for t in trades], dtype=float)
+
+        # NaN 제거
+        pnls = pnls[np.isfinite(pnls)]
+        if len(pnls) == 0:
+            return 0.0
+
         wins = pnls[pnls > 0]
         losses = pnls[pnls < 0]
 
-        win_rate = len(wins) / len(pnls)
+        # 모든 거래가 break-even(pnl=0)이면 edge 없음
+        if len(wins) == 0 and len(losses) == 0:
+            return 0.0
+
+        raw_win_rate = len(wins) / len(pnls)
         avg_win = float(wins.mean()) if len(wins) > 0 else 0.0
         avg_loss = float(abs(losses.mean())) if len(losses) > 0 else 0.0
+
+        # 소표본 Bayesian shrinkage: 거래 수가 적으면 win_rate를 50%로 축소
+        # shrink_factor = n / (n + min_trades): n이 많을수록 1에 수렴
+        threshold = min_trades if min_trades is not None else cls.MIN_TRADES_FOR_KELLY
+        n = len(pnls)
+        if n < threshold:
+            shrink_factor = n / (n + threshold)
+            win_rate = shrink_factor * raw_win_rate + (1.0 - shrink_factor) * 0.5
+        else:
+            win_rate = raw_win_rate
 
         sizer = cls(
             fraction=fraction,

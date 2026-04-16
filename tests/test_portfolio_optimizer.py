@@ -197,13 +197,23 @@ def test_var_cvar_small_sample_boundary():
 
 
 def test_var_cvar_all_positive_returns():
-    """모든 수익률이 양수인 경우 VaR=0, CVaR=0 (max(0,x) 처리 확인)."""
-    r = np.array([0.01, 0.02, 0.03, 0.005, 0.015, 0.008, 0.012, 0.007,
-                  0.011, 0.009, 0.014, 0.006, 0.013, 0.016, 0.004,
-                  0.018, 0.019, 0.003, 0.017, 0.010])
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
-    assert var == 0.0
-    assert cvar == 0.0
+    """모든 수익률이 양수: historical VaR=0이지만, 소표본(T<30)이면
+    parametric 보정으로 양수 VaR이 나올 수 있음 (정규분포 꼬리).
+    T>=30이면 historical만 사용 → VaR=0."""
+    # T=50 (>=30): parametric 보정 미적용 → historical VaR=0
+    r_large = np.linspace(0.003, 0.02, 50)
+    var_l, cvar_l = PortfolioOptimizer._compute_var_cvar(r_large, confidence=0.95)
+    assert var_l == 0.0
+    assert cvar_l == 0.0
+
+    # T=20 (<30): parametric 보정 적용 → VaR >= 0 (보수적)
+    r_small = np.array([0.01, 0.02, 0.03, 0.005, 0.015, 0.008, 0.012, 0.007,
+                        0.011, 0.009, 0.014, 0.006, 0.013, 0.016, 0.004,
+                        0.018, 0.019, 0.003, 0.017, 0.010])
+    var_s, cvar_s = PortfolioOptimizer._compute_var_cvar(r_small, confidence=0.95)
+    assert var_s >= 0.0
+    assert cvar_s >= 0.0
+    assert cvar_s >= var_s - 1e-12  # CVaR >= VaR 유지
 
 
 # ── Boundary: zero correlation, all-NaN, single data point ───────────────────
@@ -279,18 +289,18 @@ def test_inf_weights_to_apply_constraints_returns_equal_weight():
 # ── VaR/CVaR 경계 시나리오 ────────────────────────────────────────────────────
 
 def test_var_cvar_minimum_data_boundary():
-    """T=2: cutoff_idx=max(1, int(2*0.05))=1 → CVaR==VaR (최솟값 하나만 평균).
+    """T=2 (<30): historical VaR=0.05이지만 parametric 보정으로 더 보수적일 수 있음.
 
-    경계 조건: 데이터 2개일 때 _compute_var_cvar가 올바른 값을 반환하는지 확인.
+    경계 조건: 데이터 2개일 때 VaR >= historical VaR, CVaR >= VaR 유지.
     """
     r = np.array([-0.05, 0.03])  # 손실 -5%, 수익 +3%
     var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
-    # sorted_r = [-0.05, 0.03], cutoff_idx=1
-    # VaR  = -(-0.05) = 0.05
-    # CVaR = -mean([-0.05]) = 0.05  (CVaR == VaR, 경계 허용)
-    assert abs(var - 0.05) < 1e-12, f"VaR expected 0.05, got {var}"
-    assert abs(cvar - 0.05) < 1e-12, f"CVaR expected 0.05, got {cvar}"
-    assert cvar >= var - 1e-12
+    # historical: sorted_r = [-0.05, 0.03], cutoff_idx=1
+    # hist_VaR = 0.05, hist_CVaR = 0.05
+    # parametric 보정: sigma가 크므로 parametric VaR > 0.05 가능
+    assert var >= 0.05 - 1e-12, f"VaR should be >= historical 0.05, got {var}"
+    assert cvar >= var - 1e-12, f"CVaR should be >= VaR"
+    assert cvar >= 0.05 - 1e-12, f"CVaR should be >= historical 0.05, got {cvar}"
 
 
 def test_var_cvar_extreme_loss_tail():
@@ -298,6 +308,7 @@ def test_var_cvar_extreme_loss_tail():
 
     100개 수익률 중 하위 5개(5%)가 -0.10 ~ -0.06 사이 큰 손실이고
     나머지는 소폭 양수 → CVaR(하위 5개 평균) > VaR(5번째 퍼센타일).
+    T=100 >= 30 이므로 parametric 보정 미적용.
     """
     # 하위 5개: 큰 손실 (-0.10, -0.09, -0.08, -0.07, -0.06)
     losses = np.array([-0.10, -0.09, -0.08, -0.07, -0.06])
@@ -313,3 +324,55 @@ def test_var_cvar_extreme_loss_tail():
     assert abs(var - 0.06) < 1e-12, f"VaR expected 0.06, got {var}"
     assert abs(cvar - 0.08) < 1e-12, f"CVaR expected 0.08, got {cvar}"
     assert cvar > var, f"CVaR {cvar} should be > VaR {var} for fat tail"
+
+
+# ── Parametric VaR/CVaR 크로스체크 테스트 ───────────────────────────────────────
+
+def test_parametric_var_cvar_basic():
+    """_parametric_var_cvar가 정규분포 기반으로 합리적 값 반환."""
+    rng = np.random.default_rng(42)
+    r = rng.normal(0.0, 0.01, 100)
+    var, cvar = PortfolioOptimizer._parametric_var_cvar(r, confidence=0.95)
+    assert var > 0.0
+    assert cvar > 0.0
+    assert cvar >= var - 1e-12  # CVaR >= VaR (항상)
+
+
+def test_parametric_var_cvar_insufficient_data():
+    """데이터 1개 → (0, 0) 반환."""
+    r = np.array([0.01])
+    var, cvar = PortfolioOptimizer._parametric_var_cvar(r, confidence=0.95)
+    assert var == 0.0
+    assert cvar == 0.0
+
+
+def test_small_sample_uses_conservative_var():
+    """T < 30: parametric 보정으로 historical보다 보수적(크거나 같은) VaR 산출."""
+    rng = np.random.default_rng(7)
+    r = rng.normal(-0.005, 0.02, 15)  # 작은 표본, 약간의 손실 경향
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+
+    # historical만으로 계산
+    sorted_r = np.sort(r)
+    cutoff_idx = max(1, int(len(r) * 0.05))
+    hist_var = max(0.0, -float(sorted_r[cutoff_idx - 1]))
+
+    # 보수적 보정: var >= historical var
+    assert var >= hist_var - 1e-12
+
+
+def test_large_sample_no_parametric_override():
+    """T >= 30: parametric 보정 미적용 → historical VaR 그대로."""
+    rng = np.random.default_rng(42)
+    r = rng.normal(0.001, 0.01, 500)
+
+    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+
+    # 직접 historical 계산
+    sorted_r = np.sort(r)
+    cutoff_idx = max(1, int(500 * 0.05))
+    expected_var = max(0.0, -float(sorted_r[cutoff_idx - 1]))
+    expected_cvar = max(0.0, -float(sorted_r[:cutoff_idx].mean()))
+
+    assert abs(var - expected_var) < 1e-12
+    assert abs(cvar - expected_cvar) < 1e-12

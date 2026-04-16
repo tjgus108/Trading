@@ -1,5 +1,29 @@
 # Work Log
 
+## [2026-04-16] Cycle 134 — C + B + SIM + F
+
+**[C] Data & Infrastructure:**
+- VPIN zero-volume 버그 수정 (`src/data/order_flow.py`): replace(0,1) → replace(0, NaN) — 저유동성 구간에서 잘못된 VPIN 값 방지
+- DataFeed LRU 캐시 퇴거 (`src/data/feed.py`): max_cache_size=128, _evict_if_needed() 추가 — 무제한 메모리 증가 방지
+
+**[B] Risk Management:**
+- KellySizer robustness (`src/risk/kelly_sizer.py`): NaN/inf/범위외 입력 검증, 소표본(<10) Bayesian shrinkage (win_rate→50% 수렴)
+- VaR/CVaR 소표본 보정 (`src/risk/portfolio_optimizer.py`): T<30일 때 parametric(정규분포) VaR와 historical VaR 중 큰 값 사용
+- 신규 테스트 19개 추가 (Kelly 15개 + VaR 4개), 전체 133개 통과
+
+**[SIM] Paper Simulation:**
+- paper_simulation.py: 전략 로드 실패/평가 오류 카운트 추적 + 경고 로그 출력
+- paper_simulation.py: 전체 심볼 fatal 시 exit code 1 반환
+- paper_connector.py: create_order(price=None) → ValueError 발생 (잘못된 가격 주문 방지)
+
+**[F] Research — Regime Detection Deep Dive:**
+- HMM 오픈소스 3개 조사: MarketRegimeTrader, market-regime-detection, PyQuantLab GMM
+- 실패 사례: 2024 Flash Crash에서 레짐 미인식 봇 연쇄 청산
+- 적용 방안: src/data/regime_detector.py 1개 추가, feed.py에 regime 컬럼 주입 제안
+- 핵심: HMM 상태 k=2~3이 표준, 크립토에는 GMM이 유리, AIC/BIC 필수
+
+---
+
 ## [2026-04-16] Cycle 133 — E + A + SIM + F
 
 **[E] Execution:**
@@ -11759,3 +11783,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-16 14:29 UTC] Cycle 134 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -90,10 +90,11 @@ class DataSummary:
 
 
 class DataFeed:
-    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3):
+    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3, max_cache_size: int = 128):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._cache_ttl = cache_ttl  # 초
+        self._max_cache_size = max_cache_size  # 최대 캐시 엔트리 수
         self._max_retries = max_retries
         self._hit_count = 0          # 캐시 히트 수
         self._miss_count = 0         # 캐시 미스 수
@@ -110,6 +111,7 @@ class DataFeed:
         self._miss_count += 1
         summary = self._fetch_with_retry(symbol, timeframe, limit)
         self._cache[key] = (summary, now)
+        self._evict_if_needed()
         return summary
 
     def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
@@ -218,6 +220,14 @@ class DataFeed:
             for k in keys_to_del:
                 del self._cache[k]
 
+    def _evict_if_needed(self):
+        """캐시가 max_cache_size를 초과하면 가장 오래된 엔트리 제거 (LRU)."""
+        if len(self._cache) <= self._max_cache_size:
+            return
+        # 타임스탬프 기준 가장 오래된 엔트리 제거
+        oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+        del self._cache[oldest_key]
+
     def cache_stats(self) -> dict:
         """
         캐시 히트율/미스율 통계 조회.
@@ -239,6 +249,7 @@ class DataFeed:
             'total': total,
             'hit_rate': hit_rate,
             'cached_keys': len(self._cache),
+            'max_cache_size': self._max_cache_size,
         }
 
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
