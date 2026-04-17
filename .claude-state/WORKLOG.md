@@ -1,5 +1,26 @@
 # Work Log
 
+## [2026-04-18] Cycle 146 — A + C + F (테스트 수정 + GARCH 교체)
+
+**[A] Quality Assurance:**
+- LSTM BooleanArray 버그 수정: pandas ExtensionArray → np.asarray 변환 (3개 테스트 수정)
+- train_ml.py Python 3.7 호환성: `str | None` → `Optional[str]`
+- 166+ 테스트 실행 확인, 핵심 모듈 전체 PASS
+
+**[C] Data & Infrastructure:**
+- 합성 데이터 GARCH(1,1) + Student-t 교체 (tests/conftest.py)
+  - 파라미터: ω=0.0001, α=0.08, β=0.90, df=6
+  - 첨도 0.51 → 5.0+ (10배 개선), 기존 인터페이스 유지
+- 데이터 품질 로깅: data_utils.py + feed.py에 첨도/왜도 통계 추가
+
+**[F] Research:**
+- GARCH-t / EGARCH-t가 크립토에 적합 (표준 GARCH보다 VaR 정확도 높음)
+- 합성 데이터는 전략 선별에만 사용, 파라미터 최적화는 실데이터 필수
+- 전략 수명: 모멘텀 3-6개월, 스윙 6-18개월 — 레짐별 Sharpe 모니터로 decay 감지
+- 다중 비교: FDR(BH 방법)이 Bonferroni보다 현실적
+
+---
+
 ## [2026-04-18] Cycle 145 — D + E + F (ML 재학습 파이프라인 + live 연동)
 
 **[D] ML & Signals:**
