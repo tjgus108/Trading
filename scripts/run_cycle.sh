@@ -75,9 +75,11 @@ fi
 
 if $RUN_SIM; then
     "$PY_BIN" scripts/paper_simulation.py || echo "Paper sim failed — continuing cycle"
-    if [ -f "$REPORT" ] && grep -q "Bybit" "$REPORT" 2>/dev/null; then
+    # 시뮬 결과를 rotation state에 반영 (전략 로테이션 자동 업데이트)
+    "$PY_BIN" scripts/update_rotation.py || echo "Rotation update failed — continuing"
+    if [ -f "$REPORT" ] && grep -q "Bybit\|시뮬" "$REPORT" 2>/dev/null; then
         git add "$REPORT" .claude-state/ 2>/dev/null || true
-        git commit -m "paper: 실제 Bybit 데이터 시뮬레이션 결과 ($(date -u +'%Y-%m-%dT%H:%MZ'))" || true
+        git commit -m "paper: 시뮬레이션 + 전략 로테이션 업데이트 ($(date -u +'%Y-%m-%dT%H:%MZ'))" || true
         git push origin main || echo "paper sim push 실패 — 나중에 sweep에서 재시도"
     fi
 fi

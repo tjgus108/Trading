@@ -77,6 +77,85 @@ def deflated_sharpe_ratio(
     return float(dsr)
 
 
+def deflated_sharpe_ratio_multi(
+    sharpe_ratios: List[float],
+    pnls_list: Optional[List[np.ndarray]] = None,
+    annualization: int = 252 * 24,
+) -> List[float]:
+    """
+    다중 전략 선택 편향 보정 DSR (Multi-Strategy DSR).
+
+    Bailey & Lopez de Prado (2014) 방법론:
+    복수의 전략을 시험한 뒤 최고 Sharpe를 선택할 때 발생하는 선택 편향을
+    haircut으로 보정한다.
+
+    공식 (근사):
+      E[SR_max] ≈ (1 - γ) * μ_SR + γ * σ_SR * sqrt(2 * ln(N))
+      여기서 γ ∈ [0, 1]: Euler-Mascheroni 상수 기반 보정
+             N: 전략 수
+
+    각 전략의 보정 비율:
+      haircut_i = min(1, SR_i / E[SR_max])
+      DSR_i = haircut_i * single_DSR_i
+
+    Args:
+        sharpe_ratios: 전략별 Sharpe Ratio 리스트 (N개)
+        pnls_list: 전략별 거래 PnL 배열 리스트 (None이면 haircut만 적용)
+        annualization: 연환산 인수
+
+    Returns:
+        List[float]: 각 전략의 선택 편향 보정 DSR
+
+    주의:
+        - sharpe_ratios와 pnls_list 길이가 일치해야 함
+        - 전략이 1개이면 단일 DSR 반환
+    """
+    n_strategies = len(sharpe_ratios)
+    if n_strategies == 0:
+        return []
+
+    srs = np.array(sharpe_ratios, dtype=float)
+
+    # 전략 1개면 단일 DSR
+    if n_strategies == 1:
+        if pnls_list and len(pnls_list) == 1:
+            dsr = deflated_sharpe_ratio(pnls_list[0], srs[0], annualization)
+        else:
+            dsr = float(srs[0])
+        return [dsr]
+
+    # E[SR_max] 근사: 정규 분포 가정 하에 order statistic 기댓값
+    # E[max(X_1,...,X_N)] ≈ μ + σ * sqrt(2 * ln(N)) for iid Normal
+    mu_sr = float(np.mean(srs))
+    sigma_sr = float(np.std(srs, ddof=1)) if n_strategies > 1 else 0.0
+    # Euler-Mascheroni 상수 (γ ≈ 0.5772)
+    euler_gamma = 0.5772156649
+    if sigma_sr > 1e-10:
+        expected_sr_max = (1 - euler_gamma) * mu_sr + euler_gamma * sigma_sr * np.sqrt(
+            2.0 * np.log(max(n_strategies, 1))
+        )
+    else:
+        expected_sr_max = mu_sr
+
+    result_dsrs = []
+    for i, sr in enumerate(srs):
+        # 단일 DSR (표본 편향 보정)
+        if pnls_list and i < len(pnls_list) and len(pnls_list[i]) >= 3:
+            single_dsr = deflated_sharpe_ratio(pnls_list[i], float(sr), annualization)
+        else:
+            single_dsr = float(sr)
+
+        # 선택 편향 haircut
+        if expected_sr_max > 1e-10:
+            haircut = min(1.0, float(sr) / expected_sr_max)
+        else:
+            haircut = 1.0
+
+        result_dsrs.append(round(single_dsr * haircut, 4))
+
+    return result_dsrs
+
+
 @dataclass
 class BacktestReport:
     # 수익률

@@ -304,3 +304,73 @@ def test_no_false_resume_when_conditions_still_active():
     s = m.update(9200)  # weekly 8% -> should escalate, NOT resume
     assert s.halted is True
     assert s.alert_level == AlertLevel.HALT
+
+
+# ── 연속 손실 + 쿨다운 ────────────────────────────────────────
+
+def test_size_multiplier_normal():
+    """연속 손실 없으면 size_multiplier=1.0."""
+    m = DrawdownMonitor(loss_streak_threshold=3)
+    assert m.get_size_multiplier() == 1.0
+
+
+def test_size_multiplier_halved_after_streak():
+    """연속 손실 3회 도달 시 size_multiplier=0.5."""
+    m = DrawdownMonitor(loss_streak_threshold=3)
+    m.record_trade_result(pnl=-100, equity=9900)
+    m.record_trade_result(pnl=-100, equity=9800)
+    assert m.get_size_multiplier() == 1.0   # 2회 아직 미달
+    m.record_trade_result(pnl=-100, equity=9700)
+    assert m.consecutive_losses == 3
+    assert m.get_size_multiplier() == 0.5
+
+
+def test_size_multiplier_resets_on_win():
+    """손실 후 수익 1회면 연속 손실 초기화 → size_multiplier=1.0."""
+    m = DrawdownMonitor(loss_streak_threshold=3)
+    for _ in range(3):
+        m.record_trade_result(pnl=-100, equity=9700)
+    assert m.get_size_multiplier() == 0.5
+    m.record_trade_result(pnl=200, equity=9900)
+    assert m.consecutive_losses == 0
+    assert m.get_size_multiplier() == 1.0
+
+
+def test_cooldown_blocks_trade_after_large_loss():
+    """단일 손실 >= single_loss_halt_pct → 쿨다운 중 size_multiplier=0.0."""
+    m = DrawdownMonitor(single_loss_halt_pct=0.02, cooldown_seconds=3600)
+    # equity=10000, loss=300 → loss_pct=3% >= 2% → 쿨다운 시작
+    m.record_trade_result(pnl=-300, equity=10000)
+    assert m.is_in_cooldown() is True
+    assert m.get_size_multiplier() == 0.0
+
+
+def test_small_loss_no_cooldown():
+    """단일 손실 < single_loss_halt_pct → 쿨다운 없음."""
+    m = DrawdownMonitor(single_loss_halt_pct=0.02, cooldown_seconds=3600)
+    m.record_trade_result(pnl=-100, equity=10000)   # 1% < 2%
+    assert m.is_in_cooldown() is False
+
+
+def test_update_reflects_size_multiplier():
+    """update() 결과에 size_multiplier, consecutive_losses, cooldown_active 반영."""
+    m = DrawdownMonitor(loss_streak_threshold=3)
+    m.record_trade_result(pnl=-100, equity=9700)
+    m.record_trade_result(pnl=-100, equity=9600)
+    m.record_trade_result(pnl=-100, equity=9500)
+    status = m.update(9500)
+    assert status.consecutive_losses == 3
+    assert status.size_multiplier == 0.5
+    assert status.cooldown_active is False
+
+
+def test_to_dict_from_dict_includes_new_state():
+    """to_dict/from_dict round-trip이 새 필드 포함."""
+    m = DrawdownMonitor(loss_streak_threshold=3, cooldown_seconds=1800)
+    m.record_trade_result(pnl=-100, equity=9900)
+    m.record_trade_result(pnl=-100, equity=9800)
+    d = m.to_dict()
+    m2 = DrawdownMonitor.from_dict(d)
+    assert m2.consecutive_losses == 2
+    assert m2.loss_streak_threshold == 3
+    assert m2.cooldown_seconds == 1800

@@ -9,6 +9,10 @@ circuit_breaker 패턴으로 거래 차단.
   - 주간 DD > weekly_limit → HALT (거래 중단)
   - 월간 DD > monthly_limit → FORCE_LIQUIDATE (강제 청산)
 
+연속 손실 + 시간 기반 쿨다운:
+  - 연속 손실 >= loss_streak_threshold → 포지션 사이즈 50% 축소
+  - 큰 손실(single_loss_halt_pct 초과) → cooldown_seconds 동안 거래 일시 정지
+
 사용:
     monitor = DrawdownMonitor(max_drawdown_pct=0.15)  # 15% MDD
     monitor.update(current_equity=9500)
@@ -17,6 +21,7 @@ circuit_breaker 패턴으로 거래 차단.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Tuple
@@ -43,6 +48,9 @@ class DrawdownStatus:
     daily_drawdown_pct: float = 0.0
     weekly_drawdown_pct: float = 0.0
     monthly_drawdown_pct: float = 0.0
+    consecutive_losses: int = 0
+    size_multiplier: float = 1.0   # 포지션 사이즈 배수 (1.0=정상, 0.5=연속손실 축소)
+    cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
 
 
 class DrawdownMonitor:
@@ -52,6 +60,11 @@ class DrawdownMonitor:
       daily_limit  (기본 0.03): 일일 DD 초과 → WARNING + 거래 중단
       weekly_limit (기본 0.07): 주간 DD 초과 → HALT + 거래 중단
       monthly_limit(기본 0.15): 월간 DD 초과 → FORCE_LIQUIDATE
+
+    연속 손실 관리:
+      loss_streak_threshold (기본 3): N회 연속 손실 시 size_multiplier=0.5 적용
+      single_loss_halt_pct  (기본 0.02): 단일 거래 손실이 계좌의 N% 초과 시 쿨다운 시작
+      cooldown_seconds      (기본 3600): 쿨다운 지속 시간 (초)
     """
 
     def __init__(
@@ -61,6 +74,9 @@ class DrawdownMonitor:
         daily_limit: float = 0.03,
         weekly_limit: float = 0.07,
         monthly_limit: float = 0.15,
+        loss_streak_threshold: int = 3,
+        single_loss_halt_pct: float = 0.02,
+        cooldown_seconds: float = 3600.0,
     ) -> None:
         """
         Args:
@@ -69,12 +85,18 @@ class DrawdownMonitor:
             daily_limit:   일일 낙폭 한계 (기본 3%).
             weekly_limit:  주간 낙폭 한계 (기본 7%).
             monthly_limit: 월간 낙폭 한계 (기본 15%).
+            loss_streak_threshold: 연속 손실 N회 시 size_multiplier 0.5로 축소.
+            single_loss_halt_pct:  단일 손실이 계좌 대비 이 비율 초과 시 쿨다운 시작.
+            cooldown_seconds:      쿨다운 지속 시간 (초). 기본 1시간.
         """
         self.max_drawdown_pct = max_drawdown_pct
         self.recovery_pct = recovery_pct
         self.daily_limit = daily_limit
         self.weekly_limit = weekly_limit
         self.monthly_limit = monthly_limit
+        self.loss_streak_threshold = loss_streak_threshold
+        self.single_loss_halt_pct = single_loss_halt_pct
+        self.cooldown_seconds = cooldown_seconds
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -86,6 +108,10 @@ class DrawdownMonitor:
         self._daily_start: Optional[float] = None
         self._weekly_start: Optional[float] = None
         self._monthly_start: Optional[float] = None
+
+        # 연속 손실 + 쿨다운 상태
+        self._consecutive_losses: int = 0
+        self._cooldown_until: float = 0.0   # epoch seconds; 0=쿨다운 없음
 
     # ── 기준 잔고 설정 ─────────────────────────────────────────
 
@@ -110,6 +136,62 @@ class DrawdownMonitor:
         if start is None or start <= 0:
             return 0.0
         return max(0.0, (start - current) / start)
+
+    # ── 연속 손실 + 쿨다운 관리 ───────────────────────────────
+
+    def record_trade_result(self, pnl: float, equity: float) -> None:
+        """거래 결과 기록.
+
+        Args:
+            pnl:    거래 손익 (음수=손실, 양수=수익).
+            equity: 거래 후 계좌 잔고.
+        """
+        if pnl >= 0:
+            if self._consecutive_losses > 0:
+                logger.info(
+                    "DrawdownMonitor: 연속 손실 초기화 (이전 %d회)", self._consecutive_losses
+                )
+            self._consecutive_losses = 0
+            return
+
+        # 손실 처리
+        self._consecutive_losses += 1
+        logger.info(
+            "DrawdownMonitor: 연속 손실 %d회 (threshold=%d)",
+            self._consecutive_losses, self.loss_streak_threshold,
+        )
+
+        # 단일 손실 비율이 single_loss_halt_pct 초과 → 쿨다운 시작
+        if equity > 0:
+            loss_pct = abs(pnl) / equity
+            if loss_pct >= self.single_loss_halt_pct:
+                self._cooldown_until = time.monotonic() + self.cooldown_seconds
+                logger.warning(
+                    "DrawdownMonitor: 쿨다운 시작 — 단일 손실 %.2f%% ≥ %.2f%% "
+                    "(%.0f초 동안 거래 정지)",
+                    loss_pct * 100, self.single_loss_halt_pct * 100, self.cooldown_seconds,
+                )
+
+    def is_in_cooldown(self) -> bool:
+        """현재 시간 기반 쿨다운 중인지 여부."""
+        return time.monotonic() < self._cooldown_until
+
+    def get_size_multiplier(self) -> float:
+        """포지션 사이즈 배수 반환.
+
+        - 쿨다운 중: 0.0 (완전 차단)
+        - 연속 손실 >= threshold: 0.5 (50% 축소)
+        - 정상: 1.0
+        """
+        if self.is_in_cooldown():
+            return 0.0
+        if self._consecutive_losses >= self.loss_streak_threshold:
+            return 0.5
+        return 1.0
+
+    @property
+    def consecutive_losses(self) -> int:
+        return self._consecutive_losses
 
     # ── 메인 업데이트 ──────────────────────────────────────────
 
@@ -187,6 +269,9 @@ class DrawdownMonitor:
             daily_drawdown_pct=daily_dd,
             weekly_drawdown_pct=weekly_dd,
             monthly_drawdown_pct=monthly_dd,
+            consecutive_losses=self._consecutive_losses,
+            size_multiplier=self.get_size_multiplier(),
+            cooldown_active=self.is_in_cooldown(),
         )
 
     def _check_tiered(
@@ -240,6 +325,8 @@ class DrawdownMonitor:
         self._daily_start = None
         self._weekly_start = None
         self._monthly_start = None
+        self._consecutive_losses = 0
+        self._cooldown_until = 0.0
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:
@@ -276,6 +363,9 @@ class DrawdownMonitor:
             "daily_limit": self.daily_limit,
             "weekly_limit": self.weekly_limit,
             "monthly_limit": self.monthly_limit,
+            "loss_streak_threshold": self.loss_streak_threshold,
+            "single_loss_halt_pct": self.single_loss_halt_pct,
+            "cooldown_seconds": self.cooldown_seconds,
             "_peak": self._peak,
             "_current": self._current,
             "_halted": self._halted,
@@ -284,6 +374,8 @@ class DrawdownMonitor:
             "_daily_start": self._daily_start,
             "_weekly_start": self._weekly_start,
             "_monthly_start": self._monthly_start,
+            "_consecutive_losses": self._consecutive_losses,
+            "_cooldown_until": self._cooldown_until,
         }
 
     @classmethod
@@ -295,6 +387,9 @@ class DrawdownMonitor:
             daily_limit=data["daily_limit"],
             weekly_limit=data["weekly_limit"],
             monthly_limit=data["monthly_limit"],
+            loss_streak_threshold=data.get("loss_streak_threshold", 3),
+            single_loss_halt_pct=data.get("single_loss_halt_pct", 0.02),
+            cooldown_seconds=data.get("cooldown_seconds", 3600.0),
         )
         obj._peak = data["_peak"]
         obj._current = data["_current"]
@@ -304,4 +399,6 @@ class DrawdownMonitor:
         obj._daily_start = data["_daily_start"]
         obj._weekly_start = data["_weekly_start"]
         obj._monthly_start = data["_monthly_start"]
+        obj._consecutive_losses = data.get("_consecutive_losses", 0)
+        obj._cooldown_until = data.get("_cooldown_until", 0.0)
         return obj

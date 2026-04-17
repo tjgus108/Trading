@@ -1,5 +1,34 @@
 # Work Log
 
+## [2026-04-17] Cycle 137 — B + D + SIM + F
+
+**[B] Risk Management:**
+- DrawdownMonitor 연속 손실 감지: `loss_streak_threshold=3` (3연패 시 포지션 50% 축소)
+- 시간 기반 쿨다운: `single_loss_halt_pct=0.02`, `cooldown_seconds=3600` (큰 손실 후 1시간 거래 정지)
+- DrawdownStatus에 consecutive_losses, size_multiplier, cooldown_active 필드 추가
+- CircuitBreaker는 ATR surge/쿨다운 이미 구현 확인 → 수정 불필요
+- 테스트 60/60 통과 (신규 7개 포함)
+
+**[D] ML & Signals:**
+- BacktestEngine MIN_TRADES 15→50 상향, MIN_WFE=0.5 추가
+- BacktestResult에 wfe 필드 추가, WFE<0.5 시 fail_reasons 기록
+- WalkForwardOptimizer에 apply_wfe() 연동
+- DSR(Deflated Sharpe Ratio) 함수 구현: `deflated_sharpe_ratio_multi()` (Bailey & Lopez de Prado)
+- 테스트 50개 통과 (engine 30 + walk_forward/report 20)
+
+**[SIM] Paper Simulation:**
+- paper_simulation.py, quality_audit.py Python 3.7 호환 수정 (list[]→List[], dict[]→Dict[])
+- roc_ma_cross: _ROC_MIN_ABS 0.5%→0.3% (신호 감도 향상)
+- volatility_cluster: _LOW_VOL_THRESH 0.5→0.6 (더 많은 기회 감지)
+- PASS 전략 22/348, 평균 Sharpe=4.79, PF=1.95, Return=+9.53%
+
+**[F] Research — 실패 사례 & 포지션 사이징:**
+- 실패 사례: dogwifhat 슬리피지 $5.7M 손실, 그리드봇 regime 미대응 73% 실패, AI봇 군집 매도 $2B 청산
+- 포지션 사이징: Full Kelly 위험, Half-Kelly 과도, Quarter-Kelly 이하 권장 (BTC 변동성 30~45%)
+- 권고: ①Volatility Targeting 도입 ②전략 상관관계 ≤0.5 제한 ③Regime Detection 우선 구현
+
+---
+
 ## [2026-04-16] Cycle 135 — D + E + SIM + F
 
 **[D] ML & Signals:**

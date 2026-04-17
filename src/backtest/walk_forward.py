@@ -23,7 +23,7 @@ from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 
 import pandas as pd
 
-from src.backtest.engine import BacktestEngine, BacktestResult
+from src.backtest.engine import BacktestEngine, BacktestResult, MIN_WFE
 from src.strategy.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -183,12 +183,9 @@ class WalkForwardOptimizer:
             oos_strategy = self.strategy_factory(best_params)
             oos_result = self._engine.run(oos_strategy, oos_df)
 
-            if best_is_sharpe > 0:
-                ratio = oos_result.sharpe_ratio / best_is_sharpe
-            elif oos_result.sharpe_ratio > 0:
-                ratio = 1.0  # IS<=0 but OOS>0: non-overfit
-            else:
-                ratio = 0.0  # IS<=0 and OOS<=0: overfit
+            # WFE 계산 및 적용 (과최적화 필터)
+            BacktestEngine.apply_wfe(oos_result, best_is_sharpe)
+            ratio = oos_result.wfe
 
             wr = WindowResult(
                 window_id=i,

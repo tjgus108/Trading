@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 MIN_SHARPE = 1.0
 MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
-MIN_TRADES = 15
+MIN_TRADES = 50          # Cycle 137: 15 → 50으로 상향 (과최적화 필터)
+MIN_WFE = 0.5            # Walk-Forward Efficiency: OOS_Sharpe / IS_Sharpe 최솟값
 MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
 
 ANNUALIZATION = {
@@ -52,9 +53,11 @@ class BacktestResult:
     win_loss_ratio: float = 0.0  # avg_win / avg_loss
     max_consecutive_losses: int = 0  # 최대 연속 손실
     trades: List[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
+    wfe: float = 0.0  # Walk-Forward Efficiency = OOS_Sharpe / IS_Sharpe (0이면 미계산)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
+        wfe_str = f"{self.wfe:.3f}" if self.wfe > 0 else "N/A"
         lines = [
             f"BACKTEST_RESULT:",
             f"  strategy: {self.strategy}",
@@ -63,6 +66,7 @@ class BacktestResult:
             f"  profit_factor: {self.profit_factor:.2f}",
             f"  sharpe_ratio: {self.sharpe_ratio:.2f}",
             f"  deflated_sharpe_ratio: {self.deflated_sharpe_ratio:.2f}",
+            f"  wfe: {wfe_str}",
             f"  max_drawdown: {self.max_drawdown:.1%}",
             f"  total_return: {self.total_return:.1%}",
             f"  total_fees: {self.total_fees:.4f}",
@@ -208,6 +212,37 @@ class BacktestEngine:
 
         return self._compute_metrics(strategy.name, trades, equity_curve, total_fees, total_slippage_cost)
 
+    @staticmethod
+    def apply_wfe(result: "BacktestResult", is_sharpe: float) -> "BacktestResult":
+        """
+        WFE(Walk-Forward Efficiency)를 계산하여 BacktestResult에 적용.
+
+        WFE = OOS_Sharpe / IS_Sharpe.
+        결과의 wfe 필드를 업데이트하고 WFE < MIN_WFE이면 fail_reasons에 추가.
+        새 BacktestResult를 반환하지 않고 원본을 직접 수정(mutate).
+
+        Args:
+            result: OOS BacktestResult (engine.run() 반환값)
+            is_sharpe: in-sample 최적 Sharpe Ratio
+
+        Returns:
+            동일 result 객체 (수정됨)
+        """
+        if is_sharpe > 0:
+            wfe = result.sharpe_ratio / is_sharpe
+        elif result.sharpe_ratio > 0:
+            wfe = 1.0  # IS<=0 but OOS>0 → 과최적화 아님
+        else:
+            wfe = 0.0  # IS<=0 and OOS<=0 → 과최적화 가능
+
+        result.wfe = round(wfe, 4)
+        if wfe > 0 and wfe < MIN_WFE:
+            reason = f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)"
+            if reason not in result.fail_reasons:
+                result.fail_reasons.append(reason)
+                result.passed = False
+        return result
+
     def _check_exit(self, position: dict, candle: pd.Series) -> Tuple[float, bool, float, float]:
         """반환: (pnl, closed, fee, slippage_cost)"""
         side = position["side"]
@@ -250,7 +285,7 @@ class BacktestEngine:
             return (exit_price - entry) * size - commission_cost, commission_cost, slip_cost
         return (entry - exit_price) * size - commission_cost, commission_cost, slip_cost
 
-    def _compute_metrics(self, name: str, trades: list, equity: list, total_fees: float = 0.0, total_slippage_cost: float = 0.0) -> BacktestResult:
+    def _compute_metrics(self, name: str, trades: list, equity: list, total_fees: float = 0.0, total_slippage_cost: float = 0.0, wfe: float = 0.0) -> BacktestResult:
         if not trades:
             return BacktestResult(
                 strategy=name, total_trades=0, win_rate=0, profit_factor=0,
@@ -295,6 +330,9 @@ class BacktestEngine:
             fail_reasons.append(f"profit_factor {profit_factor:.2f} < {MIN_PROFIT_FACTOR}")
         if len(trades) < MIN_TRADES:
             fail_reasons.append(f"trades {len(trades)} < {MIN_TRADES}")
+        # WFE 필터: wfe > 0이면 과최적화 체크 (0은 미제공 = 체크 생략)
+        if wfe > 0 and wfe < MIN_WFE:
+            fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
         # avg_win, avg_loss, win_loss_ratio 계산
         avg_win_val = float(np.mean(wins)) if wins else 0.0
@@ -329,4 +367,5 @@ class BacktestEngine:
             win_loss_ratio=round(win_loss_ratio_val, 3) if win_loss_ratio_val != float("inf") else float("inf"),
             max_consecutive_losses=max_cons_loss,
             trades=trades,  # 거래 PnL 리스트 저장
+            wfe=round(wfe, 4),
         )
