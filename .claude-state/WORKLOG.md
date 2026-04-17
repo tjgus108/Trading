@@ -19,6 +19,19 @@
 - WFA 주의: 윈도우 크기 자체를 튜닝하면 안 됨 (메타 오버피팅)
 - 슬리피지 현실화: BTC top-10 0.05~0.1%, 소형 알트 0.5~2%
 
+## [2026-04-17] Cycle 141 — B + D + F
+
+**[B] Risk Management:**
+- CircuitBreaker를 live_paper_trader에 통합 (일일 3%, 전체 15% DD 한도)
+- 리스크 모듈 현황 점검: circuit_breaker, drawdown_monitor, kelly_sizer, performance_tracker 정상
+
+**[D] ML:**
+- scikit-learn 1.8.0 설치 + 호환성 수정 (CalibratedClassifierCV)
+- train_ml.py: --bybit 옵션 + 과거 방향 페이지네이션 수정
+- 3심볼 RF 학습 결과: 전부 FAIL (BTC 35.3%, ETH 35.5%, SOL 37.0%)
+- 원인: 3-class 분류 과적합 (train 64% vs test 35%)
+- 향후: 2-class 단순화, threshold 조정, max_depth 제한 필요
+
 ---
 
 ## [2026-04-17] Cycle 139 — C + B + SIM + F

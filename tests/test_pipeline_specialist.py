@@ -54,6 +54,8 @@ def _make_signal(action: Action = Action.BUY) -> Signal:
 def _make_pipeline(dry_run: bool = True) -> TradingPipeline:
     """컴포넌트를 모두 Mock으로 구성한 TradingPipeline."""
     connector = MagicMock()
+    connector.is_halted = False
+    connector.sync_positions.return_value = []
     connector.fetch_balance.return_value = {"total": {"USDT": 10000.0}}
 
     data_feed = MagicMock()

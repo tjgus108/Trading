@@ -64,9 +64,9 @@ class TradeLogger:
                 "symbol": symbol,
                 "side": side,
                 "order_id": order.get("id", ""),
-                "client_order_id": (order.get("clientOrderId")
-                                    or order.get("info", {}).get("clientOrderId", "")
-                                    if isinstance(order.get("info"), dict) else ""),
+                "client_order_id": (order.get("clientOrderId", "")
+                                    or (order.get("info", {}).get("clientOrderId", "")
+                                        if isinstance(order.get("info"), dict) else "")),
                 "price": order.get("average") or order.get("price") or "",
                 "amount": order.get("filled") or order.get("amount") or "",
                 "cost": order.get("cost") or "",

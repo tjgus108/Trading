@@ -40,3 +40,5 @@ _Last updated: 2026-04-17 (멀티심볼 live paper trader 배포)_
 - ~~Regime Detection 구현~~ → 이전 세션 완료 (ADX+EMA+ATR)
 - 전략 상관관계 모니터링
 - OOS 기간 확장 (1개월 → 3개월)
+- ML RF 모델 개선: 3-class → 2-class, threshold 0.003→0.01, max_depth 제한
+- live paper trader에 ML 시그널 연동 (모델 PASS 이후)
