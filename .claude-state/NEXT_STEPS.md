@@ -82,10 +82,13 @@ _Last updated: 2026-04-18 (Cycle 147 - 레짐 포지션 사이징 + PFI 완료)_
 - ~~TWAP 실행기 검증~~ — 기본 동작 정상, 안정성 개선 ✅
 - ~~합성 데이터 GARCH 교체~~ — GARCH(1,1) + Student-t, kurtosis ≥ 5.0 ✅
 - ~~데이터 품질 통계 로깅~~ — kurtosis, skewness 모니터링 ✅
+- ~~레짐 기반 동적 포지션 사이징~~ — TREND_UP 1.3x, HIGH_VOL 0.3x, DD한도 연동 ✅
+- ~~ML PFI 분석 자동화~~ — feature_importance JSON 저장 ✅
+- ~~LSTM BooleanArray 수정~~ — pandas ExtensionArray 호환 ✅
 
 **다음 구현 과제 (우선순위):**
 1. **ML 모델 실제 생성** — BTC/ETH/SOL에서 1000캔들 WF로 PASS 모델 학습 & 저장
-2. **Regime 기반 동적 포지션 사이징** — TREND_UP에서 +30%, TREND_DOWN에서 -50% 또는 숏만 활성화
-3. **live_paper_trader 검증 실행** — 7일 운영 (--days 7 --ml-filter 옵션)
-4. 전략 상관관계 모니터링
-5. 데이터 품질 임계값 설정 (kurtosis < 2.0이면 경고)
+2. **live_paper_trader 검증 실행** — 7일 운영 (`--days 7 --ml-filter`)
+3. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, 과집중 경고
+4. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2) 
+5. **데이터 품질 임계값** — kurtosis < 2.0 → 경고
