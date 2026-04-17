@@ -29,6 +29,7 @@ def parse_args():
     p.add_argument("--model", choices=["rf", "lstm"], default="rf")
     p.add_argument("--limit", type=int, default=1000)
     p.add_argument("--demo", action="store_true", help="MockExchangeConnector 사용")
+    p.add_argument("--bybit", action="store_true", help="ccxt Bybit 직접 fetch (API 키 불필요)")
     return p.parse_args()
 
 
@@ -90,13 +91,58 @@ def train_lstm(df, symbol: str):
     return result
 
 
+def fetch_bybit(symbol: str, timeframe: str, limit: int):
+    """ccxt Bybit에서 직접 fetch (API 키 불필요). 과거 방향 페이지네이션."""
+    import ccxt
+    import pandas as pd
+    import time as _time
+
+    tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+    interval_ms = tf_ms.get(timeframe, 3_600_000)
+
+    ex = ccxt.bybit()
+    ex.timeout = 30000
+    now_ms = int(_time.time() * 1000)
+    since = now_ms - limit * interval_ms
+    all_ohlcv = []
+    stall = 0
+    while len(all_ohlcv) < limit and since < now_ms:
+        batch = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=1000)
+        if not batch:
+            stall += 1
+            if stall >= 3:
+                break
+            since += 1000 * interval_ms
+            continue
+        stall = 0
+        all_ohlcv.extend(batch)
+        since = batch[-1][0] + interval_ms
+        _time.sleep(0.3)
+    seen = set()
+    deduped = []
+    for row in all_ohlcv:
+        if row[0] not in seen:
+            seen.add(row[0])
+            deduped.append(row)
+    deduped.sort(key=lambda x: x[0])
+    deduped = deduped[:limit]
+    df = pd.DataFrame(deduped, columns=["timestamp", "open", "high", "low", "close", "volume"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+    df = df.set_index("timestamp").sort_index()
+    logger.info("Bybit: fetched %d candles (%s ~ %s)", len(df), df.index[0], df.index[-1])
+    return df
+
+
 def main():
     args = parse_args()
-    logger.info("train_ml.py: symbol=%s timeframe=%s model=%s limit=%d demo=%s",
-                args.symbol, args.timeframe, args.model, args.limit, args.demo)
+    logger.info("train_ml.py: symbol=%s timeframe=%s model=%s limit=%d",
+                args.symbol, args.timeframe, args.model, args.limit)
 
-    connector = get_connector(args.symbol, args.demo)
-    df = fetch_df(connector, args.symbol, args.timeframe, args.limit)
+    if args.bybit:
+        df = fetch_bybit(args.symbol, args.timeframe, args.limit)
+    else:
+        connector = get_connector(args.symbol, args.demo)
+        df = fetch_df(connector, args.symbol, args.timeframe, args.limit)
 
     if args.model == "rf":
         train_rf(df, args.symbol)

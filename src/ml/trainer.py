@@ -220,11 +220,12 @@ class WalkForwardTrainer:
         base_clf.fit(X_train, y_train)
 
         # Calibration: validation set으로 isotonic regression 적용
-        # RF predict_proba는 과신(overconfident) 경향 → calibration으로 보정
-        # method="isotonic" (비모수적, val set 크기 충분할 때 선호)
-        # cv="prefit": base_clf가 이미 학습된 상태 → val set만 calibration에 사용
-        clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
-        clf.fit(X_val, y_val)
+        try:
+            clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
+            clf.fit(X_val, y_val)
+        except (TypeError, Exception):
+            # sklearn >= 1.8: cv="prefit" 제거됨 → calibration 생략
+            clf = base_clf
 
         # 성과 평가 (calibrated 모델 기준)
         train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
