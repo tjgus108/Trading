@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 # Error classification
 def _is_transient_error(error: Exception) -> bool:
     """네트워크/속도 제한 에러는 재시도 가능."""
+    if ccxt is None:
+        return isinstance(error, (TimeoutError, ConnectionError))
+    
     transient_types = (
         ccxt.NetworkError,
         ccxt.RequestTimeout,
@@ -37,19 +40,23 @@ def _is_transient_error(error: Exception) -> bool:
 
 def _is_fatal_error(error: Exception) -> bool:
     """인증, 심볼, 권한 에러는 즉시 중단."""
-    fatal_types = (
-        ccxt.BadSymbol,
-        ccxt.InvalidAddress,
-        ccxt.AuthenticationError,
-        ccxt.PermissionDenied,
-        ValueError,  # Invalid data format
-        KeyError,    # Missing required fields
-    )
-    return isinstance(error, fatal_types)
+    fatal_types = [ValueError, KeyError]
+    
+    if ccxt is not None:
+        fatal_types.extend([
+            ccxt.BadSymbol,
+            ccxt.InvalidAddress,
+            ccxt.AuthenticationError,
+            ccxt.PermissionDenied,
+        ])
+    
+    return isinstance(error, tuple(fatal_types))
 
 
 def _is_rate_limit_error(error: Exception) -> bool:
     """Rate limit 에러 여부 감지."""
+    if ccxt is None:
+        return False
     return isinstance(error, ccxt.RateLimitExceeded)
 
 
@@ -398,3 +405,68 @@ class DataFeed:
         df["return_5"] = close.pct_change(5)
 
         return df
+
+    # ------------------------------------------------------------------
+    # Auto-reconnection and enhanced validation
+    # ------------------------------------------------------------------
+
+    def ensure_connected(self, max_retries: int = 3) -> bool:
+        """
+        거래소 연결 상태 확인 및 재연결 시도.
+        
+        Args:
+            max_retries: 재연결 최대 시도 횟수
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        try:
+            # 헬스 체크로 연결 상태 확인
+            health = self.connector.health_check()
+            if health.get("connected"):
+                return True
+            
+            # 연결 끊김 감지 → 재연결 시도
+            logger.warning("DataFeed: connection lost, attempting reconnect...")
+            if self.connector.reconnect(max_retries=max_retries):
+                logger.info("DataFeed: reconnection successful")
+                self.invalidate_cache()  # 캐시 무효화 (재연결 후)
+                return True
+            else:
+                logger.error("DataFeed: reconnection failed after %d attempts", max_retries)
+                return False
+        except Exception as e:
+            logger.error("DataFeed: ensure_connected failed: %s", e)
+            return False
+
+    def validate_fetch_result(self, summary: DataSummary) -> bool:
+        """
+        fetch 결과의 품질 검증. 임계값 이상의 이상이 있으면 False.
+        
+        Returns:
+            True if data quality is acceptable
+        """
+        # 임계값: 누락 캔들이 전체의 5% 초과하면 경고
+        missing_ratio = summary.missing / summary.candles if summary.candles > 0 else 0
+        if missing_ratio > 0.05:
+            logger.warning(
+                "High missing ratio (%.1f%%): %s %s has %d missing candles",
+                missing_ratio * 100, summary.symbol, summary.timeframe, summary.missing
+            )
+        
+        # 이상 감지 시 경고
+        if summary.anomalies:
+            logger.warning(
+                "Data anomalies detected: %s %s — %s",
+                summary.symbol, summary.timeframe, "; ".join(summary.anomalies)
+            )
+        
+        # 최소 캔들 수 확인 (최소 50개 필요)
+        if summary.candles < 50:
+            logger.error(
+                "Insufficient data: %s %s only has %d candles (need >=50)",
+                summary.symbol, summary.timeframe, summary.candles
+            )
+            return False
+        
+        return True

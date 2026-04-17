@@ -50,6 +50,43 @@ class LivePerformanceTracker:
         annualization = sqrt(252)
         return mean_pnl / std_pnl * annualization
 
+    def rolling_sharpe_check(
+        self,
+        strategy: str,
+        window: int = 30,
+        warn_threshold: float = 0.5,
+        disable_threshold: float = 0.0,
+    ) -> dict:
+        """Rolling Sharpe 기반 전략 상태 플래그 반환.
+
+        Returns:
+            {
+              "sharpe":  float | None,   — 계산된 Rolling Sharpe (거래 수 < 5 시 None)
+              "warn":    bool,           — Sharpe < warn_threshold (기본 0.5) 시 True
+              "disable": bool,           — Sharpe < disable_threshold (기본 0.0) 시 True
+              "reason":  str,            — 플래그 발생 시 설명
+            }
+        """
+        sharpe = self.get_live_sharpe(strategy, window=window)
+        if sharpe is None:
+            return {"sharpe": None, "warn": False, "disable": False, "reason": "insufficient_data"}
+
+        if sharpe < disable_threshold:
+            return {
+                "sharpe": sharpe,
+                "warn": True,
+                "disable": True,
+                "reason": f"Rolling Sharpe {sharpe:.3f} < disable_threshold {disable_threshold} — 전략 비활성화 권고",
+            }
+        if sharpe < warn_threshold:
+            return {
+                "sharpe": sharpe,
+                "warn": True,
+                "disable": False,
+                "reason": f"Rolling Sharpe {sharpe:.3f} < warn_threshold {warn_threshold} — 경고",
+            }
+        return {"sharpe": sharpe, "warn": False, "disable": False, "reason": ""}
+
     def check_degradation(
         self, strategy: str, backtest_sharpe: float
     ) -> Optional[str]:

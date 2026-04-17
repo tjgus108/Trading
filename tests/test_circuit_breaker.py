@@ -6,7 +6,7 @@ from src.risk.circuit_breaker import CircuitBreaker
 # ── 기본 생성 ──────────────────────────────────────────────
 def test_default_limits():
     cb = CircuitBreaker()
-    assert cb.daily_drawdown_limit == 0.05
+    assert cb.daily_drawdown_limit == 0.03
     assert cb.total_drawdown_limit == 0.15
 
 

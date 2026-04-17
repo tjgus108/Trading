@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class CircuitBreaker:
     def __init__(
         self,
-        daily_drawdown_limit: float = 0.05,   # -5% 일일 낙폭
+        daily_drawdown_limit: float = 0.03,   # -3% 일일 낙폭 (config max_daily_loss)
         total_drawdown_limit: float = 0.15,   # -15% 전체 낙폭
         atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
         corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소

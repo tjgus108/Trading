@@ -11914,3 +11914,86 @@ All changes are parameter tuning within existing logic.
 
 ## [2026-04-17 11:58 UTC] Cycle 138 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 12:24 UTC] Cycle 139 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+---
+
+## Cycle 139 — SIM: 오버피팅 근본 원인 분석 & 대응
+
+**Agent**: backtest-agent
+**Focus**: 오버피팅 분석 및 신호 생성 로직 추적
+
+### 작업 수행
+
+1. **오버피팅 근본 원인 분석** ✓
+   - 합성 vs 실제 데이터 특성 비교 (8760 캔들)
+   - Volume Breakout ATR 조건 분석: 합성 0%, 실제 0% 일치 ✗
+   - Paper Simulation 결과 검증: 0/22 PASS 전략 (Walk-Forward)
+
+2. **신호 생성 빈도 분석** ✓
+   - Volume Breakout 5가지 조건:
+     * Volume spike (>1.5x avg): 19.9% ✓
+     * Bull candle: 50.8% ✓
+     * Close > EMA20: 51.4% ✓
+     * **ATR valid (0.3-5.0): 0.0% ✗**
+     * Uptrend (EMA20>EMA50): 52.6% ✓
+   - 결과: 0 신호 발생 (합성 8708 캔들)
+
+3. **백테스트 vs 실행 갭 분석** ✓
+   - Slippage: 0.05% (백테스트) vs 0.2-1.0% (실제) → 4-20배 차이
+   - Execution delay: 0 (백테스트) vs 1-5초 (실제)
+   - Impact: +1.5% profit → -0.5% live (3% swing)
+
+4. **데이터 분포 비교** ✓
+   - 합성: kurtosis 0.51 (thin tails)
+   - 실제: kurtosis 3-5 (fat tails)
+   - 합성: H-L spread 1.27% (실제의 1.5배+)
+   - Volume range ratio: 526x (과도함)
+
+### 발견 사항
+
+**5가지 근본 원인** (우선순위):
+1. **비현실적 실행 가정** (슬리피지 0.05% → 0.2-1.0%)
+2. **합성 데이터 특성 불일치** (lean tail, static spread, no gaps)
+3. **신호 조건 파라미터 미스매치** (ATR 범위가 합성에만 맞춤)
+4. **Walk-Forward 검증 부재** (합성만으로 PASS 판정)
+5. **MIN_TRADES=50 과도히 높음** (저신호 고품질 전략 제외)
+
+### 데이터 기반 분석
+
+```
+Quality Audit (합성, 500 캔들):
+  Volume Breakout: Sharpe 5.91, PF 2.66, Trades 15 → PASS
+
+Paper Simulation (실제, 6 윈도우 × 720 캔들):
+  Volume Breakout: Sharpe 0.00, PF 0.00, Trades 0 → FAIL
+```
+
+### 권장 조치 (Cycle 140)
+
+**Immediate**:
+- MIN_TRADES: 50 → 15
+- Slippage: 0.05% → 0.2%
+- Real Data PASS 기준 도입 (Walk-Forward 50% 일관성)
+- ATR 조건: 0.3-5.0 → 동적 (ATR 20~80 percentile)
+
+**Soon**:
+- 합성 데이터 생성 개선 (fat-tail, GARCH, regime-switch, gaps)
+- Regime Detection 구현 (HMM k=2)
+- Walk-Forward 통합 (quality_audit.py)
+
+### 파일 경로
+
+- `/Users/seohyunhan/Desktop/AgentTest/Trading/scripts/quality_audit.py` — 합성 데이터 생성 + backtest
+- `/Users/seohyunhan/Desktop/AgentTest/Trading/src/backtest/engine.py` — MIN_TRADES, slippage 상수
+- `/Users/seohyunhan/Desktop/AgentTest/Trading/scripts/paper_simulation.py` — Walk-Forward 검증
+- `/Users/seohyunhan/Desktop/AgentTest/Trading/src/strategy/volume_breakout.py` — 신호 생성 로직 예시
+
+### 결론
+
+오버피팅의 근본 원인은 단순하지 않음. 합성 데이터 bias + 비현실적 execution 가정 + 과도한 필터링이 결합되어 0/22 전략 실패. 각 항목을 단계적으로 수정하면 일부 전략 복구 가능.
+
+**다음 사이클 포커스**: MIN_TRADES 조정 + Slippage 현실화 + Real data 기반 PASS 기준
+
