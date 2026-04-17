@@ -5,9 +5,14 @@ ExchangeConnector.check_api_permissions() 단위 테스트.
 
 import logging
 from unittest.mock import MagicMock, patch
-
-import ccxt
 import pytest
+
+try:
+    import ccxt
+    HAS_CCXT = True
+except ImportError:
+    HAS_CCXT = False
+    ccxt = None
 
 from src.exchange.connector import ExchangeConnector
 
@@ -21,6 +26,7 @@ def _make_connector() -> ExchangeConnector:
     return conn
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 class TestCheckApiPermissions:
     def test_no_withdraw_logs_info(self, caplog):
         """출금 권한이 없으면 INFO 로그를 남기고 빈 withdraw=False를 반환한다."""

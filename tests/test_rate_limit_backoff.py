@@ -4,12 +4,19 @@ RateLimitExceeded 감지 시 긴 backoff 사용 검증.
 """
 
 from unittest.mock import MagicMock, patch
-import ccxt
 import pytest
+
+try:
+    import ccxt
+    HAS_CCXT = True
+except ImportError:
+    HAS_CCXT = False
+    ccxt = None
 
 from src.data.feed import DataFeed, _is_rate_limit_error, _backoff_with_rate_limit
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 class TestRateLimitBackoff:
     """Rate limit 에러 처리 테스트."""
 

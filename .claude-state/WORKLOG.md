@@ -1,5 +1,32 @@
 # Work Log
 
+## [2026-04-17] Cycle 138 — E + A + SIM + F
+
+**[E] Execution:**
+- Volatility Targeting 포지션 사이징: `volatility_targeted_position_size()`, `kelly_with_vol_targeting()` 추가 (src/risk/position_sizer.py)
+- TWAP + DrawdownMonitor 연동: `execute_with_drawdown_protection()` (src/exchange/twap.py)
+- 쿨다운 시 주문 거부, 연속손실 시 50% 축소 반영
+- 테스트 24개 추가 (vol_targeting 16 + twap_drawdown 8), 전체 171개 관련 테스트 PASS
+
+**[A] Quality Assurance:**
+- Collection error 3개 수정: test_api_key_permissions, test_connector, test_rate_limit_backoff (ccxt SSL skipif marker)
+- BacktestEngine MIN_TRADES=50, WFE>0.5, DrawdownMonitor 호환성 검증 완료
+- 테스트 75개 검증 (engine 30 + walk_forward 15 + drawdown 30)
+
+**[SIM] Paper Simulation — ⚠️ 심각한 오버피팅 확인:**
+- 실제 거래소 데이터(Bybit)로 22개 PASS 전략 walk-forward 시뮬레이션 → **전부 실패**
+- BTC/USDT: 0/22 PASS, 평균 -7.25% | ETH/USDT: 0/22, -4.61% | SOL/USDT: 0/22, -5.92%
+- Sharpe 모두 음수, PF 모두 1.5 이하, 거래 수 극소
+- 결론: 합성 데이터와 실제 데이터 간 심각한 괴리. 전략 신호 생성 로직 전면 재검토 필요
+
+**[F] Research — 운영 실패 & 알파 감쇠:**
+- 운영 실패 사례: 설정 오류 35% 손실, HFT 레이턴시 슬리피지 3~5배, 그리드봇 regime 미대응
+- 실전 배포 체크리스트: 백테스트→페이퍼(4~8주)→소액→본격, 각 단계 필수 검증 항목
+- 알파 감쇠: 평균 12개월, Rolling Sharpe 30일 < 0.5 시 황색 경보
+- 권고: ①Circuit Breaker 일일손실 -3%/MDD -15% ②Rolling Sharpe 모니터 ③테스트넷/실전 환경 분리
+
+---
+
 ## [2026-04-17] Cycle 137 — B + D + SIM + F
 
 **[B] Risk Management:**
@@ -11884,3 +11911,6 @@ All changes are parameter tuning within existing logic.
 32 related tests pass (18 + 14).
 
 ---
+
+## [2026-04-17 11:58 UTC] Cycle 138 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -307,3 +307,89 @@ class TWAPExecutor:
                 base *= 0.95  # 매도 시 약간 완화
 
         return base + half_spread
+
+    def execute_with_drawdown_protection(
+        self,
+        connector,
+        symbol: str,
+        side: str,
+        total_qty: float,
+        price_limit: Optional[float] = None,
+        drawdown_monitor=None,
+    ) -> TWAPResult:
+        """DrawdownMonitor 연동 TWAP 실행.
+
+        DrawdownMonitor의 상태에 따라 주문을 거부하거나 사이즈를 축소한다:
+          - is_in_cooldown(): 주문 완전 거부 (total_qty=0 → 빈 결과)
+          - get_size_multiplier() < 1.0: 사이즈 축소 적용
+
+        Args:
+            connector: 거래소 커넥터
+            symbol: 심볼
+            side: "buy" | "sell"
+            total_qty: 원청 총 주문 수량
+            price_limit: 제한 가격
+            drawdown_monitor: DrawdownMonitor 인스턴스. None이면 제약 없음.
+
+        Returns:
+            TWAPResult. 쿨다운 중이면 slices_executed=0, filled_qty=0.
+
+        Raises:
+            ValueError: 입력 검증 실패 시
+        """
+        # DrawdownMonitor 체크
+        if drawdown_monitor is not None:
+            # 1. 쿨다운 중이면 완전 차단
+            if drawdown_monitor.is_in_cooldown():
+                logger.warning(
+                    "TWAP execute_with_drawdown_protection: cooldown_active, rejecting order"
+                )
+                return TWAPResult(
+                    slices_executed=0,
+                    avg_price=0.0,
+                    total_qty=total_qty,
+                    filled_qty=0.0,
+                    estimated_slippage_pct=0.0,
+                    dry_run=self.dry_run,
+                    partial_fills=0,
+                    timeout_occurred=False,
+                    avg_execution_time=0.0,
+                    errors=1,
+                )
+
+            # 2. size_multiplier 적용 (연속 손실 축소 등)
+            size_mult = drawdown_monitor.get_size_multiplier()
+            adjusted_qty = total_qty * size_mult
+            if adjusted_qty < total_qty:
+                logger.info(
+                    "TWAP execute_with_drawdown_protection: size_multiplier=%.2f, "
+                    "qty adjusted %.6f → %.6f",
+                    size_mult, total_qty, adjusted_qty,
+                )
+                total_qty = adjusted_qty
+
+        # 표준 TWAP 실행
+        if total_qty <= 0:
+            logger.warning(
+                "TWAP execute_with_drawdown_protection: total_qty <= 0 after adjustment"
+            )
+            return TWAPResult(
+                slices_executed=0,
+                avg_price=0.0,
+                total_qty=0.0,
+                filled_qty=0.0,
+                estimated_slippage_pct=0.0,
+                dry_run=self.dry_run,
+                partial_fills=0,
+                timeout_occurred=False,
+                avg_execution_time=0.0,
+                errors=1,
+            )
+
+        return self.execute(
+            connector=connector,
+            symbol=symbol,
+            side=side,
+            total_qty=total_qty,
+            price_limit=price_limit,
+        )

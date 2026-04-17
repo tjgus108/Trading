@@ -5,9 +5,14 @@ ExchangeConnector.check_api_permissions 단위 테스트.
 
 import logging
 from unittest.mock import MagicMock, patch
-
 import pytest
-import ccxt
+
+try:
+    import ccxt
+    HAS_CCXT = True
+except ImportError:
+    HAS_CCXT = False
+    ccxt = None
 
 from src.exchange.connector import ExchangeConnector
 
@@ -19,6 +24,7 @@ def _make_connector() -> ExchangeConnector:
     return conn
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_check_permissions_no_withdraw(caplog):
     """출금 권한 없음 → CRITICAL 없이 INFO 로그, dict 반환."""
     conn = _make_connector()
@@ -40,6 +46,7 @@ def test_check_permissions_no_withdraw(caplog):
     assert any("passed" in r.message for r in caplog.records)
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_check_permissions_withdraw_enabled(caplog):
     """출금 권한 있음 → CRITICAL 경고 로그 발생."""
     conn = _make_connector()
@@ -58,6 +65,7 @@ def test_check_permissions_withdraw_enabled(caplog):
     assert "WITHDRAW" in critical_msgs[0].message
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_check_permissions_not_supported(caplog):
     """fetchApiKeyPermissions 미지원 거래소 → 빈 dict 반환 + WARNING."""
     conn = _make_connector()
@@ -147,6 +155,7 @@ def test_health_check_exception_handling():
 
 # ── create_order 재시도 테스트 ─────────────────────────────────────────────
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_create_order_retries_on_network_error():
     """NetworkError 1회 후 성공 → 재시도 후 정상 반환."""
     conn = _make_connector()
@@ -162,6 +171,7 @@ def test_create_order_retries_on_network_error():
     assert conn._exchange.create_market_order.call_count == 2
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_create_order_raises_after_max_retries():
     """NetworkError가 max_retries(2)번 계속되면 예외 전파."""
     conn = _make_connector()
@@ -175,6 +185,7 @@ def test_create_order_raises_after_max_retries():
 
 # ── fetch_balance 견고성 테스트 ────────────────────────────────────────────
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_fetch_balance_none_response(caplog):
     """fetch_balance가 None을 반환할 때 안전한 기본값을 돌려준다."""
     conn = _make_connector()
@@ -187,6 +198,7 @@ def test_fetch_balance_none_response(caplog):
     assert any("unexpected" in r.message for r in caplog.records)
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_fetch_balance_exception(caplog):
     """fetch_balance 호출 중 예외 발생 시 안전한 기본값을 돌려준다."""
     conn = _make_connector()
@@ -201,6 +213,7 @@ def test_fetch_balance_exception(caplog):
 
 # ── fetch_ohlcv / fetch_ticker 재시도 테스트 ──────────────────────────────
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_fetch_ohlcv_retries_on_network_error():
     """fetch_ohlcv: NetworkError 1회 후 성공 → 재시도로 정상 반환."""
     conn = _make_connector()
@@ -218,6 +231,7 @@ def test_fetch_ohlcv_retries_on_network_error():
     assert conn._exchange.fetch_ohlcv.call_count == 2
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_fetch_ohlcv_raises_after_retries():
     """fetch_ohlcv: 모든 재시도 실패 → 예외 전파."""
     conn = _make_connector()
@@ -231,6 +245,7 @@ def test_fetch_ohlcv_raises_after_retries():
     assert conn._exchange.fetch_ohlcv.call_count == 2
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_fetch_ticker_retries_on_timeout():
     """fetch_ticker: RequestTimeout 1회 후 성공."""
     conn = _make_connector()
@@ -248,6 +263,7 @@ def test_fetch_ticker_retries_on_timeout():
     assert conn._exchange.fetch_ticker.call_count == 2
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_create_order_exponential_backoff():
     """create_order: 재시도 시 exponential backoff 적용 확인."""
     conn = _make_connector()
@@ -351,6 +367,7 @@ def test_call_with_deadline_returns_on_success():
     assert result == 42
 
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_call_with_deadline_raises_on_hang():
     """함수가 타임아웃 초과 시 RequestTimeout 발생."""
     import time as _time
@@ -365,6 +382,7 @@ def test_call_with_deadline_raises_on_hang():
 
 # ── _timed_call 강제 타임아웃 테스트 ─────────────────────────────────────
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_timed_call_timeout_increments_consecutive_failures():
     """API 호출이 hang 시 consecutive_failures가 증가하고 RequestTimeout 발생."""
     import time as _time
@@ -399,6 +417,7 @@ def test_connector_passes_timeout_to_ccxt():
 
 # ── pipeline 타임아웃 테스트 ─────────────────────────────────────────────
 
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
 def test_pipeline_timeout_returns_error():
     """파이프라인 실행이 타임아웃되면 ERROR 결과 반환."""
     import time as _time
