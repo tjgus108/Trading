@@ -11816,3 +11816,42 @@ Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-16 14:36 UTC] Cycle 135 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-16 20:44 UTC] Cycle 136 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 11:28 UTC] Cycle 137 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17] Cycle 137 — B + D + SIM + F
+
+**[SIM] Paper Simulation & Auto-improve:**
+
+Infrastructure Fix:
+- Fixed type hints incompatibility in `scripts/paper_simulation.py` and `scripts/quality_audit.py`
+  - Replaced Python 3.10+ syntax (e.g., `list[...]`, `dict[...]`, `|` union types)
+  - Added `from typing import List, Dict, Tuple, Optional` imports
+  - Both scripts now run on Python 3.7+ without "'type' object is not subscriptable" errors
+
+Strategy Improvements (targeting 2 worst PASS performers):
+1. **roc_ma_cross**: Relaxed ROC_MIN_ABS threshold 0.5% → 0.3%
+   - Rationale: Sharpe=3.0 (lowest among PASS), PF=1.58 (minimum acceptable), Return=+4.92%
+   - Change: More sensitive signal detection to increase trade count
+   - Tests: All 18 tests PASS
+
+2. **volatility_cluster**: Increased _LOW_VOL_THRESH 0.5 → 0.6
+   - Rationale: Sharpe=3.4, PF=1.70, Return=+5.46% (2nd worst)
+   - Change: Higher vol_ratio threshold allows more signal opportunities
+   - Tests: All 14 tests PASS
+
+Quality Metrics Analysis (QUALITY_AUDIT.csv, 500-candle synthetic data):
+- Total PASS strategies: 22 out of 348 (6.3%)
+- Avg Return: +9.53%, Avg Sharpe: 4.79, Avg PF: 1.95, Avg Trades: 23
+- Top performers: wick_reversal (+16.83%), cmf (+15.57%), momentum_quality (+12.46%)
+- Worst performers (improved): roc_ma_cross (+4.92%), volatility_cluster (+5.46%)
+
+No new strategy files created (per project rules).
+All changes are parameter tuning within existing logic.
+32 related tests pass (18 + 14).
+
+---
