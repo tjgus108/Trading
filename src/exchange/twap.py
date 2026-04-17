@@ -227,6 +227,10 @@ class TWAPExecutor:
                         "slice %d/%d FAILED after %d retries — skipping",
                         i + 1, self.n_slices, self.max_retries_per_slice,
                     )
+                    # 실패한 슬라이스는 filled_qty = 0으로 기록
+                    if not filled_prices:  # 이번 슬라이스에서 처음 실패
+                        filled_prices.append(0.0)
+                        filled_quantities.append(0.0)
                 if timeout_occurred:
                     break
 

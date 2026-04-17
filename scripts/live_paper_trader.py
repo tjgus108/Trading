@@ -14,6 +14,12 @@ Live Paper Trader — 며칠간 연속 운영하는 실시간 모의거래 시�
 7. 상태를 파일에 저장해 중단 후 재시작 가능
 
 정지: Ctrl+C (graceful shutdown, 상태 저장)
+
+옵션:
+    --days N: 운영 기간 (기본 7일)
+    --interval S: tick 간격 (기본 3600초)
+    --reset: 상태 파일 초기화 후 시작
+    --ml-filter: ML 모델 기반 시그널 필터 활성화 (PASS 모델 자동 로드)
 """
 from __future__ import annotations
 
@@ -139,6 +145,101 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# ── ML 모델 로드 및 시그널 ──────────────────────────────
+
+def load_ml_model(symbol: str) -> Optional[tuple]:
+    """
+    최신 ML 바이너리 모델 로드.
+    
+    Returns:
+        (model, scaler) 또는 None
+    """
+    try:
+        import joblib
+        
+        model_dir = ROOT / "models"
+        if not model_dir.exists():
+            return None
+            
+        # symbol에서 '/' 제거 (BTC/USDT -> BTCUSDT)
+        sym_clean = symbol.replace("/", "")
+        
+        # 최신 *_rf_binary.pkl 찾기
+        pattern = f"{sym_clean}_*_rf_binary.pkl"
+        models = sorted(model_dir.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+        
+        if not models:
+            return None
+        
+        model_path = models[0]
+        model = joblib.load(model_path)
+        
+        # scaler 찾기
+        scaler_path = model_path.with_name(model_path.stem.replace("_rf_binary", "_scaler") + ".pkl")
+        scaler = None
+        if scaler_path.exists():
+            scaler = joblib.load(scaler_path)
+        
+        logger.info("Loaded ML model for %s: %s (scaler=%s)", symbol, model_path.name, scaler is not None)
+        return (model, scaler)
+    except ImportError:
+        logger.debug("joblib not available; ML filtering disabled")
+        return None
+    except Exception as e:
+        logger.debug("ML model load failed for %s: %s", symbol, str(e)[:100])
+        return None
+
+
+def get_ml_features(df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """
+    ML 모델이 기대하는 피처 생성.
+    
+    기본 피처:
+    - rsi14, atr14, sma20, ema50, bb_upper, bb_lower, volume_sma20, return_5, macd, vwap
+    """
+    try:
+        required = ["rsi14", "atr14", "sma20", "ema50", "bb_upper", "bb_lower", 
+                   "volume_sma20", "return_5", "macd", "vwap"]
+        
+        missing = [col for col in required if col not in df.columns]
+        if missing:
+            return None
+        
+        # 최근 100캔들로 피처 준비
+        features = df[required].tail(100).copy()
+        if len(features) < 50:  # 최소 50캔들 필요
+            return None
+        
+        return features
+    except Exception:
+        return None
+
+
+def predict_ml_signal(model: object, features: pd.DataFrame, scaler=None) -> Optional[tuple]:
+    """
+    ML 모델로 예측 (UP/DOWN).
+    
+    Returns:
+        ('UP', confidence) or ('DOWN', confidence) 또는 None (예측 실패 시)
+    """
+    try:
+        X = features.iloc[-1:].values  # 최신 1캔들만 사용
+        
+        if scaler is not None:
+            X = scaler.transform(X)
+        
+        pred = model.predict(X)[0]  # 0 또는 1
+        prob = model.predict_proba(X)[0]
+        
+        label = 'UP' if pred == 1 else 'DOWN'
+        confidence = max(prob[0], prob[1])
+        
+        return (label, confidence)
+    except Exception:
+        return None
+
+
+
 # ── 전략 로드 ──────────────────────────────────────────
 
 def load_pass_strategies() -> list[tuple[str, str]]:
@@ -242,6 +343,8 @@ class LivePaperTrader:
         )
         self._daily_start_balance: float = self.state.portfolio_balance
         self.running = True
+        self.ml_filter_enabled = False  # --ml-filter 옵션으로 활성화
+        self.ml_models: dict[str, tuple] = {}  # symbol -> (model, scaler)
         self._df_caches: dict[str, pd.DataFrame] = {}  # symbol -> df
 
         signal.signal(signal.SIGINT, self._handle_shutdown)
@@ -286,6 +389,15 @@ class LivePaperTrader:
 
             self.symbol_strategies[symbol] = sym_strats
             self.state.active_strategies[symbol] = list(sym_strats.keys())
+
+            # ML 모델 로드 (옵셔널)
+            if self.ml_filter_enabled:
+                ml_result = load_ml_model(symbol)
+                if ml_result:
+                    self.ml_models[symbol] = ml_result
+                    logger.info("[%s] ML model loaded", symbol)
+                else:
+                    logger.info("[%s] ML model not found (fallback to strategy-only)", symbol)
 
             df = fetch_latest_candles(symbol=symbol, limit=WARMUP_CANDLES)
             if df is not None:
@@ -398,6 +510,23 @@ class LivePaperTrader:
                 sig = strategy.generate(df)
                 if sig.action == Action.HOLD:
                     continue
+                
+                # ML 필터 적용 (활성화된 경우)
+                if self.ml_filter_enabled and symbol in self.ml_models:
+                    model, scaler = self.ml_models[symbol]
+                    ml_features = get_ml_features(df)
+                    if ml_features is not None:
+                        ml_pred = predict_ml_signal(model, ml_features, scaler)
+                        if ml_pred:
+                            ml_label, ml_conf = ml_pred
+                            # BUY는 DOWN 예측 시 차단, SELL은 UP 예측 시 차단
+                            if (sig.action == Action.BUY and ml_label == "DOWN") or \
+                               (sig.action == Action.SELL and ml_label == "UP"):
+                                logger.info("  [%s:%s] ML filtered: %s @ %s (confidence=%.2f)",
+                                           symbol, name, ml_label, sig.action.value, ml_conf)
+                                continue
+                            logger.debug("  [%s:%s] ML OK: %s @ %s (confidence=%.2f)",
+                                        symbol, name, ml_label, sig.action.value, ml_conf)
 
                 atr = float(latest["atr14"])
                 if atr <= 0:
@@ -652,6 +781,7 @@ def main():
     parser.add_argument("--days", type=int, default=DEFAULT_DAYS, help="운영 기간 (일)")
     parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL, help="체크 간격 (초)")
     parser.add_argument("--reset", action="store_true", help="상태 초기화 후 시작")
+    parser.add_argument("--ml-filter", action="store_true", help="ML 모델 시그널 필터 활성화")
     args = parser.parse_args()
 
     if args.reset and LIVE_STATE_PATH.exists():
@@ -659,6 +789,7 @@ def main():
         logger.info("State reset.")
 
     trader = LivePaperTrader(days=args.days, interval=args.interval)
+    trader.ml_filter_enabled = args.ml_filter
     sys.exit(trader.run())
 
 
