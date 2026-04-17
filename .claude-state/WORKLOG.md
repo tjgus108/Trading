@@ -1,5 +1,38 @@
 # Work Log
 
+## [2026-04-17] Cycle 139 — C + B + SIM + F
+
+**[C] Data & Infrastructure:**
+- `src/data/data_utils.py` 생성: 실제 거래소 데이터 다운로드+검증 유틸리티
+  - HistoricalDataDownloader: Bybit/ccxt paginated fetching, parquet 캐시, exponential backoff
+  - DataValidationReport: OHLC 관계, 가격 이상치, 갭 감지, 0-100% 품질 점수
+  - Multi-timeframe 지원 (1m~1d)
+- `src/data/feed.py` 개선: ensure_connected() 자동 재연결, validate_fetch_result() 품질 검증
+- 14/16 tests pass, 826+ 기존 테스트 유지
+
+**[B] Risk Management:**
+- Rolling Sharpe 모니터: `performance_tracker.py`에 `rolling_sharpe_check()` 추가
+  - 30일 Rolling Sharpe < 0.5 → warn, < 0.0 → disable 플래그
+- CircuitBreaker daily_drawdown_limit: 5% → 3% (config/config.yaml과 일치)
+- 테스트 75개 전체 PASS (circuit_breaker 34 + drawdown 24 + performance 17)
+
+**[SIM] 오버피팅 근본 원인 분석:**
+- 근본 원인 5개 식별:
+  1. 슬리피지 0.05% vs 실제 0.2-1.0% (4-20x 갭) — 최대 영향
+  2. 합성 데이터 첨도 0.51 vs 실제 3-5 (fat tails 부재)
+  3. 합성 스프레드 1.27% vs 실제 0.2-0.8%
+  4. 신호 파라미터가 합성 노이즈에 과적합 (ATR 조건 0% 충족)
+  5. WFA 없이 500-candle 합성 테스트만으로 PASS 판정
+- 권고: MIN_TRADES 50→15, 슬리피지 0.2%, ATR 조건 동적화
+
+**[F] Research — 합성 데이터 실패 & 로버스트니스:**
+- 합성 데이터가 stylized facts (변동성 클러스터링, fat tails, 자기상관) 보존 못함
+- WFA meta-overfitting: WFA 파라미터 자체가 과적합, 355개 전략 다중 비교 문제
+- Monte Carlo Permutation Test, White's RC, Hansen's SPA, Parameter Plateau 방법론 조사
+- 권고: ①합성 데이터 GARCH(1,1)+Student-t 교체 ②Monte Carlo permutation gate 추가 ③OOS 3개월+regime 다양성
+
+---
+
 ## [2026-04-17] Cycle 138 — E + A + SIM + F
 
 **[E] Execution:**
