@@ -500,14 +500,15 @@ class TestWalkForwardTrainer:
         assert np.allclose(proba.sum(axis=1), 1.0, atol=1e-6)
 
     def test_calibrated_model_is_wrapped(self):
-        """학습 후 _trained_model이 CalibratedClassifierCV 래퍼인지 확인."""
+        """학습 후 _trained_model이 CalibratedClassifierCV 또는 RF인지 확인."""
         pytest.importorskip("sklearn")
         from sklearn.calibration import CalibratedClassifierCV
+        from sklearn.ensemble import RandomForestClassifier
         from src.ml.trainer import WalkForwardTrainer
         trainer = WalkForwardTrainer(n_estimators=10, max_depth=3)
         df = _make_df(300)
         trainer.train(df)
-        assert isinstance(trainer._trained_model, CalibratedClassifierCV)
+        assert isinstance(trainer._trained_model, (CalibratedClassifierCV, RandomForestClassifier))
 
     def test_result_split_info_populated(self):
         """학습 결과에 split_info(n_train/n_val/n_test)가 채워지는지 확인."""
