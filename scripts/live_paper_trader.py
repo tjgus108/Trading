@@ -42,6 +42,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.strategy.base import Action, BaseStrategy
+from src.strategy.rotation import StrategyRotationManager
+from src.strategy.regime import MarketRegimeDetector
 from src.exchange.paper_trader import PaperTrader
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,8 +61,13 @@ DEFAULT_DAYS = 7              # 기본 7일 운영
 WARMUP_CANDLES = 200          # 지표 계산용 warmup
 REPORT_INTERVAL = 24 * 3600   # 24시간마다 리포트
 REEVAL_INTERVAL = 24 * 3600   # 24시간마다 전략 재평가
-MAX_ACTIVE_STRATEGIES = 10    # 동시 활성 전략 수 상한
-RISK_PER_TRADE = 0.01         # 트레이드당 1% 리스크
+MAX_ACTIVE_STRATEGIES = 5     # 동시 활성 전략 수 상한
+RISK_PER_TRADE = 0.005        # 트레이드당 0.5% 리스크
+MAX_TOTAL_EXPOSURE = 0.15     # 전체 포트폴리오 최대 노출 15%
+MAX_CONCURRENT_POSITIONS = 3  # 동시 포지션 최대 3개
+SL_ATR_MULT = 2.5             # SL = ATR * 2.5 (기존 1.5 → 노이즈 방지)
+TP_ATR_MULT = 4.0             # TP = ATR * 4.0 (기존 3.0 → R:R 1.6)
+MAX_HOLD_CANDLES = 48         # 48시간 강제 청산 (기존 24)
 INITIAL_BALANCE = 10_000.0
 
 
@@ -216,11 +223,13 @@ class LivePaperTrader:
         self.paper = PaperTrader(
             initial_balance=self.state.portfolio_balance,
             fee_rate=0.001,
-            slippage_pct=0.05,
+            slippage_pct=0.0005,
             partial_fill_prob=0.0,  # 시뮬에서는 확률적 요소 제거
             timeout_prob=0.0,
         )
         self.strategies: dict[str, BaseStrategy] = {}
+        self.rotation = StrategyRotationManager()
+        self.regime_detector = MarketRegimeDetector()
         self.running = True
         self._df_cache: Optional[pd.DataFrame] = None
 
@@ -239,26 +248,30 @@ class LivePaperTrader:
             logger.error("No strategies found. Run quality_audit.py first.")
             return False
 
-        # 기존 활성 전략 복원 또는 초기 선택
-        if self.state.active_strategies:
-            for mod, cls_name in strat_list:
-                inst = load_strategy_instance(mod, cls_name)
-                if inst and inst.name in self.state.active_strategies:
-                    self.strategies[inst.name] = inst
+        # rotation manager에서 PASS 전략 우선 선택
+        rotation_pass = self.rotation.get_active_strategies(DEFAULT_SYMBOL)
+        all_strats = {}
+        for mod, cls_name in strat_list:
+            inst = load_strategy_instance(mod, cls_name)
+            if inst:
+                all_strats[inst.name] = inst
+
+        if rotation_pass:
+            for name in rotation_pass[:MAX_ACTIVE_STRATEGIES]:
+                if name in all_strats:
+                    self.strategies[name] = all_strats[name]
+            logger.info("Rotation PASS strategies: %s", list(self.strategies.keys()))
+        elif self.state.active_strategies:
+            for name in self.state.active_strategies:
+                if name in all_strats:
+                    self.strategies[name] = all_strats[name]
             logger.info("Restored %d active strategies", len(self.strategies))
         else:
-            # 초기: 전체 로드 후 상위 N개 선택 (paper_simulation 결과 기반)
-            all_strats = {}
-            for mod, cls_name in strat_list:
-                inst = load_strategy_instance(mod, cls_name)
-                if inst:
-                    all_strats[inst.name] = inst
-
-            # 초기 선택: 최대 MAX_ACTIVE_STRATEGIES개
             selected = list(all_strats.items())[:MAX_ACTIVE_STRATEGIES]
             self.strategies = dict(selected)
-            self.state.active_strategies = list(self.strategies.keys())
-            logger.info("Selected %d strategies for live trading", len(self.strategies))
+            logger.info("Fallback: selected %d strategies", len(self.strategies))
+
+        self.state.active_strategies = list(self.strategies.keys())
 
         # 초기 데이터 수집
         df = fetch_latest_candles(limit=WARMUP_CANDLES)
@@ -294,9 +307,10 @@ class LivePaperTrader:
         latest = df.iloc[-1]
         current_price = latest["close"]
 
-        logger.info("Tick %d | Price: $%.2f | Balance: $%.2f | Strategies: %d | Positions: %d",
+        regime = self.regime_detector.detect(df)
+        logger.info("Tick %d | Price: $%.2f | Balance: $%.2f | Regime: %s | Positions: %d/%d",
                      self.state.tick_count, current_price, self.state.portfolio_balance,
-                     len(self.strategies), len(self.state.open_positions))
+                     regime.value, len(self.state.open_positions), MAX_CONCURRENT_POSITIONS)
 
         # 2. 열린 포지션 관리 (SL/TP 체크)
         self._manage_positions(latest)
@@ -304,30 +318,44 @@ class LivePaperTrader:
         # 3. 각 전략 신호 생성 및 실행
         for name, strategy in self.strategies.items():
             if name in self.state.open_positions:
-                continue  # 이미 포지션이 있으면 스킵
+                continue
+
+            if len(self.state.open_positions) >= MAX_CONCURRENT_POSITIONS:
+                break
+
+            current_exposure = self._total_exposure(current_price)
+            if current_exposure >= MAX_TOTAL_EXPOSURE:
+                logger.info("  Exposure %.1f%% >= limit %.1f%%, skipping new entries",
+                            current_exposure * 100, MAX_TOTAL_EXPOSURE * 100)
+                break
 
             try:
                 sig = strategy.generate(df)
                 if sig.action == Action.HOLD:
                     continue
 
-                # ATR 기반 포지션 사이즈
                 atr = latest["atr14"]
                 if atr <= 0:
                     continue
 
-                sl_dist = atr * 1.5
+                sl_dist = atr * SL_ATR_MULT
                 risk_amt = self.state.portfolio_balance * RISK_PER_TRADE
                 size = risk_amt / sl_dist
+
+                max_size = (self.state.portfolio_balance * MAX_TOTAL_EXPOSURE) / current_price
+                size = min(size, max_size)
+
+                if size * current_price < 10:
+                    continue
 
                 if sig.action == Action.BUY:
                     entry = current_price
                     sl = entry - sl_dist
-                    tp = entry + atr * 3.0
+                    tp = entry + atr * TP_ATR_MULT
                 else:
                     entry = current_price
                     sl = entry + sl_dist
-                    tp = entry - atr * 3.0
+                    tp = entry - atr * TP_ATR_MULT
 
                 # 모의 실행
                 result = self.paper.execute_signal(
@@ -381,6 +409,16 @@ class LivePaperTrader:
         # 6. 상태 저장
         self.state.save()
 
+    def _total_exposure(self, current_price: float) -> float:
+        """열린 포지션의 전체 노출 비율 (0~1)."""
+        if self.state.portfolio_balance <= 0:
+            return 1.0
+        total_value = sum(
+            pos["size"] * current_price
+            for pos in self.state.open_positions.values()
+        )
+        return total_value / self.state.portfolio_balance
+
     def _manage_positions(self, candle: pd.Series):
         """열린 포지션의 SL/TP 체크 및 강제 청산."""
         closed = []
@@ -395,8 +433,7 @@ class LivePaperTrader:
             exit_price = close_price
             reason = ""
 
-            # 24봉(24시간) 강제 청산
-            if pos["hold_candles"] >= 24:
+            if pos["hold_candles"] >= MAX_HOLD_CANDLES:
                 should_close = True
                 exit_price = close_price
                 reason = "max_hold"
