@@ -54,7 +54,7 @@ CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 
 # ── 설정 ─────────────────────────────────────────────────
 
-DEFAULT_SYMBOL = "BTC/USDT"
+SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
 DEFAULT_TIMEFRAME = "1h"
 DEFAULT_INTERVAL = 3600       # 1시간마다 체크
 DEFAULT_DAYS = 7              # 기본 7일 운영
@@ -63,8 +63,9 @@ REPORT_INTERVAL = 24 * 3600   # 24시간마다 리포트
 REEVAL_INTERVAL = 24 * 3600   # 24시간마다 전략 재평가
 MAX_ACTIVE_STRATEGIES = 5     # 동시 활성 전략 수 상한
 RISK_PER_TRADE = 0.005        # 트레이드당 0.5% 리스크
-MAX_TOTAL_EXPOSURE = 0.15     # 전체 포트폴리오 최대 노출 15%
-MAX_CONCURRENT_POSITIONS = 3  # 동시 포지션 최대 3개
+MAX_TOTAL_EXPOSURE = 0.30     # 전체 포트폴리오 최대 노출 30% (3심볼)
+MAX_CONCURRENT_POSITIONS = 5  # 동시 포지션 최대 5개 (3심볼 합산)
+MAX_PER_SYMBOL_POSITIONS = 2  # 심볼당 최대 2개
 SL_ATR_MULT = 2.5             # SL = ATR * 2.5 (기존 1.5 → 노이즈 방지)
 TP_ATR_MULT = 4.0             # TP = ATR * 4.0 (기존 3.0 → R:R 1.6)
 MAX_HOLD_CANDLES = 48         # 48시간 강제 청산 (기존 24)
@@ -74,7 +75,7 @@ INITIAL_BALANCE = 10_000.0
 # ── 데이터 수집 ──────────────────────────────────────────
 
 def fetch_latest_candles(
-    symbol: str = DEFAULT_SYMBOL,
+    symbol: str = "BTC/USDT",
     timeframe: str = DEFAULT_TIMEFRAME,
     limit: int = 500,
 ) -> Optional[pd.DataFrame]:
@@ -170,12 +171,12 @@ class LiveState:
         self.start_time: str = datetime.utcnow().isoformat()
         self.last_tick: str = ""
         self.tick_count: int = 0
-        self.active_strategies: list[str] = []
-        self.strategy_scores: dict[str, dict] = {}  # name -> {wins, losses, pnl, signals}
+        self.active_strategies: dict[str, list[str]] = {}  # symbol -> [strategy_names]
+        self.strategy_scores: dict[str, dict] = {}  # "symbol:name" -> {wins, losses, pnl, signals}
         self.portfolio_balance: float = INITIAL_BALANCE
         self.portfolio_peak: float = INITIAL_BALANCE
-        self.portfolio_history: list[dict] = []  # [{time, balance}]
-        self.open_positions: dict[str, dict] = {}  # strategy_name -> position info
+        self.portfolio_history: list[dict] = []
+        self.open_positions: dict[str, dict] = {}  # "symbol:strategy" -> position info
         self.trade_log: list[dict] = []
         self.last_report_time: float = 0
         self.last_reeval_time: float = 0
@@ -224,14 +225,14 @@ class LivePaperTrader:
             initial_balance=self.state.portfolio_balance,
             fee_rate=0.001,
             slippage_pct=0.0005,
-            partial_fill_prob=0.0,  # 시뮬에서는 확률적 요소 제거
+            partial_fill_prob=0.0,
             timeout_prob=0.0,
         )
-        self.strategies: dict[str, BaseStrategy] = {}
+        self.symbol_strategies: dict[str, dict[str, BaseStrategy]] = {}  # symbol -> {name: strategy}
         self.rotation = StrategyRotationManager()
         self.regime_detector = MarketRegimeDetector()
         self.running = True
-        self._df_cache: Optional[pd.DataFrame] = None
+        self._df_caches: dict[str, pd.DataFrame] = {}  # symbol -> df
 
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
@@ -241,92 +242,116 @@ class LivePaperTrader:
         self.running = False
 
     def initialize(self):
-        """초기화: 전략 로드 및 초기 데이터 수집."""
-        # 전략 로드
+        """초기화: 심볼별 전략 로드 및 초기 데이터 수집."""
         strat_list = load_pass_strategies()
         if not strat_list:
             logger.error("No strategies found. Run quality_audit.py first.")
             return False
 
-        # rotation manager에서 PASS 전략 우선 선택
-        rotation_pass = self.rotation.get_active_strategies(DEFAULT_SYMBOL)
         all_strats = {}
         for mod, cls_name in strat_list:
             inst = load_strategy_instance(mod, cls_name)
             if inst:
                 all_strats[inst.name] = inst
 
-        if rotation_pass:
-            for name in rotation_pass[:MAX_ACTIVE_STRATEGIES]:
-                if name in all_strats:
-                    self.strategies[name] = all_strats[name]
-            logger.info("Rotation PASS strategies: %s", list(self.strategies.keys()))
-        elif self.state.active_strategies:
-            for name in self.state.active_strategies:
-                if name in all_strats:
-                    self.strategies[name] = all_strats[name]
-            logger.info("Restored %d active strategies", len(self.strategies))
-        else:
-            selected = list(all_strats.items())[:MAX_ACTIVE_STRATEGIES]
-            self.strategies = dict(selected)
-            logger.info("Fallback: selected %d strategies", len(self.strategies))
+        for symbol in SYMBOLS:
+            rotation_pass = self.rotation.get_active_strategies(symbol)
+            sym_strats = {}
 
-        self.state.active_strategies = list(self.strategies.keys())
+            if rotation_pass:
+                for name in rotation_pass[:MAX_ACTIVE_STRATEGIES]:
+                    if name in all_strats:
+                        sym_strats[name] = all_strats[name]
+                logger.info("[%s] Rotation PASS: %s", symbol, list(sym_strats.keys()))
+            elif symbol in self.state.active_strategies and self.state.active_strategies[symbol]:
+                for name in self.state.active_strategies[symbol]:
+                    if name in all_strats:
+                        sym_strats[name] = all_strats[name]
+                logger.info("[%s] Restored %d strategies", symbol, len(sym_strats))
 
-        # 초기 데이터 수집
-        df = fetch_latest_candles(limit=WARMUP_CANDLES)
-        if df is None:
-            logger.error("Cannot fetch initial data")
+            if not sym_strats:
+                selected = list(all_strats.items())[:MAX_ACTIVE_STRATEGIES]
+                sym_strats = dict(selected)
+                logger.info("[%s] Fallback: %d strategies", symbol, len(sym_strats))
+
+            self.symbol_strategies[symbol] = sym_strats
+            self.state.active_strategies[symbol] = list(sym_strats.keys())
+
+            df = fetch_latest_candles(symbol=symbol, limit=WARMUP_CANDLES)
+            if df is not None:
+                self._df_caches[symbol] = enrich_indicators(df)
+                logger.info("[%s] Data: %d candles", symbol, len(self._df_caches[symbol]))
+            else:
+                logger.warning("[%s] Initial data fetch failed", symbol)
+
+        if not self._df_caches:
+            logger.error("No data for any symbol")
             return False
-        self._df_cache = enrich_indicators(df)
-        logger.info("Initial data: %d candles (%s ~ %s)",
-                     len(self._df_cache), self._df_cache.index[0], self._df_cache.index[-1])
         return True
 
     def tick(self):
-        """매 interval마다 실행되는 메인 로직."""
+        """매 interval마다 실행: 모든 심볼 순회."""
         self.state.tick_count += 1
         self.state.last_tick = datetime.utcnow().isoformat()
 
-        # 1. 최신 데이터 수집
-        new_df = fetch_latest_candles(limit=50)
+        for symbol in SYMBOLS:
+            self._tick_symbol(symbol)
+
+        self.state.portfolio_peak = max(self.state.portfolio_peak, self.state.portfolio_balance)
+        self.state.portfolio_history.append({
+            "time": datetime.utcnow().isoformat(),
+            "balance": round(self.state.portfolio_balance, 2),
+            "positions": len(self.state.open_positions),
+        })
+
+        now = time.time()
+        if now - self.state.last_report_time >= REPORT_INTERVAL:
+            self._generate_report()
+            self.state.last_report_time = now
+
+        self.state.save()
+
+    def _tick_symbol(self, symbol: str):
+        """단일 심볼에 대한 tick 로직."""
+        new_df = fetch_latest_candles(symbol=symbol, limit=50)
         if new_df is None:
-            logger.warning("Tick %d: data fetch failed, skipping", self.state.tick_count)
             return
 
-        # 기존 캐시와 병합 (중복 제거)
-        if self._df_cache is not None:
-            combined = pd.concat([self._df_cache, new_df])
+        if symbol in self._df_caches:
+            combined = pd.concat([self._df_caches[symbol], new_df])
             combined = combined[~combined.index.duplicated(keep="last")].sort_index()
-            # 최근 1000봉만 유지
-            self._df_cache = enrich_indicators(combined.tail(1000))
+            self._df_caches[symbol] = enrich_indicators(combined.tail(1000))
         else:
-            self._df_cache = enrich_indicators(new_df)
+            self._df_caches[symbol] = enrich_indicators(new_df)
 
-        df = self._df_cache
+        df = self._df_caches[symbol]
         latest = df.iloc[-1]
-        current_price = latest["close"]
+        current_price = float(latest["close"])
 
         regime = self.regime_detector.detect(df)
-        logger.info("Tick %d | Price: $%.2f | Balance: $%.2f | Regime: %s | Positions: %d/%d",
-                     self.state.tick_count, current_price, self.state.portfolio_balance,
-                     regime.value, len(self.state.open_positions), MAX_CONCURRENT_POSITIONS)
 
-        # 2. 열린 포지션 관리 (SL/TP 체크)
-        self._manage_positions(latest)
+        sym_positions = {k: v for k, v in self.state.open_positions.items() if k.startswith(f"{symbol}:")}
 
-        # 3. 각 전략 신호 생성 및 실행
-        for name, strategy in self.strategies.items():
-            if name in self.state.open_positions:
+        logger.info("[%s] Tick %d | $%.2f | %s | pos=%d/%d",
+                     symbol, self.state.tick_count, current_price,
+                     regime.value, len(sym_positions), MAX_PER_SYMBOL_POSITIONS)
+
+        self._manage_positions_for_symbol(symbol, latest)
+
+        strategies = self.symbol_strategies.get(symbol, {})
+        for name, strategy in strategies.items():
+            pos_key = f"{symbol}:{name}"
+            if pos_key in self.state.open_positions:
                 continue
 
             if len(self.state.open_positions) >= MAX_CONCURRENT_POSITIONS:
                 break
+            sym_positions = {k: v for k, v in self.state.open_positions.items() if k.startswith(f"{symbol}:")}
+            if len(sym_positions) >= MAX_PER_SYMBOL_POSITIONS:
+                break
 
-            current_exposure = self._total_exposure(current_price)
+            current_exposure = self._total_exposure_all()
             if current_exposure >= MAX_TOTAL_EXPOSURE:
-                logger.info("  Exposure %.1f%% >= limit %.1f%%, skipping new entries",
-                            current_exposure * 100, MAX_TOTAL_EXPOSURE * 100)
                 break
 
             try:
@@ -334,7 +359,7 @@ class LivePaperTrader:
                 if sig.action == Action.HOLD:
                     continue
 
-                atr = latest["atr14"]
+                atr = float(latest["atr14"])
                 if atr <= 0:
                     continue
 
@@ -342,24 +367,21 @@ class LivePaperTrader:
                 risk_amt = self.state.portfolio_balance * RISK_PER_TRADE
                 size = risk_amt / sl_dist
 
-                max_size = (self.state.portfolio_balance * MAX_TOTAL_EXPOSURE) / current_price
+                max_size = (self.state.portfolio_balance * 0.10) / current_price
                 size = min(size, max_size)
 
                 if size * current_price < 10:
                     continue
 
                 if sig.action == Action.BUY:
-                    entry = current_price
-                    sl = entry - sl_dist
-                    tp = entry + atr * TP_ATR_MULT
+                    sl = current_price - sl_dist
+                    tp = current_price + atr * TP_ATR_MULT
                 else:
-                    entry = current_price
-                    sl = entry + sl_dist
-                    tp = entry - atr * TP_ATR_MULT
+                    sl = current_price + sl_dist
+                    tp = current_price - atr * TP_ATR_MULT
 
-                # 모의 실행
                 result = self.paper.execute_signal(
-                    symbol=DEFAULT_SYMBOL,
+                    symbol=symbol,
                     action=sig.action.value,
                     price=current_price,
                     quantity=size,
@@ -368,7 +390,8 @@ class LivePaperTrader:
                 )
 
                 if result["status"] in ("filled", "partial"):
-                    self.state.open_positions[name] = {
+                    self.state.open_positions[pos_key] = {
+                        "symbol": symbol,
                         "side": sig.action.value,
                         "entry": result["actual_price"],
                         "sl": sl,
@@ -379,50 +402,40 @@ class LivePaperTrader:
                     }
                     self.state.portfolio_balance = result["balance"]
 
-                    # 전략 스코어 초기화
-                    if name not in self.state.strategy_scores:
-                        self.state.strategy_scores[name] = {"wins": 0, "losses": 0, "pnl": 0.0, "signals": 0}
-                    self.state.strategy_scores[name]["signals"] += 1
+                    score_key = pos_key
+                    if score_key not in self.state.strategy_scores:
+                        self.state.strategy_scores[score_key] = {"wins": 0, "losses": 0, "pnl": 0.0, "signals": 0}
+                    self.state.strategy_scores[score_key]["signals"] += 1
 
-                    logger.info("  [%s] %s @ $%.2f (size=%.6f, sl=$%.2f, tp=$%.2f)",
-                                name, sig.action.value, result["actual_price"],
-                                result["actual_quantity"], sl, tp)
+                    logger.info("  [%s:%s] %s @ $%.2f (size=%.6f)",
+                                symbol, name, sig.action.value, result["actual_price"], result["actual_quantity"])
 
             except Exception as e:
-                logger.error("  [%s] Error: %s", name, str(e)[:80])
+                logger.error("  [%s:%s] Error: %s", symbol, name, str(e)[:80])
 
-        # 4. 포트폴리오 기록
-        self.state.portfolio_peak = max(self.state.portfolio_peak, self.state.portfolio_balance)
-        self.state.portfolio_history.append({
-            "time": datetime.utcnow().isoformat(),
-            "balance": round(self.state.portfolio_balance, 2),
-            "price": round(current_price, 2),
-            "positions": len(self.state.open_positions),
-        })
-
-        # 5. 주기적 리포트
-        now = time.time()
-        if now - self.state.last_report_time >= REPORT_INTERVAL:
-            self._generate_report()
-            self.state.last_report_time = now
-
-        # 6. 상태 저장
-        self.state.save()
-
-    def _total_exposure(self, current_price: float) -> float:
-        """열린 포지션의 전체 노출 비율 (0~1)."""
+    def _total_exposure_all(self) -> float:
+        """모든 심볼의 열린 포지션 전체 노출 비율 (0~1)."""
         if self.state.portfolio_balance <= 0:
             return 1.0
-        total_value = sum(
-            pos["size"] * current_price
-            for pos in self.state.open_positions.values()
-        )
+        total_value = 0.0
+        for key, pos in self.state.open_positions.items():
+            symbol = pos.get("symbol", key.split(":")[0])
+            df = self._df_caches.get(symbol)
+            if df is not None and len(df) > 0:
+                price = float(df.iloc[-1]["close"])
+            else:
+                price = pos["entry"]
+            total_value += pos["size"] * price
         return total_value / self.state.portfolio_balance
 
-    def _manage_positions(self, candle: pd.Series):
-        """열린 포지션의 SL/TP 체크 및 강제 청산."""
+    def _manage_positions_for_symbol(self, symbol: str, candle: pd.Series):
+        """특정 심볼의 열린 포지션 SL/TP 체크 및 강제 청산."""
         closed = []
+        prefix = f"{symbol}:"
         for name, pos in self.state.open_positions.items():
+            if not name.startswith(prefix):
+                continue
+
             pos["hold_candles"] = pos.get("hold_candles", 0) + 1
             side = pos["side"]
             sl, tp = pos["sl"], pos["tp"]
@@ -449,19 +462,16 @@ class LivePaperTrader:
                     should_close, exit_price, reason = True, tp, "take_profit"
 
             if should_close:
-                # PnL 계산
                 if side == "BUY":
                     pnl = (exit_price - pos["entry"]) * pos["size"]
                 else:
                     pnl = (pos["entry"] - exit_price) * pos["size"]
 
-                # 수수료
                 fee = pos["size"] * exit_price * 0.001
                 pnl -= fee
 
                 self.state.portfolio_balance += pnl
 
-                # 전략 스코어 업데이트
                 if name not in self.state.strategy_scores:
                     self.state.strategy_scores[name] = {"wins": 0, "losses": 0, "pnl": 0.0, "signals": 0}
                 scores = self.state.strategy_scores[name]
@@ -471,10 +481,10 @@ class LivePaperTrader:
                     scores["losses"] += 1
                 scores["pnl"] += pnl
 
-                # 거래 로그
                 self.state.trade_log.append({
                     "time": datetime.utcnow().isoformat(),
                     "strategy": name,
+                    "symbol": symbol,
                     "side": side,
                     "entry": pos["entry"],
                     "exit": exit_price,
@@ -497,9 +507,9 @@ class LivePaperTrader:
         lines.append("# Live Paper Trading Report\n")
         lines.append(f"_Generated: {datetime.utcnow().isoformat()}Z_")
         lines.append(f"_Started: {self.state.start_time}_")
-        lines.append(f"_Ticks: {self.state.tick_count} | Interval: {self.interval}s_\n")
+        lines.append(f"_Ticks: {self.state.tick_count} | Interval: {self.interval}s_")
+        lines.append(f"_Symbols: {', '.join(SYMBOLS)}_\n")
 
-        # 포트폴리오 요약
         total_return = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE
         max_dd = (self.state.portfolio_peak - self.state.portfolio_balance) / self.state.portfolio_peak if self.state.portfolio_peak > 0 else 0
         lines.append("## Portfolio\n")
@@ -513,11 +523,21 @@ class LivePaperTrader:
         lines.append(f"| Total Trades | {len(self.state.trade_log)} |")
         lines.append("")
 
-        # 전략별 성과
+        for symbol in SYMBOLS:
+            sym_positions = {k: v for k, v in self.state.open_positions.items() if k.startswith(f"{symbol}:")}
+            sym_trades = [t for t in self.state.trade_log if t.get("symbol") == symbol or t.get("strategy", "").startswith(f"{symbol}:")]
+            sym_pnl = sum(t["pnl"] for t in sym_trades)
+            lines.append(f"### {symbol}\n")
+            lines.append(f"- Open: {len(sym_positions)} | Trades: {len(sym_trades)} | PnL: ${sym_pnl:+.2f}")
+            strats = self.state.active_strategies.get(symbol, [])
+            if strats:
+                lines.append(f"- Strategies: {', '.join(strats)}")
+            lines.append("")
+
         if self.state.strategy_scores:
             lines.append("## Strategy Performance\n")
-            lines.append("| Strategy | Signals | Wins | Losses | WR | PnL |")
-            lines.append("|----------|---------|------|--------|----|-----|")
+            lines.append("| Symbol:Strategy | Signals | Wins | Losses | WR | PnL |")
+            lines.append("|----------------|---------|------|--------|----|-----|")
             sorted_scores = sorted(
                 self.state.strategy_scores.items(),
                 key=lambda x: x[1]["pnl"], reverse=True,
@@ -529,12 +549,11 @@ class LivePaperTrader:
                              f"{wr:.0%} | ${s['pnl']:+.2f} |")
             lines.append("")
 
-        # 최근 거래
         recent = self.state.trade_log[-20:]
         if recent:
             lines.append("## Recent Trades (last 20)\n")
-            lines.append("| Time | Strategy | Side | Entry | Exit | PnL | Reason |")
-            lines.append("|------|----------|------|-------|------|-----|--------|")
+            lines.append("| Time | Symbol:Strategy | Side | Entry | Exit | PnL | Reason |")
+            lines.append("|------|----------------|------|-------|------|-----|--------|")
             for t in reversed(recent):
                 lines.append(f"| {t['time'][:16]} | `{t['strategy']}` | {t['side']} | "
                              f"${t['entry']:.2f} | ${t['exit']:.2f} | ${t['pnl']:+.2f} | {t['reason']} |")
@@ -572,9 +591,9 @@ class LivePaperTrader:
         logger.info("Shutting down...")
         self._generate_report()
         self.state.save()
-        logger.info("Final balance: $%.2f (return: %+.2%)",
-                     self.state.portfolio_balance,
-                     (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100)
+        ret = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100
+        logger.info("Final balance: $%.2f (return: %+.2f%%)",
+                     self.state.portfolio_balance, ret)
         return 0
 
 

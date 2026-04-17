@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-04-17 (Cycle 137-139 완료 — 세션 종료 핸드오프)_
+_Last updated: 2026-04-17 (멀티심볼 live paper trader 배포)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -27,11 +27,11 @@ _Last updated: 2026-04-17 (Cycle 137-139 완료 — 세션 종료 핸드오프)_
 8. **전략 상관관계 모니터링**: ≤ 0.5 제한
 9. **Rolling Sharpe 자동 비활성화**: < 0.0 시 전략 off
 
-### Cycle 139 주요 성과
-- **데이터**: data_utils.py (실거래소 다운로드+검증), feed.py 자동 재연결
-- **리스크**: Rolling Sharpe 모니터, CircuitBreaker 3% 일일 한도
-- **SIM**: 오버피팅 근본 원인 5개 분석 완료
-- **리서치**: 합성 데이터 실패 메커니즘, GARCH/Monte Carlo/WFA 개선안
+### 최근 완료
+- **Live Paper Trader 멀티심볼**: BTC/ETH/SOL 3심볼 동시 운영 (7일, 1시간 간격)
+- **리스크 수정**: 슬리피지 0.05→0.0005, RISK 1%→0.5%, SL ATR*2.5, TP ATR*4, MAX_POS=5
+- **Regime Detection**: ADX+EMA+ATR 기반 시장 상태 분류 (TREND_UP/DOWN, RANGING, HIGH_VOL)
+- **Strategy Rotation**: 30일 주기 재검증, rotation_state.json 기반 PASS/FAIL 관리
 
 ### 후속 과제 (미착수)
 - 슬리피지 현실화 (0.05→0.2%)
