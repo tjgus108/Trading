@@ -215,9 +215,12 @@ class WalkForwardTrainer:
         )
 
         # 학습
+        # max_features='sqrt': 앙상블 다양성 확보 (기본값 'auto'='sqrt'이지만 명시)
+        # max_depth=6: 과적합 방지 (기본 None에서 제한)
         base_clf = RandomForestClassifier(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
+            max_features="sqrt",
             random_state=42,
             n_jobs=-1,
             class_weight="balanced",

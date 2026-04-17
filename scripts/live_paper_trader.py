@@ -77,6 +77,12 @@ SL_ATR_MULT = 2.5             # SL = ATR * 2.5 (기존 1.5 → 노이즈 방지)
 TP_ATR_MULT = 4.0             # TP = ATR * 4.0 (기존 3.0 → R:R 1.6)
 MAX_HOLD_CANDLES = 48         # 48시간 강제 청산 (기존 24)
 INITIAL_BALANCE = 10_000.0
+# 레짐별 포지션 사이즈 배수 (RANGING은 진입 자체를 차단하므로 제외)
+REGIME_SIZE_MULT: dict = {
+    'TREND_UP':   1.3,   # 추세 상승: 30% 확대
+    'TREND_DOWN': 0.5,   # 추세 하락: 50% 축소 (숏 포지션에만 진입 권장)
+    'HIGH_VOL':   0.3,   # 고변동성: 70% 대폭 축소
+}
 
 
 # ── 데이터 수집 ──────────────────────────────────────────
@@ -539,6 +545,15 @@ class LivePaperTrader:
                 max_size = (self.state.portfolio_balance * 0.10) / current_price
                 size = min(size, max_size)
                 size *= size_mult
+
+                # 레짐 기반 포지션 사이즈 조정
+                regime_mult = REGIME_SIZE_MULT.get(regime.value, 1.0)
+                if regime_mult != 1.0:
+                    logger.info(
+                        '  [%s:%s] Regime=%s → size_mult=%.1f (%.6f → %.6f)',
+                        symbol, name, regime.value, regime_mult, size, size * regime_mult,
+                    )
+                size *= regime_mult
 
                 if size * current_price < 10:
                     continue

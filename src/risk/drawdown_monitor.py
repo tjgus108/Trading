@@ -97,6 +97,8 @@ class DrawdownMonitor:
         self.loss_streak_threshold = loss_streak_threshold
         self.single_loss_halt_pct = single_loss_halt_pct
         self.cooldown_seconds = cooldown_seconds
+        self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
+        self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -129,6 +131,27 @@ class DrawdownMonitor:
         """월간 기준 잔고 설정 (매월 1일 호출)."""
         self._monthly_start = equity
         logger.info("DrawdownMonitor: monthly_start=%.2f", equity)
+
+    def set_regime(self, regime: str) -> None:
+        """현재 시장 레짐 설정. HIGH_VOL 시 일일 DD 한도를 강화한다.
+
+        Args:
+            regime: 레짐 문자열 — 'TREND_UP', 'TREND_DOWN', 'RANGING', 'HIGH_VOL'
+        """
+        self._current_regime = regime.upper() if regime else ''
+        if self._current_regime == 'HIGH_VOL':
+            logger.info(
+                'DrawdownMonitor: HIGH_VOL 레짐 — 일일 DD 한도 %.1f%% → %.1f%% 강화',
+                self.daily_limit * 100, self._high_vol_daily_limit * 100,
+            )
+        else:
+            logger.debug('DrawdownMonitor: regime=%s (일일 한도=%.1f%%)', self._current_regime, self.daily_limit * 100)
+
+    def _effective_daily_limit(self) -> float:
+        """현재 레짐에 따른 실효 일일 DD 한도 반환."""
+        if self._current_regime == 'HIGH_VOL':
+            return self._high_vol_daily_limit
+        return self.daily_limit
 
     # ── 낙폭 계산 헬퍼 ────────────────────────────────────────
 
@@ -292,10 +315,10 @@ class DrawdownMonitor:
                 AlertLevel.HALT,
                 f"주간 낙폭 {weekly_dd:.1%} ≥ 한계 {self.weekly_limit:.1%} — 거래 중단",
             )
-        if daily_dd >= self.daily_limit:
+        if daily_dd >= self._effective_daily_limit():
             return (
                 AlertLevel.WARNING,
-                f"일일 낙폭 {daily_dd:.1%} ≥ 한계 {self.daily_limit:.1%} — 경고",
+                f"일일 낙폭 {daily_dd:.1%} ≥ 한계 {self._effective_daily_limit():.1%} — 경고",
             )
         return AlertLevel.NONE, ""
 

@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-04-18] Cycle 147 — B + D + F (포지션 사이징 + PFI + 리서치)
+
+**[B] Risk Management:**
+- live_paper_trader 레짐 기반 포지션 사이징: REGIME_SIZE_MULT 상수 추가
+  - TREND_UP ×1.3, TREND_DOWN ×0.5, HIGH_VOL ×0.3
+  - 포지션 계산 후 레짐 배수 적용, INFO 로그 기록
+- DrawdownMonitor HIGH_VOL 연동: set_regime() + _effective_daily_limit()
+  - HIGH_VOL: 일일 DD 한도 3% → 2%로 자동 축소
+
+**[D] ML & Signals:**
+- train_ml.py PFI(Permutation Feature Importance) 분석 추가
+  - sklearn permutation_importance (n_repeats=10)
+  - 상위/하위 5 피처 로그, near-zero 피처 식별
+  - models/feature_importance_{symbol}.json 자동 저장
+- RF 모델 설정: max_features='sqrt' 명시적 지정 (향후 sklearn 호환성)
+
+**[F] Research:**
+- 포지션 사이징 실패: 3AC/FTX 과레버리지+집중투자 파산 사례
+- ATR 함정: 후행 지표로 스파이크 직전 무방비 → 레짐 필터와 AND 조건 필요
+- Kelly 비율: Quarter Kelly가 실전 최적 (변동성 50% 감소, 성장률 유지)
+- 드로우다운 복구: 20% MDD → 25% 회복 필요, Anti-Martingale 적합
+- 실전 권장: 고정 1-2% 리스크 + 레짐 승수 (절대 단독 확대 금지)
+
+---
+
 ## [2026-04-18] Cycle 146 — A + C + F (테스트 수정 + GARCH 교체)
 
 **[A] Quality Assurance:**
@@ -12372,3 +12397,6 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-17 19:17 UTC] Cycle 146 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 20:25 UTC] Cycle 147 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

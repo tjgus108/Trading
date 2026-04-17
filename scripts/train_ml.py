@@ -153,6 +153,76 @@ def fetch_bybit(symbol: str, timeframe: str, limit: int):
     return df
 
 
+def run_pfi_analysis(trainer, X_test, y_test, result, symbol: str):
+    """
+    Permutation Feature Importance (PFI) 분석 실행 후 JSON 저장.
+
+    - sklearn permutation_importance 사용 (n_repeats=10)
+    - models/feature_importance_{symbol}.json 에 저장
+    - 상위/하위 5개 피처 로그 출력
+    - 중요도 ~0 피처 (mean < 0.001) 자동 식별
+    """
+    try:
+        from sklearn.inspection import permutation_importance
+    except ImportError:
+        logger.warning("permutation_importance 없음 — sklearn 업그레이드 필요")
+        return
+
+    logger.info("PFI 분석 시작 (n_repeats=10, test set=%d rows)", len(X_test))
+    perm = permutation_importance(
+        trainer._trained_model, X_test, y_test,
+        n_repeats=10, random_state=42, n_jobs=-1,
+        scoring="accuracy",
+    )
+
+    feature_names = list(X_test.columns)
+    pfi_means = perm.importances_mean.tolist()
+    pfi_stds = perm.importances_std.tolist()
+
+    pfi_data = {
+        name: {"mean": float(mean), "std": float(std)}
+        for name, mean, std in zip(feature_names, pfi_means, pfi_stds)
+    }
+
+    # 상위/하위 5개
+    ranked = sorted(pfi_data.items(), key=lambda x: x[1]["mean"], reverse=True)
+    top5 = ranked[:5]
+    bottom5 = ranked[-5:]
+
+    logger.info("PFI 상위 5개 피처:")
+    for name, v in top5:
+        logger.info("  %s: %.4f ± %.4f", name, v["mean"], v["std"])
+
+    logger.info("PFI 하위 5개 피처:")
+    for name, v in bottom5:
+        logger.info("  %s: %.4f ± %.4f", name, v["mean"], v["std"])
+
+    # 중요도 ~0 피처 식별 (제거 후보)
+    near_zero = [name for name, v in pfi_data.items() if abs(v["mean"]) < 0.001]
+    if near_zero:
+        logger.info("PFI ~0 피처 (제거 후보 %d개): %s", len(near_zero), near_zero)
+    else:
+        logger.info("PFI ~0 피처 없음 — 모든 피처 기여")
+
+    # JSON 저장
+    safe_symbol = symbol.replace("/", "_")
+    pfi_path = MODELS_DIR / f"feature_importance_{safe_symbol}.json"
+    output = {
+        "symbol": symbol,
+        "model": result.model_name,
+        "n_test_samples": len(X_test),
+        "mdi_importance": result.feature_importances,
+        "pfi_importance": pfi_data,
+        "near_zero_features": near_zero,
+        "top5_pfi": [n for n, _ in top5],
+        "bottom5_pfi": [n for n, _ in bottom5],
+    }
+    with open(pfi_path, "w") as f:
+        json.dump(output, f, indent=2)
+    logger.info("PFI 결과 저장: %s", pfi_path)
+    print(f"Feature importance saved: {pfi_path}")
+
+
 def auto_retrain(symbol: str, timeframe: str):
     """
     자동 재학습 모드:
@@ -161,6 +231,7 @@ def auto_retrain(symbol: str, timeframe: str):
     - PASS 기준: test acc >= 55%, val acc >= 55%
     - PASS 시 models/{symbol}_{timestamp}_rf_binary.pkl 저장
     - 결과를 models/retrain_log.json에 기록
+    - 학습 후 PFI 분석 → models/feature_importance_{symbol}.json 저장
     """
     logger.info("Auto-retrain: symbol=%s timeframe=%s limit=%d", symbol, timeframe, AUTO_RETRAIN_LIMIT)
     MODELS_DIR.mkdir(exist_ok=True)
@@ -168,6 +239,7 @@ def auto_retrain(symbol: str, timeframe: str):
     df = fetch_bybit(symbol, timeframe, AUTO_RETRAIN_LIMIT)
 
     from src.ml.trainer import WalkForwardTrainer
+    from src.ml.features import FeatureBuilder
     trainer = WalkForwardTrainer(
         symbol=symbol,
         binary=True,
@@ -194,6 +266,21 @@ def auto_retrain(symbol: str, timeframe: str):
     }
 
     print(result.summary())
+
+    # PFI 분석: test set 재구성 후 실행
+    try:
+        X_all, y_all = FeatureBuilder(forward_n=5, threshold=AUTO_RETRAIN_BINARY_THRESHOLD, binary=True).build(df)
+        y_all = y_all.astype(int)
+        n_total = len(X_all)
+        val_end = int(n_total * 0.80)
+        X_test_pfi = X_all.iloc[val_end:]
+        y_test_pfi = y_all.iloc[val_end:]
+        if len(X_test_pfi) >= 20:
+            run_pfi_analysis(trainer, X_test_pfi, y_test_pfi, result, symbol)
+        else:
+            logger.warning("PFI 생략: test set 샘플 부족 (%d < 20)", len(X_test_pfi))
+    except Exception as e:
+        logger.warning("PFI 분석 실패 (무시): %s", e)
 
     if result.passed:
         model_path = str(MODELS_DIR / f"{safe_symbol}_{timestamp}_rf_binary.pkl")

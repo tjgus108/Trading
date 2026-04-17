@@ -1,17 +1,25 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 146 - 합성 데이터 GARCH 교체 완료)_
+_Last updated: 2026-04-18 (Cycle 147 - 레짐 포지션 사이징 + PFI 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 147
-- 147 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** (표 기준 Cycle 2 패턴)
+### 로테이션: Cycle 148
+- 148 mod 5 = 3 → **E(실행) + A(품질) + F(리서치)** (표 기준 Cycle 3 패턴)
 
-### ✅ Cycle 146 완료 사항
+### ✅ Cycle 147 완료 사항
 
-#### 작업 1: 합성 데이터 GARCH(1,1) + Student-t 교체 ✅ COMPLETE
+#### 작업 1: 레짐 기반 포지션 사이징 live 연동 ✅ COMPLETE
+- live_paper_trader: REGIME_SIZE_MULT (TREND_UP 1.3x, TREND_DOWN 0.5x, HIGH_VOL 0.3x)
+- DrawdownMonitor: set_regime() + HIGH_VOL에서 일일 DD 2%로 축소
+
+#### 작업 2: ML PFI 분석 자동화 ✅ COMPLETE
+- train_ml.py: auto-retrain 후 PFI 자동 실행, feature_importance JSON 저장
+- RF: max_features='sqrt' 명시적 지정
+
+#### 이전: 합성 데이터 GARCH(1,1) + Student-t 교체 ✅ COMPLETE
 - **상태**: ✅ COMPLETE
 - **배경**: 기존 정상분포 기반 합성 데이터는 첨도 0.51로 비현실적 → fat tails 부재
 - **구현**:
