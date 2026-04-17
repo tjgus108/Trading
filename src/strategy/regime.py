@@ -114,3 +114,23 @@ class MarketRegimeDetector:
         cur = float(atr_ratio.iloc[-2]) if not pd.isna(atr_ratio.iloc[-2]) else 0.0
         avg = float(mean20.iloc[-2]) if not pd.isna(mean20.iloc[-2]) else float("inf")
         return cur > avg * self.vol_multiplier if avg > 0 else False
+
+    def _atr_regime_series(self, high, low, close) -> list:
+        """전체 시리즈에 대해 HIGH_VOL 여부 반환."""
+        tr = pd.concat([
+            high - low,
+            (high - close.shift(1)).abs(),
+            (low - close.shift(1)).abs(),
+        ], axis=1).max(axis=1)
+        atr14 = tr.rolling(14).mean()
+        atr_ratio = atr14 / close.replace(0, np.nan)
+        mean20 = atr_ratio.rolling(20).mean()
+        result = []
+        for i in range(len(close)):
+            r = atr_ratio.iloc[i]
+            m = mean20.iloc[i]
+            if pd.isna(r) or pd.isna(m) or m <= 0:
+                result.append(False)
+            else:
+                result.append(r > m * self.vol_multiplier)
+        return result

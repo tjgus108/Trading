@@ -25,6 +25,7 @@ from typing import Optional, Tuple, List
 
 DEFAULT_FORWARD_N = 5       # 5캔들 후 수익률로 레이블 생성
 DEFAULT_THRESHOLD = 0.003   # 0.3% 초과 시 BUY/SELL
+DEFAULT_BINARY_THRESHOLD = 0.01  # 2-class 모드: 1% 이상만 학습
 
 
 class FeatureBuilder:
@@ -36,14 +37,20 @@ class FeatureBuilder:
         self,
         forward_n: int = DEFAULT_FORWARD_N,
         threshold: float = DEFAULT_THRESHOLD,
+        binary: bool = False,
+        binary_threshold: float = DEFAULT_BINARY_THRESHOLD,
     ):
         """
         Args:
             forward_n: 레이블 생성 기준 — N 캔들 후 수익률 참조.
             threshold: BUY/SELL 판정 최소 수익률 (기본 0.003 = 0.3%).
+            binary: True면 2-class (UP=1/DOWN=0), |fwd_ret| < binary_threshold 제외.
+            binary_threshold: 2-class 모드에서 중립 구간 폭 (기본 1%).
         """
         self.forward_n = forward_n
         self.threshold = threshold
+        self.binary = binary
+        self.binary_threshold = binary_threshold
 
     def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -177,16 +184,21 @@ class FeatureBuilder:
         """
         forward_n 캔들 후 수익률 기반 레이블 생성.
 
-        Returns:
-            pd.Series[Int64]: 1(BUY) / -1(SELL) / 0(HOLD). 미래 데이터 부족한
-            마지막 forward_n 행은 NaN으로 반환 → build()의 dropna()에서 제거됨.
+        3-class 모드: 1(BUY) / -1(SELL) / 0(HOLD)
+        2-class 모드 (binary=True): 1(UP) / 0(DOWN), 중립 구간 NaN으로 제거
         """
         close = df["close"]
         fwd_ret = close.shift(-self.forward_n) / close - 1.0
+
+        if self.binary:
+            label = pd.Series(np.nan, index=df.index, name="label", dtype=float)
+            label[fwd_ret >= self.binary_threshold] = 1.0
+            label[fwd_ret <= -self.binary_threshold] = 0.0
+            return label.astype("Int64")
+
         label = pd.Series(np.nan, index=df.index, name="label", dtype=float)
         label[fwd_ret > self.threshold] = 1.0
         label[fwd_ret < -self.threshold] = -1.0
-        # 미래 데이터가 없는 마지막 forward_n 행은 NaN → build()의 dropna()에서 제거
         label[~fwd_ret.isna()] = label[~fwd_ret.isna()].fillna(0.0)
         return label.astype("Int64")
 

@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.strategy.base import Action, BaseStrategy
 from src.strategy.rotation import StrategyRotationManager
-from src.strategy.regime import MarketRegimeDetector
+from src.strategy.regime import MarketRegimeDetector, MarketRegime
 from src.exchange.paper_trader import PaperTrader
 from src.risk.circuit_breaker import CircuitBreaker
 
@@ -363,6 +363,10 @@ class LivePaperTrader:
             return
         if size_mult < 1.0:
             logger.info("[%s] CircuitBreaker size_mult=%.1f", symbol, size_mult)
+
+        if regime == MarketRegime.RANGING:
+            logger.info("[%s] RANGING regime — skipping new entries", symbol)
+            return
 
         strategies = self.symbol_strategies.get(symbol, {})
         for name, strategy in strategies.items():

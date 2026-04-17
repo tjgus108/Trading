@@ -1,45 +1,45 @@
 # Next Steps
 
-_Last updated: 2026-04-17 (멀티심볼 live paper trader 배포)_
+_Last updated: 2026-04-18 (레짐분석 + ML 2-class 결과)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 143
-- 143 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** (표 기준 Cycle 4 패턴)
+### 로테이션: Cycle 144
+- 144 mod 5 = 4 → **A(전략) + C(데이터) + F(리서치)** (표 기준 Cycle 5 패턴)
 
-### ⚠️ 핵심 문제: 전략 엣지 부재
+### ⚠️ 핵심 문제: 전략 엣지 부재 → 해법 확인됨
 
-22개 전략 모두 실데이터 6개월 WF에서 0 PASS. 인프라/리스크/검증 파이프라인은 완성됐으나 **전략 자체에 엣지가 없음**이 확인됨.
+22개 전략 모두 실데이터 6개월 WF에서 0 PASS. **하지만 두 가지 유효한 경로 발견:**
+
+#### 경로 1: ML 2-class (UP/DOWN) — **PASS 확인**
+- BTC 1000캔들(42일): test acc 63.5%, val 67.3% → **PASS**
+- 1500+ 캔들에서는 FAIL (레짐 변화로 패턴 소멸)
+- **구현 방향**: 최근 1000캔들로 학습, 주 1회 재학습, binary_threshold=0.01
+- 코드: `scripts/train_ml.py --binary --bybit --limit 1000`
+
+#### 경로 2: 레짐 필터링
+- BTC 레짐 분석 결과:
+  - RANGING (1213 candles, 28%): 모든 전략 -3~-4 Sharpe → **거래 금지**
+  - TREND_UP (350 candles, 8%): narrow_range Sharpe +1.25 → 조건부 활성화
+  - TREND_DOWN (739 candles, 17%): 대부분 음수 → 거래 금지 or 숏 전용
+- **구현 방향**: live_paper_trader에 레짐 필터 추가, RANGING에서 시그널 무시
 
 **완료:**
-- ~~슬리피지 현실화~~: 0.1% (Cycle 140)
-- ~~MIN_TRADES 조정~~: 15 (Cycle 140)
-- ~~MC Permutation gate~~: 500 perms, p<0.05 (Cycle 140)
-- ~~Regime Detection~~: ADX+EMA+ATR (이전 세션)
-- ~~CircuitBreaker 통합~~: live paper trader (Cycle 140)
-- ~~실패 테스트 수정~~: 14개 → 0개 (Cycle 142)
+- ~~슬리피지 현실화~~: 0.1%
+- ~~MIN_TRADES 조정~~: 15
+- ~~MC Permutation gate~~: 500 perms, sign randomization, p<0.05
+- ~~Regime Detection~~: ADX+EMA+ATR 벡터라이즈
+- ~~CircuitBreaker 통합~~: live paper trader
+- ~~실패 테스트 수정~~: 14개 → 0개
+- ~~파라미터 최적화~~: grid search + WF (3 전략, BTC/ETH)
+- ~~ML 2-class 모드~~: binary=True (UP/DOWN), threshold 1%
+- ~~레짐별 성과 분석~~: 벡터라이즈 감지 + chunk 백테스트
 
-**남은 과제:**
-1. **전략 엣지 확보**: 기존 전략 파라미터 최적화 또는 새로운 접근 (WFA 기준 유지)
-2. 합성 데이터 GARCH 교체
-3. ML RF 모델 개선 (3-class → 2-class, test acc 37% → 55%+)
-4. 전략 상관관계 모니터링
-5. OOS 기간 확장 (1개월 → 3개월)
-
-### 최근 완료
-- **Live Paper Trader 멀티심볼**: BTC/ETH/SOL 3심볼 동시 운영 (7일, 1시간 간격)
-- **리스크 수정**: 슬리피지 0.05→0.0005, RISK 1%→0.5%, SL ATR*2.5, TP ATR*4, MAX_POS=5
-- **Regime Detection**: ADX+EMA+ATR 기반 시장 상태 분류 (TREND_UP/DOWN, RANGING, HIGH_VOL)
-- **Strategy Rotation**: 30일 주기 재검증, rotation_state.json 기반 PASS/FAIL 관리
-
-### 후속 과제 (미착수)
-- ~~슬리피지 현실화~~ → Cycle 140 완료 (0.05→0.1%)
-- ~~Monte Carlo Permutation gate~~ → Cycle 140 완료 (500 perms, p<0.05)
-- 합성 데이터 GARCH 교체
-- ~~Regime Detection 구현~~ → 이전 세션 완료 (ADX+EMA+ATR)
-- 전략 상관관계 모니터링
-- OOS 기간 확장 (1개월 → 3개월)
-- ML RF 모델 개선: 3-class → 2-class, threshold 0.003→0.01, max_depth 제한
-- live paper trader에 ML 시그널 연동 (모델 PASS 이후)
+**다음 구현 과제 (우선순위):**
+1. **live_paper_trader 레짐 필터** — RANGING에서 시그널 무시
+2. **ML 자동 재학습 파이프라인** — 주 1회, 최근 1000캔들
+3. **ML 시그널 live 연동** — PASS 모델 로드 → 시그널 생성
+4. 합성 데이터 GARCH 교체
+5. 전략 상관관계 모니터링

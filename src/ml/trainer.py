@@ -132,11 +132,16 @@ class WalkForwardTrainer:
         max_depth: int = 6,
         forward_n: int = 5,
         threshold: float = 0.003,
+        binary: bool = False,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
         self.max_depth = max_depth
-        self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
+        self.binary = binary
+        self.feature_builder = FeatureBuilder(
+            forward_n=forward_n, threshold=threshold,
+            binary=binary,
+        )
         self._trained_model = None
         self._class_order: Optional[List[int]] = None
         self._feature_names: List[str] = []

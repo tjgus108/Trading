@@ -1,0 +1,27 @@
+2026-04-17 23:20:34 [INFO] ============================================================
+2026-04-17 23:20:34 [INFO] Live Paper Trader starting (days=7, interval=3600s)
+2026-04-17 23:20:34 [INFO] ============================================================
+2026-04-17 23:20:34 [INFO] [BTC/USDT] Fallback: 5 strategies
+2026-04-17 23:20:37 [INFO] [BTC/USDT] Data: 200 candles
+2026-04-17 23:20:37 [INFO] [ETH/USDT] Rotation PASS: ['lob_maker']
+2026-04-17 23:20:39 [INFO] [ETH/USDT] Data: 200 candles
+2026-04-17 23:20:39 [INFO] [SOL/USDT] Rotation PASS: ['lob_maker']
+2026-04-17 23:20:43 [INFO] [SOL/USDT] Data: 200 candles
+2026-04-17 23:20:45 [INFO] [BTC/USDT] Tick 1 | $77259.30 | TREND_UP | pos=0/2
+2026-04-17 23:20:45 [INFO]   [BTC/USDT:cmf] BUY @ $77259.43 (size=0.012943)
+2026-04-17 23:20:45 [INFO]   [BTC/USDT:momentum_quality] BUY @ $77259.39 (size=0.011648)
+2026-04-17 23:20:47 [INFO] [ETH/USDT] Tick 1 | $2429.55 | TREND_UP | pos=0/2
+2026-04-17 23:20:47 [INFO]   [ETH/USDT:lob_maker] BUY @ $2429.56 (size=0.333321)
+2026-04-17 23:20:51 [INFO] [SOL/USDT] Tick 1 | $89.87 | TREND_UP | pos=0/2
+2026-04-18 00:20:54 [INFO] [BTC/USDT] Tick 2 | $77846.20 | TREND_UP | pos=2/2
+2026-04-18 00:20:57 [INFO] [ETH/USDT] Tick 2 | $2443.28 | TREND_UP | pos=1/2
+2026-04-18 00:21:00 [INFO] [SOL/USDT] Tick 2 | $89.92 | TREND_UP | pos=0/2
+2026-04-18 01:21:24 [INFO] [BTC/USDT] Tick 3 | $78141.90 | TREND_UP | pos=2/2
+2026-04-18 01:21:27 [INFO] [ETH/USDT] Tick 3 | $2451.91 | TREND_UP | pos=1/2
+2026-04-18 01:21:29 [INFO] [SOL/USDT] Tick 3 | $90.23 | TREND_UP | pos=0/2
+2026-04-18 02:21:56 [INFO] [BTC/USDT] Tick 4 | $77254.80 | TREND_UP | pos=2/2
+2026-04-18 02:21:59 [INFO] [ETH/USDT] Tick 4 | $2430.89 | TREND_UP | pos=1/2
+2026-04-18 02:22:01 [INFO] [SOL/USDT] Tick 4 | $89.47 | TREND_UP | pos=0/2
+2026-04-18 03:22:28 [INFO] [BTC/USDT] Tick 5 | $77113.30 | TREND_UP | pos=2/2
+2026-04-18 03:22:30 [INFO] [ETH/USDT] Tick 5 | $2416.68 | TREND_UP | pos=1/2
+2026-04-18 03:22:32 [INFO] [SOL/USDT] Tick 5 | $89.03 | TREND_UP | pos=0/2

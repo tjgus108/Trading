@@ -144,7 +144,7 @@ def walk_forward_optimize(
     strategy_name: str,
     grid_config: dict,
     df: pd.DataFrame,
-    train_hours: int = 2880,
+    train_hours: int = 1440,
     test_hours: int = 720,
 ) -> list[dict]:
     """Grid search + Walk-Forward로 최적 파라미터 탐색."""
@@ -228,6 +228,42 @@ def walk_forward_optimize(
     return results
 
 
+# ── 레짐 벡터라이즈 감지 ────────────────────────────────────
+
+def _detect_regimes_vectorized(df: pd.DataFrame, detector: MarketRegimeDetector) -> list:
+    """전체 DataFrame에 대해 벡터화된 레짐 감지."""
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
+
+    adx_s, plus_di, minus_di = detector._adx(high, low, close, period=14)
+    atr_regime_mask = detector._atr_regime_series(high, low, close)
+    ema20 = close.ewm(span=20, adjust=False).mean()
+    ema50 = close.ewm(span=50, adjust=False).mean()
+
+    regimes = []
+    for i in range(len(df)):
+        if i < 59:
+            regimes.append(MarketRegime.RANGING)
+            continue
+        if atr_regime_mask[i]:
+            regimes.append(MarketRegime.HIGH_VOL)
+        elif not pd.isna(adx_s.iloc[i]) and adx_s.iloc[i] > detector.adx_threshold:
+            p = plus_di.iloc[i] if not pd.isna(plus_di.iloc[i]) else 0.0
+            m = minus_di.iloc[i] if not pd.isna(minus_di.iloc[i]) else 0.0
+            e20 = ema20.iloc[i]
+            e50 = ema50.iloc[i]
+            if p > m and e20 > e50:
+                regimes.append(MarketRegime.TREND_UP)
+            elif m > p and e20 < e50:
+                regimes.append(MarketRegime.TREND_DOWN)
+            else:
+                regimes.append(MarketRegime.RANGING)
+        else:
+            regimes.append(MarketRegime.RANGING)
+    return regimes
+
+
 # ── 레짐별 분석 ─────────────────────────────────────────────
 
 def regime_analysis(
@@ -251,24 +287,23 @@ def regime_analysis(
         slippage_pct=0.001,
     )
 
-    regimes = detector.detect_history(df)
+    regimes = _detect_regimes_vectorized(df, detector)
     regime_results = {}
 
     for regime in MarketRegime:
-        regime_mask = [r == regime for r in regimes]
-        regime_indices = [i for i, m in enumerate(regime_mask) if m]
+        regime_indices = [i for i, r in enumerate(regimes) if r == regime]
 
-        if len(regime_indices) < 200:
+        if len(regime_indices) < 100:
             continue
 
         chunks = []
         chunk_start = regime_indices[0]
         for i in range(1, len(regime_indices)):
             if regime_indices[i] - regime_indices[i - 1] > 5:
-                if regime_indices[i - 1] - chunk_start >= 48:
+                if regime_indices[i - 1] - chunk_start >= 24:
                     chunks.append((chunk_start, regime_indices[i - 1] + 1))
                 chunk_start = regime_indices[i]
-        if regime_indices[-1] - chunk_start >= 48:
+        if regime_indices[-1] - chunk_start >= 24:
             chunks.append((chunk_start, regime_indices[-1] + 1))
 
         if not chunks:
@@ -276,8 +311,8 @@ def regime_analysis(
 
         chunk_results = []
         for start, end in chunks:
-            chunk_df = df.iloc[max(0, start - 200):end]
-            if len(chunk_df) < 200:
+            chunk_df = df.iloc[max(0, start - 100):end]
+            if len(chunk_df) < 100:
                 continue
             result = engine.run(strategy, chunk_df)
             chunk_results.append({
@@ -377,8 +412,10 @@ def main():
     lines.append("")
 
     report = "\n".join(lines)
-    REPORT_PATH.write_text(report)
-    logger.info("Report saved to %s", REPORT_PATH)
+    sym_tag = args.symbol.replace("/", "").upper()
+    report_path = ROOT / ".claude-state" / f"OPTIMIZATION_REPORT_{sym_tag}.md"
+    report_path.write_text(report)
+    logger.info("Report saved to %s", report_path)
     print(report)
 
 

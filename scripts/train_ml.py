@@ -30,6 +30,7 @@ def parse_args():
     p.add_argument("--limit", type=int, default=1000)
     p.add_argument("--demo", action="store_true", help="MockExchangeConnector 사용")
     p.add_argument("--bybit", action="store_true", help="ccxt Bybit 직접 fetch (API 키 불필요)")
+    p.add_argument("--binary", action="store_true", help="2-class (UP/DOWN) 모드, HOLD 제거")
     return p.parse_args()
 
 
@@ -56,9 +57,9 @@ def fetch_df(connector, symbol: str, timeframe: str, limit: int):
     return summary.df
 
 
-def train_rf(df, symbol: str):
+def train_rf(df, symbol: str, binary: bool = False):
     from src.ml.trainer import WalkForwardTrainer
-    trainer = WalkForwardTrainer(symbol=symbol)
+    trainer = WalkForwardTrainer(symbol=symbol, binary=binary)
     result = trainer.train(df)
     print(result.summary())
     if result.passed:
@@ -145,7 +146,7 @@ def main():
         df = fetch_df(connector, args.symbol, args.timeframe, args.limit)
 
     if args.model == "rf":
-        train_rf(df, args.symbol)
+        train_rf(df, args.symbol, binary=args.binary)
     else:
         train_lstm(df, args.symbol)
 
