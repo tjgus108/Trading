@@ -7,8 +7,8 @@ VolatilityClusterStrategy (improved v3):
   - direction = close의 10봉 모멘텀
   - sma10 = 10봉 이동평균 (트렌드 확인)
 - 신호:
-  - BUY: vol_ratio < 0.5 AND direction > 0 AND close > sma10
-  - SELL: vol_ratio < 0.5 AND direction < 0 AND close < sma10
+  - BUY: vol_ratio < 0.6 AND direction > 0 AND close > sma10
+  - SELL: vol_ratio < 0.6 AND direction < 0 AND close < sma10
   - HIGH confidence: vol_ratio < 0.3
 - 최소 데이터: 30행
 """
@@ -23,7 +23,7 @@ _MIN_ROWS = 30
 _VOL_SHORT = 5
 _VOL_LONG = 20
 _DIRECTION_PERIOD = 10
-_LOW_VOL_THRESH = 0.5
+_LOW_VOL_THRESH = 0.6  # IMPROVED:
 _HIGH_CONF_THRESH = 0.3
 _SMA_PERIOD = 10
 

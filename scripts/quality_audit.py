@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.strategy.base import BaseStrategy, Action
 from src.backtest.engine import BacktestEngine, BacktestResult
+from typing import List, Tuple, Optional
 
 
 def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
@@ -101,7 +102,7 @@ def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
-def find_strategy_classes() -> list[tuple[str, str, type]]:
+def find_strategy_classes() -> List[Tuple[str, str, type]]:
     """src/strategy/ 내 모든 BaseStrategy 하위 클래스를 찾는다."""
     strategy_dir = Path(__file__).resolve().parent.parent / "src" / "strategy"
     results = []

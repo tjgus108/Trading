@@ -3,7 +3,7 @@ ROCMACrossStrategy v3 (Cycle 122):
 
 개선 사항:
 - RSI 필터 추가: BUY시 RSI<70, SELL시 RSI>30 (과매수/과매도 회피)
-- ROC 절대값 필터 강화: abs(ROC) > 0.5% 요구 (신호 신뢰도 향상)
+- ROC 절대값 필터 강화: abs(ROC) > 0.3% 요구 (더 민감하게) (신호 신뢰도 향상)
 - EMA50/200 이중 필터: 중장기 추세 확인
 - 목표: PF 1.577 → 1.75+, Win Rate 50% → 55%+
 
@@ -11,7 +11,7 @@ ROCMACrossStrategy v3 (Cycle 122):
 - ROC = (close / close.shift(12) - 1) * 100
 - ROC_MA = ROC.rolling(3).mean() (스무딩)
 - BUY: ROC_MA 0 상향 + ROC>0.5% + RSI<70 + close > EMA50/200
-- SELL: ROC_MA 0 하향 + ROC<-0.5% + RSI>30 + close < EMA50/200
+- SELL: ROC_MA 0 하향 + ROC<-0.3% + RSI>30 + close < EMA50/200
 """
 
 import pandas as pd
@@ -23,7 +23,7 @@ _ROC_PERIOD = 12
 _MA_PERIOD = 3
 _STD_PERIOD = 20
 _STD_MULT = 2.0
-_ROC_MIN_ABS = 0.5  # ✅ NEW: ROC 절대값 최소값 (0.5%)
+_ROC_MIN_ABS = 0.3  # IMPROVED:: ROC 절대값 최소값 (0.5%)
 
 
 class ROCMACrossStrategy(BaseStrategy):
@@ -115,7 +115,7 @@ class ROCMACrossStrategy(BaseStrategy):
                 bear_case="단순 조정 후 재하락 가능",
             )
 
-        # SELL: ROC_MA 하향 + ROC<-0.5% + RSI>30 + close < EMA50 + (EMA200 확인 or 없음)
+        # SELL: ROC_MA 하향 + ROC<-0.3% + RSI>30 + close < EMA50 + (EMA200 확인 or 없음)
         if (cross_below and 
             abs(roc_now) > _ROC_MIN_ABS and roc_now < 0 and
             rsi_val > 30 and

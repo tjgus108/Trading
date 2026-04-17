@@ -12,6 +12,7 @@ Paper Trading 시뮬레이션 — 실제 Bybit 데이터로 전략들을 Walk-Fo
 5. 결과를 .claude-state/PAPER_SIMULATION_REPORT.md에 기록
 """
 from __future__ import annotations
+from typing import Optional, List, Dict, Tuple, Set
 
 import importlib
 import json
@@ -63,7 +64,7 @@ def fetch_real_data_paginated(
     timeframe: str = "1h",
     total_candles: int = 8760,  # 1년 (365일 * 24h)
     batch_size: int = 1000,
-) -> pd.DataFrame | None:
+) -> pd.Optional[DataFrame]:
     """Bybit에서 페이지네이션으로 장기 OHLCV 데이터 수집. 실패 시 None."""
     try:
         import ccxt
@@ -180,7 +181,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 # ── 전략 로드 ──────────────────────────────────────────────
 
-def load_pass_strategies() -> list[tuple[str, str]]:
+def load_pass_strategies() -> List[Tuple[str, str]]:
     """QUALITY_AUDIT.csv에서 PASS 전략만 로드."""
     if CSV_PATH.exists():
         df = pd.read_csv(CSV_PATH)
@@ -206,7 +207,7 @@ def load_strategy_class(module_name: str, class_name: str):
 
 # ── Walk-Forward 평가 ──────────────────────────────────────
 
-def make_walk_forward_windows(df: pd.DataFrame) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+def make_walk_forward_windows(df: pd.DataFrame) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
     """데이터를 훈련/테스트 윈도우로 분할.
     Returns: [(train_df, test_df), ...]
     """
@@ -245,7 +246,7 @@ def make_walk_forward_windows(df: pd.DataFrame) -> list[tuple[pd.DataFrame, pd.D
 
 def evaluate_strategy_walk_forward(
     strategy_cls,
-    windows: list[tuple[pd.DataFrame, pd.DataFrame]],
+    windows: List[Tuple[pd.DataFrame, pd.DataFrame]],
     engine: BacktestEngine,
 ) -> dict:
     """Walk-Forward로 전략을 평가. 각 윈도우의 테스트 구간에서 백테스트 실행.
@@ -316,7 +317,7 @@ def evaluate_strategy_walk_forward(
 
 # ── 리포트 ──────────────────────────────────────────────────
 
-def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT") -> str:
+def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT") -> str:
     results.sort(key=lambda x: x["avg_return"], reverse=True)
     lines = []
     lines.append(f"# Paper Trading 시뮬레이션 리포트 — {symbol} (Walk-Forward)\n")
@@ -391,7 +392,7 @@ def generate_report(results: list[dict], data_source: str, df: pd.DataFrame, win
 # ── 구조화 데이터 저장 ──────────────────────────────────────
 
 
-def export_results_json(all_symbol_results: dict[str, list[dict]], metadata: dict) -> None:
+def export_results_json(all_symbol_results: Dict[str, List[dict]], metadata: dict) -> None:
     """심볼별 전략 결과를 JSON으로 저장. 윈도우별 상세 포함."""
     output = {
         "metadata": metadata,
@@ -422,7 +423,7 @@ def export_results_json(all_symbol_results: dict[str, list[dict]], metadata: dic
     print(f"[EXPORT] JSON saved to {RESULTS_JSON_PATH}")
 
 
-def export_results_csv(all_symbol_results: dict[str, list[dict]]) -> None:
+def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
     """심볼별 전략 요약을 flat CSV로 저장 (한 행 = 한 전략×심볼)."""
     rows = []
     for symbol, results in all_symbol_results.items():
@@ -454,7 +455,7 @@ def export_results_csv(all_symbol_results: dict[str, list[dict]]) -> None:
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
-def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> tuple[str, list[dict]]:
+def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tuple[str, List[dict]]:
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
@@ -526,7 +527,7 @@ def run_simulation():
     )
 
     sections = []
-    all_symbol_results: dict[str, list[dict]] = {}
+    all_symbol_results: Dict[str, List[dict]] = {}
     fatal_count = 0
     for symbol in SYMBOLS:
         try:
