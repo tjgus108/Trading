@@ -1,5 +1,32 @@
 # Work Log
 
+## [2026-04-18] Cycle 145 — D + E + F (ML 재학습 파이프라인 + live 연동)
+
+**[D] ML & Signals:**
+- train_ml.py `--auto-retrain` 모드 추가: 최근 1000캔들 fetch → binary RF 학습 → PASS 시 모델 저장
+  - 모델 형식: `models/{symbol}_{timestamp}_rf_binary.pkl`
+  - 결과 기록: `models/retrain_log.json` (누적)
+  - PASS 기준: test/val accuracy >= 55%
+- `--predict` 모드 추가: 저장된 모델 로드 → 현재 데이터 예측
+  - `--model-file` 지정 또는 최신 자동 선택
+
+**[E] Execution:**
+- live_paper_trader ML 시그널 연동: `--ml-filter` 옵션
+  - `load_ml_model()`: models/ 에서 최신 모델 자동 로드 (joblib)
+  - `get_ml_features()`: 피처 10개 생성 (rsi14, atr14, sma20, ema50 등)
+  - `predict_ml_signal()`: UP/DOWN 이진 분류 + confidence
+  - BUY+ML_DOWN → 차단, SELL+ML_UP → 차단
+- TWAP 실행기 검증: 정상 동작 확인, filled 기본값 0.0으로 안전화
+
+**[F] Research:**
+- ML 재학습 빈도: 크립토 주 단위 권장 (42일 창 + 주 1회가 현실적)
+- Feature decay: PFI 재측정으로 소멸 피처 탈락, 순위 변화 시 재학습 트리거
+- CPCV: mlfinlab CombinatorialPurgedKFold (N=8, k=2) → 현재 단순 split 대체 가능
+- 앙상블 다양성: 다른 피처 서브셋 + 다른 알고리즘 + 다른 시간 창
+- 레짐 전환점 = feature decay 가속 → 레짐 필터 + 재학습 연동 권장
+
+---
+
 ## [2026-04-18] Cycle 144 — C + B + F (레짐 필터 + 리스크 검증)
 
 **[C] Data & Infrastructure — 레짐 필터 구현 완료:**
@@ -12318,3 +12345,6 @@ Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-17 18:42 UTC] Cycle 144 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 19:10 UTC] Cycle 145 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
