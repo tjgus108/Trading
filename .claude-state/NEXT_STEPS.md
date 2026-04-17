@@ -34,8 +34,9 @@ _Last updated: 2026-04-17 (멀티심볼 live paper trader 배포)_
 - **Strategy Rotation**: 30일 주기 재검증, rotation_state.json 기반 PASS/FAIL 관리
 
 ### 후속 과제 (미착수)
-- 슬리피지 현실화 (0.05→0.2%)
+- ~~슬리피지 현실화~~ → Cycle 140 완료 (0.05→0.1%)
+- ~~Monte Carlo Permutation gate~~ → Cycle 140 완료 (500 perms, p<0.05)
 - 합성 데이터 GARCH 교체
-- Monte Carlo Permutation gate
-- Regime Detection 구현
+- ~~Regime Detection 구현~~ → 이전 세션 완료 (ADX+EMA+ATR)
 - 전략 상관관계 모니터링
+- OOS 기간 확장 (1개월 → 3개월)

@@ -45,6 +45,7 @@ from src.strategy.base import Action, BaseStrategy
 from src.strategy.rotation import StrategyRotationManager
 from src.strategy.regime import MarketRegimeDetector
 from src.exchange.paper_trader import PaperTrader
+from src.risk.circuit_breaker import CircuitBreaker
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / ".claude-state"
@@ -224,13 +225,20 @@ class LivePaperTrader:
         self.paper = PaperTrader(
             initial_balance=self.state.portfolio_balance,
             fee_rate=0.001,
-            slippage_pct=0.0005,
+            slippage_pct=0.001,
             partial_fill_prob=0.0,
             timeout_prob=0.0,
         )
         self.symbol_strategies: dict[str, dict[str, BaseStrategy]] = {}  # symbol -> {name: strategy}
         self.rotation = StrategyRotationManager()
         self.regime_detector = MarketRegimeDetector()
+        self.circuit_breaker = CircuitBreaker(
+            daily_drawdown_limit=0.03,
+            total_drawdown_limit=0.15,
+            max_consecutive_losses=5,
+            cooldown_periods=3,
+        )
+        self._daily_start_balance: float = self.state.portfolio_balance
         self.running = True
         self._df_caches: dict[str, pd.DataFrame] = {}  # symbol -> df
 
@@ -304,9 +312,12 @@ class LivePaperTrader:
             "positions": len(self.state.open_positions),
         })
 
+        self.circuit_breaker.tick_cooldown()
+
         now = time.time()
         if now - self.state.last_report_time >= REPORT_INTERVAL:
             self._generate_report()
+            self._daily_start_balance = self.state.portfolio_balance
             self.state.last_report_time = now
 
         self.state.save()
@@ -337,6 +348,21 @@ class LivePaperTrader:
                      regime.value, len(sym_positions), MAX_PER_SYMBOL_POSITIONS)
 
         self._manage_positions_for_symbol(symbol, latest)
+
+        cb_result = self.circuit_breaker.check(
+            current_balance=self.state.portfolio_balance,
+            peak_balance=self.state.portfolio_peak,
+            daily_start_balance=self._daily_start_balance,
+            current_atr=float(latest["atr14"]) if "atr14" in latest.index else None,
+            candle_open=float(latest["open"]),
+            candle_close=float(latest["close"]),
+        )
+        size_mult = cb_result["size_multiplier"]
+        if cb_result["triggered"]:
+            logger.warning("[%s] CircuitBreaker TRIGGERED: %s", symbol, cb_result["reason"])
+            return
+        if size_mult < 1.0:
+            logger.info("[%s] CircuitBreaker size_mult=%.1f", symbol, size_mult)
 
         strategies = self.symbol_strategies.get(symbol, {})
         for name, strategy in strategies.items():
@@ -369,6 +395,7 @@ class LivePaperTrader:
 
                 max_size = (self.state.portfolio_balance * 0.10) / current_price
                 size = min(size, max_size)
+                size *= size_mult
 
                 if size * current_price < 10:
                     continue
@@ -494,6 +521,7 @@ class LivePaperTrader:
                     "hold_candles": pos["hold_candles"],
                 })
 
+                self.circuit_breaker.record_trade_result(is_loss=(pnl <= 0))
                 logger.info("  [%s] CLOSED %s @ $%.2f -> $%.2f | PnL: $%.2f (%s)",
                             name, side, pos["entry"], exit_price, pnl, reason)
                 closed.append(name)

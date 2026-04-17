@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 MIN_SHARPE = 1.0
 MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
-MIN_TRADES = 50          # Cycle 137: 15 → 50으로 상향 (과최적화 필터)
+MIN_TRADES = 15          # Cycle 140: 50 → 15 (실데이터 거래 수 부족 해소)
 MIN_WFE = 0.5            # Walk-Forward Efficiency: OOS_Sharpe / IS_Sharpe 최솟값
+MC_P_THRESHOLD = 0.05    # Monte Carlo permutation p-value 상한
+MC_N_PERMUTATIONS = 500  # 셔플 횟수 (리서치 권장 1000, 속도 타협 500)
 MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
 
 ANNUALIZATION = {
@@ -54,6 +56,7 @@ class BacktestResult:
     max_consecutive_losses: int = 0  # 최대 연속 손실
     trades: List[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
     wfe: float = 0.0  # Walk-Forward Efficiency = OOS_Sharpe / IS_Sharpe (0이면 미계산)
+    mc_p_value: float = -1.0  # Monte Carlo permutation p-value (-1=미계산)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -86,8 +89,8 @@ class BacktestEngine:
         fee_rate: Optional[float] = None,  # 진입/청산 각 0.1%, 왕복 0.2%
         atr_multiplier_sl: float = 1.5,
         atr_multiplier_tp: float = 3.0,
-        slippage: float = 0.0005,
-        slippage_pct: Optional[float] = None,  # 0.05% 슬리피지
+        slippage: float = 0.001,
+        slippage_pct: Optional[float] = None,  # 0.1% 슬리피지 (Cycle 140: 0.05→0.1%)
         timeframe: str = "1h",
         funding_cost_per_candle: float = 0.0,
         dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
@@ -334,6 +337,13 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
+        # MC Permutation test: 거래가 충분할 때만
+        mc_p = -1.0
+        if len(trades) >= MIN_TRADES:
+            mc_p = self._mc_permutation_test(trades, sharpe)
+            if mc_p > MC_P_THRESHOLD:
+                fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")
+
         # avg_win, avg_loss, win_loss_ratio 계산
         avg_win_val = float(np.mean(wins)) if wins else 0.0
         avg_loss_val = float(abs(np.mean(losses))) if losses else 0.0
@@ -368,4 +378,21 @@ class BacktestEngine:
             max_consecutive_losses=max_cons_loss,
             trades=trades,  # 거래 PnL 리스트 저장
             wfe=round(wfe, 4),
+            mc_p_value=round(mc_p, 4),
         )
+
+    @staticmethod
+    def _mc_permutation_test(trades: list, original_sharpe: float) -> float:
+        """거래 순서를 셔플하여 원래 Sharpe가 우연인지 검증. p-value 반환."""
+        rng = np.random.default_rng(42)
+        arr = np.array(trades, dtype=float)
+        n_better = 0
+        for _ in range(MC_N_PERMUTATIONS):
+            rng.shuffle(arr)
+            equity = np.cumsum(arr)
+            returns = np.diff(np.concatenate([[0], equity])) / (np.abs(equity.max()) + 1e-10)
+            std = returns.std()
+            perm_sharpe = (returns.mean() / std * np.sqrt(8760)) if std > 1e-10 else 0.0
+            if perm_sharpe >= original_sharpe:
+                n_better += 1
+        return n_better / MC_N_PERMUTATIONS

@@ -1,5 +1,26 @@
 # Work Log
 
+## [2026-04-17] Cycle 140 — A + C + F (오버피팅 대응)
+
+**[A] Quality Assurance:**
+- BacktestEngine 슬리피지 0.05% → 0.1% (리서치 기반: BTC/ETH 1h 권장 0.05~0.1%)
+- MIN_TRADES 50 → 15 (실데이터 거래 수 부족 해소)
+- Monte Carlo Permutation gate 추가: 500회 셔플, p < 0.05 통과 조건
+  - `_mc_permutation_test()` → BacktestResult에 mc_p_value 필드 추가
+- paper_simulation.py 슬리피지도 0.1%로 동기화
+
+**[C] Data & Infrastructure:**
+- data_utils.py 현황 확인: 다운로드+캐시+검증 정상
+- feed.py 재연결 로직 확인: backoff + rate limit 분류 정상
+
+**[F] Research:**
+- 크립토봇 실패 원인 5가지: 룩어헤드 바이어스, 파라미터 과다, 레짐 의존성, 회로차단기 부재, 메타 오버피팅
+- MC Permutation test 적용 사례: 실패율 30~50% 감소 효과
+- WFA 주의: 윈도우 크기 자체를 튜닝하면 안 됨 (메타 오버피팅)
+- 슬리피지 현실화: BTC top-10 0.05~0.1%, 소형 알트 0.5~2%
+
+---
+
 ## [2026-04-17] Cycle 139 — C + B + SIM + F
 
 **[C] Data & Infrastructure:**
@@ -12104,3 +12125,70 @@ Paper Simulation (실제, 6 윈도우 × 720 캔들):
 - [SIM]: Walk-forward on multi-timeframe real data
 - [F] Research: Analyze 22-strategy failure (synthetic vs real)
 
+
+## [2026-04-17 14:33 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-17 14:33 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-17 14:33 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures

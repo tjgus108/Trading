@@ -523,7 +523,7 @@ def run_simulation():
     engine = BacktestEngine(
         initial_balance=10_000,
         fee_rate=0.001,
-        slippage_pct=0.0005,
+        slippage_pct=0.001,
     )
 
     sections = []
