@@ -11997,3 +11997,77 @@ Paper Simulation (실제, 6 윈도우 × 720 캔들):
 
 **다음 사이클 포커스**: MIN_TRADES 조정 + Slippage 현실화 + Real data 기반 PASS 기준
 
+
+---
+
+## [2026-04-17] Cycle 139 — C (Data & Infrastructure)
+
+**[C] Data Infrastructure — Real Data Download & Validation:**
+
+**New Module: `src/data/data_utils.py` (480 lines)**
+- `HistoricalDataDownloader`: ccxt 기반 거래소 OHLCV 다운로드
+  - Paginated fetching (rate limit 대응)
+  - Parquet 캐싱 (중복 다운로드 방지)
+  - 다중 타임프레임 지원 (1m, 5m, 15m, 1h, 4h, 1d)
+  - Exponential backoff 재시도 (configurable max_retries)
+  
+- `DataValidationReport`: 구조화된 검증 결과
+  - 데이터 품질점수 (0-100%)
+  - Missing candles 카운트 & gap 구간
+  - OHLC 관계 검증 (high≥max(O,C), low≤min(O,C), high≥low)
+  - 이상탐지 (음수 가격, >10% 단일캔들 점프)
+  
+- `download_multi_timeframe()`: 배치 다운로드 헬퍼
+
+**Enhanced `src/data/feed.py` (440 lines → 480 lines)**
+- New: `ensure_connected(max_retries=3)` → bool
+  - Health check (connector.health_check())
+  - Auto-reconnect with exponential backoff
+  - Cache invalidation post-reconnection
+  
+- New: `validate_fetch_result(summary)` → bool
+  - Min candles: 50 (insufficient data 방지)
+  - Max missing ratio: 5% (초과 시 경고)
+  - Anomaly 리포팅
+  
+- Fix: Error classification 함수들 (ccxt=None 안전 처리)
+  - `_is_transient_error()`: TimeoutError, ConnectionError 우선 체크
+  - `_is_fatal_error()`: ValueError, KeyError 항상, ccxt 예외 선택적
+  - `_is_rate_limit_error()`: ccxt=None 체크 후 RateLimitExceeded
+
+**Updated `src/data/__init__.py`**
+- Lazy exports: HistoricalDataDownloader, DataValidationReport, download_multi_timeframe
+
+**Test Coverage: `tests/test_data_utils.py` (420 lines)**
+- DataValidationReport: 2/2 PASS
+- HistoricalDataDownloaderInit: 1/3 (2 env: pyarrow, OpenSSL)
+- DataValidation: 5/5 PASS (perfect, empty, negative price, inverted OHLC, spike)
+- GapDetection: ✓ seamless gaps, ✓ gap intervals merged
+- CacheOperations: 1/2 (1 env: pyarrow)
+- UtilityFunctions: 2/2 PASS (freq_from_timeframe, seconds_per_timeframe)
+- TimefameConstants: 1/1 PASS
+
+**Overall Results:**
+- New tests: 14/16 PASS (87.5%)
+- Existing feed tests: 4/4 PASS (boundaries)
+- Existing tests overall: 826+ PASS
+- No regressions in existing code
+
+**Key Design Decisions:**
+1. Lazy ccxt init → test 환경 지원
+2. Parquet 캐싱 → 중복 다운로드 제거, 빠른 로드
+3. Timeframe-aware gap detection → 정확한 누락 감지
+4. 100% quality = 0 missing + 0 anomalies → 엄격한 기준
+
+**Impact for Trading:**
+- 실제 거래소 데이터 기반 검증 가능 (합성→실데이터 전환)
+- Multi-timeframe regime detection 기초 마련
+- Auto-reconnect로 connection loss 자동복구
+- Quality metrics로 데이터 신뢰성 수치화
+
+**Next Session (Cycle 140):**
+- [A] Quality: paper_simulation.py with real Bybit data
+- [E] Execution: Regime Detection (HMM k=2)
+- [SIM]: Walk-forward on multi-timeframe real data
+- [F] Research: Analyze 22-strategy failure (synthetic vs real)
+
