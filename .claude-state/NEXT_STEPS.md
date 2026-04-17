@@ -6,26 +6,27 @@ _Last updated: 2026-04-17 (멀티심볼 live paper trader 배포)_
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 140
-- 140 mod 5 = 0 → **A(품질) + C(데이터) + SIM + F(리서치)** (표 기준 Cycle 1 패턴)
-- `python3 scripts/cycle_dispatcher.py` 실행하면 자동 배정
+### 로테이션: Cycle 143
+- 143 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** (표 기준 Cycle 4 패턴)
 
-### ⚠️ 최우선: 오버피팅 대응 (Cycle 139 분석 결과 기반)
+### ⚠️ 핵심 문제: 전략 엣지 부재
 
-**즉시 조치 (다음 사이클):**
-1. **슬리피지 현실화**: BacktestEngine 슬리피지 0.05% → 0.2% 상향
-2. **MIN_TRADES 조정**: 50 → 15 (실데이터에서 거래 수 부족 문제 해소)
-3. **실데이터 기반 재검증**: data_utils.py로 Bybit 데이터 다운로드 후 전략 재평가
+22개 전략 모두 실데이터 6개월 WF에서 0 PASS. 인프라/리스크/검증 파이프라인은 완성됐으나 **전략 자체에 엣지가 없음**이 확인됨.
 
-**중기 조치:**
-4. **합성 데이터 생성기 교체**: GARCH(1,1)+Student-t 분포 (변동성 클러스터링+fat tails)
-5. **Monte Carlo Permutation gate**: 1,000회 셔플, p < 0.05 시에만 PASS
-6. **OOS 기간 확장**: 1개월 → 3개월 + regime 다양성 요건
+**완료:**
+- ~~슬리피지 현실화~~: 0.1% (Cycle 140)
+- ~~MIN_TRADES 조정~~: 15 (Cycle 140)
+- ~~MC Permutation gate~~: 500 perms, p<0.05 (Cycle 140)
+- ~~Regime Detection~~: ADX+EMA+ATR (이전 세션)
+- ~~CircuitBreaker 통합~~: live paper trader (Cycle 140)
+- ~~실패 테스트 수정~~: 14개 → 0개 (Cycle 142)
 
-**장기 과제:**
-7. **Regime Detection 구현**: HMM k=2 (추세/횡보)
-8. **전략 상관관계 모니터링**: ≤ 0.5 제한
-9. **Rolling Sharpe 자동 비활성화**: < 0.0 시 전략 off
+**남은 과제:**
+1. **전략 엣지 확보**: 기존 전략 파라미터 최적화 또는 새로운 접근 (WFA 기준 유지)
+2. 합성 데이터 GARCH 교체
+3. ML RF 모델 개선 (3-class → 2-class, test acc 37% → 55%+)
+4. 전략 상관관계 모니터링
+5. OOS 기간 확장 (1개월 → 3개월)
 
 ### 최근 완료
 - **Live Paper Trader 멀티심볼**: BTC/ETH/SOL 3심볼 동시 운영 (7일, 1시간 간격)
