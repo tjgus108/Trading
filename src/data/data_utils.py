@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import numpy as np
+from scipy import stats
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -347,6 +348,25 @@ class HistoricalDataDownloader:
 
         # 5. 갭과 누락 캔들 감지
         missing, gaps = self._detect_gaps(df, timeframe)
+        # ─ 데이터 품질 통계 (kurtosis, skewness) 계산 및 로깅 ─
+        kurtosis_val = None
+        skewness_val = None
+        if len(df) > 2:
+            try:
+                log_returns = np.log(df["close"].pct_change() + 1).dropna()
+                if len(log_returns) > 2:
+                    kurtosis_val = stats.kurtosis(log_returns)
+                    skewness_val = stats.skew(log_returns)
+                    logger.debug(
+                        "Data quality stats for %s %s: kurtosis=%.2f, skewness=%.2f",
+                        getattr(df, 'name', 'UNKNOWN'),
+                        timeframe,
+                        kurtosis_val,
+                        skewness_val
+                    )
+            except Exception as e:
+                logger.debug("Failed to compute data stats: %s", e)
+
 
         # 6. 데이터 품질 점수
         expected_candles = len(pd.date_range(

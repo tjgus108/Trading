@@ -15,6 +15,7 @@ except ImportError:
     ccxt = None  # type: ignore[assignment]
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from src.exchange.connector import ExchangeConnector
 from typing import Dict, List, Optional
@@ -288,13 +289,28 @@ class DataFeed:
             anomalies=anomalies,
             df=df,
         )
+        # ─ 데이터 품질 통계 계산 ─
+        kurtosis_val = None
+        skewness_val = None
+        if len(df) > 2:
+            try:
+                log_returns = np.log(df["close"].pct_change() + 1).dropna()
+                if len(log_returns) > 2:
+                    kurtosis_val = stats.kurtosis(log_returns)
+                    skewness_val = stats.skew(log_returns)
+            except:
+                pass
+
         logger.info(
-            "DataFeed: %s %s — %d candles, %d missing, %d anomalies",
-            symbol,
-            timeframe,
-            len(df),
+            "DataFeed: %s %s — %d candles, %d missing, %d anomalies, "
+            "kurtosis=%.2f, skewness=%.2f",
+        symbol,
+        timeframe,
+        len(df),
             missing,
             len(anomalies),
+            kurtosis_val if kurtosis_val is not None else 0.0,
+            skewness_val if skewness_val is not None else 0.0,
         )
         return summary
 
