@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from src.exchange.connector import ExchangeConnector
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,7 @@ class DataFeed:
         self._max_retries = max_retries
         self._hit_count = 0          # 캐시 히트 수
         self._miss_count = 0         # 캐시 미스 수
+        self._regime_cache: dict = {}  # symbol -> (regime_value, timestamp)
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         key = (symbol, timeframe, limit)
@@ -218,14 +219,18 @@ class DataFeed:
         
         return results
 
-    def invalidate_cache(self, symbol=None, timeframe=None):
-        """특정 심볼/타임프레임 또는 전체 캐시 무효화."""
+    def invalidate_cache(self, symbol=None, timeframe=None, regime_cache_too=True):
+        """특정 심볼/타임프레임 또는 전체 캐시 무효화. regime_cache_too=True로 레짐 캐시도 함께 무효화."""
         if symbol is None and timeframe is None:
             self._cache.clear()
+            if regime_cache_too:
+                self._regime_cache.clear()
         else:
             keys_to_del = [k for k in self._cache if k[0] == symbol or k[1] == timeframe]
             for k in keys_to_del:
                 del self._cache[k]
+            if regime_cache_too and symbol:
+                self._regime_cache.pop(symbol, None)
 
     def _evict_if_needed(self):
         """캐시가 max_cache_size를 초과하면 가장 오래된 엔트리 제거 (LRU)."""
@@ -405,6 +410,32 @@ class DataFeed:
         df["return_5"] = close.pct_change(5)
 
         return df
+
+
+    # ------------------------------------------------------------------
+    # Regime cache (lightweight regime tracking)
+    # ------------------------------------------------------------------
+
+    def cache_regime(self, symbol: str, regime_value: str, ttl: int = 300) -> None:
+        """regime 감지 결과를 캐시에 저장 (TTL 기본 5분)."""
+        self._regime_cache[symbol] = (regime_value, time.time() + ttl)
+
+    def get_cached_regime(self, symbol: str) -> Optional[str]:
+        """캐시된 regime 반환. 만료되었으면 None."""
+        if symbol not in self._regime_cache:
+            return None
+        regime, expiry = self._regime_cache[symbol]
+        if time.time() > expiry:
+            del self._regime_cache[symbol]
+            return None
+        return regime
+
+    def clear_regime_cache(self, symbol: Optional[str] = None) -> None:
+        """regime 캐시 삭제."""
+        if symbol:
+            self._regime_cache.pop(symbol, None)
+        else:
+            self._regime_cache.clear()
 
     # ------------------------------------------------------------------
     # Auto-reconnection and enhanced validation

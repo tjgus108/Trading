@@ -181,6 +181,7 @@ class LiveState:
         self.trade_log: list[dict] = []
         self.last_report_time: float = 0
         self.last_reeval_time: float = 0
+        self.regime_states: dict[str, dict] = {}  # symbol -> {regime: MarketRegime, skipped_count: int}
 
     def save(self):
         data = {
@@ -196,6 +197,7 @@ class LiveState:
             "trade_log": self.trade_log[-1000:],  # 최근 1000개만
             "last_report_time": self.last_report_time,
             "last_reeval_time": self.last_reeval_time,
+            "regime_states": self.regime_states,  # 레짐 상태 추적
         }
         LIVE_STATE_PATH.write_text(json.dumps(data, indent=2, default=str))
 
@@ -342,10 +344,17 @@ class LivePaperTrader:
         regime = self.regime_detector.detect(df)
 
         sym_positions = {k: v for k, v in self.state.open_positions.items() if k.startswith(f"{symbol}:")}
+        # 레짐 상태 추적
+        if symbol not in self.state.regime_states:
+            self.state.regime_states[symbol] = {"regime": None, "skipped_count": 0}
+        prev_regime = self.state.regime_states[symbol].get("regime")
+        regime_changed = prev_regime != regime.value
+        self.state.regime_states[symbol]["regime"] = regime.value
 
-        logger.info("[%s] Tick %d | $%.2f | %s | pos=%d/%d",
+        logger.info("[%s] Tick %d | $%.2f | Regime=%s%s | pos=%d/%d",
                      symbol, self.state.tick_count, current_price,
-                     regime.value, len(sym_positions), MAX_PER_SYMBOL_POSITIONS)
+                     regime.value, " (CHANGED)" if regime_changed else "",
+                     len(sym_positions), MAX_PER_SYMBOL_POSITIONS)
 
         self._manage_positions_for_symbol(symbol, latest)
 
@@ -366,6 +375,7 @@ class LivePaperTrader:
 
         if regime == MarketRegime.RANGING:
             logger.info("[%s] RANGING regime — skipping new entries", symbol)
+            self.state.regime_states[symbol]["skipped_count"] = self.state.regime_states[symbol].get("skipped_count", 0) + 1
             return
 
         strategies = self.symbol_strategies.get(symbol, {})
@@ -561,6 +571,13 @@ class LivePaperTrader:
             sym_pnl = sum(t["pnl"] for t in sym_trades)
             lines.append(f"### {symbol}\n")
             lines.append(f"- Open: {len(sym_positions)} | Trades: {len(sym_trades)} | PnL: ${sym_pnl:+.2f}")
+            
+            # 레짐 정보
+            regime_info = self.state.regime_states.get(symbol, {})
+            regime = regime_info.get("regime", "N/A")
+            skipped = regime_info.get("skipped_count", 0)
+            lines.append(f"- Regime: {regime} | Skipped (RANGING): {skipped}")
+            
             strats = self.state.active_strategies.get(symbol, [])
             if strats:
                 lines.append(f"- Strategies: {', '.join(strats)}")

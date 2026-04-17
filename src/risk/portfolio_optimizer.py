@@ -148,8 +148,11 @@ class PortfolioOptimizer:
     ) -> tuple:
         """VaR과 CVaR 계산 (손실 기준, 양수 반환).
 
-        Historical simulation 방식. 소표본(T < 30)일 경우
+        Historical simulation 방식. 소표본(T < 100)일 경우
         parametric (정규분포 가정) VaR/CVaR과 비교하여 보수적(큰) 값을 사용.
+
+        95% confidence에서 tail 샘플 수 = T * 0.05. CVaR 안정성을 위해
+        최소 5개 tail 샘플이 필요하므로 T >= 100이 요구됨.
 
         Args:
             port_returns: 포트폴리오 수익률 배열
@@ -158,6 +161,7 @@ class PortfolioOptimizer:
         Returns:
             (var, cvar) — 양수 (손실)
         """
+        MIN_SAMPLES = 100  # 95% VaR CVaR 안정성 최소 데이터 포인트
         if len(port_returns) == 0:
             return 0.0, 0.0
         sorted_r = np.sort(port_returns)
@@ -172,8 +176,8 @@ class PortfolioOptimizer:
         var = max(0.0, hist_var)
         cvar = max(0.0, hist_cvar)
 
-        # 소표본 보정: T < 30이면 parametric VaR/CVaR과 비교, 보수적(큰) 값 선택
-        if T < 30:
+        # 소표본 보정: T < MIN_SAMPLES이면 parametric VaR/CVaR과 비교, 보수적(큰) 값 선택
+        if T < MIN_SAMPLES:
             param_var, param_cvar = PortfolioOptimizer._parametric_var_cvar(
                 port_returns, confidence
             )

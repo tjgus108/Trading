@@ -1,5 +1,42 @@
 # Work Log
 
+## [2026-04-18] Cycle 144 — C + B + F (레짐 필터 + 리스크 검증)
+
+**[C] Data & Infrastructure — 레짐 필터 구현 완료:**
+- **live_paper_trader.py**: 레짐 필터 강화
+  - `LiveState.regime_states` 추가: symbol별 현재 레짐 + skipped_count 추적
+  - `_tick_symbol()`: 레짐 변화 감지 로깅 ("[CHANGED]" 표시)
+  - RANGING 필터 시 skipped_count 자동 증가
+  - `_generate_report()`: 심볼별 레짐 정보 + skipped 횟수 표시
+  - 상태 저장/복원: regime_states 포함 → 재시작 후 추적 가능
+- **src/data/feed.py**: 레짐 캐시 구현
+  - `_regime_cache`: symbol → (regime_value, ttl 타임스탬프)
+  - `cache_regime(symbol, regime_value, ttl=300)`: 저장
+  - `get_cached_regime(symbol)`: 조회 (만료 체크)
+  - `clear_regime_cache(symbol=None)`: 삭제
+  - `invalidate_cache()`: regime_cache_too 파라미터 추가
+- 변경사항: +60줄, 문법/테스트 모두 통과
+
+**[B] Risk Management:**
+- VaR/CVaR 검증: parametric fallback 임계값 T<30 → T<100으로 상향 (tail 샘플 부족 문제)
+- Historical VaR/CVaR 계산 로직 정상 확인
+- Kelly Sizer 레짐 조정: `adjust_for_regime()` 메서드 추가
+  - RANGING → 0.5x, HIGH_VOL → 0.3x, TREND_UP/DOWN → 1.0x
+  - 반환값 [min_fraction, max_fraction] 클리핑
+
+**[F] Research:**
+- 크립토봇 실패 사례: AI봇 플래시크래시($20억 매도), 888개 전략 중 44% 복제 실패
+- 자동화 계좌 52% 3개월 내 실패 (과도한 레버리지, 비용 무시)
+- 성공 봇 공통점: regime detection, walk-forward validation, 파라미터 최소화
+- 레짐 기반 포지션 사이징: 0.25~0.5× Kelly + ATR 기반이 실용적
+- 즉시 적용 인사이트: WF 5~10구간 rolling, regime gate, 피처 수 축소
+
+**[SIM] Backtest Quality:**
+- BacktestEngine 품질 게이트 검증: MIN_TRADES=15, 슬리피지 0.1%, MC p<0.05, WFE>0.5 모두 정상
+- 22개 전략 0 PASS는 엔진 버그 아닌 전략 약점 확인
+
+---
+
 ## [2026-04-17] Cycle 140 — A + C + F (오버피팅 대응)
 
 **[A] Quality Assurance:**
@@ -12272,3 +12309,12 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-17 18:37 UTC] Cycle 140 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 18:42 UTC] Cycle 141 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-17 18:42 UTC] Cycle 144 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

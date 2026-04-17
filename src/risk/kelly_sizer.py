@@ -191,3 +191,31 @@ class KellySizer:
             leverage=leverage,
         )
         return sizer.compute(win_rate, avg_win, avg_loss, capital, price, atr, target_atr)
+
+    # 레짐 → Kelly fraction 스케일 팩터
+    _REGIME_SCALE: dict = {
+        "TREND_UP":   1.0,
+        "TREND_DOWN": 1.0,
+        "RANGING":    0.5,   # 레인지장: 절반으로 축소
+        "HIGH_VOL":   0.3,   # 고변동성: 크게 축소
+    }
+    _DEFAULT_REGIME_SCALE: float = 0.5  # 알 수 없는 레짐 보수적 처리
+
+    def adjust_for_regime(self, regime: str) -> float:
+        """레짐에 따른 Kelly fraction 스케일 팩터 반환.
+
+        현재 인스턴스의 fraction에 레짐 스케일을 곱한 유효 fraction을 반환한다.
+        포지션 사이징 시 compute()의 결과를 이 팩터로 추가 스케일할 때 사용.
+
+        Args:
+            regime: 레짐 문자열.
+                    "TREND_UP" | "TREND_DOWN" → 1.0 (스케일 없음)
+                    "RANGING"                 → 0.5 (Kelly fraction 50% 축소)
+                    "HIGH_VOL"                → 0.3 (Kelly fraction 70% 축소)
+                    기타                      → 0.5 (보수적)
+
+        Returns:
+            유효 Kelly fraction (= self.fraction * regime_scale)
+        """
+        scale = self._REGIME_SCALE.get(regime.upper(), self._DEFAULT_REGIME_SCALE)
+        return float(np.clip(self.fraction * scale, self.min_fraction, self.max_fraction))
