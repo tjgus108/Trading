@@ -319,7 +319,7 @@ class LSTMSignalGenerator:
         y_test = label_s.iloc[test_start:]
 
         preds = np.sign(X_test["return_5"].values).astype(int)
-        correct = (preds == y_test.values).sum()
+        correct = np.asarray(preds == y_test.values, dtype=int).sum()
         test_acc = correct / len(y_test) if len(y_test) > 0 else 0.0
         passed = test_acc >= MIN_ACCURACY
 

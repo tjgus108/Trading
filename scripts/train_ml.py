@@ -20,6 +20,7 @@ import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 # 프로젝트 루트를 sys.path에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -218,7 +219,7 @@ def auto_retrain(symbol: str, timeframe: str):
     return result
 
 
-def predict_mode(symbol: str, timeframe: str, model_file: str | None, bybit: bool, demo: bool, limit: int):
+def predict_mode(symbol: str, timeframe: str, model_file: Optional[str], bybit: bool, demo: bool, limit: int):
     """
     예측 모드:
     - 저장된 모델 로드 (model_file 없으면 models/ 에서 최신 자동 선택)
