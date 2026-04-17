@@ -383,16 +383,19 @@ class BacktestEngine:
 
     @staticmethod
     def _mc_permutation_test(trades: list, original_sharpe: float) -> float:
-        """거래 순서를 셔플하여 원래 Sharpe가 우연인지 검증. p-value 반환."""
+        """Sign randomization test: 거래 부호를 랜덤으로 뒤집어 Sharpe 비교.
+        원래 Sharpe가 랜덤 부호 대비 유의미한지 p-value로 반환."""
         rng = np.random.default_rng(42)
         arr = np.array(trades, dtype=float)
+        n = len(arr)
+        ann = np.sqrt(8760)
         n_better = 0
         for _ in range(MC_N_PERMUTATIONS):
-            rng.shuffle(arr)
-            equity = np.cumsum(arr)
-            returns = np.diff(np.concatenate([[0], equity])) / (np.abs(equity.max()) + 1e-10)
-            std = returns.std()
-            perm_sharpe = (returns.mean() / std * np.sqrt(8760)) if std > 1e-10 else 0.0
+            signs = rng.choice([-1.0, 1.0], size=n)
+            perm_trades = arr * signs
+            mean_r = perm_trades.mean()
+            std_r = perm_trades.std()
+            perm_sharpe = (mean_r / std_r * ann) if std_r > 1e-10 else 0.0
             if perm_sharpe >= original_sharpe:
                 n_better += 1
         return n_better / MC_N_PERMUTATIONS
