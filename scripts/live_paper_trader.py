@@ -69,6 +69,7 @@ DEFAULT_DAYS = 7              # 기본 7일 운영
 WARMUP_CANDLES = 200          # 지표 계산용 warmup
 REPORT_INTERVAL = 24 * 3600   # 24시간마다 리포트
 REEVAL_INTERVAL = 24 * 3600   # 24시간마다 전략 재평가
+WEEKLY_RETRAIN_INTERVAL = 7 * 24 * 3600  # 주 1회 ML 재학습 (168시간)
 MAX_ACTIVE_STRATEGIES = 5     # 동시 활성 전략 수 상한
 RISK_PER_TRADE = 0.005        # 트레이드당 0.5% 리스크
 MAX_TOTAL_EXPOSURE = 0.30     # 전체 포트폴리오 최대 노출 30% (3심볼)
@@ -348,6 +349,7 @@ class LivePaperTrader:
         self.ml_models: dict[str, tuple] = {}  # symbol -> (model, scaler)
         self._df_caches: dict[str, pd.DataFrame] = {}  # symbol -> df
         self.correlation_tracker = SignalCorrelationTracker(warn_threshold=0.75)
+        self._last_retrain_time: float = 0.0  # 마지막 ML 재학습 시각
 
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
@@ -431,6 +433,10 @@ class LivePaperTrader:
         self.circuit_breaker.tick_cooldown()
 
         now = time.time()
+        if self.ml_filter_enabled and now - self._last_retrain_time >= WEEKLY_RETRAIN_INTERVAL:
+            self._weekly_retrain()
+            self._last_retrain_time = now
+
         if now - self.state.last_report_time >= REPORT_INTERVAL:
             self._generate_report()
             self._daily_start_balance = self.state.portfolio_balance
@@ -694,6 +700,47 @@ class LivePaperTrader:
 
         for name in closed:
             del self.state.open_positions[name]
+
+    def _weekly_retrain(self):
+        """
+        주 1회 ML 재학습 훅.
+        - ML 필터 활성화 시에만 실행 (--ml-filter)
+        - 각 심볼에 대해 auto_retrain() 호출 (최근 1000캔들, binary RF)
+        - PASS 시 models/ 저장 + ml_models 캐시 갱신
+        - 결과는 models/retrain_log.json에 자동 기록됨 (auto_retrain 내부)
+        """
+        logger.info("Weekly ML retrain triggered (ml_filter_enabled=%s)", self.ml_filter_enabled)
+        try:
+            from scripts.train_ml import auto_retrain as _auto_retrain
+        except ImportError:
+            # 절대 경로로 재시도
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "train_ml", Path(__file__).resolve().parent / "train_ml.py"
+            )
+            _train_ml_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(_train_ml_mod)
+            _auto_retrain = _train_ml_mod.auto_retrain
+
+        for symbol in SYMBOLS:
+            logger.info("Weekly retrain: %s ...", symbol)
+            try:
+                result = _auto_retrain(symbol=symbol, timeframe=DEFAULT_TIMEFRAME)
+                if result.passed:
+                    # 재학습 성공 → 모델 캐시 갱신
+                    new_model = load_ml_model(symbol)
+                    if new_model:
+                        self.ml_models[symbol] = new_model
+                        logger.info("Weekly retrain PASS for %s — ML model refreshed", symbol)
+                    else:
+                        logger.warning("Weekly retrain PASS but model file not found for %s", symbol)
+                else:
+                    logger.warning(
+                        "Weekly retrain FAIL for %s (val=%.3f test=%.3f reasons=%s)",
+                        symbol, result.val_accuracy, result.test_accuracy, result.fail_reasons,
+                    )
+            except Exception as exc:
+                logger.error("Weekly retrain error for %s: %s", symbol, str(exc)[:120])
 
     def _generate_report(self):
         """24시간마다 성과 리포트 생성."""

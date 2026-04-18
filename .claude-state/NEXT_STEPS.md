@@ -15,6 +15,20 @@ _Last updated: 2026-04-18 (Cycle 151 완료, Cycle 152 시작)_
 - tests/test_risk.py에 8개 단위 테스트 추가 (25 total, 모두 PASS)
 - 전체 테스트: 6682 passed, 20 failed (pre-existing 변화 없음)
 
+#### C(데이터): ML 재학습 스케줄러 + Triple Barrier 레이블링 ✅ COMPLETE
+- **주 1회 ML 재학습 훅** (`scripts/live_paper_trader.py`):
+  - `WEEKLY_RETRAIN_INTERVAL = 7 * 24 * 3600` 상수 추가
+  - `_last_retrain_time` 상태 변수 추가
+  - `tick()` 내부에서 weekly 경과 시 `_weekly_retrain()` 자동 호출
+  - `_weekly_retrain()`: BTC/ETH/SOL 각각 auto_retrain() → PASS 시 ml_models 캐시 갱신
+  - `--ml-filter` 활성화 시에만 동작 (불필요한 API 호출 방지)
+- **Triple Barrier 레이블링** (`src/ml/features.py`):
+  - `FeatureBuilder` 파라미터 추가: `triple_barrier=False`, `tb_tp_pct=0.02`, `tb_sl_pct=0.01`
+  - `_compute_triple_barrier_labels()`: high/low 배리어 터치 감지 (look-ahead 없음)
+  - 기본 forward_return 방식과 호환 (triple_barrier=False가 기본값)
+  - 사용: `FeatureBuilder(binary=True, triple_barrier=True, tb_tp_pct=0.02, tb_sl_pct=0.01)`
+  - 시간 초과(배리어 미도달) → NaN → dropna 자동 제거 (이전 방식과 동일)
+
 ### ✅ Cycle 150 완료 사항
 
 #### D(ML): BTC 시차 피처 + 모델 재학습 ✅ COMPLETE (FAIL)
