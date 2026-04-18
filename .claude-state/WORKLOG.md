@@ -1,5 +1,18 @@
 # Work Log
 
+## [2026-04-18] Cycle 153 — A (Quality Assurance)
+
+**[A1] drift_detector.py 테스트 추가:**
+- `tests/test_drift_detector.py` 신규 생성 (28개 테스트, 전체 PASS)
+  - `TestPageHinkleyDriftDetector` (9개): initial_state, no_drift_stable, drift_on_sudden_change, reset, return_type, accuracy_convergence, n_samples, summary, min_samples_guard
+  - `TestCUSUMDriftDetector` (8개): initial_state, no_drift_stable, drift_on_degradation, reset, return_type, min_samples_guard, summary, n_samples
+  - `TestAccuracyDriftMonitor` (11개): initial_state, no_retrain_good_acc, retrain_on_degradation, window_acc_none, window_acc_computed, total_predictions, reset_detectors, below_min_accuracy, summary, return_type, correct_classification
+
+**주요 발견:**
+- PHT 구현 특성: `ph_stat = sum - min_sum`은 베이스라인 대비 상승 변화를 감지. 하락 드리프트는 CUSUM이 담당. 두 알고리즘이 상호 보완적으로 동작함.
+
+**검증:** 28/28 PASS
+
 ## [2026-04-18] Cycle 152 — D (ML & Signals)
 
 **[D1] Triple Barrier 모델 재학습 옵션 추가:**
