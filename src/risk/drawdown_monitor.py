@@ -22,9 +22,12 @@ circuit_breaker 패턴으로 거래 차단.
 
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Callable, Deque, List, Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -425,3 +428,236 @@ class DrawdownMonitor:
         obj._consecutive_losses = data.get("_consecutive_losses", 0)
         obj._cooldown_until = data.get("_cooldown_until", 0.0)
         return obj
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# DriftMonitor: Page-Hinkley 기반 수익률 분포 변화(concept drift) 감지
+# ────────────────────────────────────────────────────────────────────────────────
+
+class DriftState(str, Enum):
+    NORMAL = "NORMAL"      # 드리프트 없음
+    WARNING = "WARNING"    # 경고 (드리프트 후보)
+    DRIFT = "DRIFT"        # 드리프트 확정 → CB 연동 트리거
+
+
+class DriftMonitor:
+    """Page-Hinkley 테스트 기반 수익률 분포 변화 감지기.
+
+    거래 수익률(pnl_pct)을 스트리밍으로 입력받아 분포의 평균 또는 분산이
+    통계적으로 유의미하게 변화했는지 감지한다.
+
+    Page-Hinkley Test (양방향):
+        m_t = x_t - mu_ref + delta        (delta: 감도 조절)
+        M_t = sum(m_0..m_t)               (누적합)
+        ph_t = max(M_0..M_t) - M_t        (Page-Hinkley 통계량, 하락 감지)
+        drift if ph_t > lambda_            (lambda_: 감지 한계)
+
+    상승 감지: m_t = mu_ref - x_t + delta 로 동일 구조 적용.
+
+    분산 감지:
+        rolling 분산이 warm-up 기간 분산의 var_ratio_threshold 배 초과 시 WARNING.
+
+    Args:
+        window:              분산 감지용 롤링 윈도우 크기 (기본 30).
+        warm_up:             기준 통계 수집 기간 (기본 50). warm-up 전에는 감지 안 함.
+        delta:               PH 최소 감지 임계값 (기본 0.001). 작을수록 민감.
+        lambda_:             PH 감지 한계 (기본 50). 클수록 false positive 감소.
+        var_ratio_threshold: 분산 배율 임계값 (기본 2.0). warm-up 분산 대비 N배 초과 시 WARNING.
+        on_drift:            드리프트 감지 시 호출할 콜백 함수 (optional).
+                             signature: (state: DriftState, reason: str) -> None
+    """
+
+    def __init__(
+        self,
+        window: int = 30,
+        warm_up: int = 50,
+        delta: float = 0.001,
+        lambda_: float = 50.0,
+        var_ratio_threshold: float = 2.0,
+        on_drift: Optional[Callable[["DriftState", str], None]] = None,
+    ) -> None:
+        self.window = window
+        self.warm_up = warm_up
+        self.delta = delta
+        self.lambda_ = lambda_
+        self.var_ratio_threshold = var_ratio_threshold
+        self.on_drift = on_drift
+
+        self._returns: Deque[float] = deque(maxlen=max(window, warm_up) * 2)
+        self._n: int = 0
+        self._state: DriftState = DriftState.NORMAL
+
+        # PH 통계량 (하락 감지)
+        self._ph_sum_down: float = 0.0
+        self._ph_max_down: float = 0.0  # max(M_t) for downward shift detection
+        # PH 통계량 (상승 감지)
+        self._ph_sum_up: float = 0.0
+        self._ph_max_up: float = 0.0
+
+        # warm-up 기간 참조 통계
+        self._mu_ref: float = 0.0
+        self._var_ref: float = 0.0
+        self._warm_up_done: bool = False
+
+    # ── 내부 헬퍼 ─────────────────────────────────────────────────
+
+    def _update_ph(self, x: float) -> Tuple[float, float]:
+        """Page-Hinkley 통계량 업데이트. (ph_down, ph_up) 반환.
+
+        표준 PH 공식 (하락 감지):
+            m_t = (x_t - mu_ref + delta)   — 평균 하락 시 m_t < 0
+            M_t = sum(m)                    — 누적합, 하락 시 감소
+            ph_t = max(M) - M_t             — M이 하락할수록 증가
+        """
+        # 하락 감지: x가 mu_ref 아래로 이동 → ph_down 증가
+        m_down = x - self._mu_ref + self.delta
+        self._ph_sum_down += m_down
+        self._ph_max_down = max(self._ph_max_down, self._ph_sum_down)
+        ph_down = self._ph_max_down - self._ph_sum_down
+
+        # 상승 감지: x가 mu_ref 위로 이동 → ph_up 증가
+        m_up = self._mu_ref - x + self.delta
+        self._ph_sum_up += m_up
+        self._ph_max_up = max(self._ph_max_up, self._ph_sum_up)
+        ph_up = self._ph_max_up - self._ph_sum_up
+
+        return ph_down, ph_up
+
+    def _rolling_variance(self) -> float:
+        """최근 window 기간 수익률 분산."""
+        recent = list(self._returns)[-self.window:]
+        if len(recent) < 2:
+            return 0.0
+        return float(np.var(recent, ddof=1))
+
+    # ── 메인 업데이트 ──────────────────────────────────────────────
+
+    def update(self, pnl_pct: float) -> "DriftState":
+        """수익률(pnl_pct) 한 건 입력. 현재 DriftState 반환.
+
+        Args:
+            pnl_pct: 거래 손익 비율. 예) -0.02 = -2% 손실, 0.015 = +1.5% 수익.
+
+        Returns:
+            DriftState: NORMAL / WARNING / DRIFT
+        """
+        self._returns.append(pnl_pct)
+        self._n += 1
+
+        # warm-up 완료 판정
+        if not self._warm_up_done and self._n >= self.warm_up:
+            warm_data = list(self._returns)[:self.warm_up]
+            self._mu_ref = float(np.mean(warm_data))
+            self._var_ref = float(np.var(warm_data, ddof=1))
+            # PH 통계량 초기화
+            self._ph_sum_down = 0.0
+            self._ph_max_down = 0.0
+            self._ph_sum_up = 0.0
+            self._ph_max_up = 0.0
+            self._warm_up_done = True
+            logger.debug(
+                "DriftMonitor: warm-up 완료 — mu_ref=%.5f, var_ref=%.8f",
+                self._mu_ref, self._var_ref,
+            )
+
+        if not self._warm_up_done:
+            return self._state
+
+        # Page-Hinkley 업데이트
+        ph_down, ph_up = self._update_ph(pnl_pct)
+
+        # 분산 감지
+        rolling_var = self._rolling_variance()
+        var_ratio = (rolling_var / self._var_ref) if self._var_ref > 0 else 1.0
+
+        # 감지 판정
+        new_state = DriftState.NORMAL
+        reason = ""
+
+        if ph_down > self.lambda_:
+            new_state = DriftState.DRIFT
+            reason = (
+                f"PH(하락) {ph_down:.1f} > lambda {self.lambda_:.1f} "
+                f"(mu_ref={self._mu_ref:.5f})"
+            )
+        elif ph_up > self.lambda_:
+            new_state = DriftState.DRIFT
+            reason = (
+                f"PH(상승) {ph_up:.1f} > lambda {self.lambda_:.1f} "
+                f"(mu_ref={self._mu_ref:.5f})"
+            )
+        elif var_ratio >= self.var_ratio_threshold:
+            new_state = DriftState.WARNING
+            reason = (
+                f"분산 {var_ratio:.2f}x 급등 "
+                f"(rolling={rolling_var:.8f}, ref={self._var_ref:.8f})"
+            )
+
+        # 상태 전이 + 콜백
+        if new_state != DriftState.NORMAL:
+            if new_state == DriftState.DRIFT:
+                logger.warning(
+                    "DriftMonitor: DRIFT 감지 — %s [n=%d]", reason, self._n
+                )
+            else:
+                logger.warning(
+                    "DriftMonitor: WARNING — %s [n=%d]", reason, self._n
+                )
+            self._state = new_state
+            if self.on_drift is not None:
+                try:
+                    self.on_drift(new_state, reason)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("DriftMonitor: on_drift 콜백 오류 — %s", exc)
+        elif self._state != DriftState.NORMAL:
+            # 드리프트 감지 후 정상화 — PH 리셋 (새 기준점)
+            logger.info(
+                "DriftMonitor: 정상화 감지 — 참조 통계 갱신 [n=%d]", self._n
+            )
+            self._reset_ph_and_ref()
+            self._state = DriftState.NORMAL
+
+        return self._state
+
+    def _reset_ph_and_ref(self) -> None:
+        """PH 통계량과 참조 평균을 최근 window 데이터 기준으로 갱신."""
+        recent = list(self._returns)[-self.window:]
+        if len(recent) >= 2:
+            self._mu_ref = float(np.mean(recent))
+            self._var_ref = float(np.var(recent, ddof=1))
+        self._ph_sum_down = 0.0
+        self._ph_max_down = 0.0
+        self._ph_sum_up = 0.0
+        self._ph_max_up = 0.0
+
+    # ── 상태 조회 ──────────────────────────────────────────────────
+
+    @property
+    def state(self) -> "DriftState":
+        return self._state
+
+    @property
+    def n_samples(self) -> int:
+        return self._n
+
+    @property
+    def is_drift(self) -> bool:
+        return self._state == DriftState.DRIFT
+
+    @property
+    def is_warning(self) -> bool:
+        return self._state in (DriftState.WARNING, DriftState.DRIFT)
+
+    def reset(self) -> None:
+        """전체 상태 초기화 (새 세션 시작 시)."""
+        self._returns.clear()
+        self._n = 0
+        self._state = DriftState.NORMAL
+        self._ph_sum_down = 0.0
+        self._ph_max_down = 0.0
+        self._ph_sum_up = 0.0
+        self._ph_max_up = 0.0
+        self._mu_ref = 0.0
+        self._var_ref = 0.0
+        self._warm_up_done = False
+        logger.info("DriftMonitor: reset")

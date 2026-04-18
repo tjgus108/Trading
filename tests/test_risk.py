@@ -304,3 +304,110 @@ def test_signal_correlation_tracker_case_insensitive():
     tracker.record("BTC/USDT", "S3", "BUY")
     result = tracker.check_and_warn("BTC/USDT")
     assert result == "BUY"
+
+
+# --- DriftMonitor 단위 테스트 ---
+import numpy as np
+from src.risk.drawdown_monitor import DriftMonitor, DriftState
+
+
+def _feed(monitor: DriftMonitor, returns, start=0):
+    """helper: 수익률 리스트를 순서대로 update()에 입력."""
+    state = DriftState.NORMAL
+    for r in returns:
+        state = monitor.update(r)
+    return state
+
+
+def test_drift_monitor_normal_during_warmup():
+    """warm-up 기간 중에는 항상 NORMAL 반환."""
+    dm = DriftMonitor(warm_up=50, lambda_=50.0)
+    for _ in range(49):
+        state = dm.update(0.001)
+    assert state == DriftState.NORMAL
+    assert dm.n_samples == 49
+
+
+def test_drift_monitor_no_drift_stable():
+    """분포 변화 없는 안정적 수익률 스트림에서 DRIFT 미발생."""
+    rng = np.random.default_rng(42)
+    dm = DriftMonitor(warm_up=50, lambda_=100.0, delta=0.001)
+    returns = rng.normal(0.001, 0.005, 150).tolist()
+    state = _feed(dm, returns)
+    # 안정 분포: DRIFT 없어야 함 (WARNING은 허용)
+    assert state != DriftState.DRIFT
+
+
+def test_drift_monitor_detects_mean_shift():
+    """평균 수익률이 크게 하락하면 DRIFT 감지."""
+    # lambda_=5.0: 민감한 설정, 낮은 delta로 false-positive 억제 최소화
+    dm = DriftMonitor(warm_up=30, lambda_=5.0, delta=0.0001)
+    # warm-up: 평균 +0.005 수익률
+    for _ in range(30):
+        dm.update(0.005)
+    # 급격한 하락: 평균 -0.05 → PH 통계량 빠르게 증가
+    state = DriftState.NORMAL
+    for _ in range(200):
+        state = dm.update(-0.05)
+        if state == DriftState.DRIFT:
+            break
+    assert state == DriftState.DRIFT
+
+
+def test_drift_monitor_variance_warning():
+    """분산이 기준 대비 2배 이상이면 최소 WARNING."""
+    rng = np.random.default_rng(7)
+    dm = DriftMonitor(warm_up=50, lambda_=500.0, var_ratio_threshold=2.0, window=30)
+    # warm-up: 낮은 분산
+    for _ in range(50):
+        dm.update(rng.normal(0.001, 0.001))
+    # 고분산 구간: std 10배
+    state = DriftState.NORMAL
+    for _ in range(40):
+        state = dm.update(rng.normal(0.001, 0.05))
+        if state != DriftState.NORMAL:
+            break
+    assert state in (DriftState.WARNING, DriftState.DRIFT)
+
+
+def test_drift_monitor_callback_called():
+    """DRIFT 감지 시 on_drift 콜백이 호출되어야 한다."""
+    calls = []
+    def cb(state, reason):
+        calls.append((state, reason))
+
+    dm = DriftMonitor(warm_up=30, lambda_=20.0, delta=0.0005, on_drift=cb)
+    for _ in range(30):
+        dm.update(0.002)
+    for _ in range(50):
+        dm.update(-0.05)
+        if calls:
+            break
+    assert len(calls) >= 1
+    assert calls[0][0] in (DriftState.WARNING, DriftState.DRIFT)
+
+
+def test_drift_monitor_reset():
+    """reset() 후에는 warm-up부터 재시작."""
+    dm = DriftMonitor(warm_up=30, lambda_=20.0)
+    for _ in range(30):
+        dm.update(0.001)
+    dm.reset()
+    assert dm.n_samples == 0
+    assert dm.state == DriftState.NORMAL
+    # warm-up 미완료 상태에서 update → NORMAL
+    state = dm.update(0.001)
+    assert state == DriftState.NORMAL
+
+
+def test_drift_monitor_is_drift_property():
+    """is_drift / is_warning 프로퍼티 정합성."""
+    dm = DriftMonitor(warm_up=30, lambda_=15.0, delta=0.0005)
+    for _ in range(30):
+        dm.update(0.002)
+    for _ in range(60):
+        dm.update(-0.03)
+    if dm.is_drift:
+        assert dm.state == DriftState.DRIFT
+    if dm.state == DriftState.DRIFT:
+        assert dm.is_warning  # DRIFT는 is_warning도 True
