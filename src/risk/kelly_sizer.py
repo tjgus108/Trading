@@ -58,6 +58,7 @@ class KellySizer:
         price: float,
         atr: Optional[float] = None,
         target_atr: Optional[float] = None,
+        regime: Optional[str] = None,
     ) -> float:
         """포지션 사이즈 (단위 수량) 반환.
 
@@ -69,6 +70,12 @@ class KellySizer:
             price: 현재 가격
             atr: 현재 ATR (선택)
             target_atr: 기준 ATR (선택, atr과 함께 사용)
+            regime: 시장 레짐 문자열 (선택).
+                    None이면 regime 조정 없음.
+                    "TREND_UP"   → 1.0× (기본)
+                    "TREND_DOWN" → 0.6× (하락장 보수적)
+                    "RANGING"    → 0.5× (절반 축소)
+                    "HIGH_VOL"   → 0.3× (고변동성 대폭 축소)
 
         Returns:
             포지션 사이즈 (수량)
@@ -98,6 +105,11 @@ class KellySizer:
         if self.max_drawdown is not None and avg_loss > 0 and self.leverage > 0:
             max_dd_constrained = self.max_drawdown / (avg_loss * self.leverage)
             fractional_f = min(fractional_f, max_dd_constrained)
+
+        # 레짐 스케일 조정 (compute()에 regime 전달 시 자동 적용)
+        if regime is not None:
+            regime_scale = self._REGIME_SCALE.get(regime.upper(), self._DEFAULT_REGIME_SCALE)
+            fractional_f *= regime_scale
 
         # 상·하한 클리핑
         fractional_f = float(np.clip(fractional_f, self.min_fraction, self.max_fraction))
@@ -129,6 +141,7 @@ class KellySizer:
         max_drawdown: Optional[float] = None,
         leverage: float = 1.0,
         min_trades: Optional[int] = None,
+        regime: Optional[str] = None,
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.
 
@@ -148,6 +161,7 @@ class KellySizer:
             max_drawdown: 허용 최대 낙폭 (선택)
             leverage: 레버리지 배수 (기본 1.0)
             min_trades: Kelly 추정에 필요한 최소 거래 수 (None이면 클래스 기본값 사용)
+            regime: 시장 레짐 (선택). compute(regime=...)에 전달됨.
 
         Returns:
             포지션 사이즈 (수량)
@@ -190,12 +204,12 @@ class KellySizer:
             max_drawdown=max_drawdown,
             leverage=leverage,
         )
-        return sizer.compute(win_rate, avg_win, avg_loss, capital, price, atr, target_atr)
+        return sizer.compute(win_rate, avg_win, avg_loss, capital, price, atr, target_atr, regime=regime)
 
     # 레짐 → Kelly fraction 스케일 팩터
     _REGIME_SCALE: dict = {
-        "TREND_UP":   1.0,
-        "TREND_DOWN": 1.0,
+        "TREND_UP":   1.0,   # 상승장: 풀 Kelly
+        "TREND_DOWN": 0.6,   # 하락장: 40% 축소 (손실 확률 상승)
         "RANGING":    0.5,   # 레인지장: 절반으로 축소
         "HIGH_VOL":   0.3,   # 고변동성: 크게 축소
     }
@@ -205,14 +219,16 @@ class KellySizer:
         """레짐에 따른 Kelly fraction 스케일 팩터 반환.
 
         현재 인스턴스의 fraction에 레짐 스케일을 곱한 유효 fraction을 반환한다.
-        포지션 사이징 시 compute()의 결과를 이 팩터로 추가 스케일할 때 사용.
+        compute(regime=...) 사용을 권장. 이 메서드는 외부에서 수동으로
+        fraction을 조회할 때 사용.
 
         Args:
             regime: 레짐 문자열.
-                    "TREND_UP" | "TREND_DOWN" → 1.0 (스케일 없음)
-                    "RANGING"                 → 0.5 (Kelly fraction 50% 축소)
-                    "HIGH_VOL"                → 0.3 (Kelly fraction 70% 축소)
-                    기타                      → 0.5 (보수적)
+                    "TREND_UP"   → 1.0 (풀 Kelly)
+                    "TREND_DOWN" → 0.6 (하락장 40% 축소)
+                    "RANGING"    → 0.5 (50% 축소)
+                    "HIGH_VOL"   → 0.3 (70% 축소)
+                    기타         → 0.5 (보수적)
 
         Returns:
             유효 Kelly fraction (= self.fraction * regime_scale)

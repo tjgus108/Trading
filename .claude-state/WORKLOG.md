@@ -1,5 +1,32 @@
 # Work Log
 
+## [2026-04-18] Cycle 149 — B (Risk Management)
+
+**[B] Kelly Sizer 개선:**
+- `TREND_DOWN` 스케일 수정: 1.0 → 0.6 (하락장 40% 축소 - 손실 확률 상승 반영)
+- `compute()` 메서드에 `regime: Optional[str]` 파라미터 추가: 레짐별 자동 스케일 적용
+- `from_trade_history()` 메서드에 `regime` 파라미터 추가 → compute()에 전달
+- `adjust_for_regime()` 독스트링 업데이트: compute(regime=...) 권장 사용법 명시
+- 레짐 스케일 순서: TREND_UP(1.0) > TREND_DOWN(0.6) > RANGING(0.5) > HIGH_VOL(0.3)
+
+**[B] VaR/CVaR 검증:**
+- `PortfolioOptimizer._compute_var_cvar()` 수치 검증 완료
+- N(-0.001, 0.02) 1000샘플 기준 VaR(95%)=0.0317, 이론값=0.0339, 차이=0.0022 (정상 범위)
+- CVaR >= VaR 항상 성립 확인
+- 소표본 보정(T < 100): parametric VaR/CVaR 비교 후 보수적 값 선택 로직 정상
+
+**[B] 테스트 추가:**
+- `tests/test_risk.py`에 KellySizer 레짐 테스트 6개 추가:
+  - `test_kelly_regime_trend_up_is_largest`: TREND_UP > TREND_DOWN > RANGING > HIGH_VOL
+  - `test_kelly_regime_trend_down_scale_is_0_6`: TREND_DOWN/TREND_UP 비율 0.55~0.65
+  - `test_kelly_regime_high_vol_scale_is_0_3`: HIGH_VOL/TREND_UP 비율 0.25~0.35
+  - `test_kelly_regime_none_unchanged`: regime=None이면 기본값과 동일
+  - `test_kelly_from_trade_history_regime`: from_trade_history 레짐 전달 검증
+  - `test_kelly_adjust_for_regime_trend_down`: adjust_for_regime TREND_DOWN = 0.3
+- 126 passed, 0 failed
+
+---
+
 ## [2026-04-18] Cycle 148 — A (Quality Assurance)
 
 **[A] Quality Assurance:**

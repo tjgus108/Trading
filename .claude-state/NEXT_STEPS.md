@@ -101,7 +101,8 @@ _Last updated: 2026-04-18 (Cycle 148 완료, Cycle 149 시작)_
 3. ~~**test_data_utils 2개 실패 수정**~~ — ✅ DONE (Cycle 148-A): 거래소 검증 사전 처리, parquet→pickle 폴백
 4. ~~**PFI near-zero 피처 제거**~~ — ✅ DONE (Cycle 149-C): rsi14, rsi_zscore, price_vs_vwap 제거 (17→14 피처)
 5. ~~**missing data 비율 경고**~~ — ✅ DONE (Cycle 149-C): >5% 누락 시 WARNING, data_utils.py
-6. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
-7. **ETH/SOL ML 모델 재학습** — 14-피처 기준으로 재학습 (기존 BTC 모델도 교체 필요)
-8. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
-9. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)
+6. ~~**Kelly Sizer 레짐 개선**~~ — ✅ DONE (Cycle 149-B): TREND_DOWN 1.0→0.6, compute(regime=...) 파라미터 추가
+7. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
+8. **ETH/SOL ML 모델 재학습** — 14-피처 기준으로 재학습 (기존 BTC 모델도 교체 필요)
+9. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
+10. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)
