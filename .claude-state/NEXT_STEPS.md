@@ -1,13 +1,23 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 152-B 완료)_
+_Last updated: 2026-04-18 (Cycle 153 E완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 152
-- 152 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** (표 기준 Cycle 2 패턴)
+### 로테이션: Cycle 154
+- 154 mod 5 = 4 → **A(품질) + B(리스크) + F(리서치)** 패턴
+
+### ✅ Cycle 153 완료 사항 (E: 실행)
+
+#### E(실행): AccuracyDriftMonitor + DriftMonitor → live_paper_trader 연동 ✅ COMPLETE
+- `scripts/live_paper_trader.py`에 두 모니터 임포트/초기화
+- `AccuracyDriftMonitor`: symbol별 ML 예측 정확도 추적, `should_retrain=True` 시 `_weekly_retrain()` 즉시 호출 + `reset_detectors()`
+- `DriftMonitor`: 거래 PnL% 스트리밍, `on_drift` 콜백으로 `CircuitBreaker._triggered=True` 강제 세팅
+- 로깅: "Drift detected, triggering emergency retrain [symbol]"
+- dry-run 검증 통과 (import OK, init OK)
+- 기존 153 PASS 테스트 영향 없음 (pre-existing yaml 오류 외)
 
 ### ✅ Cycle 152 완료 사항
 

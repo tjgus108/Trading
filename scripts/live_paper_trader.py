@@ -53,6 +53,8 @@ from src.strategy.regime import MarketRegimeDetector, MarketRegime
 from src.exchange.paper_trader import PaperTrader
 from src.risk.circuit_breaker import CircuitBreaker
 from src.risk.manager import SignalCorrelationTracker
+from src.ml.drift_detector import AccuracyDriftMonitor
+from src.risk.drawdown_monitor import DriftMonitor, DriftState
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / ".claude-state"
@@ -351,12 +353,33 @@ class LivePaperTrader:
         self.correlation_tracker = SignalCorrelationTracker(warn_threshold=0.75)
         self._last_retrain_time: float = 0.0  # 마지막 ML 재학습 시각
 
+        # ML 예측 정확도 드리프트 모니터 (AccuracyDriftMonitor)
+        # symbol별로 관리: symbol -> AccuracyDriftMonitor
+        self._accuracy_monitors: dict[str, AccuracyDriftMonitor] = {}
+
+        # 수익률 분포 드리프트 모니터 (DriftMonitor) — CircuitBreaker 연동
+        self._drift_monitor = DriftMonitor(
+            window=30,
+            warm_up=50,
+            delta=0.001,
+            lambda_=50.0,
+            on_drift=self._on_return_drift,
+        )
+
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
 
     def _handle_shutdown(self, signum, frame):
         logger.info("Shutdown signal received. Saving state...")
         self.running = False
+
+    def _on_return_drift(self, state: DriftState, reason: str) -> None:
+        """수익률 DriftMonitor 콜백 — DRIFT 시 CircuitBreaker 강제 트리거."""
+        if state == DriftState.DRIFT:
+            logger.warning("DriftMonitor DRIFT detected — triggering CircuitBreaker: %s", reason)
+            # CircuitBreaker 내부 상태를 직접 세팅 (force trigger)
+            self.circuit_breaker._triggered = True
+            self.circuit_breaker._reason = f"DriftMonitor: {reason}"
 
     def initialize(self):
         """초기화: 심볼별 전략 로드 및 초기 데이터 수집."""
@@ -532,6 +555,24 @@ class LivePaperTrader:
                         ml_pred = predict_ml_signal(model, ml_features, scaler)
                         if ml_pred:
                             ml_label, ml_conf = ml_pred
+                            # AccuracyDriftMonitor 업데이트 (signal direction을 실제값으로 사용)
+                            # 예측: UP=1, DOWN=0; 실제: BUY→UP=1, SELL→DOWN=0
+                            if symbol not in self._accuracy_monitors:
+                                self._accuracy_monitors[symbol] = AccuracyDriftMonitor(
+                                    window=100, min_accuracy=0.52
+                                )
+                            actual_label = 1 if sig.action == Action.BUY else 0
+                            pred_label = 1 if ml_label == "UP" else 0
+                            acc_monitor = self._accuracy_monitors[symbol]
+                            acc_monitor.update(prediction=pred_label, actual=actual_label)
+                            if acc_monitor.should_retrain:
+                                logger.warning(
+                                    "Drift detected, triggering emergency retrain [%s] %s",
+                                    symbol, acc_monitor.summary().split('\n')[0],
+                                )
+                                self._weekly_retrain()
+                                self._last_retrain_time = time.time()
+                                acc_monitor.reset_detectors()
                             # BUY는 DOWN 예측 시 차단, SELL은 UP 예측 시 차단
                             if (sig.action == Action.BUY and ml_label == "DOWN") or \
                                (sig.action == Action.SELL and ml_label == "UP"):
@@ -694,6 +735,14 @@ class LivePaperTrader:
                 })
 
                 self.circuit_breaker.record_trade_result(is_loss=(pnl <= 0))
+                # 수익률 DriftMonitor 업데이트 (포지션 기준 pnl%)
+                entry_val = pos["entry"] * pos["size"]
+                pnl_pct = pnl / entry_val if entry_val > 0 else 0.0
+                drift_state = self._drift_monitor.update(pnl_pct)
+                if drift_state == DriftState.DRIFT:
+                    logger.warning(
+                        "  [%s] DriftMonitor DRIFT — CircuitBreaker triggered", name
+                    )
                 logger.info("  [%s] CLOSED %s @ $%.2f -> $%.2f | PnL: $%.2f (%s)",
                             name, side, pos["entry"], exit_price, pnl, reason)
                 closed.append(name)
