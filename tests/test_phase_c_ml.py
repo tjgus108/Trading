@@ -130,7 +130,8 @@ class TestFeatureBuilder:
         X, _ = fb.build(df)
 
         # Feature가 존재하는지 확인
-        required_features = ["rsi_zscore", "volatility_20", "ema_ratio",
+        # Cycle 149: rsi_zscore 제거됨 (PFI near-zero)
+        required_features = ["volatility_20", "ema_ratio",
                             "price_vs_ema20", "volume_ratio_20", "donchian_pct"]
         for feat in required_features:
             assert feat in X.columns, f"Feature {feat} missing"

@@ -424,6 +424,21 @@ class HistoricalDataDownloader:
         ))
         quality_pct = 100.0 * len(df) / expected_candles if expected_candles > 0 else 0.0
 
+        # 누락 데이터 비율 > 5% 경고 (Cycle 149)
+        if expected_candles > 0 and missing > 0:
+            missing_ratio = missing / expected_candles
+            if missing_ratio > 0.05:
+                symbol_name = df.name if hasattr(df, 'name') else "UNKNOWN"
+                logger.warning(
+                    "High missing data ratio for %s %s: %.1f%% (%d/%d candles missing). "
+                    "Consider re-downloading or using a different timeframe.",
+                    symbol_name,
+                    timeframe,
+                    missing_ratio * 100,
+                    missing,
+                    expected_candles,
+                )
+
         return DataValidationReport(
             symbol=df.name if hasattr(df, 'name') else "UNKNOWN",
             timeframe=timeframe,

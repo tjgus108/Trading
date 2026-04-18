@@ -3,11 +3,16 @@ C1. FeatureBuilder: OHLCV + 기술 지표 → ML 학습 피처.
 
 피처 목록:
   - 수익률: return_1, return_3, return_5, return_10, return_20
-  - 모멘텀: rsi14, rsi_zscore
   - 변동성: atr_pct (ATR / close), volatility_20
   - 추세: ema_ratio (ema20/ema50), price_vs_ema20, price_vs_ema50
   - 볼륨: volume_ratio_20 (현재/20일 평균)
   - Donchian: donchian_pct (현재 가격의 채널 내 위치)
+  - 기타: macd_hist, bb_position
+
+제거된 피처 (PFI near-zero, Cycle 149):
+  - rsi14: MDI=0.0, PFI=0.0 (BTC/ETH/SOL 공통)
+  - rsi_zscore: MDI=0.0, PFI=0.0 (BTC/ETH/SOL 공통)
+  - price_vs_vwap: MDI=0.0, PFI=0.0 (BTC/ETH/SOL 공통)
 
 타겟 레이블:
   - forward_return_n 캔들 후 수익률 기준
@@ -102,17 +107,6 @@ class FeatureBuilder:
         feat["return_10"] = np.log(close / close.shift(10))
         feat["return_20"] = np.log(close / close.shift(20))
 
-        # RSI: 이전 20바의 통계로 정규화 (현재 바 제외)
-        if "rsi14" in df.columns:
-            feat["rsi14"] = df["rsi14"] / 100.0  # 0~1 정규화
-            rsi_shifted = df["rsi14"].shift(1)  # 이전 바 기준
-            feat["rsi_zscore"] = (rsi_shifted - rsi_shifted.rolling(20).mean()) / (
-                rsi_shifted.rolling(20).std() + 1e-9
-            )
-        else:
-            feat["rsi14"] = 0.5
-            feat["rsi_zscore"] = 0.0
-
         # ATR 변동성
         if "atr14" in df.columns:
             feat["atr_pct"] = df["atr14"] / close
@@ -152,12 +146,6 @@ class FeatureBuilder:
             low20 = low_prev.rolling(20).min()
             chan_range = high20 - low20
             feat["donchian_pct"] = (close - low20) / (chan_range + 1e-9)
-
-        # VWAP 관계
-        if "vwap" in df.columns:
-            feat["price_vs_vwap"] = (close - df["vwap"]) / (df["vwap"] + 1e-9)
-        else:
-            feat["price_vs_vwap"] = 0.0
 
         # MACD 히스토그램: 이전 바 기준 (shift(1) 적용)
         close_prev = close.shift(1)
@@ -204,15 +192,16 @@ class FeatureBuilder:
 
     @property
     def feature_names(self) -> List[str]:
-        """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정)."""
+        """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정).
+
+        Cycle 149: rsi14, rsi_zscore, price_vs_vwap 제거 (PFI near-zero).
+        """
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",
-            "rsi14", "rsi_zscore",
             "atr_pct", "volatility_20",
             "ema_ratio", "price_vs_ema20", "price_vs_ema50",
             "volume_ratio_20",
             "donchian_pct",
-            "price_vs_vwap",
             "macd_hist",
             "bb_position",
         ]
