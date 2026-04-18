@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-04-18] Cycle 150 — D (ML/Signals)
+
+**[D] BTC 14-피처 재학습 + ETH/SOL BTC 시차 피처 추가:**
+
+- `src/ml/features.py`: `btc_close_lag1` 피처 추가 (df에 `btc_close` 컬럼 있을 때만 계산)
+  - ETH/SOL에서 BTC 1봉 시차 수익률 = log(btc_close.shift(1) / btc_close.shift(2))
+  - look-ahead bias 없음 (shift(1), shift(2) 모두 과거 데이터만 참조)
+- `scripts/train_ml.py`: `merge_btc_close()` 함수 추가
+  - ETH/SOL auto-retrain 시 BTC/USDT 1h 데이터 별도 fetch 후 btc_close 컬럼으로 병합
+  - BTC/USDT 자체는 병합 없음 (if "BTC" in symbol)
+
+**학습 결과 (Bybit 실데이터, 2026-03-07~04-18, 1000캔들):**
+
+| 심볼 | n_samples | val_acc | test_acc | 결과 | 이유 |
+|---|---|---|---|---|---|
+| BTC/USDT | 259 (14 feat) | 0.654 | 0.519 | FAIL | test < 0.55 |
+| ETH/USDT | 326 (15 feat) | 0.508 | 0.636 | FAIL | val < 0.55 |
+| SOL/USDT | 355 (15 feat) | 0.578 | 0.493 | FAIL | test < 0.55 |
+
+**분석**: 현재 시장(2026-03~04)은 레짐 변화 구간. val↑/test↓ 또는 val↓/test↑ 패턴
+→ 훈련 구간과 테스트 구간 간 분포 불일치. 단기 재학습 사이클 필요.
+
+**BTC btc_close_lag1 PFI**: ETH에서 MDI 5.9% (10위), SOL에서 PFI 음수 → SOL에선 효과 없음
+
+---
+
 ## [2026-04-18] Cycle 149 — B (Risk Management)
 
 **[B] Kelly Sizer 개선:**

@@ -8,6 +8,7 @@ C1. FeatureBuilder: OHLCV + 기술 지표 → ML 학습 피처.
   - 볼륨: volume_ratio_20 (현재/20일 평균)
   - Donchian: donchian_pct (현재 가격의 채널 내 위치)
   - 기타: macd_hist, bb_position
+  - BTC 시차 (선택): btc_close_lag1 — df에 'btc_close' 컬럼이 있을 때만 추가
 
 제거된 피처 (PFI near-zero, Cycle 149):
   - rsi14: MDI=0.0, PFI=0.0 (BTC/ETH/SOL 공통)
@@ -163,6 +164,12 @@ class FeatureBuilder:
         bb_range = bb_upper - bb_lower
         feat["bb_position"] = (close - bb_lower) / (bb_range + 1e-9)
 
+        # BTC 시차 피처 (ETH/SOL 개선용): df에 'btc_close' 컬럼이 있을 때만 추가
+        # Cycle 150: ETH/SOL은 BTC 가격 움직임에 후행하는 경향 → 1봉 시차 수익률 사용
+        if "btc_close" in df.columns:
+            btc_close = df["btc_close"]
+            feat["btc_close_lag1"] = np.log(btc_close.shift(1) / btc_close.shift(2))
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -195,6 +202,8 @@ class FeatureBuilder:
         """모델 학습/추론에 사용되는 피처 컬럼명 목록 (순서 고정).
 
         Cycle 149: rsi14, rsi_zscore, price_vs_vwap 제거 (PFI near-zero).
+        Cycle 150: btc_close_lag1 추가 (선택적 — df에 'btc_close' 컬럼 필요).
+        base 14피처만 반환. btc_close_lag1은 build() 시 자동 추가됨.
         """
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",

@@ -1,15 +1,30 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 148 완료, Cycle 149 시작)_
+_Last updated: 2026-04-18 (Cycle 150 D 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 149
-- 149 mod 5 = 4 → **C(데이터) + B(리스크) + F(리서치)** (표 기준 Cycle 4 패턴)
+### 로테이션: Cycle 150
+- 150 mod 5 = 0 → **D(ML) + E(실행) + F(리서치)** (표 기준 Cycle 5 패턴)
 
-### ✅ Cycle 148 완료 사항
+### ✅ Cycle 149 완료 사항
+
+#### C(데이터): PFI 피처 제거 + missing data 경고 ✅ COMPLETE
+- rsi14, rsi_zscore, price_vs_vwap 제거 (17→14 피처)
+- missing data > 5% WARNING 추가
+- ⚠️ 기존 BTC 모델 17피처 → 14피처 기준 재학습 필요
+
+#### B(리스크): Kelly 레짐 개선 + VaR 검증 ✅ COMPLETE
+- TREND_DOWN 스케일 1.0→0.6, compute(regime=) API 추가
+- VaR/CVaR 정확성 확인, 테스트 6개 추가
+
+#### F(리서치): ETH/SOL 예측 + Online Learning ✅ COMPLETE
+- ETH/SOL 실패 원인: 높은 변동성 + 내러티브 이벤트
+- 개선: BTC 시차 피처, 레짐별 서브모델, River 온라인 학습
+
+### ✅ Cycle 148 완료 사항 (요약)
 
 #### E(실행): ML 모델 실제 생성 ✅ COMPLETE
 - BTC PASS (val 65.4%, test 63.5%), ETH/SOL FAIL
@@ -102,7 +117,10 @@ _Last updated: 2026-04-18 (Cycle 148 완료, Cycle 149 시작)_
 4. ~~**PFI near-zero 피처 제거**~~ — ✅ DONE (Cycle 149-C): rsi14, rsi_zscore, price_vs_vwap 제거 (17→14 피처)
 5. ~~**missing data 비율 경고**~~ — ✅ DONE (Cycle 149-C): >5% 누락 시 WARNING, data_utils.py
 6. ~~**Kelly Sizer 레짐 개선**~~ — ✅ DONE (Cycle 149-B): TREND_DOWN 1.0→0.6, compute(regime=...) 파라미터 추가
-7. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
-8. **ETH/SOL ML 모델 재학습** — 14-피처 기준으로 재학습 (기존 BTC 모델도 교체 필요)
-9. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
-10. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)
+7. ~~**BTC 14-피처 재학습 + BTC 시차 피처**~~ — ✅ DONE (Cycle 150-D): FAIL (레짐 변화), btc_close_lag1 구현됨
+   - BTC val=0.654/test=0.519 FAIL, ETH val=0.508/test=0.636 FAIL, SOL val=0.578/test=0.493 FAIL
+   - 시장 2026-03~04: 레짐 변화 구간 → val↔test 불일치. 주기적 재학습 필요
+8. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
+9. **ML 주 1회 재학습 스케줄러** — cron 또는 live_paper_trader 내부 weekly retrain hook
+10. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
+11. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)

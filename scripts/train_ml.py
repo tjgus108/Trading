@@ -223,6 +223,25 @@ def run_pfi_analysis(trainer, X_test, y_test, result, symbol: str):
     print(f"Feature importance saved: {pfi_path}")
 
 
+def merge_btc_close(df, symbol: str, timeframe: str, limit: int):
+    """
+    ETH/SOL 학습 시 BTC 종가를 btc_close 컬럼으로 병합.
+    BTC/USDT 심볼이 아닐 때만 실행. 인덱스 기준 left join.
+    """
+    if "BTC" in symbol:
+        return df
+    try:
+        logger.info("BTC 시차 피처 추가: BTC/USDT %s 데이터 fetch 중...", timeframe)
+        btc_df = fetch_bybit("BTC/USDT", timeframe, limit)
+        # 인덱스 정렬 후 left join
+        df = df.copy()
+        df["btc_close"] = btc_df["close"].reindex(df.index, method="ffill")
+        logger.info("btc_close 병합 완료: %d rows", df["btc_close"].notna().sum())
+    except Exception as e:
+        logger.warning("BTC 데이터 병합 실패 (피처 없이 진행): %s", e)
+    return df
+
+
 def auto_retrain(symbol: str, timeframe: str):
     """
     자동 재학습 모드:
@@ -237,6 +256,8 @@ def auto_retrain(symbol: str, timeframe: str):
     MODELS_DIR.mkdir(exist_ok=True)
 
     df = fetch_bybit(symbol, timeframe, AUTO_RETRAIN_LIMIT)
+    # ETH/SOL: BTC 시차 피처 추가 (btc_close_lag1)
+    df = merge_btc_close(df, symbol, timeframe, AUTO_RETRAIN_LIMIT)
 
     from src.ml.trainer import WalkForwardTrainer
     from src.ml.features import FeatureBuilder
@@ -267,7 +288,7 @@ def auto_retrain(symbol: str, timeframe: str):
 
     print(result.summary())
 
-    # PFI 분석: test set 재구성 후 실행
+    # PFI 분석: test set 재구성 후 실행 (btc_close 포함된 df 사용)
     try:
         X_all, y_all = FeatureBuilder(forward_n=5, threshold=AUTO_RETRAIN_BINARY_THRESHOLD, binary=True).build(df)
         y_all = y_all.astype(int)
