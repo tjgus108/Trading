@@ -776,3 +776,471 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Ethereum MEV Bot Exploit 2025 — Gate.com](https://www.gate.com/crypto-wiki/article/ethereum-mev-bot-exploit-impact-on-defi-and-mitigation-strategies-in-2025)
 - [Deep Learning for Algo Trading Review — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S2590005625000177)
 - [LLM-Driven DRL Trading Framework — MDPI](https://www.mdpi.com/2504-2289/9/12/317)
+
+
+## [2026-04-18] Cycle 148 — 봇 실패/성공 케이스 및 최신 퀀트 논문
+
+### 봇 실패 패턴 (2024~2026 업데이트)
+
+- **과적합(Overfitting) 위험 재확인**: 888개 알고 전략 연구에서 백테스트 Sharpe와 실전 Sharpe의 R² < 0.025 — 상관관계 거의 없음. 44%의 전략이 새로운 데이터에서 재현 실패. 본 봇의 355개 전략 중 실전 통과 0개와 일치.
+- **레짐 변화 무방비**: 2025년 5월 AI봇 플래시 크래시 — 정상 시장용 설계된 봇이 3분 내 $2B 매도. 레짐 감지 없는 단일 전략 운영의 전형적 실패. Grid-trading 봇은 추세 구간에서 대규모 손실.
+- **73% 6개월 내 실패**: 주원인 3가지 — (1) 리스크 관리 부재, (2) 과최적화, (3) 레짐 변화 무대응. 세 요인 모두 본 프로젝트가 이미 식별한 문제와 동일.
+
+### 성공 봇의 공통 특징
+
+1. **Walk-forward 검증 필수**: 백테스트 아닌 실전 데이터 롤링 검증을 통해 레짐 의존성 제거.
+2. **규율(Discipline) > 지능(Intelligence)**: Qwen 소형 LLM 봇이 GPT-5 기반보다 우수 — 빠른 손절 + 작은 포지션이 결정적. 복잡한 모델보다 엄격한 규칙이 우선.
+3. **다중 레짐 적응**: 상승/하락/횡보 3개 레짐을 명시적으로 구분하고 전략 전환. 단일 전략 운영 금지.
+4. **레버리지 제한**: 성공 봇들의 공통점 — 낮은 레버리지 + 1% 포지션 룰.
+
+### 최신 퀀트 논문 요약 (2024~2026)
+
+1. **Directional Change + Meta-Learning (Razmi & Barak, 2024)**
+   - DC(방향 변화) 방식: 고정 시간 간격 아닌 유의미한 가격 움직임 기준으로 샘플링 → 레짐 변화에 민감.
+   - Meta-learning 레이어가 온체인 데이터(BTC/ETH), DC 지표, 레짐 통계 4개 피처셋 기반으로 하이퍼파라미터 자동 조정.
+   - 결과: 수익률 최대 10배, Sharpe 3배 향상. Binance 선물 2021~2024년 검증.
+   - 출처: [SSRN 5017215](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5017215)
+
+2. **Regime-Switching RL for Crypto Portfolio (2025)**
+   - 변동성 + 수익률 분위수 기반 3개 레짐 정의 → 레짐별 RL 모델 전환.
+   - 레짐 전환 시 포지션 자동 조정 — 단일 RL 대비 안정성 향상.
+   - 출처: [Springer Digital Finance](https://link.springer.com/article/10.1007/s42521-024-00123-2)
+
+3. **DQN 기반 전략 선택 RL (2025, TandFonline)**
+   - 사전 정의된 기술 전략들 중 DQN이 선택 — 블랙박스 회피, 해석 가능성 + 안정성.
+   - 단일 전략 대비 변동성 감소, 해석 가능성 향상.
+   - 출처: [TandFonline](https://www.tandfonline.com/doi/full/10.1080/23322039.2025.2594873)
+
+4. **Regime-Conditional RL Reward Functions (MDPI, 2026)**
+   - 경제 효용 이론 기반 보상 함수 + 레짐 조건부 최적화.
+   - 레짐별 성과 이질성 분석: 동일 전략이 레짐에 따라 수익/손실 크게 다름 → 레짐 필터 없이는 평균 성과가 의미 없음.
+   - 출처: [MDPI Mathematics](https://www.mdpi.com/2227-7390/14/5/794)
+
+### 우리 봇에 대한 시사점
+
+1. **DC 방법론 검토 가능성**: 시간 기반이 아닌 가격 움직임 기반 이벤트 샘플링이 레짐 변화 포착에 우수. ML 모델의 입력 피처로 활용 검토.
+2. **레짐별 ML 모델 분리**: 현재 단일 ML 2-class 모델 → 레짐별(TREND_UP/RANGING/TREND_DOWN) 별도 모델 또는 레짐 피처 추가.
+3. **DQN 전략 선택기**: 기존 355개 전략 중 레짐별 상위 전략을 DQN으로 선택하는 메타-레이어 접근법 — 신규 전략 추가 없이 기존 전략 활용 극대화.
+
+### 참고 출처
+
+- [Why Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [AI Trading Bots 2025 Reality — AgentiveAIQ](https://agentiveaiq.com/blog/is-ai-bot-trading-profitable-the-2025-reality-check)
+- [Adaptive Crypto Trading DC + Meta-Learning — SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5017215)
+- [Regime Switching Forecasting Crypto — Springer](https://link.springer.com/article/10.1007/s42521-024-00123-2)
+- [DQN Strategy Selection — TandFonline](https://www.tandfonline.com/doi/full/10.1080/23322039.2025.2594873)
+- [Regime-Conditional RL Rewards — MDPI](https://www.mdpi.com/2227-7390/14/5/794)
+- [ML Crypto Trading Comparative Analysis — Springer](https://link.springer.com/article/10.1007/s44163-025-00519-y)
+
+
+## [2026-04-18] Cycle 149 — ETH/SOL ML 개선 + Online Learning
+
+### 1. ETH/SOL이 BTC보다 예측하기 어려운 이유
+
+**시장 미시구조 차이**
+- SOL 변동성 ~80%, ETH ~60%, BTC ~41% — 알트코인 변동성이 BTC의 2배 이상. 노이즈 대비 시그널 비율이 낮아 동일 모델 구조가 BTC보다 낮은 정확도를 냄.
+- BTC-SOL 상관계수 0.99로 장기 동조화가 강하지만, 내러티브 이벤트(DeFi 시즌, NFT, 밈코인 등) 발생 시 상관관계가 급격히 이탈 — 상관관계 기반 피처가 비정상 시점에 오히려 혼란을 줌.
+- ETH는 가스 사용량·스마트 컨트랙트 활동 등 온체인 피처에 크게 반응하나 BTC에는 없는 DeFi 레짐이 별도로 존재 — 동일 피처셋 사용 시 ETH/SOL에서 모델 오버피팅 발생.
+
+**내러티브 드리븐 가격 형성**
+- 알트코인은 단기 내러티브(에어드랍, 업그레이드, 고래 매집)에 의해 짧은 랠리를 반복. 기술적 패턴보다 이벤트 감응도가 높아 과거 OHLCV 기반 ML의 예측력이 구조적으로 낮음.
+- BTC 관련 마이크로구조 피처(BTC Roll, BTC VPIN)가 ETH/SOL 예측에 강한 설명력을 보임 — 알트코인 과거 가격보다 BTC 미시구조 변수가 더 유용한 입력.
+
+**추천 피처 추가 방향 (ETH/SOL 전용)**
+- BTC 미시구조 시차 피처: BTC_close_lag1, BTC_roll, BTC_VPIN
+- 온체인: ETH 가스 사용량, 활성 주소수 (ETH 전용)
+- 유동성 깊이(order book depth) 변화율
+- 변동성 레짐 레이블 (ATR 분위수 기반 3단계)
+- 감성 피처: RoBERTa 기반 뉴스/소셜 감성 (Bi-LSTM 조합 시 MAPE 2.01% 달성 사례)
+
+**추천 아키텍처 변경**
+- 단일 2-class 모델 → 레짐별 서브모델 (TREND_UP/RANGING/TREND_DOWN)
+- 앙상블: LSTM + GRU 결합 또는 Gradient Boosting + 감성 피처 레이어 추가
+- 출처: [ETH Multi-Factor ML — ACM ICAIF 2025](https://dl.acm.org/doi/10.1145/3766918.3766922), [Deep Learning Crypto Forecasting — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S0169207025000147)
+
+---
+
+### 2. Online / Incremental Learning 리서치
+
+**핵심 라이브러리**
+
+| 라이브러리 | 특징 | 크립토 적합성 |
+|---|---|---|
+| **River** | Python 딕셔너리 스트림 입력, 가독성 우수, partial_fit 패턴 | 코드 통합 용이, 소규모 봇에 적합 |
+| **Vowpal Wabbit (VW)** | 해싱 기반 고속 온라인 학습, 능동/대화형 학습 지원 | 고빈도 틱 데이터 처리에 유리 |
+| **scikit-learn `partial_fit`** | SGDClassifier, MiniBatchKMeans 등 점진적 학습 지원 | 기존 sklearn 파이프라인 재사용 가능 |
+
+**크립토 트레이딩에서의 적용 사례**
+- 실시간 ML 파이프라인은 데이터가 도착하는 즉시 학습하므로 컨셉 드리프트(시장 레짐 변화)에 빠르게 적응. 주기적 재학습(배치) 대비 레짐 전환 후 반응 지연이 없음.
+- Meta-RL-Crypto (arXiv 2509.09751) 에서 BTC/ETH/SOL 대상으로 OHLCV + 거래량 + 시총 피처 기반 메타-보상 자기개선 구조 적용 — 온라인 업데이트와 결합 시 드리프트 대응 효율 증가.
+- 실전 주의점: River/VW는 배치 모델보다 단기 노이즈에 과반응 위험. 학습률(learning rate) 감쇠 또는 윈도우 제한(sliding window) 필수.
+
+**우리 봇에 대한 시사점**
+1. **단기 적용 방향**: 기존 배치 ML 모델 유지 + River SGDClassifier로 온라인 보조 모델 추가 → 두 모델의 합의(앙상블 voting) 시에만 신호 발생.
+2. **중기 방향**: ETH/SOL 전용 온라인 학습 레이어 — 레짐 전환 후 24시간 내 자동 가중치 조정.
+3. **구현 위치**: `src/strategy/ml_strategy.py` 또는 `src/data/` 파이프라인 내 스트리밍 피처 처리 모듈로 통합.
+
+---
+
+### 우리 봇 적용 우선순위
+
+1. **ETH/SOL 피처 추가 (단기)**: BTC 미시구조 시차 피처 + ATR 레짐 레이블 추가 → 별도 배치 재학습으로 성능 개선 시도.
+2. **레짐별 서브모델 분리 (중기)**: 현재 단일 모델 → 3개 레짐별 분리 모델, ETH/SOL 정확도 향상 기대.
+3. **River 보조 온라인 모델 (중기)**: 기존 배치 모델 + River 온라인 모델 앙상블로 레짐 드리프트 대응력 강화.
+
+### 참고 출처
+
+- [BTC Microstructure and Altcoin Prediction — Cornell/ACM](https://stoye.economics.cornell.edu/docs/Easley_ssrn-4814346.pdf)
+- [ETH Multi-Factor ML — ACM ICAIF 2025](https://dl.acm.org/doi/10.1145/3766918.3766922)
+- [Deep Learning + On-Chain + Sentiment — ScienceDirect](https://www.sciencedirect.com/science/article/pii/S0169207025000147)
+- [Sentiment-Driven LSTM/GRU Crypto Forecasting — Springer](https://link.springer.com/article/10.1007/s13278-025-01463-6)
+- [River + Vowpal Wabbit Real-Time ML — Rotational Labs](https://rotational.io/blog/realtime-machine-learning/)
+- [Meta-RL-Crypto Online Learning — arXiv](https://arxiv.org/html/2509.09751v1)
+- [ETH/SOL Correlation & Volatility 2026 — Dropstab](https://dropstab.com/research/crypto/solana-ethereum-correlation-and-volatility)
+
+---
+
+## [2026-04-18] Cycle 150 — CPCV & 메타-라벨링 리서치
+
+### 1. CPCV (Combinatorial Purged Cross-Validation)
+
+#### 개요
+- Lopez de Prado가 제안한 금융 ML 전용 교차검증. 표준 k-fold와 달리 시계열 데이터의 정보 누출(leakage)을 방지.
+- 핵심 메커니즘 2가지:
+  - **Purging**: 학습셋에서 테스트 레이블 기간과 겹치는 구간 제거 → 미래 정보 유입 차단
+  - **Embargo**: 각 테스트 구간 이후 n개 바를 학습셋에서도 제외 → 지연된 자기상관 leakage 방지
+- 단일 경로(single path) 백테스트 대신 **다수의 백테스트 경로 분포**를 생성 → 전략 성과의 통계적 신뢰도 확보
+
+#### WF(Walk-Forward) 대비 CPCV 장단점
+
+| 항목 | Walk-Forward | CPCV |
+|---|---|---|
+| 과적합 탐지 | 단일 경로 의존, 취약 | PBO(Probability of Backtest Overfitting) 계산 가능 |
+| 정보 누출 | Embargo 없으면 누출 위험 | Purging+Embargo로 체계적 차단 |
+| 구현 복잡도 | 단순 | 복잡 (조합 수 C(N,k) 폭발) |
+| 결과 해석 | 단일 Sharpe | Sharpe 분포 + DSR(Deflated Sharpe Ratio) |
+| 크립토 적합성 | 현재 우리 봇 사용 중 | 높은 편향-분산 트레이드오프 개선 |
+
+#### mlfinlab vs 자체 구현 비교
+- **mlfinlab**: `CombinatorialPurgedKFold` 클래스 제공. 설치 시 상용 라이선스 문제 있음 (오픈소스 버전 제한적).
+- **skfolio**: `CombinatorialPurgedCV` 무료 구현체. sklearn 호환 API.
+- **자체 구현**: quantbeckman.com 코드 참고 시 ~100줄로 구현 가능. Embargo 파라미터 커스터마이징 자유도 높음.
+- **권장**: skfolio 또는 자체 구현. mlfinlab 유료 버전 불필요.
+
+#### 우리 봇 현황과의 연결
+- 현재 WF 검증에서 355+ 전략 모두 실패(실전 데이터 기준). 이는 단일 경로 의존 + purging 미적용이 원인일 가능성 높음.
+- CPCV 도입 시 → Sharpe 분포 확인 → 진짜 엣지 있는 전략 vs 운 좋은 전략 구분 가능.
+- **구현 대상**: `src/backtest/engine.py`에 CPCV 모드 옵션 추가 고려.
+
+---
+
+### 2. 메타-라벨링 (Meta-Labeling)
+
+#### 개요 (Lopez de Prado, 2018)
+- Triple Barrier Method + 2단계 ML 구조
+- **1차 모델**: 방향 예측 (UP/DOWN) — 기존 전략/사이드 신호
+- **2차 모델(메타-라벨러)**: 1차 모델의 신호를 받아 "이 신호를 실행할지 말지"를 예측
+  - 출력: Precision/Recall 개선, F1 Score 최적화
+  - 핵심: 1차 모델이 틀렸을 때 걸러내는 필터 역할
+
+#### Triple Barrier 레이블링
+- 각 진입점마다 3개 배리어 설정:
+  - **상단 배리어**: 익절 목표 (예: +2% ATR 기반)
+  - **하단 배리어**: 손절 (예: -1% ATR 기반)
+  - **수직 배리어**: 최대 보유 시간 (예: 24시간)
+- 첫 배리어 도달 시 레이블 결정 → 단순 UP/DOWN보다 실제 트레이딩 로직 반영
+
+#### Binary UP/DOWN vs 메타-라벨링 비교
+
+| 항목 | Binary UP/DOWN (현재) | 메타-라벨링 |
+|---|---|---|
+| 레이블 정의 | n개 바 후 종가 상승 여부 | 실제 TP/SL 도달 여부 |
+| 클래스 불균형 | 50:50 강제 | 자연스러운 분포 반영 |
+| 거래 실행 여부 | 항상 실행 | 2차 모델이 필터링 |
+| Precision | 낮음 (노이즈 많음) | 높아짐 (실행 건 선별) |
+| 구현 복잡도 | 단순 | 2단계 파이프라인 필요 |
+| 크립토 2024-2025 연구 | 기본 방식 | Triple Barrier가 BTC/ETH에서 우월 확인 |
+
+#### 크립토 적용 사례 (2024~2025)
+- Springer Nature 2025 논문: Information-driven bars + Triple Barrier + 딥러닝 조합이 BTC/ETH에서 우월한 성과.
+- MDPI 2024: GA-driven Triple Barrier + ML이 크립토 페어 트레이딩에서 성과 개선.
+- Medium 실험: 크립토 시장 메타-라벨링 적용 시 Precision 유의미하게 향상, 과매매(overtrading) 감소.
+- **결론**: 메타-라벨링이 현재 binary 분류보다 실전 트레이딩에 더 적합. 특히 레버리지 크립토에서 거짓 신호 필터링 효과 큼.
+
+---
+
+### Cycle 150 우리 봇 적용 우선순위
+
+1. **단기 — 메타-라벨링 파일럿**: `src/strategy/ml_strategy.py`의 RF 분류기에 Triple Barrier 레이블 추가. 현재 63.5% 정확도 → Precision 개선 목표.
+2. **중기 — CPCV 도입**: `src/backtest/engine.py`에 skfolio의 `CombinatorialPurgedCV` 통합. 현재 WF 실패 원인이 단일 경로 과적합인지 검증.
+3. **주의사항**: CPCV는 계산 비용이 WF 대비 C(N,k)배 높음 — N=10, k=2 기준 45배. 전략 수 355+에 일괄 적용 시 실행 시간 문제 → 상위 후보 전략만 선별 적용 권장.
+
+### 참고 출처
+
+- [mlfinlab CPCV 공식 문서](https://www.mlfinlab.com/en/latest/cross_validation/cpcv.html)
+- [quantbeckman CPCV 코드 구현](https://www.quantbeckman.com/p/with-code-combinatorial-purged-cross)
+- [skfolio CombinatorialPurgedCV](https://skfolio.org/generated/skfolio.model_selection.CombinatorialPurgedCV.html)
+- [ScienceDirect: WF vs CPCV 오버피팅 비교](https://www.sciencedirect.com/science/article/abs/pii/S0950705124011110)
+- [Hudson & Thames: 메타-라벨링 효과 검증](https://hudsonthames.org/does-meta-labeling-add-to-signal-efficacy-triple-barrier-method/)
+- [Springer: Triple Barrier + 딥러닝 크립토 2025](https://link.springer.com/article/10.1186/s40854-025-00866-w)
+- [MDPI: GA-Triple Barrier 크립토 페어 트레이딩 2024](https://www.mdpi.com/2227-7390/12/5/780)
+- [Medium: 크립토 메타-라벨링 실험](https://medium.com/@liangnguyen612/meta-labeling-in-cryptocurrencies-market-95f761410fac)
+
+---
+
+## [2026-04-18] Cycle 151 — Concept Drift Detection & 동적 Feature Selection
+
+### 1. Concept Drift Detection 비교
+
+#### ADWIN (Adaptive Windowing)
+- **원리**: 가변 길이 슬라이딩 윈도우 유지. 윈도우 내 두 부분 구간의 평균 차이가 통계적 임계값 초과 시 드리프트 감지. 수학적 보장(PAC 학습) 있음.
+- **장점**: 점진적 드리프트에도 자동 윈도우 크기 조정, 임계값 사전 설정 불필요
+- **단점**: 메모리 사용량이 데이터 복잡도에 비례 증가, 갑작스러운 급변에는 반응 속도 느림
+- **River 구현**: `from river.drift import ADWIN` — 온라인 학습 파이프라인에 즉시 통합 가능
+
+#### DDM (Drift Detection Method)
+- **원리**: 모델의 예측 오류율 모니터링. PAC 학습 기반으로 정상 분포에서 오류율 감소 가정. 오류율이 경고/드리프트 임계값 초과 시 알람.
+- **장점**: 예측 오류율 직접 감시 → 실제 모델 성능 저하 시점과 연동, 계산 효율 높음
+- **단점**: 분류 모델에 최적화(연속값 예측엔 변형 필요), 초기 학습 구간 필요
+- **River 구현**: `from river.drift.binary import DDM` — 이진 오류(0/1) 스트림에 사용
+
+#### Page-Hinkley (PH)
+- **원리**: 관측값의 누적 편차가 사전 설정 임계값 초과 시 평균 변화 감지. 단일 데이터포인트 처리, 전체 스트림 저장 불필요.
+- **장점**: 실시간 처리에 최적, 메모리 효율 최고, 계산 비용 O(1)
+- **단점**: 점진적 드리프트 감지 약함(급격한 변화 전용), 임계값 수동 설정 필요
+- **River 구현**: `from river.drift import PageHinkley`
+
+#### 우리 봇 권장 조합
+- **1단계 실시간 감시**: PageHinkley — 급격한 레짐 전환(2026-03~04 같은 경우) 즉각 감지
+- **2단계 점진적 드리프트**: ADWIN — 서서히 변하는 feature 분포 변화 추적
+- **트리거**: DDM으로 모델 예측 오류율 감시 → 경고 레벨 시 재학습 준비, 드리프트 레벨 시 즉시 재학습
+
+---
+
+### 2. 재학습 시점 자동 판단 기준
+
+| 조건 | 행동 |
+|------|------|
+| DDM 경고(warning) 레벨 도달 | 최근 데이터 버퍼 수집 시작, 백그라운드 재학습 준비 |
+| DDM 드리프트 레벨 OR PageHinkley 감지 | 즉시 재학습 트리거, 현재 모델 가중치 감소 |
+| ADWIN 윈도우 급격히 축소 | 점진적 드리프트 확인, 주 1회 → 일 1회 재학습 주기 단축 |
+| 3일 연속 Sharpe < 0.5 (실전 성과) | 레짐 변화 의심, 강제 재학습 |
+
+현재 ML 모델 FAIL 원인(2026-03~04 레짐 변화)은 PageHinkley + DDM 조합이면 사전 감지 가능했을 케이스.
+
+---
+
+### 3. 동적 Feature Selection (레짐 변화 대응)
+
+#### Boruta 방식
+- **원리**: 원본 피처의 무작위 셔플 버전(Shadow Feature) 생성 후 랜덤포레스트 중요도 비교. Shadow 대비 통계적으로 유의미한 피처만 선택.
+- **레짐 적용**: 레짐 전환 감지 시 해당 레짐 데이터만으로 Boruta 재실행 → 레짐별 중요 피처 세트 관리
+- **단점**: 계산 비용 높음(반복 RF 학습), 실시간 적용 어려움 → 주기적 오프라인 실행 적합
+
+#### BorutaSHAP (권장)
+- **원리**: Boruta에서 RF 중요도 대신 SHAP 값 사용. Wasserstein 거리로 SHAP 값 분포의 드리프트 점수 계산 가능.
+- **시간 가중 SHAP**: 최근 데이터에 높은 가중치 부여하는 decay 함수 적용 → 레짐 전환 후 새 중요 피처를 빠르게 포착
+- **라이브러리**: `BorutaShapPlus` (pip 설치 가능)
+- **실전 적용**: ADWIN이 드리프트 감지 시 → BorutaSHAP 재실행 → 피처 세트 업데이트 → 모델 재학습 파이프라인
+
+#### SHAP 기반 피처 드리프트 감시
+- SHAP 값의 시간별 분포 변화 = 피처 중요도 드리프트 지표
+- Wasserstein 거리로 이전 기간 vs 현재 기간 SHAP 분포 비교 → 임계값 초과 시 재선택 트리거
+- **이점**: 모델 성능 저하 이전에 피처 레벨에서 조기 경보 가능
+
+---
+
+### 4. 우리 봇 적용 우선순위 (Cycle 151)
+
+1. **단기 — River Drift Detector 통합**: `src/strategy/ml_strategy.py` 또는 별도 `src/ml/drift_monitor.py` 생성. PageHinkley로 예측 오류 스트림 감시, DDM으로 재학습 트리거 자동화. River 이미 온라인러닝 기반으로 사용 중이므로 추가 의존성 없음.
+
+2. **중기 — BorutaSHAP 주기적 재선택**: 현재 고정된 피처 세트를 레짐별로 관리. ADWIN 드리프트 감지 시 or 매주 월요일 BorutaSHAP 재실행 → `config/feature_sets.json`에 레짐별 피처 저장.
+
+3. **주의사항**: Boruta 단독은 계산 비용 과다(355+ 전략에 일괄 적용 불가). SHAP-only 경량 버전 먼저 적용 권장.
+
+### 참고 출처
+
+- [River ADWIN 공식 문서](https://riverml.xyz/dev/api/drift/ADWIN/)
+- [River DDM 공식 문서](https://riverml.xyz/dev/api/drift/binary/DDM/)
+- [River Concept Drift 가이드](https://riverml.xyz/dev/introduction/getting-started/concept-drift-detection/)
+- [Page-Hinkley 방법론 설명](https://www.geeksforgeeks.org/artificial-intelligence/page-hinkley-method/)
+- [Springer: Page-Hinkley 개념 드리프트 감지](https://link.springer.com/chapter/10.1007/978-981-97-8946-7_3)
+- [Temporal SHAP 동적 피처 중요도](https://www.academia.edu/165470033/Temporal_SHAP_Analysis_for_Dynamic_Feature_Importance_in_Streaming_Transaction_Data_Achieving_Explainability_and_Fairness_in_Real_Time_AML_Detection_Systems)
+- [SHAP 안정성 및 드리프트 점수](https://ceur-ws.org/Vol-4059/paper14.pdf)
+- [BorutaSHAP for Temporal Feature Selection (TDS)](https://towardsdatascience.com/boruta-shap-for-temporal-feature-selection-96a7840c7713/)
+- [BorutaShapPlus 라이브러리](https://medium.com/@originallyretro/introducing-borutashapplus-feature-selection-via-boruta-and-shapley-values-3cf1fd9b368e)
+- [DataCamp: Data Drift & Model Drift 파이썬 구현](https://www.datacamp.com/tutorial/understanding-data-drift-model-drift)
+
+---
+
+## [2026-04-18] Cycle 152 Research — 포지션 사이징 최적화 & 실전 봇 운영 사례
+
+### 1. 포지션 사이징 방법론 비교
+
+#### Kelly Criterion (켈리 공식)
+- 공식: `Kelly% = (W × R - L) / R` (W=승률, L=1-W, R=손익비)
+- 크립토 특성상 **Full Kelly는 위험** — BTC 30일 실현 변동성이 30~45%로 전통 자산 대비 30~45배 높음
+- 실전 권장: **Quarter Kelly (0.25×Kelly)** 또는 그 이하, 입력값 추정 오차가 결과에 과도한 영향
+- 포트폴리오 노출 6% 이하, 단일 트레이드 1% 이하가 실전 기준
+
+#### Optimal-F (최적 f)
+- Ralph Vince의 방법론: 실제 트레이드 히스토리로 기하학적 성장을 극대화하는 f값 역산
+- 단순 승률 대신 트레이드 분포 패턴 + 드로다운 내성까지 반영
+- 실전 optimal f 범위: **0.1~0.3 (10~30%)** — Kelly보다 보수적이나 더 정확
+- 크립토 레짐 변화 시 히스토리 기반 f값이 무효화될 수 있음 → 정기 재계산 필수
+
+#### Fixed Fractional (고정 비율)
+- 매 트레이드마다 총자본의 고정% 위험: 자본 증가 시 절대 포지션 자동 증가, 손실 시 자동 감소
+- Balsara(1992) 연구: 다른 방법 대비 **가장 매끄러운 에퀴티 커브** 생성
+- 크립토 실전: **1~2% 고정** 권장. 저변동성 → 1%, 고변동성 → 0.5%
+- 단순하여 레짐 추정 오류로 인한 과최적화 위험 없음
+
+#### Risk Parity (리스크 패리티)
+- 각 포지션의 변동성 기여분이 동일하도록 역변동성 가중
+- 기관급 도구 — 상관관계/VaR 모델링, 빈번한 리밸런싱 필요
+- 크립토에서 **상관관계가 시장 스트레스 시 급등** → 리스크 패리티가 깨지는 타이밍이 가장 위험
+- 실전 적용: 단일 알트코인 최대 5~8%, BTC/ETH 코어 포지션 역변동성 비중
+
+---
+
+### 2. 레짐별 사이징 전환 전략
+
+| 레짐 | 사이징 방법 | 위험/트레이드 | 비고 |
+|------|------------|--------------|------|
+| 저변동성 상승추세 | Kelly-Lite 또는 Optimal-F | 1.5~2% | 에지 확실할 때 증가 |
+| 고변동성 | Fixed Fractional 축소 | 0.5~0.75% | Kelly값 25~50% 삭감 |
+| 횡보/불확실 | Fixed Fractional 보수적 | 0.5~1% | 현금 50~70% 유지 |
+| 하락장 | Fixed Fractional 최소 | 0.5% | 스테이블 50~80% 유지 |
+
+핵심 원칙: **레짐 전환 시 사이징을 먼저 줄이고, 전략 성과가 확인된 후 증가**
+
+---
+
+### 3. 실전 크립토 봇 운영 사례 (2025~2026)
+
+#### 성공 사례 — SaintQuant (2025-03 변동성 기간)
+- $10,000 포지션 기준 전략 파라미터 실시간 자동 조정
+- **연환산 42% 수익, MDD 11%** (시장이 주 30% 하락 가능한 환경)
+- 자동화 시스템 MDD 4.6% vs 수동 트레이딩 훨씬 높은 MDD
+
+#### 드로다운 관리 핵심 원칙
+- **회복의 비대칭성**: 10% 손실 → 11.1% 이익 필요, 20% 손실 → 25%, 50% 손실 → 100%
+- 드로다운 방지가 수익 극대화보다 기하급수적으로 중요
+- 성공 봇의 공통: **다층 서킷브레이커** (일일 3% + 주간 7%), **볼라틸리티 필터**, **수동 오버라이드**
+
+#### 포지션 사이징 2% 룰 (실전 공식)
+```
+포지션 크기 = 포트폴리오 × 2% ÷ 손절 거리(%)
+예시: 손절 20% → 포지션 = 10%, 손절 50% → 포지션 = 4%
+```
+
+#### AI 리스크 관리 트렌드 (2025~2026)
+- 변동성 예측 기반 노출 조절이 핵심 (근거리 분산 추정)
+- 과거 고정 파라미터 → **연속적 적응형 사이징**으로 전환 중
+- 포트폴리오 집중도 모니터링: 단일 자산 최대 5~8%
+
+---
+
+### 4. 우리 봇 적용 우선순위 (Cycle 152)
+
+1. **단기 — ATR 기반 동적 사이징**: `src/risk/` 에서 현재 ATR(14) 값 기반으로 포지션 크기를 실시간 조정. 고변동성(ATR > 2×중간값) 시 Fixed Fractional을 0.5%로 자동 축소.
+
+2. **중기 — 레짐별 사이징 파라미터**: `src/risk/position_sizer.py` (또는 해당 모듈)에 레짐(상승/횡보/하락/고변동) 태그별 다른 f값 적용. 현재 ML 모델 FAIL 상황에서 단순 Fixed Fractional 0.5~1%가 가장 안전.
+
+3. **주의사항**: Optimal-F는 355+ 전략 각각에 히스토리 기반 f 계산이 필요하므로 단기 적용은 과부하. 먼저 Fixed Fractional 0.5~1% + ATR 배율 조정 조합 적용 후, 충분한 실거래 데이터 축적 후 Optimal-F 전환 검토.
+
+### 참고 출처
+
+- [Kelly Criterion for Crypto (Medium, 2026)](https://medium.com/@tmapendembe_28659/kelly-criterion-for-crypto-traders-a-modern-approach-to-volatile-markets-a0cda654caa9)
+- [Beware of Excessive Leverage: Kelly & Optimal-F (QuantPedia)](https://quantpedia.com/beware-of-excessive-leverage-introduction-to-kelly-and-optimal-f/)
+- [Position Sizing Methods: 7 Techniques (TradeFundrr)](https://tradefundrr.com/position-sizing-methods/)
+- [ATR-Based & Kelly-Lite Frameworks (Medium)](https://medium.com/@ildiveliu/risk-before-returns-position-sizing-frameworks-fixed-fractional-atr-based-kelly-lite-4513f770a82a)
+- [AI Risk Management in Crypto 2026 (Blockchain Council)](https://www.blockchain-council.org/cryptocurrency/risk-management-with-ai-in-crypto-trading-volatility-forecasting-position-sizing-stop-loss-automation/)
+- [Crypto Bear Market Position Sizing (FullSwing AI)](https://www.fullswing.ai/bear-market)
+- [Crypto Bot Risk Management Guide 2025 (3Commas)](https://3commas.io/blog/ai-trading-bot-risk-management-guide-2025)
+
+---
+
+## [2026-04-18] Cycle 153 Research — Paper→실전 전환 체크리스트 & Execution Quality
+
+### 1. Paper Trading → 실전 전환 시 흔한 실패 원인
+
+| 함정 | 설명 |
+|------|------|
+| 수수료 미반영 | 페이퍼 트레이딩이 수수료를 무시하면 실전 PnL이 30~50% 낮아질 수 있음 |
+| 슬리피지 과소 추정 | 페이퍼는 이상적 체결가 가정 → 실전은 항상 불리한 가격에 체결 |
+| 과적합 신뢰 오류 | 페이퍼 성과가 좋아도 과최적화된 전략일 가능성, 실전 레짐 변화에 취약 |
+| 감정적 일관성 결여 | 페이퍼 성공으로 자신감 과잉 → 실전에서 포지션 과대 진입, 손절 지연 |
+| 레짐 불일치 | 페이퍼 기간 레짐(예: 상승장)이 실전 레짐과 다를 수 있음 |
+| 유동성 차이 | 소형 코인의 경우 페이퍼에서는 체결되지만 실전 호가창 깊이가 부족해 미체결 |
+
+### 2. 실전 전환 전 필수 확인 항목 (체크리스트)
+
+**데이터/백테스트 검증**
+- [ ] Walk-Forward 검증 완료: Sharpe ≥ 1.0, PF ≥ 1.5, MDD ≤ 20%, Trades ≥ 15 (3개 이상 레짐 포함)
+- [ ] 수수료·슬리피지 포함한 net PnL 검증 (Taker 0.055%, 예상 슬리피지 0.05~0.1% 추가)
+- [ ] 최소 3개 시장 레짐(상승/하락/횡보)에서 전략이 FAIL 없이 통과했는지 확인
+
+**인프라/API**
+- [ ] Bybit Testnet에서 실제 API 호출 지연(latency) 측정 완료
+- [ ] 주문 거부(order reject) 처리 로직 확인 (잔고 부족, 최소 주문 수량 미달 등)
+- [ ] WebSocket 재연결 로직 및 heartbeat 타임아웃 처리 구현 확인
+- [ ] Rate limit 초과 시 재시도(backoff) 로직 구현 여부 확인
+- [ ] 포지션 동기화 로직: 봇 재시작 후 거래소 실제 포지션과 내부 상태 일치 확인
+
+**리스크 관리**
+- [ ] 일일 드로다운 서킷브레이커 (3% 초과 시 거래 중단) 활성화
+- [ ] 단일 포지션 크기 ≤ 전체 자본의 1~2%
+- [ ] 레버리지 제한: 초기 실전은 최대 3x 이하 권고
+- [ ] 수동 킬스위치(kill switch) 구현 및 테스트 완료
+
+**운영 준비**
+- [ ] 알림 시스템: Telegram/슬랙으로 주문 체결, 에러, 드로다운 알림 설정
+- [ ] 로그: 모든 주문 이벤트 파일 기록 (체결가, 수량, 타임스탬프)
+- [ ] 초기 자본 최소화: 전체 자본의 5~10%로 시작, 1개월 안정 운영 후 증액
+
+### 3. Bybit API Execution Quality
+
+**주문 타입별 수수료**
+
+| 주문 타입 | Maker 수수료 | Taker 수수료 | 비고 |
+|-----------|-------------|-------------|------|
+| Limit Order (지정가) | 0.020% | — | 호가창에 유동성 공급 = Maker |
+| Market Order (시장가) | — | 0.055% | 즉시 체결 = Taker |
+| TWAP Order | ~Maker급 | — | 소분할 지정가 방식 |
+| VIP 레벨 최대 | 0.000% | 0.030% | 거래량 기준 VIP 적용 |
+| Funding Fee | — | — | 8시간마다 부과 (레버리지 전체 포지션 기준) |
+
+→ **핵심**: Limit Order 사용으로 Taker 대비 수수료 63% 절감 가능
+
+**슬리피지 최소화 기법**
+
+| 기법 | 원리 | Bybit 지원 여부 |
+|------|------|----------------|
+| TWAP | 시간 분산 체결 (5~120초 간격, 최대 20개 동시) | 지원 (Help Center 내 TWAP 전략) |
+| Limit+PostOnly | 지정가 + PostOnly 파라미터로 무조건 Maker 체결 강제 | 지원 (timeInForce: PostOnly) |
+| IOC Limit | 즉시 체결 안 되면 취소 → 불리한 슬리피지 차단 | 지원 |
+| Iceberg | 대형 주문을 소분할해 시장 충격 최소화 | 수동 구현 필요 (API 직접 지원 없음) |
+| SlippageTolerance | 시장가 주문 시 최대 허용 슬리피지 설정 (0.01~10%) | V5 API 파라미터로 지원 |
+
+**시장 충격 최소화 실전 권고**
+- 주문 크기 ≤ 해당 호가창 상위 5개 호가 합계의 10% 이하
+- 저유동성 코인(24h 거래량 < $1M): 포지션 전체 크기 ≤ 시장 깊이의 0.1%
+- 진입 분할: 목표 포지션의 33% → 33% → 33% 3회 분할 진입 (TWAP 유사)
+- Maker-only 전략이 아닌 경우, 시장 급변동 시 자동으로 IOC 전환하는 로직 권고
+
+### 4. 우리 봇 적용 우선순위 (Cycle 153)
+
+1. **즉시**: Bybit 주문 타입을 기본 `Limit + PostOnly`로 변경 → Taker 수수료 0.055% 절감 → PF 개선 직접 기여
+2. **단기**: 주문 수량이 큰 경우(자본 대비 > 0.5%) TWAP 3분할 자동 적용 로직 `src/exchange/` 에 추가
+3. **실전 전환 기준**: Walk-Forward PASS (Sharpe ≥ 1.0, PF ≥ 1.5, MDD ≤ 20%) + Bybit Testnet 1주일 무오류 운영 + 위 체크리스트 전항목 완료 후에만 실전 전환
+
+### 참고 출처
+
+- [Bybit Types of Orders](https://www.bybit.com/en/help-center/article/Types-of-Orders-Available-on-Bybit)
+- [Bybit TWAP Strategy Introduction](https://www.bybit.com/en/help-center/article/Introduction-to-TWAP-Strategy)
+- [Bybit Market Order Slippage Tolerance](https://www.bybit.com/en/help-center/article/Market-Order-with-Slippage-Tolerance)
+- [Bybit Trading Fee Structure](https://www.bybit.com/en/help-center/article/Trading-Fee-Structure)
+- [Bybit V5 API Changelog](https://bybit-exchange.github.io/docs/changelog/v5)
+- [Bybit Futures Fees (TradersUnion)](https://tradersunion.com/brokers/crypto/view/bybit/futures-fees/)
+- [Coinrule Paper Trading 2025](https://coinrule.com/blog/trading-tips/paper-trading-in-2025-perfect-your-crypto-skills-without-risk/)
