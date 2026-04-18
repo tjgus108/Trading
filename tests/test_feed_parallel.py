@@ -255,7 +255,7 @@ class TestFeedParallel:
     @pytest.mark.slow
     def test_fetch_error_log_includes_context(self):
         """Transient 에러 모두 실패 시 exhausted 로그에 context 포함."""
-        import ccxt
+        ccxt = pytest.importorskip("ccxt", reason="ccxt not available in this environment")
         connector = MagicMock()
         error = ccxt.NetworkError("Connection failed")
         connector.fetch_ohlcv.side_effect = error
@@ -487,9 +487,7 @@ class TestErrorClassification:
 
     def test_transient_network_error_retry(self):
         """NetworkError는 transient → 재시도."""
-    def test_transient_network_error_retry(self):
-        """NetworkError는 transient → 재시도."""
-        import ccxt
+        ccxt = pytest.importorskip("ccxt", reason="ccxt not available in this environment")
         from unittest.mock import MagicMock, patch
 
         connector = MagicMock()
@@ -510,7 +508,7 @@ class TestErrorClassification:
 
     def test_fatal_bad_symbol_no_retry(self):
         """BadSymbol은 fatal → 즉시 중단."""
-        import ccxt
+        ccxt = pytest.importorskip("ccxt", reason="ccxt not available in this environment")
         from unittest.mock import MagicMock, patch
 
         connector = MagicMock()
