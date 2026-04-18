@@ -92,8 +92,11 @@ class HistoricalDataDownloader:
         self._exchange = None
         
         # Lazy initialization — ccxt를 여기서 import하지 않고 필요할 때만
+        # ValueError (잘못된 거래소 이름)는 즉시 전파, 그 외 연결 에러는 defer
         try:
             self._init_exchange()
+        except ValueError:
+            raise
         except Exception as e:
             logger.warning("Exchange initialization deferred: %s", e)
             # 테스트 환경에서는 실제 exchange 필요 없음
@@ -107,53 +110,88 @@ class HistoricalDataDownloader:
 
     def _init_exchange(self):
         """거래소 인스턴스 초기화."""
+        # 알려진 거래소 목록으로 이름을 먼저 검증 (ccxt import 전)
+        _KNOWN_EXCHANGES = {
+            "bybit", "binance", "okx", "kraken", "coinbase", "huobi",
+            "kucoin", "gate", "bitfinex", "bitmex", "deribit", "ftx",
+            "bitget", "mexc", "phemex", "bitmart", "gemini", "poloniex",
+        }
+        if self.exchange_name not in _KNOWN_EXCHANGES:
+            raise ValueError(f"Exchange '{self.exchange_name}' not supported by ccxt")
+
         try:
             import ccxt
-            exchange_class = getattr(ccxt, self.exchange_name)
+            exchange_class = getattr(ccxt, self.exchange_name, None)
+            if exchange_class is None:
+                raise ValueError(f"Exchange '{self.exchange_name}' not supported by ccxt")
             self._exchange = exchange_class({
                 "timeout": self.timeout_ms,
                 "enableRateLimit": True,
             })
             logger.debug("Initialized %s exchange", self.exchange_name)
-        except AttributeError:
-            raise ValueError(f"Exchange '{self.exchange_name}' not supported by ccxt")
+        except ValueError:
+            raise
         except Exception as e:
             logger.error("Failed to initialize %s: %s", self.exchange_name, e)
             raise
 
-    def _get_cache_path(self, symbol: str, timeframe: str) -> Path:
+    def _get_cache_path(self, symbol: str, timeframe: str, ext: str = "parquet") -> Path:
         """캐시 파일 경로 생성."""
         if not self.cache_dir:
             return None
         safe_symbol = symbol.replace("/", "_")
-        return self.cache_dir / f"{safe_symbol}_{timeframe}.parquet"
+        return self.cache_dir / f"{safe_symbol}_{timeframe}.{ext}"
 
     def _load_from_cache(self, symbol: str, timeframe: str) -> Optional[pd.DataFrame]:
-        """캐시에서 데이터 로드."""
+        """캐시에서 데이터 로드. parquet → pickle 순으로 시도."""
         if not self.cache_dir:
             return None
-        cache_path = self._get_cache_path(symbol, timeframe)
-        if cache_path.exists():
+
+        # parquet 우선 시도
+        parquet_path = self._get_cache_path(symbol, timeframe, "parquet")
+        if parquet_path.exists():
             try:
-                df = pd.read_parquet(cache_path)
-                logger.debug("Loaded %d candles from cache: %s %s",
+                df = pd.read_parquet(parquet_path)
+                logger.debug("Loaded %d candles from cache (parquet): %s %s",
                            len(df), symbol, timeframe)
                 return df
             except Exception as e:
-                logger.warning("Failed to load cache %s: %s", cache_path, e)
-                return None
+                logger.warning("Failed to load parquet cache %s: %s", parquet_path, e)
+
+        # pickle 폴백
+        pickle_path = self._get_cache_path(symbol, timeframe, "pkl")
+        if pickle_path.exists():
+            try:
+                df = pd.read_pickle(pickle_path)
+                logger.debug("Loaded %d candles from cache (pickle): %s %s",
+                           len(df), symbol, timeframe)
+                return df
+            except Exception as e:
+                logger.warning("Failed to load pickle cache %s: %s", pickle_path, e)
+
         return None
 
     def _save_to_cache(self, df: pd.DataFrame, symbol: str, timeframe: str):
-        """캐시에 데이터 저장."""
+        """캐시에 데이터 저장. parquet 실패 시 pickle으로 폴백."""
         if not self.cache_dir or df.empty:
             return
-        cache_path = self._get_cache_path(symbol, timeframe)
+
+        # parquet 우선 시도
+        parquet_path = self._get_cache_path(symbol, timeframe, "parquet")
         try:
-            df.to_parquet(cache_path)
-            logger.debug("Saved %d candles to cache: %s", len(df), cache_path)
+            df.to_parquet(parquet_path)
+            logger.debug("Saved %d candles to cache (parquet): %s", len(df), parquet_path)
+            return
         except Exception as e:
-            logger.warning("Failed to save cache %s: %s", cache_path, e)
+            logger.debug("Parquet save failed, falling back to pickle: %s", e)
+
+        # pickle 폴백
+        pickle_path = self._get_cache_path(symbol, timeframe, "pkl")
+        try:
+            df.to_pickle(pickle_path)
+            logger.debug("Saved %d candles to cache (pickle): %s", len(df), pickle_path)
+        except Exception as e:
+            logger.warning("Failed to save cache %s: %s", pickle_path, e)
 
     def download(
         self,
@@ -357,13 +395,23 @@ class HistoricalDataDownloader:
                 if len(log_returns) > 2:
                     kurtosis_val = stats.kurtosis(log_returns)
                     skewness_val = stats.skew(log_returns)
+                    symbol_name = getattr(df, 'name', 'UNKNOWN')
                     logger.debug(
                         "Data quality stats for %s %s: kurtosis=%.2f, skewness=%.2f",
-                        getattr(df, 'name', 'UNKNOWN'),
+                        symbol_name,
                         timeframe,
                         kurtosis_val,
                         skewness_val
                     )
+                    # fat-tail 부재 경고: 암호화폐 정상 범위는 kurtosis ≥ 2.0
+                    if kurtosis_val < 2.0:
+                        logger.warning(
+                            "Low kurtosis detected for %s %s: %.2f (expected ≥ 2.0). "
+                            "Data may lack fat tails — synthetic or stale data suspected.",
+                            symbol_name,
+                            timeframe,
+                            kurtosis_val,
+                        )
             except Exception as e:
                 logger.debug("Failed to compute data stats: %s", e)
 

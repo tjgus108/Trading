@@ -89,7 +89,9 @@ _Last updated: 2026-04-18 (Cycle 148 - F 리서치: DC+Meta-Learning, Regime-RL 
 **다음 구현 과제 (우선순위):**
 1. ~~**ML 모델 실제 생성**~~ — ✅ DONE (Cycle 148): BTC PASS val=65.4%/test=63.5%, ETH/SOL FAIL
    - **주의**: `python3` = Python 3.7 SSL 오류 → 반드시 `/usr/local/bin/python3.11` 사용
-2. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
-3. **ETH/SOL ML 모델 개선** — rsi14, rsi_zscore, price_vs_vwap 제거 후 재학습 (PFI 근거)
-4. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, 과집중 경고
-5. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)
+2. ~~**데이터 품질 임계값 경고**~~ — ✅ DONE (Cycle 148-A): kurtosis < 2.0 → WARNING 로그, data_utils.py
+3. ~~**test_data_utils 2개 실패 수정**~~ — ✅ DONE (Cycle 148-A): 거래소 검증 사전 처리, parquet→pickle 폴백
+4. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
+5. **ETH/SOL ML 모델 개선** — rsi14, rsi_zscore, price_vs_vwap 제거 후 재학습 (PFI 근거)
+6. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
+7. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)

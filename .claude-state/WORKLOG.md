@@ -1,5 +1,17 @@
 # Work Log
 
+## [2026-04-18] Cycle 148 — A (Quality Assurance)
+
+**[A] Quality Assurance:**
+- 테스트 수정: `tests/test_data_utils.py` 2개 실패 → 0개 실패
+  - `test_init_invalid_exchange`: `_init_exchange`에 알려진 거래소 사전검증 추가 (ccxt import 전), `__init__`에서 `ValueError` 즉시 전파
+  - `test_cache_save_and_load`: parquet 실패 시 pickle 폴백 구현 (`_save_to_cache`/`_load_from_cache`)
+- kurtosis < 2.0 WARNING 추가: `data_utils.py` `validate_data()`에 WARNING 레벨 로그 (NEXT_STEPS 태스크 3 완료)
+  - 메시지: "Low kurtosis detected for ... (expected ≥ 2.0). Data may lack fat tails — synthetic or stale data suspected."
+- 핵심 테스트 117개 전체 PASS (data_utils, strategy_correlation, strategy, backtest_engine, risk_manager)
+
+---
+
 ## [2026-04-18] Cycle 148 — E (ML 모델 실제 생성 + live_paper_trader 검증)
 
 **[E] Execution / ML Model Training:**
