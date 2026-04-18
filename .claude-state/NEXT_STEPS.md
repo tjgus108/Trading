@@ -72,6 +72,14 @@ _Last updated: 2026-04-18 (Cycle 150 D 완료)_
       - `DataFeed: {symbol} {timeframe} — {candles} candles, {missing} missing, {anomalies} anomalies, kurtosis=X.XX, skewness=Y.YY`
   - scipy.stats 임포트 추가 (data_utils.py, feed.py)
 
+### ✅ Cycle 150 완료 사항 (E: 실행)
+
+#### E(실행): 피처 불일치 수정, 상관관계 트래커, 슬리피지 현실화 ✅ COMPLETE
+- `get_ml_features()` → FeatureBuilder 사용 (14피처 통일)
+- `SignalCorrelationTracker` → src/risk/manager.py 추가, live_paper_trader 통합
+- slippage_pct: 0.001 → 0.05 (0.05% 현실적 슬리피지)
+- ⚠️ 기존 BTC 모델(17피처) → 14피처 기준 재학습 필요 (--auto-retrain)
+
 ### ⚠️ 핵심 문제: 전략 엣지 부재 → 해법 확인됨
 
 22개 전략 모두 실데이터 6개월 WF에서 0 PASS. **유효한 경로:**

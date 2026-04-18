@@ -1,5 +1,33 @@
 # Work Log
 
+## [2026-04-18] Cycle 150 — E (실행/Execution)
+
+**[E1] get_ml_features 피처 불일치 수정:**
+- `scripts/live_paper_trader.py`: `get_ml_features()` 함수 재작성
+  - 기존: 10개 하드코딩 피처 (rsi14, atr14, sma20, ...) → 모델과 불일치
+  - 수정: `FeatureBuilder.build_features_only()` 사용 → 14피처 통일
+  - 구 BTC 모델(17피처)은 `predict_ml_signal`의 try/except로 gracefully skip
+  - 14피처 재학습 모델 있을 때 자동 사용 가능
+
+**[E2] SignalCorrelationTracker 추가:**
+- `src/risk/manager.py`: `SignalCorrelationTracker` 클래스 추가 (파일 끝)
+  - `record(symbol, name, action)`: 전략 시그널 기록
+  - `check_and_warn(symbol)`: 동일 방향 ≥ 75% 시 WARNING 로깅, 방향 반환
+  - `summary(symbol)`: BUY/SELL/HOLD 분포 요약 dict
+  - `reset(symbol)`: tick 시작 시 초기화
+- `scripts/live_paper_trader.py`: `LivePaperTrader`에 통합
+  - `self.correlation_tracker` 인스턴스 추가
+  - `_tick_symbol()`: 전략 루프 시 시그널 기록 + 루프 종료 후 check_and_warn
+
+**[E3] 슬리피지 수정:**
+- `scripts/live_paper_trader.py`: `PaperTrader` slippage_pct 0.001 → 0.05 (0.05% 현실적)
+  - 기존 0.001%는 사실상 슬리피지 없음 → 성과 과대평가 가능
+  - `PaperTrader` default(0.05%)에 맞춤
+
+**테스트 결과:** 6682 passed, 20 failed (모두 pre-existing: yaml, module-not-found)
+
+---
+
 ## [2026-04-18] Cycle 150 — D (ML/Signals)
 
 **[D] BTC 14-피처 재학습 + ETH/SOL BTC 시차 피처 추가:**

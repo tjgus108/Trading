@@ -52,6 +52,7 @@ from src.strategy.rotation import StrategyRotationManager
 from src.strategy.regime import MarketRegimeDetector, MarketRegime
 from src.exchange.paper_trader import PaperTrader
 from src.risk.circuit_breaker import CircuitBreaker
+from src.risk.manager import SignalCorrelationTracker
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / ".claude-state"
@@ -198,26 +199,20 @@ def load_ml_model(symbol: str) -> Optional[tuple]:
 
 def get_ml_features(df: pd.DataFrame) -> Optional[pd.DataFrame]:
     """
-    ML 모델이 기대하는 피처 생성.
-    
-    기본 피처:
-    - rsi14, atr14, sma20, ema50, bb_upper, bb_lower, volume_sma20, return_5, macd, vwap
+    ML 모델이 기대하는 피처 생성 (FeatureBuilder 기반, 14 피처).
+
+    Cycle 149에서 rsi14, rsi_zscore, price_vs_vwap 제거 후 14피처 고정.
+    모델 재학습 후에도 동일 피처 세트 사용.
     """
     try:
-        required = ["rsi14", "atr14", "sma20", "ema50", "bb_upper", "bb_lower", 
-                   "volume_sma20", "return_5", "macd", "vwap"]
-        
-        missing = [col for col in required if col not in df.columns]
-        if missing:
+        from src.ml.features import FeatureBuilder
+        builder = FeatureBuilder(binary=True)
+        feat = builder.build_features_only(df)
+        if len(feat) < 50:
             return None
-        
-        # 최근 100캔들로 피처 준비
-        features = df[required].tail(100).copy()
-        if len(features) < 50:  # 최소 50캔들 필요
-            return None
-        
-        return features
-    except Exception:
+        return feat
+    except Exception as exc:
+        logger.debug("get_ml_features failed: %s", exc)
         return None
 
 
@@ -334,7 +329,7 @@ class LivePaperTrader:
         self.paper = PaperTrader(
             initial_balance=self.state.portfolio_balance,
             fee_rate=0.001,
-            slippage_pct=0.001,
+            slippage_pct=0.05,   # 0.05% 현실적 슬리피지 (이전 0.001% → 수정)
             partial_fill_prob=0.0,
             timeout_prob=0.0,
         )
@@ -352,6 +347,7 @@ class LivePaperTrader:
         self.ml_filter_enabled = False  # --ml-filter 옵션으로 활성화
         self.ml_models: dict[str, tuple] = {}  # symbol -> (model, scaler)
         self._df_caches: dict[str, pd.DataFrame] = {}  # symbol -> df
+        self.correlation_tracker = SignalCorrelationTracker(warn_threshold=0.75)
 
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
@@ -496,6 +492,9 @@ class LivePaperTrader:
             self.state.regime_states[symbol]["skipped_count"] = self.state.regime_states[symbol].get("skipped_count", 0) + 1
             return
 
+        # 시그널 상관관계 트래커 초기화 (tick 시작 시)
+        self.correlation_tracker.reset(symbol)
+
         strategies = self.symbol_strategies.get(symbol, {})
         for name, strategy in strategies.items():
             pos_key = f"{symbol}:{name}"
@@ -514,9 +513,11 @@ class LivePaperTrader:
 
             try:
                 sig = strategy.generate(df)
+                # 시그널 상관관계 기록 (HOLD 포함)
+                self.correlation_tracker.record(symbol, name, sig.action.value)
                 if sig.action == Action.HOLD:
                     continue
-                
+
                 # ML 필터 적용 (활성화된 경우)
                 if self.ml_filter_enabled and symbol in self.ml_models:
                     model, scaler = self.ml_models[symbol]
@@ -597,6 +598,13 @@ class LivePaperTrader:
 
             except Exception as e:
                 logger.error("  [%s:%s] Error: %s", symbol, name, str(e)[:80])
+
+        # 시그널 상관관계 경고 체크 (전략 루프 종료 후)
+        self.correlation_tracker.check_and_warn(symbol)
+        corr_summary = self.correlation_tracker.summary(symbol)
+        if corr_summary["active_signals"] >= 2:
+            logger.debug("[%s] Signal distribution: BUY=%d SELL=%d HOLD=%d",
+                        symbol, corr_summary["buy"], corr_summary["sell"], corr_summary["hold"])
 
     def _total_exposure_all(self) -> float:
         """모든 심볼의 열린 포지션 전체 노출 비율 (0~1)."""

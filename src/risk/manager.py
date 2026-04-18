@@ -363,3 +363,83 @@ class RiskManager:
             risk_amount=round(risk_amount, 2),
             portfolio_exposure=round(exposure, 4),
         )
+
+
+class SignalCorrelationTracker:
+    """전략 시그널 상관관계 모니터링.
+
+    활성 전략 다수가 동시에 같은 방향(BUY/SELL)을 낼 때 경고 로깅.
+    live_paper_trader에서 집중 포지션 리스크를 감지하는 데 사용.
+
+    사용법:
+        tracker = SignalCorrelationTracker(warn_threshold=0.8)
+        tracker.record("BTC/USDT", "StratA", "BUY")
+        tracker.record("BTC/USDT", "StratB", "BUY")
+        tracker.record("BTC/USDT", "StratC", "SELL")
+        tracker.check_and_warn("BTC/USDT")  # 2/3 = 0.67 → 경고 없음 (< 0.8)
+    """
+
+    def __init__(self, warn_threshold: float = 0.75, window: int = 1):
+        """
+        Args:
+            warn_threshold: 동일 방향 비율 임계값 (기본 0.75 = 75%).
+                            이 비율 이상이면 WARNING 로깅.
+            window: 몇 tick 분의 시그널을 집계할지 (기본 1 = 최신 tick만).
+        """
+        self.warn_threshold = warn_threshold
+        self.window = window
+        # symbol → {strategy_name: "BUY" | "SELL" | "HOLD"}
+        self._signals: dict[str, dict[str, str]] = {}
+
+    def record(self, symbol: str, strategy_name: str, action: str) -> None:
+        """시그널 기록. action: "BUY", "SELL", "HOLD"."""
+        if symbol not in self._signals:
+            self._signals[symbol] = {}
+        self._signals[symbol][strategy_name] = action.upper()
+
+    def reset(self, symbol: str) -> None:
+        """심볼의 시그널 초기화 (tick 시작 시 호출)."""
+        self._signals[symbol] = {}
+
+    def check_and_warn(self, symbol: str) -> Optional[str]:
+        """
+        동일 방향 비율이 warn_threshold를 초과하면 WARNING 로그 + 방향 반환.
+
+        Returns:
+            "BUY" | "SELL" if concentrated, else None.
+        """
+        sigs = self._signals.get(symbol, {})
+        active = {k: v for k, v in sigs.items() if v in ("BUY", "SELL")}
+        if len(active) < 2:
+            return None
+
+        buy_count = sum(1 for v in active.values() if v == "BUY")
+        sell_count = sum(1 for v in active.values() if v == "SELL")
+        total = len(active)
+
+        dominant, dominant_count = ("BUY", buy_count) if buy_count >= sell_count else ("SELL", sell_count)
+        ratio = dominant_count / total
+
+        if ratio >= self.warn_threshold:
+            logger.warning(
+                "[SignalCorrelation] %s: %d/%d strategies -> %s (%.0f%% concentration). "
+                "Concentrated risk detected.",
+                symbol, dominant_count, total, dominant, ratio * 100,
+            )
+            return dominant
+        return None
+
+    def summary(self, symbol: str) -> dict:
+        """현재 시그널 분포 요약."""
+        sigs = self._signals.get(symbol, {})
+        active = {k: v for k, v in sigs.items() if v in ("BUY", "SELL")}
+        buy_count = sum(1 for v in active.values() if v == "BUY")
+        sell_count = sum(1 for v in active.values() if v == "SELL")
+        return {
+            "symbol": symbol,
+            "total_strategies": len(sigs),
+            "active_signals": len(active),
+            "buy": buy_count,
+            "sell": sell_count,
+            "hold": len(sigs) - len(active),
+        }
