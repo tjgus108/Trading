@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 147 - 레짐 포지션 사이징 + PFI 완료)_
+_Last updated: 2026-04-18 (Cycle 148 - F 리서치: DC+Meta-Learning, Regime-RL 논문, 봇 실패패턴)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -87,8 +87,9 @@ _Last updated: 2026-04-18 (Cycle 147 - 레짐 포지션 사이징 + PFI 완료)_
 - ~~LSTM BooleanArray 수정~~ — pandas ExtensionArray 호환 ✅
 
 **다음 구현 과제 (우선순위):**
-1. **ML 모델 실제 생성** — BTC/ETH/SOL에서 1000캔들 WF로 PASS 모델 학습 & 저장
-2. **live_paper_trader 검증 실행** — 7일 운영 (`--days 7 --ml-filter`)
-3. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, 과집중 경고
-4. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2) 
-5. **데이터 품질 임계값** — kurtosis < 2.0 → 경고
+1. ~~**ML 모델 실제 생성**~~ — ✅ DONE (Cycle 148): BTC PASS val=65.4%/test=63.5%, ETH/SOL FAIL
+   - **주의**: `python3` = Python 3.7 SSL 오류 → 반드시 `/usr/local/bin/python3.11` 사용
+2. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
+3. **ETH/SOL ML 모델 개선** — rsi14, rsi_zscore, price_vs_vwap 제거 후 재학습 (PFI 근거)
+4. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, 과집중 경고
+5. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)

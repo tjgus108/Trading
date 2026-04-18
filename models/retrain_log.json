@@ -1,0 +1,51 @@
+[
+  {
+    "timestamp": "20260418_030634",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "binary_threshold": 0.01,
+    "n_samples": 260,
+    "train_accuracy": 1.0,
+    "val_accuracy": 0.6538,
+    "test_accuracy": 0.6346,
+    "passed": true,
+    "fail_reasons": [],
+    "model_path": "/Users/seohyunhan/Desktop/AgentTest/Trading/models/BTC_USDT_20260418_030634_rf_binary.pkl"
+  },
+  {
+    "timestamp": "20260418_030706",
+    "symbol": "ETH/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "binary_threshold": 0.01,
+    "n_samples": 326,
+    "train_accuracy": 0.9949,
+    "val_accuracy": 0.5385,
+    "test_accuracy": 0.5909,
+    "passed": false,
+    "fail_reasons": [
+      "val_accuracy 0.538 < 0.55"
+    ],
+    "model_path": null
+  },
+  {
+    "timestamp": "20260418_030724",
+    "symbol": "SOL/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "binary_threshold": 0.01,
+    "n_samples": 356,
+    "train_accuracy": 0.9859,
+    "val_accuracy": 0.5634,
+    "test_accuracy": 0.4722,
+    "passed": false,
+    "fail_reasons": [
+      "test_accuracy 0.472 < 0.55"
+    ],
+    "model_path": null
+  }
+]

@@ -1,5 +1,21 @@
 # Work Log
 
+## [2026-04-18] Cycle 148 — E (ML 모델 실제 생성 + live_paper_trader 검증)
+
+**[E] Execution / ML Model Training:**
+- BTC/USDT 1h, 1000캔들 실데이터(Bybit) 기반 RF binary 모델 학습
+  - val=65.4%, test=63.5% → PASS (threshold 55%)
+  - 저장: models/BTC_USDT_20260418_030634_rf_binary.pkl (307KB)
+  - PFI 분석: atr_pct, volume_ratio_20, return_1 상위 → rsi14, rsi_zscore, price_vs_vwap 제거 후보
+- ETH/USDT: val=53.8% < 55% → FAIL (모델 미저장)
+- SOL/USDT: test=47.2% < 55% → FAIL (모델 미저장)
+- PFI JSON 저장: feature_importance_{BTC,ETH,SOL}_USDT.json
+- retrain_log.json 업데이트 (3개 심볼 기록)
+- live_paper_trader 검증: 모든 임포트 OK, MLSignalGenerator.load_latest() → True (BTC 모델 자동 감지)
+- python3 = Python 3.7 SSL 오류 → /usr/local/bin/python3.11 사용 (이후 세션도 동일)
+
+---
+
 ## [2026-04-18] Cycle 147 — B + D + F (포지션 사이징 + PFI + 리서치)
 
 **[B] Risk Management:**
