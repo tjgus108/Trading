@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-04-18] Cycle 152 — D (ML & Signals)
+
+**[D1] Triple Barrier 모델 재학습 옵션 추가:**
+- `scripts/train_ml.py`: `--triple-barrier`, `--tb-tp`, `--tb-sl` 인수 추가
+  - `--auto-retrain` 및 일반 `rf` 모드 모두 triple_barrier 지원
+  - 저장 파일명: `{symbol}_{ts}_rf_tb.pkl` (binary는 `rf_binary.pkl` 유지)
+- `src/ml/trainer.py`: `WalkForwardTrainer.__init__()` — `triple_barrier`, `tb_tp_pct`, `tb_sl_pct` 파라미터 추가
+  - `FeatureBuilder`에 triple_barrier 파라미터 전달
+  - model_name에 label_mode suffix 추가 (`rf_tb`, `rf_binary`, `rf_3class`)
+
+**[D2] Concept Drift Detector 구현:**
+- `src/ml/drift_detector.py` 신규 생성 (river 없이 순수 numpy)
+  - `PageHinkleyDriftDetector`: 점진적 정확도 하락 감지 (PHT 알고리즘)
+  - `CUSUMDriftDetector`: 양방향 변화점 감지 (CUSUM 알고리즘)
+  - `AccuracyDriftMonitor`: sliding window + PHT + CUSUM 통합 모니터
+    - `update(prediction, actual)` → drift 감지 시 `should_retrain=True`
+    - `reset_detectors()` → 재학습 완료 후 상태 리셋
+  - 검증: CUSUM이 accuracy 급락(정확률 0%) 시 47스텝 내 감지 확인
+
+**[D3] CPCV 구현 (sklearn 기반):**
+- `src/ml/trainer.py`: `combinatorial_purged_cv()` 함수 추가
+  - skfolio 없이 `sklearn.TimeSeriesSplit` + purge_gap + embargo로 구현
+  - n_splits=6, purge_gap=5, embargo_pct=1% 기본값
+  - 각 fold: 경계 구간 purge → RF 학습 → train/test accuracy 반환
+  - 검증: 4-fold CPCV avg_test_acc 계산 정상 동작 확인
+
+**검증:**
+- 전체 테스트: 6692 passed (기존 21 pre-existing 실패 변화 없음)
+- 신규 코드 임포트/동작 검증 완료
+
+---
+
 ## [2026-04-18] Cycle 151 — A (품질/Quality Assurance)
 
 **[A1] 전체 테스트 스위트 점검:**

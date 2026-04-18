@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 151 완료, Cycle 152 시작)_
+_Last updated: 2026-04-18 (Cycle 152-B 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -8,6 +8,16 @@ _Last updated: 2026-04-18 (Cycle 151 완료, Cycle 152 시작)_
 
 ### 로테이션: Cycle 152
 - 152 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** (표 기준 Cycle 2 패턴)
+
+### ✅ Cycle 152 완료 사항
+
+#### B(리스크): DriftMonitor — Page-Hinkley 드리프트 감지 ✅ COMPLETE
+- src/risk/drawdown_monitor.py에 DriftMonitor 클래스 추가
+- Page-Hinkley 테스트 (양방향: 평균 하락/상승 감지)
+- 롤링 분산 비율 감지 (var_ratio_threshold 배 초과 → WARNING)
+- DriftState enum: NORMAL / WARNING / DRIFT
+- on_drift 콜백으로 CircuitBreaker 연동 가능
+- 7개 단위 테스트 추가 (tests/test_risk.py: 25 → 32 PASS)
 
 ### ✅ Cycle 151 완료 사항
 
@@ -154,17 +164,14 @@ _Last updated: 2026-04-18 (Cycle 151 완료, Cycle 152 시작)_
 - ~~LSTM BooleanArray 수정~~ — pandas ExtensionArray 호환 ✅
 
 **다음 구현 과제 (우선순위):**
-1. ~~**ML 모델 실제 생성**~~ — ✅ DONE (Cycle 148): BTC PASS val=65.4%/test=63.5%, ETH/SOL FAIL
-   - **주의**: `python3` = Python 3.7 SSL 오류 → 반드시 `/usr/local/bin/python3.11` 사용
-2. ~~**데이터 품질 임계값 경고**~~ — ✅ DONE (Cycle 148-A): kurtosis < 2.0 → WARNING 로그, data_utils.py
-3. ~~**test_data_utils 2개 실패 수정**~~ — ✅ DONE (Cycle 148-A): 거래소 검증 사전 처리, parquet→pickle 폴백
-4. ~~**PFI near-zero 피처 제거**~~ — ✅ DONE (Cycle 149-C): rsi14, rsi_zscore, price_vs_vwap 제거 (17→14 피처)
-5. ~~**missing data 비율 경고**~~ — ✅ DONE (Cycle 149-C): >5% 누락 시 WARNING, data_utils.py
-6. ~~**Kelly Sizer 레짐 개선**~~ — ✅ DONE (Cycle 149-B): TREND_DOWN 1.0→0.6, compute(regime=...) 파라미터 추가
-7. ~~**BTC 14-피처 재학습 + BTC 시차 피처**~~ — ✅ DONE (Cycle 150-D): FAIL (레짐 변화), btc_close_lag1 구현됨
-   - BTC val=0.654/test=0.519 FAIL, ETH val=0.508/test=0.636 FAIL, SOL val=0.578/test=0.493 FAIL
-   - 시장 2026-03~04: 레짐 변화 구간 → val↔test 불일치. 주기적 재학습 필요
-8. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
-9. **ML 주 1회 재학습 스케줄러** — cron 또는 live_paper_trader 내부 weekly retrain hook
-10. **전략 상관관계 모니터링** — 활성 전략 간 상관 측정, live_paper_trader에 SignalCorrelationTracker 연동
-11. **CPCV 도입** — mlfinlab CombinatorialPurgedKFold (N=8, k=2)
+1. ~~**ML 모델 실제 생성**~~ — ✅ DONE (Cycle 148)
+2. ~~**PFI near-zero 피처 제거**~~ — ✅ DONE (Cycle 149-C)
+3. ~~**Kelly Sizer 레짐 개선**~~ — ✅ DONE (Cycle 149-B)
+4. ~~**BTC 14-피처 재학습 + BTC 시차 피처**~~ — ✅ DONE (Cycle 150-D)
+5. ~~**Triple Barrier 레이블링**~~ — ✅ DONE (Cycle 151-C)
+6. ~~**Triple Barrier 학습 옵션 (train_ml.py)**~~ — ✅ DONE (Cycle 152-D): --triple-barrier, --tb-tp, --tb-sl
+7. ~~**Concept Drift Detector**~~ — ✅ DONE (Cycle 152-D): src/ml/drift_detector.py (PHT+CUSUM+AccuracyDriftMonitor)
+8. ~~**CPCV 구현**~~ — ✅ DONE (Cycle 152-D): combinatorial_purged_cv() in trainer.py (sklearn 기반)
+9. **AccuracyDriftMonitor → live_paper_trader 연동** — `_weekly_retrain()` 내 drift 감지 시 즉시 재학습 트리거
+10. **Triple Barrier 실데이터 검증** — `--bybit --triple-barrier --binary` 로 BTC 학습 후 CPCV 결과 비교
+11. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`

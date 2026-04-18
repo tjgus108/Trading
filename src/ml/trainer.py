@@ -133,14 +133,21 @@ class WalkForwardTrainer:
         forward_n: int = 5,
         threshold: float = 0.003,
         binary: bool = False,
+        triple_barrier: bool = False,
+        tb_tp_pct: float = 0.02,
+        tb_sl_pct: float = 0.01,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.binary = binary
+        self.triple_barrier = triple_barrier
         self.feature_builder = FeatureBuilder(
             forward_n=forward_n, threshold=threshold,
             binary=binary,
+            triple_barrier=triple_barrier,
+            tb_tp_pct=tb_tp_pct,
+            tb_sl_pct=tb_sl_pct,
         )
         self._trained_model = None
         self._class_order: Optional[List[int]] = None
@@ -266,7 +273,8 @@ class WalkForwardTrainer:
         self._class_order = list(base_clf.classes_)
         self._feature_names = list(X_train.columns)
         self._last_feature_importances = feat_importance
-        model_name = f"rf_{self.symbol.replace('/', '').lower()}_{date.today()}"
+        label_mode = "tb" if self.triple_barrier else ("binary" if self.binary else "3class")
+        model_name = f"rf_{self.symbol.replace('/', '').lower()}_{label_mode}_{date.today()}"
 
         result = TrainingResult(
             model_name=model_name,
@@ -427,3 +435,114 @@ class WalkForwardTrainer:
             pickle.dump(payload, f)
         logger.info("ML model saved: %s", path)
         return path
+
+
+def combinatorial_purged_cv(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_splits: int = 6,
+    purge_gap: int = 5,
+    embargo_pct: float = 0.01,
+) -> List[Dict]:
+    """
+    Combinatorial Purged Cross-Validation (CPCV) — sklearn 기반 구현.
+
+    skfolio CombinatorialPurgedCV의 핵심 아이디어를 sklearn TimeSeriesSplit으로 근사.
+    미래 데이터 누출 방지를 위해 train/test 사이에 purge_gap 간격과
+    embargo(테스트 끝 이후 일정 구간 제외)를 적용.
+
+    Args:
+        X: 피처 DataFrame (시계열 순서 필수)
+        y: 레이블 Series
+        n_splits: CV fold 수 (기본 6)
+        purge_gap: train-test 경계 간 제거 샘플 수 (기본 5, forward_n과 동일 권장)
+        embargo_pct: 테스트 끝 이후 embargo 비율 (기본 1%)
+
+    Returns:
+        List[Dict]: 각 fold의 결과
+          - fold: fold 번호
+          - n_train: train 샘플 수
+          - n_test: test 샘플 수
+          - train_acc: train accuracy
+          - test_acc: test accuracy
+          - purged_samples: purge로 제거된 샘플 수
+
+    Example:
+        fb = FeatureBuilder(binary=True, triple_barrier=True)
+        X, y = fb.build(df)
+        y = y.astype(int)
+        results = combinatorial_purged_cv(X, y, n_splits=6, purge_gap=5)
+        avg_test_acc = sum(r["test_acc"] for r in results) / len(results)
+    """
+    try:
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.metrics import accuracy_score
+        from sklearn.model_selection import TimeSeriesSplit
+    except ImportError:
+        logger.error("scikit-learn 미설치")
+        return []
+
+    n = len(X)
+    embargo_size = max(1, int(n * embargo_pct))
+    tscv = TimeSeriesSplit(n_splits=n_splits, gap=purge_gap)
+
+    results = []
+    for fold_idx, (train_idx, test_idx) in enumerate(tscv.split(X)):
+        # Embargo: test set 이후 구간을 train에서 제거 (이미 gap으로 처리되지만 보강)
+        # test 끝 이후 embargo_size 만큼 추가 제거
+        test_end = test_idx[-1]
+        embargo_end = min(n, test_end + embargo_size)
+
+        # purge: train에서 test 시작 이전 purge_gap 구간 제거
+        test_start = test_idx[0]
+        purge_start = max(0, test_start - purge_gap)
+        purged_mask = train_idx < purge_start
+        train_idx_purged = train_idx[purged_mask]
+        purged_count = len(train_idx) - len(train_idx_purged)
+
+        if len(train_idx_purged) < 50 or len(test_idx) < 20:
+            logger.debug("CPCV fold %d: 샘플 부족 (train=%d, test=%d) — 건너뜀",
+                         fold_idx, len(train_idx_purged), len(test_idx))
+            continue
+
+        X_train = X.iloc[train_idx_purged]
+        y_train = y.iloc[train_idx_purged]
+        X_test = X.iloc[test_idx]
+        y_test = y.iloc[test_idx]
+
+        clf = RandomForestClassifier(
+            n_estimators=50,
+            max_depth=6,
+            max_features="sqrt",
+            random_state=42 + fold_idx,
+            n_jobs=-1,
+            class_weight="balanced",
+        )
+        clf.fit(X_train, y_train)
+
+        train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
+        test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
+
+        fold_result = {
+            "fold": fold_idx,
+            "n_train": len(X_train),
+            "n_test": len(X_test),
+            "train_acc": round(train_acc, 4),
+            "test_acc": round(test_acc, 4),
+            "purged_samples": purged_count,
+        }
+        results.append(fold_result)
+        logger.info(
+            "CPCV fold %d: train=%d test=%d purged=%d | train_acc=%.3f test_acc=%.3f",
+            fold_idx, len(X_train), len(X_test), purged_count, train_acc, test_acc,
+        )
+
+    if results:
+        avg_test = np.mean([r["test_acc"] for r in results])
+        std_test = np.std([r["test_acc"] for r in results])
+        logger.info(
+            "CPCV summary: %d folds, avg_test_acc=%.3f ± %.3f",
+            len(results), avg_test, std_test,
+        )
+
+    return results

@@ -44,6 +44,10 @@ def parse_args():
     p.add_argument("--demo", action="store_true", help="MockExchangeConnector 사용")
     p.add_argument("--bybit", action="store_true", help="ccxt Bybit 직접 fetch (API 키 불필요)")
     p.add_argument("--binary", action="store_true", help="2-class (UP/DOWN) 모드, HOLD 제거")
+    p.add_argument("--triple-barrier", action="store_true",
+                   help="Triple Barrier 레이블링 사용 (TP=2%%, SL=1%%). --binary와 함께 사용 권장")
+    p.add_argument("--tb-tp", type=float, default=0.02, help="Triple Barrier TP 배리어 (기본 0.02=2%%)")
+    p.add_argument("--tb-sl", type=float, default=0.01, help="Triple Barrier SL 배리어 (기본 0.01=1%%)")
     p.add_argument("--auto-retrain", action="store_true",
                    help="자동 재학습: 최근 1000캔들 Bybit fetch → binary RF → PASS 시 저장")
     p.add_argument("--predict", action="store_true",
@@ -76,9 +80,13 @@ def fetch_df(connector, symbol: str, timeframe: str, limit: int):
     return summary.df
 
 
-def train_rf(df, symbol: str, binary: bool = False):
+def train_rf(df, symbol: str, binary: bool = False,
+             triple_barrier: bool = False, tb_tp: float = 0.02, tb_sl: float = 0.01):
     from src.ml.trainer import WalkForwardTrainer
-    trainer = WalkForwardTrainer(symbol=symbol, binary=binary)
+    trainer = WalkForwardTrainer(
+        symbol=symbol, binary=binary,
+        triple_barrier=triple_barrier, tb_tp_pct=tb_tp, tb_sl_pct=tb_sl,
+    )
     result = trainer.train(df)
     print(result.summary())
     if result.passed:
@@ -242,7 +250,8 @@ def merge_btc_close(df, symbol: str, timeframe: str, limit: int):
     return df
 
 
-def auto_retrain(symbol: str, timeframe: str):
+def auto_retrain(symbol: str, timeframe: str, triple_barrier: bool = False,
+                 tb_tp: float = 0.02, tb_sl: float = 0.01):
     """
     자동 재학습 모드:
     - Bybit에서 최근 1000캔들 다운로드
@@ -264,6 +273,9 @@ def auto_retrain(symbol: str, timeframe: str):
     trainer = WalkForwardTrainer(
         symbol=symbol,
         binary=True,
+        triple_barrier=triple_barrier,
+        tb_tp_pct=tb_tp,
+        tb_sl_pct=tb_sl,
     )
     result = trainer.train(df)
 
@@ -276,6 +288,9 @@ def auto_retrain(symbol: str, timeframe: str):
         "timeframe": timeframe,
         "limit": AUTO_RETRAIN_LIMIT,
         "binary": True,
+        "triple_barrier": triple_barrier,
+        "tb_tp_pct": tb_tp,
+        "tb_sl_pct": tb_sl,
         "binary_threshold": AUTO_RETRAIN_BINARY_THRESHOLD,
         "n_samples": result.n_samples,
         "train_accuracy": result.train_accuracy,
@@ -290,7 +305,10 @@ def auto_retrain(symbol: str, timeframe: str):
 
     # PFI 분석: test set 재구성 후 실행 (btc_close 포함된 df 사용)
     try:
-        X_all, y_all = FeatureBuilder(forward_n=5, threshold=AUTO_RETRAIN_BINARY_THRESHOLD, binary=True).build(df)
+        X_all, y_all = FeatureBuilder(
+            forward_n=5, threshold=AUTO_RETRAIN_BINARY_THRESHOLD, binary=True,
+            triple_barrier=triple_barrier, tb_tp_pct=tb_tp, tb_sl_pct=tb_sl,
+        ).build(df)
         y_all = y_all.astype(int)
         n_total = len(X_all)
         val_end = int(n_total * 0.80)
@@ -304,7 +322,8 @@ def auto_retrain(symbol: str, timeframe: str):
         logger.warning("PFI 분석 실패 (무시): %s", e)
 
     if result.passed:
-        model_path = str(MODELS_DIR / f"{safe_symbol}_{timestamp}_rf_binary.pkl")
+        label_tag = "rf_tb" if triple_barrier else "rf_binary"
+        model_path = str(MODELS_DIR / f"{safe_symbol}_{timestamp}_{label_tag}.pkl")
         trainer.save(model_path)
         log_entry["model_path"] = model_path
         print(f"Auto-retrain PASS — saved: {model_path}")
@@ -363,7 +382,12 @@ def main():
     args = parse_args()
 
     if args.auto_retrain:
-        auto_retrain(args.symbol, args.timeframe)
+        auto_retrain(
+            args.symbol, args.timeframe,
+            triple_barrier=args.triple_barrier,
+            tb_tp=args.tb_tp,
+            tb_sl=args.tb_sl,
+        )
         return
 
     if args.predict:
@@ -387,7 +411,13 @@ def main():
         df = fetch_df(connector, args.symbol, args.timeframe, args.limit)
 
     if args.model == "rf":
-        train_rf(df, args.symbol, binary=args.binary)
+        train_rf(
+            df, args.symbol,
+            binary=args.binary,
+            triple_barrier=args.triple_barrier,
+            tb_tp=args.tb_tp,
+            tb_sl=args.tb_sl,
+        )
     else:
         train_lstm(df, args.symbol)
 
