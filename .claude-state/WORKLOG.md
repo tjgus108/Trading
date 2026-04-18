@@ -1,5 +1,26 @@
 # Work Log
 
+## [2026-04-18] Cycle 151 — A (품질/Quality Assurance)
+
+**[A1] 전체 테스트 스위트 점검:**
+- 20개 pre-existing 실패 확인 (yaml module, specialized strategy modules) — 변화 없음
+- 최근 변경(SignalCorrelationTracker, kelly_sizer, slippage, btc_close_lag1) 관련 신규 실패 없음
+- 6682 passed, 20 failed (pre-existing), 20 skipped
+
+**[A2] SignalCorrelationTracker (src/risk/manager.py) 단위 테스트 추가:**
+- `tests/test_risk.py`에 8개 테스트 추가
+  - `test_signal_correlation_tracker_no_warn_below_threshold`: 임계값 미만 → None
+  - `test_signal_correlation_tracker_warns_at_threshold`: 임계값 이상 → 방향 반환
+  - `test_signal_correlation_tracker_sell_concentration`: SELL 집중 감지
+  - `test_signal_correlation_tracker_hold_ignored`: HOLD 시그널 집계 제외
+  - `test_signal_correlation_tracker_unknown_symbol_returns_none`: 미등록 심볼
+  - `test_signal_correlation_tracker_reset_clears_signals`: reset 후 None
+  - `test_signal_correlation_tracker_summary_fields`: summary 딕셔너리 필드
+  - `test_signal_correlation_tracker_case_insensitive`: 대소문자 무관 처리
+- 25 passed (기존 17 + 신규 8)
+
+---
+
 ## [2026-04-18] Cycle 150 — E (실행/Execution)
 
 **[E1] get_ml_features 피처 불일치 수정:**

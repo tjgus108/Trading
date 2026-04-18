@@ -1,13 +1,35 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 150 D 완료)_
+_Last updated: 2026-04-18 (Cycle 151 완료, Cycle 152 시작)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 150
-- 150 mod 5 = 0 → **D(ML) + E(실행) + F(리서치)** (표 기준 Cycle 5 패턴)
+### 로테이션: Cycle 152
+- 152 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** (표 기준 Cycle 2 패턴)
+
+### ✅ Cycle 151 완료 사항
+
+#### A(품질): SignalCorrelationTracker 테스트 추가 ✅ COMPLETE
+- tests/test_risk.py에 8개 단위 테스트 추가 (25 total, 모두 PASS)
+- 전체 테스트: 6682 passed, 20 failed (pre-existing 변화 없음)
+
+### ✅ Cycle 150 완료 사항
+
+#### D(ML): BTC 시차 피처 + 모델 재학습 ✅ COMPLETE (FAIL)
+- btc_close_lag1 피처 구현 (ETH/SOL용)
+- BTC/ETH/SOL 모두 FAIL — 2026-03~04 레짐 변화 구간
+- 주 1회 재학습 스케줄러 필요
+
+#### E(실행): 피처 통일 + 상관관계 트래커 ✅ COMPLETE
+- get_ml_features → FeatureBuilder 사용 (14피처 통일)
+- SignalCorrelationTracker 추가 (src/risk/manager.py)
+- 슬리피지 0.001→0.05 (0.05%)
+
+#### F(리서치): CPCV + 메타-라벨링 ✅ COMPLETE
+- skfolio CombinatorialPurgedCV 무료 사용 가능
+- Triple Barrier + 메타-라벨링 → Precision 개선 기대
 
 ### ✅ Cycle 149 완료 사항
 

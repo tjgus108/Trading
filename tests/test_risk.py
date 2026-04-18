@@ -213,3 +213,94 @@ def test_kelly_adjust_for_regime_trend_down():
     effective = sizer.adjust_for_regime("TREND_DOWN")
     expected = 0.5 * 0.6  # 0.3
     assert abs(effective - expected) < 1e-9, f"Expected {expected}, got {effective}"
+
+
+# --- SignalCorrelationTracker (src/risk/manager.py) 단위 테스트 ---
+from src.risk.manager import SignalCorrelationTracker
+
+
+def test_signal_correlation_tracker_no_warn_below_threshold():
+    """동일 방향 비율이 임계값 미만이면 None 반환."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.8)
+    tracker.record("BTC/USDT", "StratA", "BUY")
+    tracker.record("BTC/USDT", "StratB", "BUY")
+    tracker.record("BTC/USDT", "StratC", "SELL")
+    # 2/3 = 0.667 < 0.8 → 경고 없음
+    result = tracker.check_and_warn("BTC/USDT")
+    assert result is None
+
+
+def test_signal_correlation_tracker_warns_at_threshold():
+    """동일 방향 비율이 임계값 이상이면 방향 반환."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.75)
+    tracker.record("BTC/USDT", "StratA", "BUY")
+    tracker.record("BTC/USDT", "StratB", "BUY")
+    tracker.record("BTC/USDT", "StratC", "BUY")
+    tracker.record("BTC/USDT", "StratD", "SELL")
+    # 3/4 = 0.75 >= 0.75 → BUY 반환
+    result = tracker.check_and_warn("BTC/USDT")
+    assert result == "BUY"
+
+
+def test_signal_correlation_tracker_sell_concentration():
+    """SELL 집중 시 SELL 반환."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.75)
+    tracker.record("ETH/USDT", "S1", "SELL")
+    tracker.record("ETH/USDT", "S2", "SELL")
+    tracker.record("ETH/USDT", "S3", "SELL")
+    result = tracker.check_and_warn("ETH/USDT")
+    assert result == "SELL"
+
+
+def test_signal_correlation_tracker_hold_ignored():
+    """HOLD 시그널은 집계에서 제외."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.75)
+    tracker.record("BTC/USDT", "S1", "HOLD")
+    tracker.record("BTC/USDT", "S2", "HOLD")
+    tracker.record("BTC/USDT", "S3", "BUY")
+    # active < 2 → None
+    result = tracker.check_and_warn("BTC/USDT")
+    assert result is None
+
+
+def test_signal_correlation_tracker_unknown_symbol_returns_none():
+    """등록되지 않은 심볼은 None 반환."""
+    tracker = SignalCorrelationTracker()
+    result = tracker.check_and_warn("UNKNOWN/USDT")
+    assert result is None
+
+
+def test_signal_correlation_tracker_reset_clears_signals():
+    """reset 호출 후 체크는 None을 반환해야 한다."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.75)
+    tracker.record("BTC/USDT", "S1", "BUY")
+    tracker.record("BTC/USDT", "S2", "BUY")
+    tracker.record("BTC/USDT", "S3", "BUY")
+    assert tracker.check_and_warn("BTC/USDT") == "BUY"
+    tracker.reset("BTC/USDT")
+    assert tracker.check_and_warn("BTC/USDT") is None
+
+
+def test_signal_correlation_tracker_summary_fields():
+    """summary 딕셔너리에 필수 필드가 포함되어야 한다."""
+    tracker = SignalCorrelationTracker()
+    tracker.record("BTC/USDT", "A", "BUY")
+    tracker.record("BTC/USDT", "B", "SELL")
+    tracker.record("BTC/USDT", "C", "HOLD")
+    s = tracker.summary("BTC/USDT")
+    assert s["symbol"] == "BTC/USDT"
+    assert s["total_strategies"] == 3
+    assert s["active_signals"] == 2
+    assert s["buy"] == 1
+    assert s["sell"] == 1
+    assert s["hold"] == 1
+
+
+def test_signal_correlation_tracker_case_insensitive():
+    """action 문자열은 대소문자 무관하게 처리된다."""
+    tracker = SignalCorrelationTracker(warn_threshold=0.75)
+    tracker.record("BTC/USDT", "S1", "buy")
+    tracker.record("BTC/USDT", "S2", "Buy")
+    tracker.record("BTC/USDT", "S3", "BUY")
+    result = tracker.check_and_warn("BTC/USDT")
+    assert result == "BUY"
