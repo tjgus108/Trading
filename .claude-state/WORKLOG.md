@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-04-20] Cycle 159 — C (데이터) + B (리스크) + SIM (시뮬레이션) + F (리서치)
+
+**[C] Funding Rate + Open Interest 데이터 수집 3계층 구현:**
+- `src/exchange/connector.py`: fetch_funding_rate, fetch_funding_rate_history, fetch_open_interest 3개 메서드
+- `src/data/feed.py`: FR/OI 수집 래퍼 + compute_fr_oi_features (delta_fr, fr_oi_interaction)
+- `src/ml/features.py`: FeatureBuilder에 FR/OI 피처 자동 통합 (기존 14 + 선택적 2 = 최대 16)
+- `tests/test_funding_oi_feed.py`: 24개 테스트 (18 pass, 6 skip[ccxt])
+
+**[B] MDD 4단계 서킷브레이커 구현 (`src/risk/drawdown_monitor.py`):**
+- MddLevel enum: NORMAL/WARN(5%)/BLOCK_ENTRY(10%)/LIQUIDATE(15%)/FULL_HALT(20%)
+- get_mdd_level(), get_mdd_size_multiplier(), should_liquidate_all() 메서드 추가
+- get_size_multiplier()에 streak×MDD min 통합, DrawdownStatus에 mdd 필드 추가
+- 직렬화 backward compatible, 기존 54 + 신규 31 = 85개 테스트 PASS
+
+**[SIM] calibration hold-out 분리 (`src/ml/trainer.py`):**
+- 데이터 분할 60/20/20 → 60/15/15/10 (train/val/cal/test)
+- isotonic regression을 별도 cal set에서 수행 (val_acc 누출 방지)
+- split_info에 n_cal 추가, backward compatible
+- tests/test_trainer.py: 39개 전체 PASS
+
+**[F] 리서치: 포지션 사이징 실패/성공 사례:**
+- 풀 Kelly → 파멸 경로: quarter-Kelly 캡 + step-down 축소 필수
+- 레짐 감지→사이징 레이어 연결: 고변동성 → 포지션 50% 자동 감소
+- MDD Hard(20%)/Soft(10-15%) 이중 기준: soft limit이 hard stop 전 완충 역할
+
 ## [2026-04-20] Cycle 158 — E (실행) + A (품질) + SIM (시뮬레이션) + F (리서치)
 
 **[E] Exchange 모듈 테스트 추가 (`tests/test_exchange.py`):**
@@ -12671,3 +12696,6 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-19 19:57 UTC] Cycle 158 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 20:13 UTC] Cycle 159 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

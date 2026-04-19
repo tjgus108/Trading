@@ -2,8 +2,11 @@
 C1. WalkForwardTrainer: RandomForest walk-forward 학습.
 
 학습 규칙:
-  - Train/validation/test split: 60/20/20 (시계열 순서 유지)
+  - Train/val/calibration/test split: 60/15/15/10 (시계열 순서 유지)
   - Walk-forward: 미래 데이터 누출 금지
+  - val_acc: base_clf로 val set 평가 (calibration 전)
+  - calibration: 별도 calibration set으로 isotonic regression 적용
+  - test_acc: calibrated 모델로 test set 최종 평가
   - 최소 성과: test accuracy > 55%
   - 모델 파일: models/<name>_<date>.pkl
 
@@ -76,11 +79,14 @@ class TrainingResult:
             lines.append(f"  saved: {self.model_path}")
         # Walk-forward 구간 정보
         if self.split_info:
-            lines.append(
+            split_parts = (
                 f"  split: train={self.split_info.get('n_train')} "
                 f"val={self.split_info.get('n_val')} "
-                f"test={self.split_info.get('n_test')}"
             )
+            if "n_cal" in self.split_info:
+                split_parts += f"cal={self.split_info.get('n_cal')} "
+            split_parts += f"test={self.split_info.get('n_test')}"
+            lines.append(split_parts)
         # 클래스별 분포
         if self.class_distribution:
             dist_str = "  ".join(
@@ -195,27 +201,31 @@ class WalkForwardTrainer:
 
         n_total = len(X_all)
         train_end = int(n_total * 0.60)
-        val_end = int(n_total * 0.80)
+        val_end = int(n_total * 0.75)
+        cal_end = int(n_total * 0.90)
 
         X_train = X_all.iloc[:train_end]
         y_train = y_all.iloc[:train_end]
         X_val = X_all.iloc[train_end:val_end]
         y_val = y_all.iloc[train_end:val_end]
-        X_test = X_all.iloc[val_end:]
-        y_test = y_all.iloc[val_end:]
+        X_cal = X_all.iloc[val_end:cal_end]
+        y_cal = y_all.iloc[val_end:cal_end]
+        X_test = X_all.iloc[cal_end:]
+        y_test = y_all.iloc[cal_end:]
 
         split_info = {
             "n_total": n_total,
             "n_train": len(X_train),
             "n_val": len(X_val),
+            "n_cal": len(X_cal),
             "n_test": len(X_test),
         }
         logger.info(
-            "Walk-forward split: n_total=%d train=%d val=%d test=%d",
-            n_total, len(X_train), len(X_val), len(X_test),
+            "Walk-forward split: n_total=%d train=%d val=%d cal=%d test=%d",
+            n_total, len(X_train), len(X_val), len(X_cal), len(X_test),
         )
 
-        n = len(X_train) + len(X_val) + len(X_test)
+        n = len(X_train) + len(X_val) + len(X_cal) + len(X_test)
         
         if n < 100:
             return TrainingResult(
@@ -226,8 +236,9 @@ class WalkForwardTrainer:
             )
 
         logger.info(
-            "Training RF: n_train=%d n_val=%d n_test=%d features=%d",
-            len(X_train), len(X_val), len(X_test), X_train.shape[1] if len(X_train) > 0 else 0,
+            "Training RF: n_train=%d n_val=%d n_cal=%d n_test=%d features=%d",
+            len(X_train), len(X_val), len(X_cal), len(X_test),
+            X_train.shape[1] if len(X_train) > 0 else 0,
         )
 
         # 학습
@@ -249,10 +260,10 @@ class WalkForwardTrainer:
         train_acc = float(accuracy_score(y_train, base_clf.predict(X_train)))
         val_acc = float(accuracy_score(y_val, base_clf.predict(X_val)))
 
-        # Calibration: validation set으로 isotonic regression 적용
+        # Calibration: 별도 calibration set으로 isotonic regression 적용 (val 누출 방지)
         try:
             clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
-            clf.fit(X_val, y_val)
+            clf.fit(X_cal, y_cal)
         except (TypeError, Exception):
             clf = base_clf
 
@@ -262,8 +273,8 @@ class WalkForwardTrainer:
         # 피처 중요도 (base estimator에서 추출)
         feat_importance = dict(zip(X_train.columns, base_clf.feature_importances_))
 
-        # 클래스별 분포 (test 구간 기준)
-        y_all_concat = pd.concat([y_train, y_val, y_test])
+        # 클래스별 분포 (전체 구간 기준)
+        y_all_concat = pd.concat([y_train, y_val, y_cal, y_test])
         total_labels = len(y_all_concat)
         class_distribution = {
             str(cls): (y_all_concat == cls).sum() / total_labels

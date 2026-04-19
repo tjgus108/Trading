@@ -698,3 +698,343 @@ def test_cb_flash_crash_takes_priority_over_drawdown():
     )
     assert result["triggered"] is True
     assert "플래시" in result["reason"]
+
+
+# ── 단계적 MDD 서킷브레이커 (DrawdownMonitor) 테스트 ──────────────────────────
+from src.risk.drawdown_monitor import MddLevel
+
+
+def _make_dm(**kwargs) -> DrawdownMonitor:
+    """단계적 MDD 테스트용 DrawdownMonitor 생성 헬퍼."""
+    defaults = dict(
+        mdd_warn_pct=0.05,
+        mdd_block_pct=0.10,
+        mdd_liquidate_pct=0.15,
+        mdd_halt_pct=0.20,
+        # 쿨다운/streak 영향 제거
+        single_loss_halt_pct=1.0,
+        loss_streak_threshold=999,
+    )
+    defaults.update(kwargs)
+    return DrawdownMonitor(**defaults)
+
+
+# ── MDD 레벨 판정 테스트 ─────────────────────────────────────────────────────
+
+def test_mdd_level_normal_when_no_drawdown():
+    """drawdown 없으면 NORMAL."""
+    dm = _make_dm()
+    dm.update(10000)
+    assert dm.get_mdd_level() == MddLevel.NORMAL
+
+
+def test_mdd_level_normal_below_warn():
+    """MDD < 5% → NORMAL."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9600)  # 4% drawdown
+    assert dm.get_mdd_level() == MddLevel.NORMAL
+
+
+def test_mdd_level_warn_at_boundary():
+    """MDD = 5% 정확히 → WARN."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9500)  # 5% drawdown
+    assert dm.get_mdd_level() == MddLevel.WARN
+
+
+def test_mdd_level_warn_between_5_and_10():
+    """5% ≤ MDD < 10% → WARN."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9200)  # 8% drawdown
+    assert dm.get_mdd_level() == MddLevel.WARN
+
+
+def test_mdd_level_block_entry_at_boundary():
+    """MDD = 10% 정확히 → BLOCK_ENTRY."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9000)  # 10% drawdown
+    assert dm.get_mdd_level() == MddLevel.BLOCK_ENTRY
+
+
+def test_mdd_level_block_entry_between_10_and_15():
+    """10% ≤ MDD < 15% → BLOCK_ENTRY."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8700)  # 13% drawdown
+    assert dm.get_mdd_level() == MddLevel.BLOCK_ENTRY
+
+
+def test_mdd_level_liquidate_at_boundary():
+    """MDD = 15% 정확히 → LIQUIDATE."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8500)  # 15% drawdown
+    assert dm.get_mdd_level() == MddLevel.LIQUIDATE
+
+
+def test_mdd_level_liquidate_between_15_and_20():
+    """15% ≤ MDD < 20% → LIQUIDATE."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8200)  # 18% drawdown
+    assert dm.get_mdd_level() == MddLevel.LIQUIDATE
+
+
+def test_mdd_level_full_halt_at_boundary():
+    """MDD = 20% 정확히 → FULL_HALT."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8000)  # 20% drawdown
+    assert dm.get_mdd_level() == MddLevel.FULL_HALT
+
+
+def test_mdd_level_full_halt_above_20():
+    """MDD > 20% → FULL_HALT."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(7000)  # 30% drawdown
+    assert dm.get_mdd_level() == MddLevel.FULL_HALT
+
+
+# ── MDD size_multiplier 테스트 ─────────────────────────────────────────────────
+
+def test_mdd_size_multiplier_normal_is_1():
+    """NORMAL 단계 → size_multiplier=1.0."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9600)  # 4%
+    assert dm.get_mdd_size_multiplier() == 1.0
+
+
+def test_mdd_size_multiplier_warn_is_05():
+    """WARN 단계 → size_multiplier=0.5."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9500)  # 5%
+    assert dm.get_mdd_size_multiplier() == 0.5
+
+
+def test_mdd_size_multiplier_block_entry_is_0():
+    """BLOCK_ENTRY 단계 → size_multiplier=0.0 (진입 차단)."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9000)  # 10%
+    assert dm.get_mdd_size_multiplier() == 0.0
+
+
+def test_mdd_size_multiplier_liquidate_is_0():
+    """LIQUIDATE 단계 → size_multiplier=0.0."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8500)  # 15%
+    assert dm.get_mdd_size_multiplier() == 0.0
+
+
+def test_mdd_size_multiplier_full_halt_is_0():
+    """FULL_HALT 단계 → size_multiplier=0.0."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8000)  # 20%
+    assert dm.get_mdd_size_multiplier() == 0.0
+
+
+# ── get_size_multiplier 통합: MDD와 streak 중 최소값 적용 ─────────────────────
+
+def test_size_multiplier_min_of_mdd_and_streak():
+    """MDD WARN(0.5) + streak 정상(1.0) → min=0.5."""
+    dm = _make_dm(loss_streak_threshold=999)
+    dm.update(10000)
+    dm.update(9500)  # 5% → WARN → mdd_mult=0.5
+    assert dm.get_size_multiplier() == 0.5
+
+
+def test_size_multiplier_streak_wins_when_lower():
+    """MDD NORMAL(1.0) + streak 축소(0.5) → min=0.5."""
+    dm = _make_dm(loss_streak_threshold=2, single_loss_halt_pct=1.0, streak_cooldown_seconds=0.0)
+    dm.update(10000)
+    dm.update(9800)  # 2% → NORMAL → mdd_mult=1.0
+    dm.record_trade_result(-10.0, 9800)
+    dm.record_trade_result(-10.0, 9790)
+    # streak=2 >= threshold=2 → streak_mult=0.5
+    assert dm.get_size_multiplier() == 0.5
+
+
+def test_size_multiplier_mdd_block_overrides_streak():
+    """MDD BLOCK_ENTRY(0.0)은 streak 0.5보다 낮으므로 0.0."""
+    dm = _make_dm(loss_streak_threshold=2, single_loss_halt_pct=1.0, streak_cooldown_seconds=0.0)
+    dm.update(10000)
+    dm.update(9000)  # 10% → BLOCK_ENTRY → mdd_mult=0.0
+    dm.record_trade_result(-10.0, 9000)
+    dm.record_trade_result(-10.0, 8990)
+    assert dm.get_size_multiplier() == 0.0
+
+
+# ── should_liquidate_all 테스트 ──────────────────────────────────────────────
+
+def test_should_liquidate_all_false_below_15():
+    """MDD < 15% → should_liquidate_all=False."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8600)  # 14%
+    assert not dm.should_liquidate_all()
+
+
+def test_should_liquidate_all_true_at_15():
+    """MDD ≥ 15% → should_liquidate_all=True."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8500)  # 15%
+    assert dm.should_liquidate_all()
+
+
+def test_should_liquidate_all_true_at_20():
+    """MDD ≥ 20% → should_liquidate_all=True."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8000)  # 20%
+    assert dm.should_liquidate_all()
+
+
+# ── DrawdownStatus 포함 확인 ─────────────────────────────────────────────────
+
+def test_update_returns_mdd_level_in_status():
+    """update() 결과 DrawdownStatus에 mdd_level과 mdd_size_multiplier가 포함된다."""
+    dm = _make_dm()
+    status = dm.update(10000)
+    assert status.mdd_level == MddLevel.NORMAL
+    assert status.mdd_size_multiplier == 1.0
+
+    status2 = dm.update(9500)  # 5% → WARN
+    assert status2.mdd_level == MddLevel.WARN
+    assert status2.mdd_size_multiplier == 0.5
+
+    status3 = dm.update(9000)  # 10% → BLOCK_ENTRY
+    assert status3.mdd_level == MddLevel.BLOCK_ENTRY
+    assert status3.mdd_size_multiplier == 0.0
+
+
+# ── 회복 시나리오: MDD 단계 하강 ────────────────────────────────────────────
+
+def test_mdd_level_recovers_when_equity_rises():
+    """equity 회복 시 MDD 단계도 정상적으로 하강."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9000)  # 10% → BLOCK_ENTRY
+    assert dm.get_mdd_level() == MddLevel.BLOCK_ENTRY
+    # equity 회복 (peak은 여전히 10000)
+    dm.update(9600)  # 4% → NORMAL
+    assert dm.get_mdd_level() == MddLevel.NORMAL
+    assert dm.get_mdd_size_multiplier() == 1.0
+
+
+# ── 커스텀 임계값 테스트 ─────────────────────────────────────────────────────
+
+def test_mdd_custom_thresholds():
+    """커스텀 임계값으로 MDD 단계가 올바르게 판정."""
+    dm = _make_dm(
+        mdd_warn_pct=0.02,
+        mdd_block_pct=0.05,
+        mdd_liquidate_pct=0.08,
+        mdd_halt_pct=0.12,
+    )
+    dm.update(10000)
+
+    dm.update(9850)  # 1.5% < 2% → NORMAL
+    assert dm.get_mdd_level() == MddLevel.NORMAL
+
+    dm.update(9800)  # 2% → WARN
+    assert dm.get_mdd_level() == MddLevel.WARN
+
+    dm.update(9500)  # 5% → BLOCK_ENTRY
+    assert dm.get_mdd_level() == MddLevel.BLOCK_ENTRY
+
+    dm.update(9200)  # 8% → LIQUIDATE
+    assert dm.get_mdd_level() == MddLevel.LIQUIDATE
+
+    dm.update(8800)  # 12% → FULL_HALT
+    assert dm.get_mdd_level() == MddLevel.FULL_HALT
+
+
+# ── mdd_level 프로퍼티 테스트 ────────────────────────────────────────────────
+
+def test_mdd_level_property_matches_method():
+    """mdd_level 프로퍼티가 get_mdd_level()과 동일 결과."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9200)  # 8% → WARN
+    assert dm.mdd_level == dm.get_mdd_level()
+    assert dm.mdd_level == MddLevel.WARN
+
+
+# ── 직렬화 호환성 테스트 ─────────────────────────────────────────────────────
+
+def test_mdd_serialization_roundtrip():
+    """to_dict/from_dict이 mdd_*_pct 파라미터를 올바르게 직렬화/복원."""
+    dm = _make_dm(mdd_warn_pct=0.03, mdd_block_pct=0.08, mdd_liquidate_pct=0.12, mdd_halt_pct=0.18)
+    d = dm.to_dict()
+    assert d["mdd_warn_pct"] == 0.03
+    assert d["mdd_block_pct"] == 0.08
+    assert d["mdd_liquidate_pct"] == 0.12
+    assert d["mdd_halt_pct"] == 0.18
+
+    restored = DrawdownMonitor.from_dict(d)
+    assert restored.mdd_warn_pct == 0.03
+    assert restored.mdd_block_pct == 0.08
+    assert restored.mdd_liquidate_pct == 0.12
+    assert restored.mdd_halt_pct == 0.18
+
+
+def test_mdd_from_dict_defaults_when_missing():
+    """from_dict에서 mdd_*_pct 키가 없으면 기본값 사용 (backward compatibility)."""
+    dm = DrawdownMonitor()
+    d = dm.to_dict()
+    # mdd_* 키 제거하여 old format 시뮬레이션
+    for k in ("mdd_warn_pct", "mdd_block_pct", "mdd_liquidate_pct", "mdd_halt_pct"):
+        d.pop(k, None)
+    restored = DrawdownMonitor.from_dict(d)
+    assert restored.mdd_warn_pct == 0.05
+    assert restored.mdd_block_pct == 0.10
+    assert restored.mdd_liquidate_pct == 0.15
+    assert restored.mdd_halt_pct == 0.20
+
+
+# ── 경계값 정밀 테스트 ───────────────────────────────────────────────────────
+
+def test_mdd_boundary_just_below_warn():
+    """MDD = 4.99% → NORMAL (5% 미만)."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9501)  # dd = 499/10000 = 4.99%
+    assert dm.get_mdd_level() == MddLevel.NORMAL
+    assert dm.get_mdd_size_multiplier() == 1.0
+
+
+def test_mdd_boundary_just_below_block():
+    """MDD = 9.99% → WARN (10% 미만)."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(9001)  # dd = 999/10000 = 9.99%
+    assert dm.get_mdd_level() == MddLevel.WARN
+    assert dm.get_mdd_size_multiplier() == 0.5
+
+
+def test_mdd_boundary_just_below_liquidate():
+    """MDD = 14.99% → BLOCK_ENTRY (15% 미만)."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8501)  # dd = 1499/10000 = 14.99%
+    assert dm.get_mdd_level() == MddLevel.BLOCK_ENTRY
+    assert dm.get_mdd_size_multiplier() == 0.0
+
+
+def test_mdd_boundary_just_below_halt():
+    """MDD = 19.99% → LIQUIDATE (20% 미만)."""
+    dm = _make_dm()
+    dm.update(10000)
+    dm.update(8001)  # dd = 1999/10000 = 19.99%
+    assert dm.get_mdd_level() == MddLevel.LIQUIDATE
+    assert dm.get_mdd_size_multiplier() == 0.0

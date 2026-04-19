@@ -39,6 +39,23 @@ class AlertLevel(str, Enum):
     FORCE_LIQUIDATE = "FORCE_LIQUIDATE"  # 월간 DD 초과 — 강제 청산
 
 
+class MddLevel(str, Enum):
+    """단계적 MDD 서킷브레이커 레벨.
+
+    MDD (peak 대비 전체 낙폭) 기준 4단계:
+      NORMAL       : MDD < mdd_warn_pct       → 정상 (size_multiplier=1.0)
+      WARN         : mdd_warn_pct ≤ MDD < mdd_block_pct → 경고 + 포지션 50% 축소
+      BLOCK_ENTRY  : mdd_block_pct ≤ MDD < mdd_liquidate_pct → 신규 진입 차단
+      LIQUIDATE    : mdd_liquidate_pct ≤ MDD < mdd_halt_pct → 모든 포지션 청산 권고
+      FULL_HALT    : MDD ≥ mdd_halt_pct       → 전체 거래 중단
+    """
+    NORMAL = "NORMAL"
+    WARN = "WARN"
+    BLOCK_ENTRY = "BLOCK_ENTRY"
+    LIQUIDATE = "LIQUIDATE"
+    FULL_HALT = "FULL_HALT"
+
+
 @dataclass
 class DrawdownStatus:
     current_equity: float
@@ -54,6 +71,8 @@ class DrawdownStatus:
     consecutive_losses: int = 0
     size_multiplier: float = 1.0   # 포지션 사이즈 배수 (1.0=정상, 0.5=연속손실 축소)
     cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
+    mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
+    mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
 
 
 class DrawdownMonitor:
@@ -63,6 +82,12 @@ class DrawdownMonitor:
       daily_limit  (기본 0.03): 일일 DD 초과 → WARNING + 거래 중단
       weekly_limit (기본 0.07): 주간 DD 초과 → HALT + 거래 중단
       monthly_limit(기본 0.15): 월간 DD 초과 → FORCE_LIQUIDATE
+
+    단계적 MDD 서킷브레이커 (peak 대비 전체 낙폭 기준):
+      mdd_warn_pct      (기본 0.05): MDD ≥ 5%  → 경고 + 포지션 사이즈 50% 축소
+      mdd_block_pct     (기본 0.10): MDD ≥ 10% → 신규 진입 차단
+      mdd_liquidate_pct (기본 0.15): MDD ≥ 15% → 모든 포지션 청산 권고
+      mdd_halt_pct      (기본 0.20): MDD ≥ 20% → 전체 거래 중단
 
     연속 손실 관리:
       loss_streak_threshold    (기본 3): N회 연속 손실 시 size_multiplier=0.5 적용 + streak 쿨다운 시작
@@ -82,6 +107,10 @@ class DrawdownMonitor:
         single_loss_halt_pct: float = 0.02,
         cooldown_seconds: float = 3600.0,
         streak_cooldown_seconds: float = 14400.0,
+        mdd_warn_pct: float = 0.05,
+        mdd_block_pct: float = 0.10,
+        mdd_liquidate_pct: float = 0.15,
+        mdd_halt_pct: float = 0.20,
     ) -> None:
         """
         Args:
@@ -96,6 +125,10 @@ class DrawdownMonitor:
             cooldown_seconds:      단일 큰 손실 후 쿨다운 지속 시간 (초). 기본 1시간.
             streak_cooldown_seconds: 연속 손실(loss_streak_threshold 도달) 후 쿨다운 지속 시간 (초).
                                      기본 4시간. 0으로 설정 시 연속 손실 쿨다운 비활성화.
+            mdd_warn_pct:      MDD 경고 기준 (기본 5%). 포지션 50% 축소.
+            mdd_block_pct:     MDD 진입 차단 기준 (기본 10%). 신규 진입 차단.
+            mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
+            mdd_halt_pct:      MDD 완전 중단 기준 (기본 20%). 전체 거래 중단.
         """
         self.max_drawdown_pct = max_drawdown_pct
         self.recovery_pct = recovery_pct
@@ -106,6 +139,10 @@ class DrawdownMonitor:
         self.single_loss_halt_pct = single_loss_halt_pct
         self.cooldown_seconds = cooldown_seconds
         self.streak_cooldown_seconds = streak_cooldown_seconds
+        self.mdd_warn_pct = mdd_warn_pct
+        self.mdd_block_pct = mdd_block_pct
+        self.mdd_liquidate_pct = mdd_liquidate_pct
+        self.mdd_halt_pct = mdd_halt_pct
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
 
@@ -229,15 +266,67 @@ class DrawdownMonitor:
     def get_size_multiplier(self) -> float:
         """포지션 사이즈 배수 반환.
 
+        여러 조건의 최소값을 적용:
         - 쿨다운 중: 0.0 (완전 차단)
         - 연속 손실 >= threshold: 0.5 (50% 축소)
+        - MDD 단계별: get_mdd_size_multiplier() 결과
         - 정상: 1.0
         """
         if self.is_in_cooldown():
             return 0.0
-        if self._consecutive_losses >= self.loss_streak_threshold:
+        streak_mult = 0.5 if self._consecutive_losses >= self.loss_streak_threshold else 1.0
+        mdd_mult = self.get_mdd_size_multiplier()
+        return min(streak_mult, mdd_mult)
+
+    # ── 단계적 MDD 서킷브레이커 ─────────────────────────────────
+
+    def get_mdd_level(self) -> MddLevel:
+        """현재 peak 대비 전체 낙폭 기준 MDD 단계 반환.
+
+        MDD 단계:
+          NORMAL      : MDD < mdd_warn_pct
+          WARN        : mdd_warn_pct ≤ MDD < mdd_block_pct
+          BLOCK_ENTRY : mdd_block_pct ≤ MDD < mdd_liquidate_pct
+          LIQUIDATE   : mdd_liquidate_pct ≤ MDD < mdd_halt_pct
+          FULL_HALT   : MDD ≥ mdd_halt_pct
+        """
+        dd = self.current_drawdown()
+        if dd >= self.mdd_halt_pct:
+            return MddLevel.FULL_HALT
+        if dd >= self.mdd_liquidate_pct:
+            return MddLevel.LIQUIDATE
+        if dd >= self.mdd_block_pct:
+            return MddLevel.BLOCK_ENTRY
+        if dd >= self.mdd_warn_pct:
+            return MddLevel.WARN
+        return MddLevel.NORMAL
+
+    def get_mdd_size_multiplier(self) -> float:
+        """MDD 단계에 따른 포지션 사이즈 배수 반환.
+
+        NORMAL      → 1.0  (정상)
+        WARN        → 0.5  (50% 축소)
+        BLOCK_ENTRY → 0.0  (신규 진입 차단)
+        LIQUIDATE   → 0.0  (청산 권고, 진입 불가)
+        FULL_HALT   → 0.0  (전체 중단)
+        """
+        level = self.get_mdd_level()
+        if level == MddLevel.NORMAL:
+            return 1.0
+        if level == MddLevel.WARN:
             return 0.5
-        return 1.0
+        # BLOCK_ENTRY, LIQUIDATE, FULL_HALT → 0.0
+        return 0.0
+
+    def should_liquidate_all(self) -> bool:
+        """MDD LIQUIDATE 이상 단계 시 True — 모든 포지션 청산 권고."""
+        level = self.get_mdd_level()
+        return level in (MddLevel.LIQUIDATE, MddLevel.FULL_HALT)
+
+    @property
+    def mdd_level(self) -> MddLevel:
+        """현재 MDD 단계 (프로퍼티)."""
+        return self.get_mdd_level()
 
     @property
     def consecutive_losses(self) -> int:
@@ -308,6 +397,17 @@ class DrawdownMonitor:
                     drawdown * 100, self._peak,
                 )
 
+        # 단계적 MDD 레벨 계산
+        cur_mdd_level = self.get_mdd_level()
+        cur_mdd_size_mult = self.get_mdd_size_multiplier()
+
+        # MDD 단계 로깅 (NORMAL 제외)
+        if cur_mdd_level != MddLevel.NORMAL:
+            logger.info(
+                "DrawdownMonitor: MDD 단계 [%s] — drawdown=%.2f%% (size_mult=%.1f)",
+                cur_mdd_level.value, drawdown * 100, cur_mdd_size_mult,
+            )
+
         return DrawdownStatus(
             current_equity=current_equity,
             peak_equity=self._peak,
@@ -322,6 +422,8 @@ class DrawdownMonitor:
             consecutive_losses=self._consecutive_losses,
             size_multiplier=self.get_size_multiplier(),
             cooldown_active=self.is_in_cooldown(),
+            mdd_level=cur_mdd_level,
+            mdd_size_multiplier=cur_mdd_size_mult,
         )
 
     def _check_tiered(
@@ -417,6 +519,10 @@ class DrawdownMonitor:
             "single_loss_halt_pct": self.single_loss_halt_pct,
             "cooldown_seconds": self.cooldown_seconds,
             "streak_cooldown_seconds": self.streak_cooldown_seconds,
+            "mdd_warn_pct": self.mdd_warn_pct,
+            "mdd_block_pct": self.mdd_block_pct,
+            "mdd_liquidate_pct": self.mdd_liquidate_pct,
+            "mdd_halt_pct": self.mdd_halt_pct,
             "_peak": self._peak,
             "_current": self._current,
             "_halted": self._halted,
@@ -442,6 +548,10 @@ class DrawdownMonitor:
             single_loss_halt_pct=data.get("single_loss_halt_pct", 0.02),
             cooldown_seconds=data.get("cooldown_seconds", 3600.0),
             streak_cooldown_seconds=data.get("streak_cooldown_seconds", 14400.0),
+            mdd_warn_pct=data.get("mdd_warn_pct", 0.05),
+            mdd_block_pct=data.get("mdd_block_pct", 0.10),
+            mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
+            mdd_halt_pct=data.get("mdd_halt_pct", 0.20),
         )
         obj._peak = data["_peak"]
         obj._current = data["_current"]

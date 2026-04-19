@@ -1364,3 +1364,60 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 
 3. **멀티 롤링 윈도우 피처 추가** — 현재 단일 윈도우 지표 위주에서 7/14/21일 롤링 MFI, BB 폭, ATR 추가 시 일반화 성능 향상 가능성 높음 (arXiv 연구 근거).
 
+
+---
+
+## [2026-04-20] Cycle 159 — 포지션 사이징 및 리스크 관리 실패/성공 사례
+
+### 실패 사례 1: 풀 Kelly 과용으로 계좌 파멸
+
+- **출처**: https://medium.com/@tmapendembe_28659/kelly-criterion-for-crypto-traders-a-modern-approach-to-volatile-markets-a0cda654caa9
+- **핵심 발견**: 크립토에서 Kelly 공식을 그대로 적용하면 레버리지 포함 시 120%+ 포지션을 권고하는 경우 발생. 한 실무자가 실제 win rate를 70%로 추정했으나 1년 실거래 결과 52%였음 — 과추정으로 Kelly 값이 대폭 부풀어짐. 30% Kelly 기준으로 설정했으나 상정 최대 손실(40%)이 실제 85% 드로다운으로 실현되어 파멸. Fat tail 이벤트는 Kelly가 가정하는 정규분포를 위반.
+- **교훈**: 우리 KellySizer의 `win_rate`, `avg_win/avg_loss` 추정값에 반드시 안전마진 적용. 라이브 환경에서는 Quarter-Kelly(25%) 이하 사용. 드로다운 20% 도달 시 포지션 크기 자동 절반 감소 로직 추가 검토.
+
+### 실패 사례 2: 2024 과레버리지 청산 파동 ($280M)
+
+- **출처**: https://www.coinspeaker.com/over-108000-crypto-traders-end-2024-280m-liquidations/, https://thedefiant.io/news/markets/inside-the-crypto-leverage-shakeout-what-88-620-trades-reveal-about-risk-discipline
+- **핵심 발견**: 2024년 말 88,620건 거래 분석에서 10x~50x 레버리지를 사용한 봇/트레이더 108,000명 이상이 $280M 손실. 공통점: 포지션 크기를 계좌 자산 대비 고정 비율로 유지하고 시장 레짐 변화 미감지. 봇은 손실 구간에서도 포지션 축소 없이 동일 크기로 계속 진입 — 손실을 기계적으로 가속.
+- **교훈**: 포지션 크기를 현재 계좌 잔고 대비 동적 계산 필수(고정 로트 금지). 연속 손실 N회 시 포지션 크기 자동 감소 또는 쿨다운 적용 (DrawdownMonitor의 역할 강화).
+
+### 성공 사례 1: 단계적 포지션 축소(Step-Down Sizing) 전략
+
+- **출처**: https://arxiv.org/html/2509.16707v1 (Increase Alpha: AI-Driven Trading Framework), https://medium.com/@jpolec_72972/position-sizing-strategies-for-algo-traders-a-comprehensive-guide-c9a8fc2443c8
+- **핵심 발견**: 드로다운 깊이에 따라 포지션 크기를 단계적으로 축소하는 전략이 단일 고정 스톱 대비 Calmar ratio 및 win rate 향상. 구체적 구조: MDD 0~5% → 풀 사이즈, 5~10% → 75%, 10~15% → 50%, 15%+ → 25% 또는 중단. 이 방식이 "active strategies achieve shallower and shorter drawdowns" 효과를 실증.
+- **교훈**: 현재 DrawdownMonitor는 임계값 도달 시 거래 중단만 함. 단계적 축소(step-down) 로직으로 개선 시 중단 전에 손실을 완화하는 완충 구간 확보 가능.
+
+### 성공 사례 2: Regime-Adaptive Sizing (RegimeNAS 계열)
+
+- **출처**: https://onlinelibrary.wiley.com/doi/full/10.1002/fut.70018 (Trading Games: Beating Passive Strategies), https://www.blockchain-council.org/cryptocurrency/risk-management-with-ai-in-crypto-trading-volatility-forecasting-position-sizing-stop-loss-automation/
+- **핵심 발견**: 상위 20개 유동 코인 로테이션 트렌드-팔로잉 전략이 레짐 감지 + 동적 사이징 조합으로 Sharpe 1.5 이상, BTC 대비 알파 10.8% 달성. 핵심: 고변동성(Regime 3) 진입 시 포지션을 자동으로 절반으로 줄이고 트렌드 레짐(Regime 1)에서만 풀 사이즈. 중립(횡보) 레짐에서는 25% 사이즈 또는 진입 불가.
+- **교훈**: 현재 우리 봇의 변동성 레짐 필터(ATR 기반)를 사이징 레이어에도 연결 필요. 신호 생성 → 레짐 판단 → 사이징 결정의 3단계 파이프라인 구조.
+
+---
+
+### Kelly Criterion 크립토 적용 주의점
+
+- **Fat Tail 문제**: BTC 30일 실현 변동성 30~45%, 전통 자산의 30~45배. Kelly가 가정하는 정규 분포와 전혀 다름. 꼬리 위험 발생 시 예상 최대 손실의 2~3배 시나리오로 스트레스 테스트 필수.
+- **Non-Stationary 문제**: 시장 레짐이 바뀌면 win rate/odds가 통계적으로 완전히 달라짐. 과거 90일 백테스트 기반 Kelly 값을 그대로 라이브에 쓰면 레짐 전환 즉시 오버베팅 전환.
+- **권고 체계**: Quarter-Kelly(25%) 기본 → 불확실 구간·상관 포지션 보유 시 Eighth-Kelly(12.5%) → 약세장·극단 변동성 시 Sixteenth-Kelly(6%) 또는 중단. 단일 포지션 최대 25% 캡 필수.
+- **출처**: https://medium.com/@tmapendembe_28659/kelly-criterion-for-crypto-traders-a-modern-approach-to-volatile-markets-a0cda654caa9, https://matthewdowney.github.io/uncertainty-kelly-criterion-optimal-bet-size.html
+
+---
+
+### MDD 10% vs 20% 실증 비교
+
+- **회복 비대칭**: 10% MDD 회복에는 +11.1% 수익 필요. 20% MDD 회복에는 +25% 필요. 수학적으로 20% 기준은 회복 비용이 2.25배 이상.
+- **실증 데이터**: MDPI 연구(2022 약세장 기간 알고 트레이딩) — Adaptive Risk Control reward 사용 전략이 MDD 16.8%, Sharpe 2.47 달성. 20% 기준을 쓰되 실제 운용에서 15~17% 수준에서 관리되는 전략이 수익/위험 균형 최적.
+- **업계 기준**: Conservative(10% 이하), Professional(10~20%), Aggressive(20~30%). 현재 우리 백테스트 기준 MDD≤20%는 Professional 범주에 해당. 단, 실전 운용 시 MDD 10~15%를 Soft Limit, 20%를 Hard Stop으로 이중 기준 운용 권고.
+- **출처**: https://www.mdpi.com/2227-7390/14/5/794, https://enlightenedstocktrading.com/drawdown-in-trading/
+
+---
+
+### 우리 프로젝트 핵심 교훈 3개 (2026-04-20 포지션/리스크)
+
+1. **KellySizer Quarter-Kelly 상한 강제 + DD-연동 Step-Down**: 현재 Kelly 계산값을 25%로 캡핑하고, 계좌 드로다운 5%/10%/15% 구간마다 포지션 크기를 75%/50%/25%로 단계 축소. `src/risk/` DrawdownMonitor에 step-down 로직 추가가 우선순위.
+
+2. **레짐별 사이징 파이프라인 연결**: ATR 기반 레짐 감지 결과를 포지션 사이징 레이어에 직접 연결. 현재 신호 생성에만 영향을 주는 레짐 필터를 사이징 결정까지 확장 — 고변동성 레짐에서 자동 50% 축소.
+
+3. **MDD Hard/Soft 이중 기준 운용**: 백테스트 합격 기준 MDD≤20%는 Hard Stop 유지. 실운용에서는 MDD 10~15%를 Soft Limit(포지션 축소)으로 추가, 조기 경보 체계 구성. 20% 도달 전에 손실을 완충할 안전망 확보.
+

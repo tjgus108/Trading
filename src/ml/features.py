@@ -9,6 +9,7 @@ C1. FeatureBuilder: OHLCV + 기술 지표 → ML 학습 피처.
   - Donchian: donchian_pct (현재 가격의 채널 내 위치)
   - 기타: macd_hist, bb_position
   - BTC 시차 (선택): btc_close_lag1 — df에 'btc_close' 컬럼이 있을 때만 추가
+  - FR/OI (선택): delta_fr, fr_oi_interaction — df에 'funding_rate'/'open_interest' 컬럼 필요
 
 제거된 피처 (PFI near-zero, Cycle 149):
   - rsi14: MDI=0.0, PFI=0.0 (BTC/ETH/SOL 공통)
@@ -187,6 +188,17 @@ class FeatureBuilder:
             btc_close = df["btc_close"]
             feat["btc_close_lag1"] = np.log(btc_close.shift(1) / btc_close.shift(2))
 
+        # Funding Rate + OI 파생 피처 (Cycle 158: SSRN 기반)
+        # df에 'funding_rate' 컬럼이 있으면 delta_fr 추가
+        # df에 'funding_rate' + 'open_interest' 둘 다 있으면 fr_oi_interaction 추가
+        if "funding_rate" in df.columns:
+            fr = df["funding_rate"]
+            feat["delta_fr"] = fr.diff()
+            if "open_interest" in df.columns:
+                oi = df["open_interest"]
+                oi_norm = oi / (oi.rolling(20, min_periods=1).mean() + 1e-9)
+                feat["fr_oi_interaction"] = fr * oi_norm
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -274,7 +286,8 @@ class FeatureBuilder:
 
         Cycle 149: rsi14, rsi_zscore, price_vs_vwap 제거 (PFI near-zero).
         Cycle 150: btc_close_lag1 추가 (선택적 — df에 'btc_close' 컬럼 필요).
-        base 14피처만 반환. btc_close_lag1은 build() 시 자동 추가됨.
+        Cycle 158: delta_fr, fr_oi_interaction 추가 (선택적 — df에 'funding_rate'/'open_interest' 필요).
+        base 14피처만 반환. 선택적 피처는 build() 시 자동 추가됨.
         """
         return [
             "return_1", "return_3", "return_5", "return_10", "return_20",

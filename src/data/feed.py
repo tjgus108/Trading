@@ -567,6 +567,94 @@ class DataFeed:
 
 
     # ------------------------------------------------------------------
+    # Funding Rate + Open Interest fetchers (for ML features)
+    # ------------------------------------------------------------------
+
+    def fetch_funding_rate(self, symbol: str) -> Optional[float]:
+        """현재 funding rate 반환. 실패 시 None (파이프라인 블록 금지).
+
+        Returns:
+            funding rate as float (e.g., 0.0001 = 0.01%), or None on failure.
+        """
+        try:
+            data = self.connector.fetch_funding_rate(symbol)
+            rate = data.get("fundingRate")
+            if rate is not None:
+                return float(rate)
+            return None
+        except Exception as e:
+            logger.warning("fetch_funding_rate failed for %s: %s", symbol, e)
+            return None
+
+    def fetch_funding_rate_history(self, symbol: str, limit: int = 100) -> pd.DataFrame:
+        """funding rate 이력을 DataFrame으로 반환.
+
+        Returns:
+            DataFrame with columns: ['funding_rate'], index=timestamp.
+            실패 시 빈 DataFrame.
+        """
+        try:
+            records = self.connector.fetch_funding_rate_history(symbol, limit=limit)
+            if not records:
+                return pd.DataFrame(columns=["funding_rate"])
+            rows = []
+            for r in records:
+                ts = r.get("timestamp")
+                fr = r.get("fundingRate")
+                if ts is not None and fr is not None:
+                    rows.append({"timestamp": ts, "funding_rate": float(fr)})
+            if not rows:
+                return pd.DataFrame(columns=["funding_rate"])
+            df = pd.DataFrame(rows)
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+            df.set_index("timestamp", inplace=True)
+            df.sort_index(inplace=True)
+            return df
+        except Exception as e:
+            logger.warning("fetch_funding_rate_history failed for %s: %s", symbol, e)
+            return pd.DataFrame(columns=["funding_rate"])
+
+    def fetch_open_interest(self, symbol: str) -> Optional[float]:
+        """현재 open interest 반환. 실패 시 None.
+
+        Returns:
+            open interest amount as float, or None on failure.
+        """
+        try:
+            data = self.connector.fetch_open_interest(symbol)
+            oi = data.get("openInterestAmount")
+            if oi is not None:
+                return float(oi)
+            return None
+        except Exception as e:
+            logger.warning("fetch_open_interest failed for %s: %s", symbol, e)
+            return None
+
+    @staticmethod
+    def compute_fr_oi_features(fr_series: pd.Series, oi_series: pd.Series) -> pd.DataFrame:
+        """Funding rate + OI 파생 피처 계산.
+
+        SSRN 연구 기반: delta_fr + fr*OI 곱이 단일 지표보다 정확도 향상.
+
+        Args:
+            fr_series: funding rate 시계열 (pd.Series, float)
+            oi_series: open interest 시계열 (pd.Series, float, 같은 인덱스)
+
+        Returns:
+            DataFrame with columns:
+              - funding_rate: 원본 FR
+              - delta_fr: fr[t] - fr[t-1] (전기 대비 변화량)
+              - fr_oi_interaction: fr * oi (곱 상호작용)
+        """
+        feat = pd.DataFrame(index=fr_series.index)
+        feat["funding_rate"] = fr_series
+        feat["delta_fr"] = fr_series.diff()
+        # OI 정규화 후 곱 (스케일 차이 방지)
+        oi_norm = oi_series / (oi_series.rolling(20, min_periods=1).mean() + 1e-9)
+        feat["fr_oi_interaction"] = fr_series * oi_norm
+        return feat
+
+    # ------------------------------------------------------------------
     # Regime cache (lightweight regime tracking)
     # ------------------------------------------------------------------
 

@@ -79,9 +79,10 @@ class TestTrainingResult:
         assert "test_accuracy" in s
 
     def test_summary_with_split_info(self):
-        result = self._make_result(split_info={"n_train": 300, "n_val": 100, "n_test": 100})
+        result = self._make_result(split_info={"n_train": 300, "n_val": 75, "n_cal": 75, "n_test": 50})
         s = result.summary()
         assert "train=300" in s
+        assert "cal=75" in s
 
     def test_summary_with_class_distribution(self):
         result = self._make_result(class_distribution={"0": 0.4, "1": 0.6})
@@ -182,7 +183,7 @@ class TestWalkForwardTrainer:
         assert len(trainer._feature_names) > 0
 
     def test_train_split_ratio(self):
-        """60/20/20 분할 비율 확인."""
+        """60/15/15/10 분할 비율 확인 (calibration hold-out 분리)."""
         trainer = WalkForwardTrainer(symbol="TEST/USDT", n_estimators=10, max_depth=3)
         df = _make_ohlcv(300)
         result = trainer.train(df)
@@ -190,11 +191,15 @@ class TestWalkForwardTrainer:
             n_total = result.split_info["n_total"]
             n_train = result.split_info["n_train"]
             n_val = result.split_info["n_val"]
+            n_cal = result.split_info["n_cal"]
             n_test = result.split_info["n_test"]
-            # 60/20/20 비율 (정수 반올림으로 약간의 오차 허용)
+            # 60/15/15/10 비율 (정수 반올림으로 약간의 오차 허용)
             assert abs(n_train / n_total - 0.60) < 0.05
-            assert abs(n_val / n_total - 0.20) < 0.05
-            assert abs(n_test / n_total - 0.20) < 0.05
+            assert abs(n_val / n_total - 0.15) < 0.05
+            assert abs(n_cal / n_total - 0.15) < 0.05
+            assert abs(n_test / n_total - 0.10) < 0.05
+            # 전체 합 일치
+            assert n_train + n_val + n_cal + n_test == n_total
 
     def test_train_class_distribution(self):
         """클래스 분포 정보 포함 확인."""
@@ -211,6 +216,24 @@ class TestWalkForwardTrainer:
         result = trainer.train(df)
         assert len(result.feature_importances) > 0
         assert sum(result.feature_importances.values()) > 0
+
+    def test_train_calibration_holdout_separate(self):
+        """calibration set이 val/test와 분리되어 있는지 확인."""
+        trainer = WalkForwardTrainer(symbol="TEST/USDT", n_estimators=10, max_depth=3)
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.split_info is not None
+        # n_cal 키가 존재해야 함
+        assert "n_cal" in result.split_info
+        n_cal = result.split_info["n_cal"]
+        n_val = result.split_info["n_val"]
+        n_test = result.split_info["n_test"]
+        # calibration set 크기 > 0
+        assert n_cal > 0
+        # val과 cal이 비슷한 크기 (~15% 각각)
+        assert abs(n_val - n_cal) <= 2
+        # test는 val보다 작아야 함 (10% vs 15%)
+        assert n_test < n_val
 
     def test_train_ensemble_weight(self):
         """PASS 시 ensemble_weight > 0, FAIL 시 0."""

@@ -249,6 +249,46 @@ class ExchangeConnector:
         logger.debug("Fetched %d candles for %s %s", len(data), symbol, timeframe)
         return data
 
+    def fetch_funding_rate(self, symbol: str) -> dict:
+        """현재 funding rate 조회 (ccxt fetchFundingRate).
+
+        Returns:
+            ccxt 표준 fundingRate 응답 dict.
+            최소 {'fundingRate': float, 'timestamp': int} 포함.
+        """
+        data = self._retry(self.exchange.fetch_funding_rate, symbol)
+        if not data:
+            raise ValueError(f"No funding rate data for {symbol}")
+        logger.debug("Fetched funding rate for %s: %s", symbol, data.get("fundingRate"))
+        return data
+
+    def fetch_funding_rate_history(self, symbol: str, limit: int = 100) -> list:
+        """funding rate 이력 조회 (ccxt fetchFundingRateHistory).
+
+        Returns:
+            list of dicts, 각각 {'fundingRate': float, 'timestamp': int, ...}
+        """
+        data = self._retry(
+            self.exchange.fetch_funding_rate_history, symbol, limit=limit
+        )
+        if not data:
+            raise ValueError(f"No funding rate history for {symbol}")
+        logger.debug("Fetched %d funding rate records for %s", len(data), symbol)
+        return data
+
+    def fetch_open_interest(self, symbol: str) -> dict:
+        """미체결 약정(OI) 조회 (ccxt fetchOpenInterest).
+
+        Returns:
+            ccxt 표준 openInterest 응답 dict.
+            최소 {'openInterestAmount': float, 'timestamp': int} 포함.
+        """
+        data = self._retry(self.exchange.fetch_open_interest, symbol)
+        if not data:
+            raise ValueError(f"No open interest data for {symbol}")
+        logger.debug("Fetched OI for %s: %s", symbol, data.get("openInterestAmount"))
+        return data
+
     def fetch_balance(self) -> dict:
         """잔고 조회. 실패/타임아웃 시 캐시 반환, 캐시도 없으면 안전 기본값."""
         try:
