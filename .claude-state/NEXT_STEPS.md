@@ -6,6 +6,33 @@ _Last updated: 2026-04-18 (Cycle 154 B완료)_
 
 ## 다음 세션이 이어받을 지점
 
+### ✅ Cycle 155 완료 사항 (C: 데이터/인프라)
+
+#### C(데이터): DataFeed 에러 핸들링 강화 + Circuit Breaker ✅ COMPLETE
+- **CircuitBreaker**: src/data/feed.py에 CircuitBreaker 클래스 추가
+  - 상태: CLOSED (정상) → OPEN (과도한 실패) → HALF_OPEN (복구 시도)
+  - `failure_threshold=5`: 연속 5회 실패 시 OPEN
+  - `recovery_timeout=60s`: 자동 복구 시도 대기 시간
+  - `success_threshold=2`: HALF_OPEN에서 2회 성공 시 CLOSED로 복구
+- **DataFeed 통합**:
+  - `fetch()` 메서드에 circuit breaker 체크 추가 (OPEN 상태 시 즉시 예외)
+  - 성공/실패 기록으로 breaker 상태 자동 추적
+  - `circuit_breaker_status()` 메서드로 현재 상태 조회 가능
+- **재시도 로직 강화**: 기존 exponential backoff 유지 (rate limit: 2s+2s*N, network: 0.5s*N)
+- **에러 분류 명확화**: transient (재시도) vs fatal (즉시 중단) 분류 유지
+- **테스트**: 13개 새 단위 테스트 추가 (test_feed_error_handling.py)
+  - Circuit breaker 상태 전이 테스트 (CLOSED→OPEN→HALF_OPEN→CLOSED)
+  - DataFeed 통합 테스트 (fetch with circuit state)
+  - Retry 로직 테스트 (transient vs fatal)
+  - 모두 PASS (13/13)
+- **기존 테스트 영향**: 0개 실패 (93/93 PASS, test_data*.py + test_feed*.py)
+
+#### 원 목표 대비
+- ✅ DataFeed 네트워크 에러 처리 견고화 (재시도 로직 기존 정상, circuit breaker 추가)
+- ✅ Exponential backoff 유지 + rate limit 구분 처리
+- ✅ Connection timeout 체크 → ensure_connected() 메서드로 헬스 체크 지원
+- ✅ 커넥션 풀링은 ExchangeConnector 레벨에서 관리 (ccxt 내장)
+
 ### 로테이션: Cycle 155
 - 155 mod 5 = 0 → **C(데이터) + D(ML) + E(실행)** 패턴
 
@@ -192,6 +219,7 @@ _Last updated: 2026-04-18 (Cycle 154 B완료)_
 6. ~~**Triple Barrier 학습 옵션 (train_ml.py)**~~ — ✅ DONE (Cycle 152-D): --triple-barrier, --tb-tp, --tb-sl
 7. ~~**Concept Drift Detector**~~ — ✅ DONE (Cycle 152-D): src/ml/drift_detector.py (PHT+CUSUM+AccuracyDriftMonitor)
 8. ~~**CPCV 구현**~~ — ✅ DONE (Cycle 152-D): combinatorial_purged_cv() in trainer.py (sklearn 기반)
-9. **AccuracyDriftMonitor → live_paper_trader 연동** — `_weekly_retrain()` 내 drift 감지 시 즉시 재학습 트리거
-10. **Triple Barrier 실데이터 검증** — `--bybit --triple-barrier --binary` 로 BTC 학습 후 CPCV 결과 비교
-11. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter`
+9. ~~**AccuracyDriftMonitor → live_paper_trader 연동**~~ — ✅ DONE (Cycle 153-E)
+10. ~~**Triple Barrier 실데이터 검증**~~ — ✅ DONE (Cycle 154-C): TB test_acc=0.600 PASS vs binary FAIL(0.540). `models/BTC_USDT_20260419_101711_rf_tb.pkl`
+11. **live_paper_trader 실제 운영** — `/usr/local/bin/python3.11 scripts/live_paper_trader.py --days 7 --ml-filter --ml-model-file models/BTC_USDT_20260419_101711_rf_tb.pkl`
+12. **DataFeed 이상 감지 강화** — ✅ DONE (Cycle 154-C): zero vol (>1%), stale feed (≥5 identical closes)

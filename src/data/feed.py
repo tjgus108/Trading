@@ -18,9 +18,88 @@ import pandas as pd
 from scipy import stats
 
 from src.exchange.connector import ExchangeConnector
+from enum import Enum
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Circuit Breaker (cascading failure prevention)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CircuitState(Enum):
+    """Circuit breaker states."""
+    CLOSED = "closed"      # Normal operation
+    OPEN = "open"          # Too many failures, reject requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreaker:
+    """Simple circuit breaker to prevent cascading failures."""
+    
+    def __init__(self, 
+                 failure_threshold: int = 5,
+                 recovery_timeout: int = 60,
+                 success_threshold: int = 2):
+        """
+        Args:
+            failure_threshold: Consecutive failures before OPEN state
+            recovery_timeout: Seconds before attempting recovery
+            success_threshold: Consecutive successes to fully close
+        """
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.success_threshold = success_threshold
+        
+        self._state = CircuitState.CLOSED
+        self._failure_count = 0
+        self._success_count = 0
+        self._last_failure_time = None
+        self._open_timestamp = None
+    
+    @property
+    def state(self) -> CircuitState:
+        """Current state with auto-recovery check."""
+        if self._state == CircuitState.OPEN:
+            if self._open_timestamp and \
+               (time.time() - self._open_timestamp) >= self.recovery_timeout:
+                logger.info("Circuit breaker: attempting recovery (OPEN -> HALF_OPEN)")
+                self._state = CircuitState.HALF_OPEN
+                self._success_count = 0
+                self._failure_count = 0
+        return self._state
+    
+    def record_success(self) -> None:
+        """Record successful fetch."""
+        self._failure_count = 0
+        self._success_count += 1
+        
+        if self._state == CircuitState.HALF_OPEN and \
+           self._success_count >= self.success_threshold:
+            logger.info("Circuit breaker: fully recovered (HALF_OPEN -> CLOSED)")
+            self._state = CircuitState.CLOSED
+            self._success_count = 0
+    
+    def record_failure(self) -> None:
+        """Record failed fetch."""
+        self._success_count = 0
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+        
+        if self._failure_count >= self.failure_threshold:
+            if self._state != CircuitState.OPEN:
+                logger.warning(
+                    "Circuit breaker: too many failures (%d), opening circuit",
+                    self._failure_count
+                )
+            self._state = CircuitState.OPEN
+            self._open_timestamp = time.time()
+    
+    def can_attempt(self) -> bool:
+        """Check if a fetch attempt should be allowed."""
+        return self.state != CircuitState.OPEN
+
 
 
 # Error classification
@@ -107,8 +186,16 @@ class DataFeed:
         self._hit_count = 0          # 캐시 히트 수
         self._miss_count = 0         # 캐시 미스 수
         self._regime_cache: dict = {}  # symbol -> (regime_value, timestamp)
+        self._circuit_breaker = CircuitBreaker()  # Cascading failure prevention
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
+        # Circuit breaker check: reject if too many cascading failures
+        if not self._circuit_breaker.can_attempt():
+            raise RuntimeError(
+                f"DataFeed circuit breaker OPEN: too many failures. "
+                f"Will retry after {self._circuit_breaker.recovery_timeout}s"
+            )
+        
         key = (symbol, timeframe, limit)
         now = time.time()
         if key in self._cache:
@@ -118,10 +205,15 @@ class DataFeed:
                 return cached_summary  # 캐시 히트
         # 캐시 미스: 실제 fetch (retry 포함)
         self._miss_count += 1
-        summary = self._fetch_with_retry(symbol, timeframe, limit)
-        self._cache[key] = (summary, now)
-        self._evict_if_needed()
-        return summary
+        try:
+            summary = self._fetch_with_retry(symbol, timeframe, limit)
+            self._circuit_breaker.record_success()  # Success: reset failure count
+            self._cache[key] = (summary, now)
+            self._evict_if_needed()
+            return summary
+        except Exception as e:
+            self._circuit_breaker.record_failure()  # Track failure
+            raise
 
     def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         """Retry 로직과 함께 fetch. 에러 분류로 재시도 판단."""
@@ -265,6 +357,34 @@ class DataFeed:
             'max_cache_size': self._max_cache_size,
         }
 
+
+    def circuit_breaker_status(self) -> dict:
+        """
+        Get circuit breaker status (cascading failure detection).
+        
+        Returns:
+            {
+                'state': 'CLOSED' | 'OPEN' | 'HALF_OPEN',
+                'failure_count': int,
+                'recovery_timeout_remaining': float (seconds, 0 if not applicable),
+            }
+        """
+        state_name = self._circuit_breaker.state.value
+        remaining = 0.0
+        if self._circuit_breaker._state == CircuitState.OPEN and \
+           self._circuit_breaker._open_timestamp:
+            remaining = max(
+                0.0,
+                self._circuit_breaker.recovery_timeout - 
+                (time.time() - self._circuit_breaker._open_timestamp)
+            )
+        
+        return {
+            'state': state_name,
+            'failure_count': self._circuit_breaker._failure_count,
+            'recovery_timeout_remaining': remaining,
+        }
+
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
         df = self._to_dataframe(raw)
@@ -345,6 +465,24 @@ class DataFeed:
         spikes = pct_change[pct_change > 0.10]
         if not spikes.empty:
             anomalies.append(f"price spike >10% at {spikes.index[0]}")
+        # 볼륨 0 캔들 (피드 동결/합성 데이터 의심)
+        zero_vol = (df["volume"] == 0).sum()
+        if zero_vol > 0:
+            zero_vol_pct = zero_vol / len(df) * 100
+            if zero_vol_pct > 1.0:  # 1% 초과 시만 기록
+                anomalies.append(f"zero volume candles: {zero_vol} ({zero_vol_pct:.1f}%)")
+            else:
+                logger.debug("Minor zero-volume candles: %d (%.1f%%)", zero_vol, zero_vol_pct)
+        # 연속 중복 종가 감지 (스테일 피드 / 거래소 장애 의심)
+        if len(df) >= 5:
+            dup_mask = df["close"].diff().abs() < 1e-10
+            consecutive_dups = 0
+            max_consecutive = 0
+            for v in dup_mask:
+                consecutive_dups = consecutive_dups + 1 if v else 0
+                max_consecutive = max(max_consecutive, consecutive_dups)
+            if max_consecutive >= 5:
+                anomalies.append(f"stale feed: {max_consecutive} consecutive identical closes")
         return anomalies
 
     def _validate_ohlc_relationships(self, df: pd.DataFrame) -> List[str]:

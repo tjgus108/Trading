@@ -1,5 +1,42 @@
 # Work Log
 
+## [2026-04-19] Cycle 154 — C (데이터) + B (리스크) + F (리서치)
+
+**[C1] DataFeed Circuit Breaker 패턴 추가:**
+- `src/data/feed.py`에 CircuitState enum + CircuitBreaker 클래스 추가
+- 3-state 상태머신: CLOSED → OPEN → HALF_OPEN (자동 복구)
+- 파라미터: failure_threshold=5, recovery_timeout=60s, success_threshold=2
+- DataFeed.fetch()에 circuit state 체크 통합
+- `tests/test_feed_error_handling.py` 신규 (13개 테스트, 전체 PASS)
+
+**[B1] CircuitBreaker 경계값 테스트 22개 추가:**
+- `tests/test_risk.py`에 FullCircuitBreaker 대상 경계값 테스트 추가
+- 일일/전체 낙폭 경계값, 플래시 크래시, 연속 손실 쿨다운, reset, 직렬화, ATR 변동성, 우선순위 검증
+- 기존 32개 + 신규 22개 = 총 54개 PASS
+
+**[F1] 리서치: 트레이딩봇 성공/실패 + ML 개선:**
+- 장기 생존 봇 공통점: 리스크 관리 > 알파, MDD 10% 기준 권장
+- Momentum + Mean Reversion 블렌드 Sharpe 1.71, Regime-adaptive 봇 40~60% 아웃퍼폼
+- ML 개선: Funding Rate + OI 피처 추가 시 3~5%p 정확도 향상 가능
+- RF + XGBoost 앙상블 권장, 4시간봉에서 ML 신호 품질 향상
+- Online/Incremental Learning 실전: ETH Sharpe 2.5 (조건부)
+
+**검증:** C: 93/93 PASS, B: 54/54 PASS
+
+## [2026-04-19] Cycle 154 — C (Data & Infrastructure) — 추가 작업
+
+**[C3] Triple Barrier 실데이터 검증 (BTC/USDT, Bybit 1h, 1000캔들):**
+- Standard binary: test_acc=0.540, FAIL (< 0.55 threshold)
+- Triple Barrier (TP=2%, SL=1%): test_acc=0.600, val=0.677, PASS
+- 모델 저장: `models/BTC_USDT_20260419_101711_rf_tb.pkl`
+- 결론: Triple Barrier 레이블링이 현 레짐(2026-03~04)에서 명확히 우위
+- 피처 변화: standard=atr_pct 1위 → TB=price_vs_ema50 1위 (추세 피처 강화)
+
+**[C4] DataFeed 이상 감지 강화 (`src/data/feed.py` `_detect_anomalies`):**
+- 볼륨 0 캔들 감지: > 1% 시 anomaly 기록, 이하는 DEBUG 로그만
+- 연속 중복 종가 감지: 5캔들 이상 동일 close → "stale feed: N consecutive identical closes"
+- 테스트 4개 추가 (`tests/test_ohlc_validation.py`, 4→8 모두 PASS)
+
 ## [2026-04-18] Cycle 153 — A (Quality Assurance)
 
 **[A1] drift_detector.py 테스트 추가:**
@@ -12575,3 +12612,6 @@ Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-17 20:25 UTC] Cycle 147 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-18 08:54 UTC] Cycle 153 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

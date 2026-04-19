@@ -70,5 +70,70 @@ class TestOHLCValidation:
             f"역전 미감지: {result.anomalies}"
 
 
+class TestAnomalyDetectionExtended:
+    """추가 이상 감지 테스트 (volume 0, stale feed)."""
+
+    def _make_candles(self, n=20, base=42000, step=1):
+        """n개의 정상 캔들 생성. 1시간 간격, OHLC 관계 정상."""
+        candles = []
+        ts = 1704067200000
+        price = base
+        for i in range(n):
+            candles.append([ts + i * 3600000, price, price + 50, price - 50, price + step * i, 100 + i])
+        return candles
+
+    def test_zero_volume_below_threshold_no_anomaly(self):
+        """볼륨 0 캔들이 1% 미만이면 anomaly 기록 안함."""
+        connector = MagicMock()
+        candles = self._make_candles(100)
+        # 1개만 zero vol → 1% 이하, anomaly 없음
+        candles[5][5] = 0
+        connector.fetch_ohlcv.return_value = candles
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert not any("zero volume" in a for a in result.anomalies), \
+            f"Unexpected zero-vol anomaly: {result.anomalies}"
+
+    def test_zero_volume_above_threshold_anomaly(self):
+        """볼륨 0 캔들이 1% 초과 시 anomaly 기록."""
+        connector = MagicMock()
+        candles = self._make_candles(20)
+        # 20개 중 2개 zero vol → 10%, anomaly 발생
+        candles[3][5] = 0
+        candles[10][5] = 0
+        connector.fetch_ohlcv.return_value = candles
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert any("zero volume" in a for a in result.anomalies), \
+            f"Expected zero-vol anomaly, got: {result.anomalies}"
+
+    def test_stale_feed_consecutive_identical_closes(self):
+        """연속 5개 이상 동일 종가 → stale feed 이상 감지."""
+        connector = MagicMock()
+        candles = self._make_candles(20, step=0)
+        # close 모두 동일 (step=0) → 연속 중복
+        for c in candles:
+            c[4] = 42000  # close 고정
+        connector.fetch_ohlcv.return_value = candles
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert any("stale feed" in a for a in result.anomalies), \
+            f"Expected stale feed anomaly, got: {result.anomalies}"
+
+    def test_no_stale_feed_with_varying_closes(self):
+        """종가가 변하는 정상 데이터는 stale 미감지."""
+        connector = MagicMock()
+        candles = self._make_candles(20, step=10)  # 10씩 증가
+        connector.fetch_ohlcv.return_value = candles
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert not any("stale feed" in a for a in result.anomalies), \
+            f"Unexpected stale feed: {result.anomalies}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

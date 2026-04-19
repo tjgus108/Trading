@@ -98,5 +98,43 @@
       "test_accuracy 0.493 < 0.55"
     ],
     "model_path": null
+  },
+  {
+    "timestamp": "20260419_101650",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "triple_barrier": false,
+    "tb_tp_pct": 0.02,
+    "tb_sl_pct": 0.01,
+    "binary_threshold": 0.01,
+    "n_samples": 248,
+    "train_accuracy": 0.9865,
+    "val_accuracy": 0.66,
+    "test_accuracy": 0.54,
+    "passed": false,
+    "fail_reasons": [
+      "test_accuracy 0.540 < 0.55"
+    ],
+    "model_path": null
+  },
+  {
+    "timestamp": "20260419_101711",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "triple_barrier": true,
+    "tb_tp_pct": 0.02,
+    "tb_sl_pct": 0.01,
+    "binary_threshold": 0.01,
+    "n_samples": 324,
+    "train_accuracy": 0.9845,
+    "val_accuracy": 0.6769,
+    "test_accuracy": 0.6,
+    "passed": true,
+    "fail_reasons": [],
+    "model_path": "/Users/seohyunhan/Desktop/AgentTest/Trading/models/BTC_USDT_20260419_101711_rf_tb.pkl"
   }
 ]
