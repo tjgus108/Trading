@@ -411,3 +411,290 @@ def test_drift_monitor_is_drift_property():
         assert dm.state == DriftState.DRIFT
     if dm.state == DriftState.DRIFT:
         assert dm.is_warning  # DRIFT는 is_warning도 True
+
+
+# --- DrawdownMonitor 연속 손실 쿨다운 단위 테스트 ---
+from src.risk.drawdown_monitor import DrawdownMonitor
+
+
+def test_streak_cooldown_triggers_on_threshold():
+    """연속 손실이 threshold에 도달하면 쿨다운이 시작되어야 한다."""
+    monitor = DrawdownMonitor(
+        loss_streak_threshold=3,
+        streak_cooldown_seconds=14400.0,
+        single_loss_halt_pct=1.0,  # 단일 손실 쿨다운은 비활성화 (100% 손실에만 반응)
+    )
+    # 2번 연속 손실 → 쿨다운 없음
+    monitor.record_trade_result(-10.0, 1000.0)
+    monitor.record_trade_result(-10.0, 990.0)
+    assert not monitor.is_in_cooldown()
+    # 3번째 → streak_cooldown 시작
+    monitor.record_trade_result(-10.0, 980.0)
+    assert monitor.is_in_cooldown()
+
+
+def test_streak_cooldown_size_multiplier_zero_during_cooldown():
+    """쿨다운 중에는 get_size_multiplier()가 0.0을 반환해야 한다."""
+    monitor = DrawdownMonitor(
+        loss_streak_threshold=2,
+        streak_cooldown_seconds=3600.0,
+        single_loss_halt_pct=1.0,
+    )
+    monitor.record_trade_result(-50.0, 1000.0)
+    monitor.record_trade_result(-50.0, 950.0)
+    assert monitor.get_size_multiplier() == 0.0
+
+
+def test_streak_cooldown_disabled_when_zero():
+    """streak_cooldown_seconds=0 이면 연속 손실 쿨다운이 시작되지 않는다."""
+    monitor = DrawdownMonitor(
+        loss_streak_threshold=2,
+        streak_cooldown_seconds=0.0,
+        single_loss_halt_pct=1.0,
+    )
+    monitor.record_trade_result(-50.0, 1000.0)
+    monitor.record_trade_result(-50.0, 950.0)
+    assert not monitor.is_in_cooldown()
+    # size_multiplier는 0.5 (threshold 도달 시 축소)
+    assert monitor.get_size_multiplier() == 0.5
+
+
+def test_streak_cooldown_win_resets_counter():
+    """수익 거래 후 연속 손실 카운터가 0으로 리셋되어야 한다."""
+    monitor = DrawdownMonitor(
+        loss_streak_threshold=3,
+        streak_cooldown_seconds=14400.0,
+        single_loss_halt_pct=1.0,
+    )
+    monitor.record_trade_result(-10.0, 1000.0)
+    monitor.record_trade_result(-10.0, 990.0)
+    # 수익 → 리셋
+    monitor.record_trade_result(20.0, 980.0)
+    assert monitor.consecutive_losses == 0
+    assert not monitor.is_in_cooldown()
+    # 다시 2번 손실 → threshold 미도달
+    monitor.record_trade_result(-10.0, 1000.0)
+    monitor.record_trade_result(-10.0, 990.0)
+    assert not monitor.is_in_cooldown()
+
+
+def test_streak_cooldown_serialization():
+    """to_dict/from_dict이 streak_cooldown_seconds를 올바르게 직렬화/복원한다."""
+    monitor = DrawdownMonitor(
+        loss_streak_threshold=3,
+        streak_cooldown_seconds=7200.0,
+    )
+    d = monitor.to_dict()
+    assert d["streak_cooldown_seconds"] == 7200.0
+    restored = DrawdownMonitor.from_dict(d)
+    assert restored.streak_cooldown_seconds == 7200.0
+
+
+# --- src/risk/circuit_breaker.py (full-featured) 경계값 테스트 ---
+from src.risk.circuit_breaker import CircuitBreaker as FullCircuitBreaker
+
+
+def _make_cb(**kwargs) -> FullCircuitBreaker:
+    defaults = dict(
+        daily_drawdown_limit=0.03,
+        total_drawdown_limit=0.15,
+        flash_crash_pct=0.10,
+        max_consecutive_losses=5,
+        cooldown_periods=3,
+    )
+    defaults.update(kwargs)
+    return FullCircuitBreaker(**defaults)
+
+
+# ── 낙폭 경계값 ───────────────────────────────────────────────────────────────
+
+def test_cb_daily_dd_exactly_at_limit_triggers():
+    """일일 낙폭이 limit와 정확히 같으면 triggered=True."""
+    cb = _make_cb(daily_drawdown_limit=0.03)
+    # 10000 → 9700: dd = 300/10000 = 3.00%
+    result = cb.check(current_balance=9700, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "일일" in result["reason"]
+
+
+def test_cb_daily_dd_just_below_limit_not_triggered():
+    """일일 낙폭이 limit 미만이면 triggered=False."""
+    cb = _make_cb(daily_drawdown_limit=0.03)
+    # 10000 → 9701: dd = 299/10000 = 2.99%
+    result = cb.check(current_balance=9701, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_total_dd_exactly_at_limit_triggers():
+    """전체 낙폭이 limit와 정확히 같으면 triggered=True."""
+    cb = _make_cb(total_drawdown_limit=0.15)
+    # peak=10000, current=8500: total_dd=15%, daily_start=8600 so daily_dd=1.16% < 3%
+    result = cb.check(current_balance=8500, peak_balance=10000, daily_start_balance=8600)
+    assert result["triggered"] is True
+    assert "전체" in result["reason"]
+
+
+def test_cb_total_dd_just_below_limit_not_triggered():
+    """전체 낙폭이 limit 미만이면 triggered=False."""
+    cb = _make_cb(total_drawdown_limit=0.15)
+    # peak=10000, current=8501: dd = 1499/10000 = 14.99%
+    result = cb.check(current_balance=8501, peak_balance=10000, daily_start_balance=8600)
+    assert result["triggered"] is False
+
+
+# ── 플래시 크래시 경계값 ──────────────────────────────────────────────────────
+
+def test_cb_flash_crash_exactly_at_limit_triggers():
+    """캔들 변동이 flash_crash_pct와 정확히 같으면 triggered=True."""
+    cb = _make_cb(flash_crash_pct=0.10)
+    # open=10000, close=9000: chg = 1000/10000 = 10.0%
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000,
+        candle_open=10000, candle_close=9000,
+    )
+    assert result["triggered"] is True
+    assert "플래시" in result["reason"]
+
+
+def test_cb_flash_crash_just_below_limit_not_triggered():
+    """캔들 변동이 flash_crash_pct 미만이면 triggered=False."""
+    cb = _make_cb(flash_crash_pct=0.10)
+    # open=10000, close=9001: chg = 999/10000 = 9.99%
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000,
+        candle_open=10000, candle_close=9001,
+    )
+    assert result["triggered"] is False
+
+
+def test_cb_flash_crash_upward_move_also_triggers():
+    """급등(상승 방향)도 abs() 처리되어 플래시 크래시로 감지된다."""
+    cb = _make_cb(flash_crash_pct=0.10)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000,
+        candle_open=9000, candle_close=9900,  # +10%
+    )
+    assert result["triggered"] is True
+
+
+# ── 연속 손실 쿨다운 ──────────────────────────────────────────────────────────
+
+def test_cb_consecutive_losses_triggers_cooldown():
+    """연속 손실 5회 → cooldown 시작, check() triggered=True."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(5):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 3
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+
+
+def test_cb_consecutive_losses_below_threshold_no_cooldown():
+    """연속 손실 4회 → 쿨다운 미발생."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(4):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 0
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_win_resets_consecutive_losses():
+    """4연속 손실 후 승리 → 연속 손실 카운터 초기화."""
+    cb = _make_cb(max_consecutive_losses=5)
+    for _ in range(4):
+        cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=False)
+    assert cb.consecutive_losses == 0
+
+
+def test_cb_tick_cooldown_decrements_and_resets():
+    """tick_cooldown() 3회 호출 후 쿨다운 종료, consecutive_losses 초기화."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(5):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 3
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 2
+    cb.tick_cooldown()
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 0
+    assert cb.consecutive_losses == 0
+
+
+# ── reset_daily / reset_all ───────────────────────────────────────────────────
+
+def test_cb_reset_daily_clears_daily_trigger():
+    """일일 낙폭 트리거 후 reset_daily() → triggered False로 해제."""
+    cb = _make_cb(daily_drawdown_limit=0.03)
+    cb.check(current_balance=9700, peak_balance=10000, daily_start_balance=10000)
+    assert cb.is_triggered is True
+    cb.reset_daily(daily_start_balance=10000)
+    assert cb.is_triggered is False
+
+
+def test_cb_reset_all_clears_everything():
+    """reset_all() 후 모든 상태가 초기화된다."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(5):
+        cb.record_trade_result(is_loss=True)
+    cb.check(current_balance=9700, peak_balance=10000, daily_start_balance=10000)
+    cb.reset_all()
+    assert cb.is_triggered is False
+    assert cb.consecutive_losses == 0
+    assert cb.cooldown_remaining == 0
+
+
+# ── to_dict / from_dict 직렬화 ────────────────────────────────────────────────
+
+def test_cb_serialization_roundtrip():
+    """to_dict() → from_dict() 후 상태가 복원된다."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    for _ in range(5):
+        cb.record_trade_result(is_loss=True)
+    state = cb.to_dict()
+
+    cb2 = _make_cb(max_consecutive_losses=5, cooldown_periods=3)
+    cb2.from_dict(state)
+    assert cb2.cooldown_remaining == cb.cooldown_remaining
+    assert cb2.consecutive_losses == cb.consecutive_losses
+    assert cb2.is_triggered == cb.is_triggered
+
+
+# ── ATR 변동성 급등 ────────────────────────────────────────────────────────────
+
+def test_cb_atr_surge_returns_size_multiplier_05():
+    """현재 ATR ≥ baseline × atr_surge_multiplier → size_multiplier=0.5, triggered=False."""
+    cb = _make_cb(atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000,
+        current_atr=200, baseline_atr=100,  # 200 >= 100*2 → surge
+    )
+    assert result["triggered"] is False
+    assert result["volatility_surge"] is True
+    assert result["size_multiplier"] == 0.5
+
+
+def test_cb_atr_no_surge_below_multiplier():
+    """ATR 비율이 multiplier 미만이면 surge 없음, size_multiplier=1.0."""
+    cb = _make_cb(atr_surge_multiplier=2.0)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000,
+        current_atr=199, baseline_atr=100,  # 199 < 100*2 → no surge
+    )
+    assert result["volatility_surge"] is False
+    assert result["size_multiplier"] == 1.0
+
+
+# ── 우선순위: 플래시 크래시 > 낙폭 ──────────────────────────────────────────
+
+def test_cb_flash_crash_takes_priority_over_drawdown():
+    """플래시 크래시와 낙폭 동시 발생 시, 플래시 크래시 reason이 우선."""
+    cb = _make_cb(flash_crash_pct=0.10, daily_drawdown_limit=0.03)
+    result = cb.check(
+        current_balance=9700, peak_balance=10000, daily_start_balance=10000,
+        candle_open=10000, candle_close=9000,
+    )
+    assert result["triggered"] is True
+    assert "플래시" in result["reason"]

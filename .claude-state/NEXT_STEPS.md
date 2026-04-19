@@ -1,13 +1,23 @@
 # Next Steps
 
-_Last updated: 2026-04-18 (Cycle 153 E완료)_
+_Last updated: 2026-04-18 (Cycle 154 B완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 154
-- 154 mod 5 = 4 → **A(품질) + B(리스크) + F(리서치)** 패턴
+### 로테이션: Cycle 155
+- 155 mod 5 = 0 → **C(데이터) + D(ML) + E(실행)** 패턴
+
+### ✅ Cycle 154 완료 사항 (B: 리스크)
+
+#### B(리스크): DrawdownMonitor 연속 손실 쿨다운 ✅ COMPLETE
+- `src/risk/drawdown_monitor.py` — `streak_cooldown_seconds` 파라미터 추가 (기본 14400s = 4시간)
+- `loss_streak_threshold` 도달 시 쿨다운 자동 시작 (기존: 50% 사이즈 축소만)
+- 단일 손실 쿨다운보다 streak 쿨다운이 길면 streak 쿨다운 우선 적용
+- `streak_cooldown_seconds=0` 설정으로 비활성화 가능
+- `to_dict/from_dict` 직렬화 지원
+- 5개 단위 테스트 추가 (tests/test_risk.py: 32 → 37 PASS)
 
 ### ✅ Cycle 153 완료 사항 (E: 실행)
 
