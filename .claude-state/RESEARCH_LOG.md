@@ -1244,3 +1244,72 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [Bybit V5 API Changelog](https://bybit-exchange.github.io/docs/changelog/v5)
 - [Bybit Futures Fees (TradersUnion)](https://tradersunion.com/brokers/crypto/view/bybit/futures-fees/)
 - [Coinrule Paper Trading 2025](https://coinrule.com/blog/trading-tips/paper-trading-in-2025-perfect-your-crypto-skills-without-risk/)
+
+---
+
+## [2026-04-18] Cycle 154 Research — 시장 현황 & RL 트레이딩 동향
+
+### 1. 2026 Q1~Q2 크립토 시장 현황
+
+**BTC/ETH/SOL 동향**
+- BTC: 2026년 초 $93,700 부근에서 강하게 시작, 1월 초 기준 YTD +7%. 이후 4월 현재 기관 ETF 유입이 하루 $471M(4/17 기준)에 달하는 강세 구간 진입.
+- ETH: $3,224 수준, YTD +9%. BlackRock 스테이킹 ETH ETF 출시 첫날 $155M 유입. 2026년 내 ETP AUM $400B 돌파 전망.
+- SOL: Q1에 -33% 급락. 그러나 온체인 현물 거래량의 41%를 처리하며 활동성 1위 유지. Q2 $100 회복 후 Q4 $250 목표 전망.
+
+**주요 매크로/구조 변화**
+- 2026년 4월: 미국·일본·홍콩·한국이 동시에 주요 크립토 규제 완화 조치 발표 (역대 최대 규모 단일 주간 규제 이벤트).
+- BTC를 포함한 16개 주요 자산이 CFTC 관할 디지털 상품으로 명시 분류 → 증권 규제 부담 제거.
+- BTC-주식 상관관계 하락 추세: ETF 유입·기관 채택·온체인 펀더멘털이 주가보다 더 강한 드라이버.
+- 전통 4년 사이클(반감기 주도 붐/버스트) 약화 → 기관 레짐으로 전환.
+
+**봇 운영 영향**
+- ETF 기반 기관 유입이 장중 유동성 급증·급감을 유발할 수 있음 → 주문 실행 타이밍 관리 필요.
+- 규제 명확성 증가 → 시장 구조 안정화 장기적으로 긍정적, 단기적으로 이벤트 기반 변동성 주의.
+- SOL처럼 온체인 활동 높아도 가격 약세 가능 → 온체인 지표만으로 진입 판단 위험.
+
+---
+
+### 2. Reinforcement Learning for Trading 최신 동향 (2025~2026)
+
+**주요 알고리즘 성과 비교**
+
+| 알고리즘 | 특성 | 크립토 성과 |
+|---|---|---|
+| PPO | 안정적, 샘플 효율, 연속/이산 모두 적용 가능 | Walk-forward 평균 Sharpe 1.95 (25개 자산 포트폴리오 기준) |
+| SAC | 엔트로피 정규화로 탐색 강화 | 극단 변동성(VIX>80) 환경에서 연환산 94% 수익 |
+| CNN-PPO | 이미지 기반 가격 패턴 결합 | 표준 RL 대비 +17.9% 성과 향상 |
+| QR-DDPG | 분위수 기반 위험 관리 | 최저 Tail Risk (CVaR -1.73%) |
+
+**RL vs RF(랜덤 포레스트) 분류기 비교**
+- RF 장점: 학습 속도 빠름, 소규모 데이터에서 안정적, 해석 용이
+- RF 단점: 레짐 변화에 취약, 정적 피처 엔지니어링 의존, 시계열 비선형성 미흡
+- RL 장점: 동적 시장 적응력, 연속 행동공간 자연 처리, 포트폴리오 전체 최적화 가능
+- RL 단점: 대규모 샘플 필요, 과최적화 위험 높음, 하이퍼파라미터 민감, 수렴 불안정
+- **핵심**: Ensemble RL+Classifier 하이브리드가 단일 방법 대비 드로다운 관리·리스크조정수익 15~20% 개선
+
+**소규모 계좌에서의 RL 실현 가능성**
+- FinRL, Stable-Baselines3, RLlib 등 프레임워크 성숙 → 구현 진입장벽 낮음
+- 크립토 24/7 + 고변동성 환경은 RL에 유리 (정적 전략보다 적응 우위)
+- **핵심 제약**: 정기 재학습(periodic retraining) 없으면 알파 감소로 성과 지속 불가. 현재 봇의 주간 재학습과 방향 일치.
+- 소규모 계좌 권고: PPO부터 시작 (SAC 대비 안정적), 처음에는 단일 자산 1개에 집중, 최소 6개월 실시간 검증 후 확대.
+
+---
+
+### 3. 봇 적용 우선순위 (Cycle 154)
+
+1. **즉시 주의**: SOL 포지션 사이즈 축소 — Q1 -33%의 급락 레짐에서 기존 사이징 과다 위험. ATR 기반 동적 축소 로직 적용 확인.
+2. **단기 검토**: PPO 기반 전략 선택기 PoC — 기존 RF 분류기를 PPO로 교체하는 소규모 실험. Stable-Baselines3 + FinRL 활용, 단일 자산(BTC) 시작.
+3. **레짐 감지 강화**: 2026년 ETF 기반 유동성 급변 대응으로 기관 유입 시그널(ETF flow 데이터) 을 레짐 피처에 통합 검토.
+
+### 참고 출처
+
+- [Bitwise 2026 Crypto Outlook](https://finance.yahoo.com/news/bitcoin-ethereum-solana-hit-time-023109855.html)
+- [CoinDesk 2026 Strong Start](https://www.coindesk.com/markets/2026/01/06/here-s-why-bitcoin-and-major-tokens-are-seeing-a-strong-start-to-2026)
+- [Amberdata Institutional Crypto Flows 2026](https://blog.amberdata.io/institutional-crypto-flows-2026-market-analysis)
+- [Grayscale 2026 Digital Asset Outlook](https://research.grayscale.com/reports/2026-digital-asset-outlook-dawn-of-the-institutional-era)
+- [NFT Plazas March 2026 Regulatory Shift](https://nftplazas.com/march-2026-crypto-regulation-shift/)
+- [arXiv: SAC/DDPG Crypto Portfolio Management](https://arxiv.org/abs/2511.20678)
+- [arXiv: Ensemble RL + Classifier Models](https://arxiv.org/abs/2502.17518)
+- [arXiv: RL Financial Decision Making Systematic Review](https://arxiv.org/html/2512.10913v1)
+- [NeuralArb: RL in Dynamic Crypto Markets](https://www.neuralarb.com/2025/11/20/reinforcement-learning-in-dynamic-crypto-markets/)
+- [Stanford CS224R: RL in Crypto Trading](https://cs224r.stanford.edu/projects/pdfs/CS224R_Report12.pdf)
