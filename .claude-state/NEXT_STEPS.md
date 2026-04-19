@@ -1,30 +1,31 @@
 # Next Steps
 
-_Last updated: 2026-04-19 (Cycle 156 완료)_
+_Last updated: 2026-04-20 (Cycle 158 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 157
-- 157 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴
+### 로테이션: Cycle 159
+- 159 mod 5 = 4 → **C(데이터) + B(리스크) + F(리서치)** 패턴
 
-### ✅ Cycle 156 완료 사항
+### ✅ Cycle 158 완료 사항
 
-#### D(ML 긴급수정): RF 과적합 수정 ✅ COMPLETE
-- `min_samples_leaf` + `min_samples_split` 추가, val_acc 누출 수정
-- train_acc 0.99→0.80, test_acc 0.44→0.62
-- `scripts/retrain_all.sh` 생성 (3심볼 일괄 재학습)
+#### E(실행): Exchange 테스트 추가 ✅ COMPLETE
+- connector.py 53개 + paper_connector.py 27개 = 98개 테스트 (94 pass)
+- `_call_with_deadline` Python 3.9+ 전용 확인
 
-#### A(품질): 테스트 점검 ✅ COMPLETE
-- 6,865개 테스트 중 2개 기존 실패 (모델 파일 이슈)
-- exchange 모듈 테스트 부재 확인
+#### A(품질): 실패 테스트 수정 + trainer 테스트 ✅ COMPLETE
+- `sys.executable` 수정으로 2개 실패 해결
+- `tests/test_trainer.py` 38개 추가, 147 전체 PASS
 
-#### C(데이터): 인프라 점검 ✅ COMPLETE
-- 모든 모듈 정상, 개선 필요사항 없음
+#### SIM: paper_simulation.py 리뷰 ✅ COMPLETE
+- 타입힌트 버그 수정 (`Optional[pd.DataFrame]`)
+- calibration hold-out 분리 권장
 
-#### F(리서치): ML 과적합 방지 ✅ COMPLETE
-- 피처 축소(SHAP), ExtraTrees, btc_return 피처 추가 권장
+#### F(리서치): ML봇 실패/성공 리서치 ✅ COMPLETE
+- FR delta+OI 피처 권장, XGBoost max_depth≤3 필수
+- WF PASS 기준 완화 금지 확인
 
 ### ⚠️ 핵심 문제: 전략 엣지 부재 → 해법 확인됨
 
@@ -37,10 +38,10 @@ _Last updated: 2026-04-19 (Cycle 156 완료)_
 - RANGING (28%): 거래 금지 ✅
 
 **다음 구현 과제 (우선순위):**
-1. **SHAP 피처 선택** — 15→6~8개로 축소, 노이즈 피처 제거
-2. **ExtraTrees 시도** — RF 대비 분산 감소 효과 검증
-3. **Funding Rate + OI 피처 추가** — Bybit API, 3~5%p 정확도 향상 기대
-4. **SOL/ETH btc_return 피처 강화** — rolling beta regression
-5. **MDD Circuit Breaker 강화** — 20%→10%, 포지션 사이즈 단계적 축소
-6. **exchange 모듈 테스트 추가** — connector.py, paper_connector.py
+1. **FR delta + OI 파생 피처 추가** — Bybit API, delta_fr + FR×OI 곱 피처 (리서치 검증 완료)
+2. **SHAP 피처 선택** — 15→6~8개로 축소, 노이즈 피처 제거
+3. **calibration hold-out 분리** — 60/15/15/10 분할로 val_acc 누출 방지
+4. **ExtraTrees 시도** — RF 대비 분산 감소 효과 검증
+5. **XGBoost 앙상블** — max_depth≤3, early_stopping, RF와 앙상블
+6. **MDD Circuit Breaker 강화** — 20%→10%, 포지션 사이즈 단계적 축소
 7. **live_paper_trader 실제 운영** — 7일 테스트

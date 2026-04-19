@@ -1313,3 +1313,54 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 - [arXiv: RL Financial Decision Making Systematic Review](https://arxiv.org/html/2512.10913v1)
 - [NeuralArb: RL in Dynamic Crypto Markets](https://www.neuralarb.com/2025/11/20/reinforcement-learning-in-dynamic-crypto-markets/)
 - [Stanford CS224R: RL in Crypto Trading](https://cs224r.stanford.edu/projects/pdfs/CS224R_Report12.pdf)
+
+---
+
+## [2026-04-20] Cycle Research — ML 봇 실패/성공 사례 + Funding Rate/OI 피처 + 모델 비교
+
+### 실패 사례
+
+- **백테스트-실전 간극 (2024, arXiv:2407.18334)** — 41개 ML 모델로 Bitcoin 거래 분석 결과, 백테스트에서 잘 작동한 모델 대부분이 forward test/실전에서 성능 급락. 연구 인용: "백테스트만으로 모델 신뢰는 금물". R² 기준 백테스트 Sharpe는 실전 성과의 예측력 2.5% 미만(R²<0.025). 교훈: **Walk-Forward 없는 백테스트 결과는 무의미**, 우리 Walk-Forward PASS 기준(Sharpe≥1.0) 유지 필수. 출처: https://arxiv.org/html/2407.18334v1
+
+- **XGBoost 소규모 데이터 과적합 (2024, mljar.com 분석)** — XGBoost 기본값(max_depth=6, lr=0.3, n_estimators=100)은 1000샘플 이하 데이터에서 공격적 과적합 발생. 튜닝 없이 RF와 비교하면 XGBoost가 열등하게 보이지만 실제로는 기본값 문제. 73%의 자동화 거래 계좌가 6개월 내 실패하는 주요 원인 중 하나. 교훈: **XGBoost 도입 시 반드시 max_depth≤4, learning_rate≤0.05, early_stopping 설정**. 출처: https://mljar.com/machine-learning/extra-trees-vs-xgboost/
+
+- **단일 지표 의존 ML 봇 실패 (2024~2025, blockchain-council.org)** — 기술 지표만 피처로 사용한 ML 봇의 경우, 규제 발표·매크로 이벤트 등 구조적 변화에 적응 실패. 888개 알고리즘 전략 연구에서 44%가 새 데이터에서 성공 재현 불가. 교훈: **파생상품 데이터(Funding Rate, OI) 등 다차원 피처 조합 필수**. 출처: https://www.blockchain-council.org/cryptocurrency/backtesting-ai-crypto-trading-strategies-avoiding-overfitting-lookahead-bias-data-leakage/
+
+---
+
+### 성공 사례
+
+- **Random Forest + BaggingClassifier Bitcoin 거래 (2024, arXiv:2407.18334)** — 41개 모델 중 RF Classifier와 BaggingClassifier가 백테스트/forward test/실전 3단계 모두 안정적 성능 유지. BaggingClassifier는 백테스트 PNL 121.73% 달성. 핵심 피처: MFI(Money Flow Index), Bollinger Bands, Keltner Channel Width, Parabolic SAR, A/D Index. 멀티 롤링 윈도우(1/7/14/21/28일) 사용. 교훈: **단일 타임프레임 대신 다중 롤링 윈도우 피처 사용이 일반화에 유리**. 출처: https://arxiv.org/html/2407.18334v1
+
+- **앙상블 RF + Random Forest Out-of-Sample (2023, ScienceDirect)** — RF 기반 암호화폐 선물시장 out-of-sample 예측 연구에서 RF가 연속형 데이터셋에서 최고 예측 성능 달성. 교훈: **연속형 OHLCV 데이터에서는 RF가 기본 베이스라인으로 적합**, 현재 63.5% acc는 유지 가능한 수준. 출처: https://www.sciencedirect.com/science/article/pii/S027553192200215X
+
+---
+
+### Funding Rate + Open Interest 피처 효과
+
+- **통합 프레임워크 정확도 향상 (gate.com, 2025)** — Funding Rate + OI + Liquidation 3개 지표를 통합한 ML 프레임워크가 단일 지표 대비 "substantially higher accuracy" 달성. 앙상블(RF, XGBoost)이 이 세 지표의 비선형 관계를 효과적으로 포착. Funding Rate은 시장 심리 방향(양수=롱 우세), OI는 포지션 확신도/레버리지 규모를 나타냄. 교훈: **두 지표를 별도 피처로 분리하지 말고, FR×OI 곱(포지션 압력 지수) 파생 피처 생성 고려**. 출처: https://web3.gate.com/en/crypto-wiki/article/how-do-futures-open-interest-funding-rates-and-liquidation-data-predict-crypto-price-movements-20251226
+
+- **Funding Rate 예측 가능성 연구 (SSRN:5576424)** — DAR 모델 기반 Funding Rate 예측이 no-change 모델 대비 방향 정확도 우위 확인. Funding Rate 자체가 다음 기간 가격 방향의 선행 지표로 기능. 교훈: **Funding Rate을 raw값 그대로 쓰기보다 전기 대비 변화량(delta FR)을 피처로 사용하면 신호 강도 향상**. 출처: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5576424
+
+---
+
+### RF vs XGBoost vs ExtraTrees 소규모 데이터 비교
+
+- **소규모(n<1000) 데이터에서 모델 선택 지침 (mljar.com, mcpanalytics.ai)**
+  - **RF**: 부트스트랩 샘플링 + 피처 서브샘플링으로 소규모 노이즈 데이터에서 자연스러운 정규화. 튜닝 없이도 과적합 저항성 높음. 현재 63.5% acc 확보한 우리 환경에 적합.
+  - **ExtraTrees**: RF보다 분할 랜덤성이 더 높아 과적합 위험 추가 감소, 훈련 속도 빠름. 단, 예측 분산이 커질 수 있어 소규모 데이터에서 RF보다 반드시 낫다고 할 수 없음. **RF 대비 성능 개선은 데이터셋마다 다름 — 교차검증으로 확인 필수**.
+  - **XGBoost**: 순차적 트리 피팅이 소규모 데이터에서 과적합 위험. 기본값 그대로 쓰면 RF보다 열등. max_depth≤3, n_estimators≤200, early_stopping 필수.
+  - **권고**: 1000캔들 환경에서는 **RF를 베이스라인으로 유지**, ExtraTrees 병렬 테스트 후 CV 기준 우위 확인 시 교체. XGBoost는 엄격한 하이퍼파라미터 튜닝 후에만 도입.
+
+- **출처**: https://mljar.com/machine-learning/extra-trees-vs-xgboost/, https://mljar.com/machine-learning/random-forest-vs-xgboost/, https://pmc.ncbi.nlm.nih.gov/articles/PMC12571449/
+
+---
+
+### 우리 프로젝트 핵심 교훈 3개 (2026-04-20)
+
+1. **Funding Rate delta + OI를 피처로 즉시 추가** — raw FR보다 전기 대비 변화량(delta_fr), FR×OI 파생 피처가 방향성 예측력 향상. 현재 15개 피처에서 2개 추가 후 SHAP으로 기여도 확인.
+
+2. **ExtraTrees는 RF와 함께 CV 비교 후 선택** — 소규모 데이터에서 ExtraTrees가 반드시 우위는 아님. RF를 베이스라인으로 유지하면서 ExtraTrees를 병렬 실험. XGBoost는 max_depth≤3 튜닝 없이 도입 금지.
+
+3. **멀티 롤링 윈도우 피처 추가** — 현재 단일 윈도우 지표 위주에서 7/14/21일 롤링 MFI, BB 폭, ATR 추가 시 일반화 성능 향상 가능성 높음 (arXiv 연구 근거).
+

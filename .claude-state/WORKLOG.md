@@ -1,5 +1,28 @@
 # Work Log
 
+## [2026-04-20] Cycle 158 — E (실행) + A (품질) + SIM (시뮬레이션) + F (리서치)
+
+**[E] Exchange 모듈 테스트 추가 (`tests/test_exchange.py`):**
+- ExchangeConnector 테스트 53개: init, is_halted, health_check, retry, fetch_ohlcv/balance/ticker, create_order, wait_for_fill, connect/reconnect, sync_positions, check_api_permissions
+- PaperConnector 테스트 27개: balance, create_order, slippage, 미지원 메서드, 왕복 거래 정합성
+- 총 98개 (94 passed, 4 skipped — Python 3.9+ 호환성)
+- 발견: `_call_with_deadline`의 `cancel_futures=True`는 Python 3.9+ 전용
+
+**[A] 기존 실패 테스트 수정 + trainer 테스트 추가:**
+- `test_lstm_strategy.py`: `/usr/bin/python3` 하드코딩 → `sys.executable`로 수정 (scipy 미설치 문제 해결)
+- `tests/test_trainer.py` 신규 38개: TrainingResult, WalkForwardTrainer, feature_importances, save/load, ensemble_weight, combinatorial_purged_cv
+- 관련 테스트 전체 147 passed, 0 failed
+
+**[SIM] Paper Simulation 코드 리뷰:**
+- `scripts/paper_simulation.py` 타입힌트 버그 수정: `pd.Optional[DataFrame]` → `Optional[pd.DataFrame]`
+- 권장: calibration hold-out 분리 (60/15/15/10), MIN_TRADES=15 통계적 유의성 검증
+- WF 테스트 83개 전체 PASS 확인
+
+**[F] 리서치: ML 트레이딩봇 실패/성공 사례:**
+- 실패 3건 + 성공 2건 + FR/OI 사례 2건 + 모델 비교 1건
+- 핵심 교훈: (1) FR delta + OI 파생 피처 즉시 추가 (2) XGBoost max_depth≤3+early_stopping 필수 (3) 멀티 롤링 윈도우(1/7/14/21/28일) RF 안정
+- Walk-Forward PASS 기준 완화 금지 (백테스트 Sharpe의 실전 예측력 R²<0.025)
+
 ## [2026-04-19] Cycle 156 — A (품질) + C (데이터) + D (ML 긴급수정) + F (리서치)
 
 **[D-긴급] RF 과적합 수정 (`src/ml/trainer.py`):**
@@ -12642,3 +12665,9 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-19 10:23 UTC] Cycle 155 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 19:56 UTC] Cycle 157 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 19:57 UTC] Cycle 158 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

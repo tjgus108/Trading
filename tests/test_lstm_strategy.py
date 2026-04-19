@@ -173,7 +173,7 @@ class TestTrainMlScript:
         """scripts/train_ml.py --demo --model rf 가 exit code 0으로 종료."""
         script = Path(__file__).parent.parent / "scripts" / "train_ml.py"
         result = subprocess.run(
-            ["/usr/bin/python3", str(script), "--demo", "--model", "rf", "--limit", "200"],
+            [sys.executable, str(script), "--demo", "--model", "rf", "--limit", "200"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -191,7 +191,7 @@ class TestTrainMlScript:
         """scripts/train_ml.py --demo --model lstm 가 exit code 0으로 종료."""
         script = Path(__file__).parent.parent / "scripts" / "train_ml.py"
         result = subprocess.run(
-            ["/usr/bin/python3", str(script), "--demo", "--model", "lstm", "--limit", "200"],
+            [sys.executable, str(script), "--demo", "--model", "lstm", "--limit", "200"],
             capture_output=True,
             text=True,
             timeout=120,

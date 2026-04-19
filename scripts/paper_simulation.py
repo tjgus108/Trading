@@ -64,7 +64,7 @@ def fetch_real_data_paginated(
     timeframe: str = "1h",
     total_candles: int = 4320,  # 6개월 (180일 * 24h)
     batch_size: int = 1000,
-) -> pd.Optional[DataFrame]:
+) -> Optional[pd.DataFrame]:
     """Bybit에서 페이지네이션으로 장기 OHLCV 데이터 수집. 실패 시 None."""
     try:
         import ccxt
