@@ -160,6 +160,7 @@ class DrawdownMonitor:
         # 연속 손실 + 쿨다운 상태
         self._consecutive_losses: int = 0
         self._cooldown_until: float = 0.0   # epoch seconds; 0=쿨다운 없음
+        self._single_loss_cooldown_until: float = 0.0  # 단일 손실로 인한 쿨다운
 
     # ── 기준 잔고 설정 ─────────────────────────────────────────
 
@@ -234,41 +235,42 @@ class DrawdownMonitor:
         if equity > 0:
             loss_pct = abs(pnl) / equity
             if loss_pct >= self.single_loss_halt_pct:
-                self._cooldown_until = time.monotonic() + self.cooldown_seconds
+                self._single_loss_cooldown_until = time.monotonic() + self.cooldown_seconds
                 logger.warning(
                     "DrawdownMonitor: 쿨다운 시작 — 단일 손실 %.2f%% ≥ %.2f%% "
                     "(%.0f초 동안 거래 정지)",
                     loss_pct * 100, self.single_loss_halt_pct * 100, self.cooldown_seconds,
                 )
 
-        # 연속 손실이 threshold에 정확히 도달 → streak 쿨다운 시작
-        # (이미 쿨다운 중이거나 streak_cooldown_seconds=0 이면 스킵)
+        # 연속 손실이 threshold에 정확히 도달 → streak 쿨다운 시작 (size reduction만, 완전 블록 아님)
+        # (streak_cooldown_seconds=0 이면 스킵)
         if (
             self._consecutive_losses == self.loss_streak_threshold
             and self.streak_cooldown_seconds > 0
         ):
-            streak_until = time.monotonic() + self.streak_cooldown_seconds
-            # 기존 쿨다운보다 길면 갱신
-            if streak_until > self._cooldown_until:
-                self._cooldown_until = streak_until
-                logger.warning(
-                    "DrawdownMonitor: 연속 손실 쿨다운 시작 — %d회 연속 손실 "
-                    "(%.0f초 = %.1f시간 동안 거래 정지)",
-                    self._consecutive_losses,
-                    self.streak_cooldown_seconds,
-                    self.streak_cooldown_seconds / 3600,
-                )
+            self._cooldown_until = time.monotonic() + self.streak_cooldown_seconds
+            logger.warning(
+                "DrawdownMonitor: 연속 손실 쿨다운 시작 — %d회 연속 손실 "
+                "(%.0f초 = %.1f시간 동안 거래 정지)",
+                self._consecutive_losses,
+                self.streak_cooldown_seconds,
+                self.streak_cooldown_seconds / 3600,
+            )
 
     def is_in_cooldown(self) -> bool:
-        """현재 시간 기반 쿨다운 중인지 여부."""
+        """현재 시간 기반 쿨다운 중인지 여부 (단일 손실로 인한 완전 블록만)."""
+        return time.monotonic() < self._single_loss_cooldown_until
+    
+    def is_in_streak_cooldown(self) -> bool:
+        """연속 손실로 인한 쿨다운 (size reduction 적용됨)."""
         return time.monotonic() < self._cooldown_until
 
     def get_size_multiplier(self) -> float:
         """포지션 사이즈 배수 반환.
 
         여러 조건의 최소값을 적용:
-        - 쿨다운 중: 0.0 (완전 차단)
-        - 연속 손실 >= threshold: 0.5 (50% 축소)
+        - 단일 손실 쿨다운 중: 0.0 (완전 차단)
+        - 연속 손실 >= threshold: 0.5 (50% 축소, streak_cooldown 중에도 유지)
         - MDD 단계별: get_mdd_size_multiplier() 결과
         - 정상: 1.0
         """
@@ -479,6 +481,7 @@ class DrawdownMonitor:
         self._monthly_start = None
         self._consecutive_losses = 0
         self._cooldown_until = 0.0
+        self._single_loss_cooldown_until = 0.0
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:
@@ -533,6 +536,7 @@ class DrawdownMonitor:
             "_monthly_start": self._monthly_start,
             "_consecutive_losses": self._consecutive_losses,
             "_cooldown_until": self._cooldown_until,
+            "_single_loss_cooldown_until": self._single_loss_cooldown_until,
         }
 
     @classmethod
@@ -563,6 +567,7 @@ class DrawdownMonitor:
         obj._monthly_start = data["_monthly_start"]
         obj._consecutive_losses = data.get("_consecutive_losses", 0)
         obj._cooldown_until = data.get("_cooldown_until", 0.0)
+        obj._single_loss_cooldown_until = data.get("_single_loss_cooldown_until", 0.0)
         return obj
 
 

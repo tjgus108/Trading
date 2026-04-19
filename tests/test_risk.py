@@ -418,23 +418,27 @@ from src.risk.drawdown_monitor import DrawdownMonitor
 
 
 def test_streak_cooldown_triggers_on_threshold():
-    """연속 손실이 threshold에 도달하면 쿨다운이 시작되어야 한다."""
+    """연속 손실이 threshold에 도달하면 streak 쿨다운이 시작되어야 한다."""
     monitor = DrawdownMonitor(
         loss_streak_threshold=3,
         streak_cooldown_seconds=14400.0,
         single_loss_halt_pct=1.0,  # 단일 손실 쿨다운은 비활성화 (100% 손실에만 반응)
     )
-    # 2번 연속 손실 → 쿨다운 없음
+    # 2번 연속 손실 → streak 쿨다운 없음
     monitor.record_trade_result(-10.0, 1000.0)
     monitor.record_trade_result(-10.0, 990.0)
-    assert not monitor.is_in_cooldown()
-    # 3번째 → streak_cooldown 시작
+    assert not monitor.is_in_streak_cooldown()
+    # 3번째 → streak_cooldown 시작 (완전 블록 아님, size reduction만)
     monitor.record_trade_result(-10.0, 980.0)
-    assert monitor.is_in_cooldown()
+    assert monitor.is_in_streak_cooldown()
+    # is_in_cooldown()은 단일 손실 쿨다운만 체크하므로 False
+    assert not monitor.is_in_cooldown()
+    # get_size_multiplier()는 0.5 반환 (streak threshold 도달)
+    assert monitor.get_size_multiplier() == 0.5
 
 
-def test_streak_cooldown_size_multiplier_zero_during_cooldown():
-    """쿨다운 중에는 get_size_multiplier()가 0.0을 반환해야 한다."""
+def test_streak_cooldown_size_multiplier_reduction_during_cooldown():
+    """streak 쿨다운 중에는 get_size_multiplier()가 0.5를 반환해야 한다."""
     monitor = DrawdownMonitor(
         loss_streak_threshold=2,
         streak_cooldown_seconds=3600.0,
@@ -442,7 +446,7 @@ def test_streak_cooldown_size_multiplier_zero_during_cooldown():
     )
     monitor.record_trade_result(-50.0, 1000.0)
     monitor.record_trade_result(-50.0, 950.0)
-    assert monitor.get_size_multiplier() == 0.0
+    assert monitor.get_size_multiplier() == 0.5
 
 
 def test_streak_cooldown_disabled_when_zero():
