@@ -136,5 +136,67 @@
     "passed": true,
     "fail_reasons": [],
     "model_path": "/Users/seohyunhan/Desktop/AgentTest/Trading/models/BTC_USDT_20260419_101711_rf_tb.pkl"
+  },
+  {
+    "timestamp": "20260419_135811",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "triple_barrier": false,
+    "tb_tp_pct": 0.02,
+    "tb_sl_pct": 0.01,
+    "binary_threshold": 0.01,
+    "n_samples": 248,
+    "train_accuracy": 1.0,
+    "val_accuracy": 0.56,
+    "test_accuracy": 0.46,
+    "passed": false,
+    "fail_reasons": [
+      "test_accuracy 0.460 < 0.55"
+    ],
+    "model_path": null
+  },
+  {
+    "timestamp": "20260419_135825",
+    "symbol": "ETH/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "triple_barrier": false,
+    "tb_tp_pct": 0.02,
+    "tb_sl_pct": 0.01,
+    "binary_threshold": 0.01,
+    "n_samples": 323,
+    "train_accuracy": 1.0,
+    "val_accuracy": 0.5385,
+    "test_accuracy": 0.5385,
+    "passed": false,
+    "fail_reasons": [
+      "test_accuracy 0.538 < 0.55",
+      "val_accuracy 0.538 < 0.55"
+    ],
+    "model_path": null
+  },
+  {
+    "timestamp": "20260419_135834",
+    "symbol": "SOL/USDT",
+    "timeframe": "1h",
+    "limit": 1000,
+    "binary": true,
+    "triple_barrier": false,
+    "tb_tp_pct": 0.02,
+    "tb_sl_pct": 0.01,
+    "binary_threshold": 0.01,
+    "n_samples": 348,
+    "train_accuracy": 0.9904,
+    "val_accuracy": 0.5143,
+    "test_accuracy": 0.4429,
+    "passed": false,
+    "fail_reasons": [
+      "test_accuracy 0.443 < 0.55",
+      "val_accuracy 0.514 < 0.55"
+    ],
+    "model_path": null
   }
 ]

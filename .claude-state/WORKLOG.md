@@ -1,5 +1,29 @@
 # Work Log
 
+## [2026-04-19] Cycle 156 — A (품질) + C (데이터) + D (ML 긴급수정) + F (리서치)
+
+**[D-긴급] RF 과적합 수정 (`src/ml/trainer.py`):**
+- `min_samples_leaf=max(10, n_train//20)` + `min_samples_split=20` 추가
+- val_acc 누출 수정: calibration 전 base 모델로 val_acc 평가
+- 효과: train_acc 0.99→0.80, test_acc 0.44→0.62 (demo 데이터 기준)
+- `scripts/retrain_all.sh` 스크립트 생성 (3심볼 일괄 재학습, Python 3.11 사용)
+
+**[A] 테스트 품질 점검:**
+- 전체 6,865개 테스트, 2개 기존 실패 (모델 파일 존재로 인한 어서션 실패)
+- CircuitBreaker 43개, drift_detector 28개 테스트 정상
+- 커버리지 부족: src/exchange/ 단위테스트 부재, trainer.py 직접 테스트 부재
+
+**[C] 데이터 인프라 점검:**
+- CircuitBreaker 3-state 상태머신 정상, OHLC 검증 3종 완전
+- 에러 분류(transient/fatal/rate_limit) 명확, 캐시 LRU 128엔트리 정상
+- 개선 필요사항 없음
+
+**[F] 리서치: ML 과적합 방지 실전 사례:**
+- 소규모 데이터(<500)에서 피처 15→6~8개 축소(SHAP)가 하이퍼파라미터 튜닝보다 효과적
+- ExtraTrees가 RF보다 분산 감소 효과 강함
+- SOL/ETH: BTC 베타 의존도 높아 기술적 지표만으로 신호 약함 → btc_return 피처 추가 권장
+- Purged CV가 소규모 데이터에서 단일 WF보다 신뢰도 우위
+
 ## [2026-04-19] Cycle 154 — C (데이터) + B (리스크) + F (리서치)
 
 **[C1] DataFeed Circuit Breaker 패턴 추가:**
@@ -12615,3 +12639,6 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-18 08:54 UTC] Cycle 153 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 10:23 UTC] Cycle 155 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

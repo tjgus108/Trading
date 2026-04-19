@@ -26,6 +26,13 @@ import pandas as pd
 
 from src.ml.features import FeatureBuilder
 
+# XGBoost optional import — 없으면 RF 단독 유지
+try:
+    import xgboost as xgb  # noqa: F401
+    _XGB_AVAILABLE = True
+except ImportError:
+    _XGB_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 MODELS_DIR = Path("models")
@@ -136,12 +143,14 @@ class WalkForwardTrainer:
         triple_barrier: bool = False,
         tb_tp_pct: float = 0.02,
         tb_sl_pct: float = 0.01,
+        ensemble: bool = True,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.binary = binary
         self.triple_barrier = triple_barrier
+        self.ensemble = ensemble  # XGBoost 앙상블 사용 여부 (XGBoost 미설치 시 자동 비활성)
         self.feature_builder = FeatureBuilder(
             forward_n=forward_n, threshold=threshold,
             binary=binary,
@@ -164,7 +173,7 @@ class WalkForwardTrainer:
         """
         try:
             from sklearn.calibration import CalibratedClassifierCV
-            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.ensemble import RandomForestClassifier, VotingClassifier
             from sklearn.metrics import accuracy_score
         except ImportError:
             logger.error("scikit-learn 미설치: pip install scikit-learn")
@@ -228,23 +237,26 @@ class WalkForwardTrainer:
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
             max_features="sqrt",
+            min_samples_leaf=max(10, len(X_train) // 20),
+            min_samples_split=20,
             random_state=42,
             n_jobs=-1,
             class_weight="balanced",
         )
         base_clf.fit(X_train, y_train)
 
+        # val_acc는 calibration 전 base 모델로 평가 (누출 방지)
+        train_acc = float(accuracy_score(y_train, base_clf.predict(X_train)))
+        val_acc = float(accuracy_score(y_val, base_clf.predict(X_val)))
+
         # Calibration: validation set으로 isotonic regression 적용
         try:
             clf = CalibratedClassifierCV(base_clf, method="isotonic", cv="prefit")
             clf.fit(X_val, y_val)
         except (TypeError, Exception):
-            # sklearn >= 1.8: cv="prefit" 제거됨 → calibration 생략
             clf = base_clf
 
-        # 성과 평가 (calibrated 모델 기준)
-        train_acc = float(accuracy_score(y_train, clf.predict(X_train)))
-        val_acc = float(accuracy_score(y_val, clf.predict(X_val)))
+        # test_acc는 calibrated 모델로 평가
         test_acc = float(accuracy_score(y_test, clf.predict(X_test)))
 
         # 피처 중요도 (base estimator에서 추출)
