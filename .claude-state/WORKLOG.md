@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-04-20] Cycle 160 — D (ML) + E (실행) + SIM (검증) + F (리서치)
+
+**[D] SHAP 피처 선택 + ExtraTrees 옵션 (`src/ml/trainer.py`):**
+- `use_shap_selection=True`: 학습 후 importance 5% 미만 피처 자동 제거+재학습
+- shap 라이브러리 없으면 feature_importances_ fallback
+- `model_type="extra_trees"`: ExtraTreesClassifier 옵션 (동일 하이퍼파라미터)
+- TrainingResult.selected_features에 선택 피처 목록 포함
+- 테스트 49개 PASS (신규 10: ExtraTrees 4 + SHAP 6)
+
+**[E] Kelly Quarter-Cap + MDD Step-Down (`src/risk/kelly_sizer.py`):**
+- `kelly_cap=0.25` 파라미터: fractional_f = min(f, cap) (풀 Kelly 파멸 방지)
+- `mdd_size_multiplier` 파라미터: DrawdownMonitor.get_mdd_size_multiplier() 연동
+- 적용 순서: Kelly→cap→DD제약→regime scale→clip→ATR→MDD multiplier
+- 테스트 77개 PASS (신규 20: cap 6 + stepdown 5 + 통합 6 + 복합 3)
+
+**[SIM] TWAP 통합 테스트 실패 3건 수정 (`src/risk/drawdown_monitor.py`):**
+- 원인: single loss cooldown과 streak cooldown이 미분리 → 둘 다 size_multiplier=0.0
+- 수정: `_single_loss_cooldown_until` 분리, streak cooldown은 0.5 반환
+- `is_in_streak_cooldown()` 메서드 추가
+- 전체 236 PASS, 4 SKIP, 0 FAIL
+
+**[F] 리서치: SHAP 피처 선택 + 피처 엔지니어링 사례:**
+- SHAP 1회 계산→반복 제거(shap-select 패턴)이 RFE보다 효율적 (arxiv 2410.06815)
+- 레짐별 피처 중요도 역전: Hash Difficulty 1위→Google Trends 1위 (레짐 전환 시)
+- ~1000샘플에서 RF 우선, ExtraTrees는 피처 수>샘플 수일 때만
+
 ## [2026-04-20] Cycle 159 — C (데이터) + B (리스크) + SIM (시뮬레이션) + F (리서치)
 
 **[C] Funding Rate + Open Interest 데이터 수집 3계층 구현:**
@@ -12699,3 +12725,6 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-19 20:13 UTC] Cycle 159 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 20:19 UTC] Cycle 160 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -34,6 +34,7 @@ class KellySizer:
         min_fraction: float = 0.001,
         max_drawdown: Optional[float] = None,
         leverage: float = 1.0,
+        kelly_cap: float = 0.25,
     ) -> None:
         """
         Args:
@@ -42,12 +43,16 @@ class KellySizer:
             min_fraction: 자본 대비 최소 포지션 비율
             max_drawdown: 허용 최대 낙폭 (e.g. 0.05 = 5%). None이면 DD 제약 미적용.
             leverage: 레버리지 배수 (기본 1.0 = 현물)
+            kelly_cap: Full Kelly fraction 상한 (기본 0.25 = Quarter-Kelly cap).
+                       kelly_f * fraction 결과가 이 값을 초과하지 않도록 제한.
+                       풀 Kelly → 파멸 경로 방지 핵심 안전장치.
         """
         self.fraction = fraction
         self.max_fraction = max_fraction
         self.min_fraction = min_fraction
         self.max_drawdown = max_drawdown
         self.leverage = leverage
+        self.kelly_cap = kelly_cap
 
     def compute(
         self,
@@ -59,6 +64,7 @@ class KellySizer:
         atr: Optional[float] = None,
         target_atr: Optional[float] = None,
         regime: Optional[str] = None,
+        mdd_size_multiplier: float = 1.0,
     ) -> float:
         """포지션 사이즈 (단위 수량) 반환.
 
@@ -76,11 +82,18 @@ class KellySizer:
                     "TREND_DOWN" → 0.6× (하락장 보수적)
                     "RANGING"    → 0.5× (절반 축소)
                     "HIGH_VOL"   → 0.3× (고변동성 대폭 축소)
+            mdd_size_multiplier: DrawdownMonitor의 MDD 단계별 사이즈 배수 (기본 1.0).
+                    DrawdownMonitor.get_mdd_size_multiplier() 결과를 전달.
+                    0.0이면 진입 차단 (0 반환), 0.5이면 50% 축소.
 
         Returns:
             포지션 사이즈 (수량)
         """
         if avg_win <= 0:
+            return 0.0
+
+        # MDD step-down: multiplier가 0이면 즉시 차단
+        if mdd_size_multiplier <= 0:
             return 0.0
 
         # NaN / inf 방어 (클리핑 전에 수행: np.clip(inf)=1.0 통과 방지)
@@ -101,6 +114,9 @@ class KellySizer:
         # Fractional Kelly
         fractional_f = kelly_f * self.fraction
 
+        # Quarter-Kelly cap: 풀 Kelly → 파멸 경로 방지
+        fractional_f = min(fractional_f, self.kelly_cap)
+
         # Risk-Constrained Kelly: max_drawdown 제약
         if self.max_drawdown is not None and avg_loss > 0 and self.leverage > 0:
             max_dd_constrained = self.max_drawdown / (avg_loss * self.leverage)
@@ -119,8 +135,11 @@ class KellySizer:
         if atr is not None and target_atr is not None and atr > 0:
             atr_factor = min(target_atr / atr, 1.0)
 
+        # MDD step-down: DrawdownMonitor 단계별 축소 적용
+        mdd_factor = float(np.clip(mdd_size_multiplier, 0.0, 1.0))
+
         # 자본 대비 포지션 금액 → 수량
-        position_capital = capital * fractional_f * atr_factor
+        position_capital = capital * fractional_f * atr_factor * mdd_factor
         qty = position_capital / price
         return qty
 
@@ -142,6 +161,8 @@ class KellySizer:
         leverage: float = 1.0,
         min_trades: Optional[int] = None,
         regime: Optional[str] = None,
+        kelly_cap: float = 0.25,
+        mdd_size_multiplier: float = 1.0,
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.
 
@@ -162,6 +183,8 @@ class KellySizer:
             leverage: 레버리지 배수 (기본 1.0)
             min_trades: Kelly 추정에 필요한 최소 거래 수 (None이면 클래스 기본값 사용)
             regime: 시장 레짐 (선택). compute(regime=...)에 전달됨.
+            kelly_cap: Kelly fraction 상한 (기본 0.25 = Quarter-Kelly cap).
+            mdd_size_multiplier: DrawdownMonitor MDD 단계별 사이즈 배수 (기본 1.0).
 
         Returns:
             포지션 사이즈 (수량)
@@ -203,8 +226,12 @@ class KellySizer:
             min_fraction=min_fraction,
             max_drawdown=max_drawdown,
             leverage=leverage,
+            kelly_cap=kelly_cap,
         )
-        return sizer.compute(win_rate, avg_win, avg_loss, capital, price, atr, target_atr, regime=regime)
+        return sizer.compute(
+            win_rate, avg_win, avg_loss, capital, price, atr, target_atr,
+            regime=regime, mdd_size_multiplier=mdd_size_multiplier,
+        )
 
     # 레짐 → Kelly fraction 스케일 팩터
     _REGIME_SCALE: dict = {

@@ -488,6 +488,148 @@ class TestCombinatorialPurgedCV:
 
 
 # ---------------------------------------------------------------------------
+# ExtraTrees 모델 타입 테스트
+# ---------------------------------------------------------------------------
+
+class TestExtraTreesModelType:
+
+    def test_extra_trees_returns_training_result(self):
+        """ExtraTrees 모델로 학습 후 TrainingResult 반환."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            model_type="extra_trees",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert isinstance(result, TrainingResult)
+        assert result.n_samples > 0
+        assert result.n_features > 0
+
+    def test_extra_trees_model_name_tag(self):
+        """ExtraTrees 선택 시 model_name에 'et' 포함."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            model_type="extra_trees",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.model_name.startswith("et_")
+
+    def test_rf_model_name_tag(self):
+        """RF(기본) 선택 시 model_name에 'rf' 포함."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            model_type="rf",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.model_name.startswith("rf_")
+
+    def test_extra_trees_same_interface(self):
+        """ExtraTrees도 RF와 동일한 TrainingResult 구조 반환."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            model_type="extra_trees",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert hasattr(result, "feature_importances")
+        assert hasattr(result, "val_accuracy")
+        assert hasattr(result, "test_accuracy")
+        assert len(result.feature_importances) > 0
+
+
+# ---------------------------------------------------------------------------
+# SHAP/importance 기반 피처 선택 테스트
+# ---------------------------------------------------------------------------
+
+class TestShapFeatureSelection:
+
+    def test_shap_selection_disabled_by_default(self):
+        """use_shap_selection 기본값 False — selected_features는 None."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.selected_features is None
+
+    def test_shap_selection_returns_feature_list(self):
+        """use_shap_selection=True → selected_features 리스트 반환."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=True,
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.selected_features is not None
+        assert isinstance(result.selected_features, list)
+        assert len(result.selected_features) >= 2
+
+    def test_shap_selection_features_subset_of_all(self):
+        """선택된 피처가 전체 피처의 부분 집합."""
+        trainer_full = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=False,
+        )
+        trainer_sel = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=True,
+        )
+        df = _make_ohlcv(300)
+        result_full = trainer_full.train(df)
+        result_sel = trainer_sel.train(df)
+
+        all_features = set(result_full.feature_importances.keys())
+        selected = set(result_sel.selected_features)
+        assert selected.issubset(all_features)
+
+    def test_shap_selection_reduces_or_keeps_features(self):
+        """피처 선택 후 피처 수 <= 전체 피처 수."""
+        trainer_full = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=False,
+        )
+        trainer_sel = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=True,
+        )
+        df = _make_ohlcv(300)
+        result_full = trainer_full.train(df)
+        result_sel = trainer_sel.train(df)
+
+        n_full = len(result_full.feature_importances)
+        n_sel = len(result_sel.selected_features)
+        assert n_sel <= n_full
+
+    def test_shap_selection_with_extra_trees(self):
+        """ExtraTrees + SHAP 선택 조합도 정상 동작."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            model_type="extra_trees", use_shap_selection=True,
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert isinstance(result, TrainingResult)
+        assert result.selected_features is not None
+        assert len(result.selected_features) >= 2
+
+    def test_shap_selection_result_is_valid_training_result(self):
+        """SHAP 선택 후 TrainingResult의 기본 필드 유효성 확인."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=10, max_depth=3,
+            use_shap_selection=True,
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert result.n_samples > 0
+        assert result.n_features > 0
+        assert 0.0 <= result.train_accuracy <= 1.0
+        assert 0.0 <= result.val_accuracy <= 1.0
+        assert 0.0 <= result.test_accuracy <= 1.0
+
+
+# ---------------------------------------------------------------------------
 # sklearn 미설치 시 fallback 테스트
 # ---------------------------------------------------------------------------
 

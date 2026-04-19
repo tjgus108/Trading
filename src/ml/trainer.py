@@ -36,6 +36,13 @@ try:
 except ImportError:
     _XGB_AVAILABLE = False
 
+# SHAP optional import — 없으면 feature_importances_ fallback
+try:
+    import shap as _shap  # noqa: F401
+    _SHAP_AVAILABLE = True
+except ImportError:
+    _SHAP_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 MODELS_DIR = Path("models")
@@ -60,6 +67,8 @@ class TrainingResult:
     class_distribution: Optional[dict] = None
     # Validation 성능 기반 앙상블 가중치
     ensemble_weight: float = 0.0
+    # SHAP/importance 기반 선택된 피처 목록 (선택)
+    selected_features: Optional[List[str]] = None
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -150,6 +159,8 @@ class WalkForwardTrainer:
         tb_tp_pct: float = 0.02,
         tb_sl_pct: float = 0.01,
         ensemble: bool = True,
+        model_type: str = "rf",
+        use_shap_selection: bool = False,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
@@ -157,6 +168,8 @@ class WalkForwardTrainer:
         self.binary = binary
         self.triple_barrier = triple_barrier
         self.ensemble = ensemble  # XGBoost 앙상블 사용 여부 (XGBoost 미설치 시 자동 비활성)
+        self.model_type = model_type  # "rf" | "extra_trees"
+        self.use_shap_selection = use_shap_selection  # SHAP/importance 기반 피처 선택
         self.feature_builder = FeatureBuilder(
             forward_n=forward_n, threshold=threshold,
             binary=binary,
@@ -179,7 +192,7 @@ class WalkForwardTrainer:
         """
         try:
             from sklearn.calibration import CalibratedClassifierCV
-            from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+            from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier, VotingClassifier
             from sklearn.metrics import accuracy_score
         except ImportError:
             logger.error("scikit-learn 미설치: pip install scikit-learn")
@@ -244,7 +257,7 @@ class WalkForwardTrainer:
         # 학습
         # max_features='sqrt': 앙상블 다양성 확보 (기본값 'auto'='sqrt'이지만 명시)
         # max_depth=6: 과적합 방지 (기본 None에서 제한)
-        base_clf = RandomForestClassifier(
+        clf_kwargs = dict(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
             max_features="sqrt",
@@ -254,7 +267,69 @@ class WalkForwardTrainer:
             n_jobs=-1,
             class_weight="balanced",
         )
+        if self.model_type == "extra_trees":
+            base_clf = ExtraTreesClassifier(**clf_kwargs)
+        else:
+            base_clf = RandomForestClassifier(**clf_kwargs)
         base_clf.fit(X_train, y_train)
+
+        # --- SHAP/importance 기반 피처 선택 (optional) ---
+        selected_features: Optional[List[str]] = None
+        if self.use_shap_selection:
+            feat_imp_arr = base_clf.feature_importances_
+            feat_names = list(X_train.columns)
+            total_imp = feat_imp_arr.sum()
+
+            if _SHAP_AVAILABLE and total_imp > 0:
+                try:
+                    import shap
+                    explainer = shap.TreeExplainer(base_clf)
+                    shap_values = explainer.shap_values(X_train)
+                    # multi-class: shap_values is list → mean abs across classes
+                    if isinstance(shap_values, list):
+                        shap_imp = np.mean(
+                            [np.abs(sv).mean(axis=0) for sv in shap_values], axis=0
+                        )
+                    else:
+                        shap_imp = np.abs(shap_values).mean(axis=0)
+                    imp_source = shap_imp / shap_imp.sum() if shap_imp.sum() > 0 else feat_imp_arr / (total_imp or 1)
+                    logger.info("SHAP 기반 피처 선택 사용")
+                except Exception as e:
+                    logger.warning("SHAP 계산 실패, feature_importances_ fallback: %s", e)
+                    imp_source = feat_imp_arr / (total_imp or 1)
+            else:
+                imp_source = feat_imp_arr / (total_imp or 1)
+                if not _SHAP_AVAILABLE:
+                    logger.info("shap 미설치 — feature_importances_ fallback으로 피처 선택")
+
+            threshold_imp = 0.05  # 전체 importance의 5% 미만 제거
+            mask = imp_source >= threshold_imp
+            selected_features = [f for f, keep in zip(feat_names, mask) if keep]
+
+            if len(selected_features) < 2:
+                # 최소 2개 피처 보장
+                logger.warning("SHAP 선택 후 피처 수 < 2 — 선택 취소")
+                selected_features = feat_names
+            elif len(selected_features) < len(feat_names):
+                removed = [f for f, keep in zip(feat_names, mask) if not keep]
+                logger.info(
+                    "피처 선택: %d→%d (제거: %s)",
+                    len(feat_names), len(selected_features), removed,
+                )
+                # 선택된 피처로 재학습
+                X_train = X_train[selected_features]
+                X_val = X_val[selected_features]
+                X_cal = X_cal[selected_features]
+                X_test = X_test[selected_features]
+
+                clf_kwargs["min_samples_leaf"] = max(10, len(X_train) // 20)
+                if self.model_type == "extra_trees":
+                    base_clf = ExtraTreesClassifier(**clf_kwargs)
+                else:
+                    base_clf = RandomForestClassifier(**clf_kwargs)
+                base_clf.fit(X_train, y_train)
+            else:
+                logger.info("SHAP 선택: 모든 피처 유지 (%d개)", len(selected_features))
 
         # val_acc는 calibration 전 base 모델로 평가 (누출 방지)
         train_acc = float(accuracy_score(y_train, base_clf.predict(X_train)))
@@ -297,7 +372,8 @@ class WalkForwardTrainer:
         self._feature_names = list(X_train.columns)
         self._last_feature_importances = feat_importance
         label_mode = "tb" if self.triple_barrier else ("binary" if self.binary else "3class")
-        model_name = f"rf_{self.symbol.replace('/', '').lower()}_{label_mode}_{date.today()}"
+        algo_tag = "et" if self.model_type == "extra_trees" else "rf"
+        model_name = f"{algo_tag}_{self.symbol.replace('/', '').lower()}_{label_mode}_{date.today()}"
 
         result = TrainingResult(
             model_name=model_name,
@@ -312,6 +388,7 @@ class WalkForwardTrainer:
             split_info=split_info,
             class_distribution=class_distribution,
             ensemble_weight=ensemble_weight,
+            selected_features=selected_features,
         )
         logger.info(result.summary())
         logger.info(result.feature_importance_report())

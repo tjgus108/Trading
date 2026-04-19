@@ -1,13 +1,20 @@
 # Next Steps
 
-_Last updated: 2026-04-20 (Cycle 159 완료)_
+_Last updated: 2026-04-20 (Cycle 160 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 160
-- 160 mod 5 = 0 → **D(ML) + E(실행) + F(리서치)** 패턴 (0→5번째)
+### 로테이션: Cycle 161
+- 161 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** 패턴
+
+### ✅ Cycle 160 완료 사항
+
+#### E(실행): Kelly Quarter-Cap + Step-Down 구현 ✅ COMPLETE
+- `kelly_cap=0.25` 파라미터 추가: fractional_f = min(kelly_f * fraction, kelly_cap)
+- `mdd_size_multiplier` 파라미터 추가: DrawdownMonitor 연동으로 MDD 단계별 포지션 축소
+- 20개 테스트 추가 (quarter-cap 6 + step-down 5 + DD-Kelly 통합 6 + 복합 3), 기존 57개 PASS 유지 → 총 77개
 
 ### ✅ Cycle 159 완료 사항
 
