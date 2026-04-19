@@ -1498,3 +1498,109 @@ Cycle 4에서 Execution 주제 포함해 리서치 강화 필요:
 2. **레짐 연동 피처 가중치 재계산**: 피처 중요도가 레짐(추세/횡보/고변동성)에 따라 역전됨이 실증됨. 레짐 감지 후 피처 그룹 가중치를 재조정하는 동적 파이프라인 필요. 추세 레짐 → 가격/모멘텀 피처 우선, 횡보 레짐 → 감성/온체인 피처 우선.
 
 3. **~1000샘플에서 RF 기본 + 피처 수 > 샘플 수일 때만 ExtraTrees**: 현재 백테스트 데이터가 소규모라면 RF를 기본으로 유지. 피처 엔지니어링으로 피처 수가 수백 개를 초과하는 경우에만 ExtraTrees로 전환. 전환 전에는 SHAP/PFI/RFE 3가지 방법의 교집합 피처만 남겨 편향 증가 문제를 사전에 완화.
+
+
+---
+
+## [2026-04-20] Cycle 160+ — Paper Trading → Live 전환 실패/성공 사례 + 체크리스트
+
+### 1. Paper → Live 전환 흔한 실패 사례 3건
+
+**사례 1: 슬리피지 과소추정**
+- Paper trading에서는 주문이 지정가에 정확히 체결되지만, 실전에서는 BTC/ETH조차 1~5 bps 슬리피지 발생. 중소형 알트코인은 0.5~2% 이상.
+- 실증: 2024년 1월 $9M dogwifhat 시장가 주문이 오더북 얕아 $5.7M 슬리피지 발생 (60% 체결가 급등). 또한 백테스트 대비 실전 성과가 평균 30~50% 하락하는 주원인이 슬리피지+수수료 미반영.
+- 우리 프로젝트 교훈: `src/backtest/engine.py` 슬리피지 파라미터를 BTC 5 bps, 알트 최소 50 bps로 설정하여 재백테스트. Sharpe >= 1.0 기준을 비용 포함 기준으로 재검증 필수.
+- 출처: [Paybis — Backtest Realistic Costs](https://paybis.com/blog/how-to-backtest-crypto-bot/), [FinanceFeeds — Crypto Slippage 2025](https://financefeeds.com/crypto-slippage-guide-2025-causes-and-effects/)
+
+**사례 2: API 에러 핸들링 부재**
+- Kronos Research API 키 유출로 $26M 손실 (2024). ccxt 기반 봇에서 rate limit 초과, 타임아웃, 부분 체결 처리 로직 없으면 미체결 주문 누적 또는 중복 주문 발생.
+- 거래소 API downtime 중 봇이 오래된 가격 기준으로 주문 실행 → 실제 시장과 큰 괴리.
+- 우리 프로젝트 교훈: `src/exchange/` 에서 API 키는 Read+Trade 권한만, 출금 불허 설정. rate limit 재시도 로직, partial fill 처리, API 오류 발생 시 봇 자동 일시중단 구현 필요.
+- 출처: [Altrady — 7 Hidden Risks of Crypto Bots](https://www.altrady.com/blog/crypto-bots/7-hidden-risks)
+
+**사례 3: 타임존 불일치 및 데이터 갭**
+- 거래소 API는 UTC 타임스탬프를 반환하지만, 시스템 로컬 시간대 설정이 다르면 일별 마감 계산 시점이 달라짐 → 동일 신호도 다른 타이밍에 발생.
+- 가격 데이터 갭(200 캔들 중 6개 누락 등) 발생 시 이동평균 계산 오류 → 잘못된 신호 생성.
+- 우리 프로젝트 교훈: 모든 시간 처리를 UTC 단일 기준으로 통일. `src/data/` 에서 수신 데이터 갭 감지 및 보간 로직 추가.
+- 출처: [Paybis — Backtest Crypto Bot](https://paybis.com/blog/how-to-backtest-crypto-bot/), [DEV Community — Data Quality Problem](https://dev.to/paarthurnax_3f967358857ce/why-your-crypto-bot-keeps-failing-the-data-quality-problem-and-how-to-fix-it-a25)
+
+---
+
+### 2. 성공적인 크립토 봇 라이브 배포 체크리스트
+
+**배포 전 (Pre-Live)**
+- Walk-forward 검증 완료: 최소 3개 레짐(상승/하락/횡보) 경험 포함, 파라미터 1개당 OOS 트레이드 200개 이상
+- 슬리피지·수수료 반영 후 Sharpe >= 1.0, MDD <= 20%, PF >= 1.5 재통과 확인
+- Paper trading 최소 30일 (100건 이상 트레이드): 체결가 vs 백테스트 가정 차이(implementation shortfall) 측정
+- API 키 보안: Read+Trade 권한만, IP 화이트리스트, 출금 권한 없음 확인
+- 서킷브레이커 코드 배포 확인: 일일 MDD 3%, 주간 7% 초과 시 자동 중단
+
+**모니터링 (Live 운영)**
+- Freqtrade/커스텀 봇: Telegram/Discord 연동으로 모든 주문 진입·청산, API 오류, 드로다운 5%+ 시 즉시 알림
+- 30일·90일 롤링 Sharpe, Profit Factor 실시간 추적. PF < 1.5 하락 시 전략 성능 저하 경보
+- Implementation Shortfall(주문 접수~체결 가격 차) 누적 모니터링: 슬리피지 예산 초과 여부 확인
+- 펀딩비 8시간 주기 모니터링: 0.05% 초과 시 방향 과매수/과매도 경보
+
+**킬 스위치 (Emergency)**
+- Feature Flag 기반 개별 전략 즉시 비활성화 (재배포 없이)
+- 자동 트리거: 일일 MDD 3%, API 오류율 급증 시 모든 신규 진입 중단
+- Freqtrade: `/stopentry` → `/forceexit all` 텔레그램 명령어 사전 숙지
+- 포지션 한도 하드코딩: 포트폴리오 최대 10%, 저유동성 자산 주문 크기 시장 깊이 0.1% 이하
+
+**자금 관리**
+- 첫 라이브 전환: 전체 자본의 5% 이하로 파일럿 시작 → 1~2주 슬리피지 검증 후 점진 증액
+- 수동 개입 금지 원칙: 봇 오버라이드 시 평균 68% 자본 손실 사례 보고. 전략 신뢰 또는 전략 교체 중 하나만 선택
+
+- 출처: [Freqtrade — Stoploss](https://www.freqtrade.io/en/stable/stoploss/), [DEV Community — Freqtrade Monitoring Lesson 24](https://dev.to/henry_lin_3ac6363747f45b4/lesson-24-freqtrade-trading-monitoring-and-adjustment-4cjj), [Darkbot — Trading Bot Checklist 2026](https://darkbot.io/blog/trading-bot-checklist-2026-essential-criteria-for-crypto-success)
+
+---
+
+### 3. ML 기반 봇의 실시간 모델 드리프트 대응
+
+**드리프트 감지 방법**
+- PSI (Population Stability Index): 피처 분포 변화 측정. PSI < 0.1 정상, 0.1~0.2 조사, > 0.2 유의미한 드리프트로 재학습 필요.
+- KS Test (Kolmogorov-Smirnov): 수치형 피처 고유값 분포 비교. 두 분포의 최대 차이 통계적 유의성 검정.
+- Concept Drift vs Data Drift 구분: 입력 피처 분포 변화(data drift)와 입력-출력 관계 변화(concept drift)를 분리 감지. 크립토에서는 기관 ETF 유입 이후 구조 변화가 concept drift에 해당.
+
+**재학습 주기 실무**
+- FreqAI, Intelligent-Trading-Bot: 신규 데이터 도착 시 매일 재학습 후 섀도 앙상블이 검증 → 성능 개선 시에만 프로덕션 모델 교체.
+- PSI > 0.2 또는 3일 연속 예측 드리프트 임계 초과 시 자동 재학습 트리거 권장.
+- 75%의 기업이 2024년 AI 성능 저하를 경험, 절반 이상이 AI 오류로 매출 손실 → 재학습 주기 자동화 필수.
+
+**우리 봇 적용 방향**
+- 현재 배치 ML 모델에 PSI 모니터링 추가: 최근 7일 피처 분포와 훈련 기간 분포를 비교, > 0.2 시 경보.
+- 재학습은 Bybit 실데이터로만 트리거. 합성 데이터 기반 드리프트 대응 금지 (CLAUDE.md 규정).
+- HITL (Human-in-the-loop): 감지된 드리프트가 일시적 노이즈인지 구조 변화인지 인간 검토 후 재학습 승인.
+
+- 출처: [MLOps Model Monitoring — Durapid](https://durapid.com/blog/mlops-model-monitoring-how-to-track-model-drift-and-performance-in-production/), [Model Drift Detection — Statsig](https://www.statsig.com/perspectives/model-drift-detection-methods-metrics), [Markaicode — Evidently Drift Detection](https://markaicode.com/ml-drift-detection-production/)
+
+---
+
+### 4. 크립토 봇 인프라 고려사항
+
+**서버 위치 및 네트워크 지연**
+- Bybit/Binance 서버: 주로 AWS Tokyo/Singapore 리전. 해당 리전 VPS 배치 시 RTT 0.3~1ms 달성 가능.
+- 10~20ms 지연만으로 브레이크아웃/스캘핑 전략 수익의 30~50% 잠식 가능. 우리 봇이 일/4시간봉 기반이면 지연 영향 적지만 분봉 이하 전략은 지연 최적화 필수.
+- 진정한 마이크로초 퍼포먼스는 연간 $200,000+ 인프라 비용. 소규모 봇은 AWS/GCP 표준 VPS로도 충분.
+
+**API Rate Limit 관리**
+- REST API: 주문 조회·생성에 사용, rate limit 엄격. WebSocket: 실시간 가격 스트리밍에 사용, REST보다 rate limit 여유.
+- ccxt 기반 봇에서 rate limit 초과 시 429 오류 → 재시도 로직 없으면 주문 누락. `ccxt.Exchange.rateLimit` 설정 및 `enableRateLimit=True` 옵션 확인.
+- WEEX 등 2025년 이후 검증 사용자 대상 API 티어 상향 정책 등장 — 거래소별 rate limit 정기 확인 필요.
+
+**Failover 및 안정성**
+- systemd `Restart=always` + Docker `--restart=unless-stopped`: 크래시 시 자동 재기동.
+- 상태 저장: 포지션·주문·전략 상태를 SQLite/Redis에 지속 저장. 재시작 시 거래소 API로 open orders 동기화.
+- 단일 장애점 제거: Primary/Standby 구성 또는 헬스체크 엔드포인트로 active failover. Bybit $1.5B 해킹 사례처럼 플랫폼 레벨 단일 장애점도 위험.
+
+- 출처: [CoinAPI — Crypto Trading Latency](https://www.coinapi.io/blog/crypto-trading-latency-guide), [TradingFXVPS — Algo Trading VPS 2025](https://tradingfxvps.com/api-trading-vps-optimization-2025-websocket-rest-for-algo-strategies/), [WEEX — Navigating API Rate Limits](https://www.weex.com/news/detail/navigating-api-rate-limits-in-crypto-trading-essential-strategies-for-developers-and-traders-204698)
+
+---
+
+### 핵심 교훈 3개 (2026-04-20)
+
+1. **슬리피지를 반영한 재백테스트 없이는 라이브 전환 금지**: 73%의 봇이 6개월 내 실패하는 가장 직접적 원인. BTC 5 bps, 알트 최소 50 bps 슬리피지 + 실제 수수료 반영 후 Sharpe >= 1.0 재통과가 라이브 전환의 최소 조건. 현재 `src/backtest/engine.py`의 비용 반영 수준을 점검해야 함.
+
+2. **드리프트 감지 + 재학습은 자동화하되 Bybit 실데이터만 사용**: PSI > 0.2 또는 3일 연속 성능 하락 시 재학습 자동 트리거 구현 필요. 단, 합성 데이터 재학습은 CLAUDE.md 규정 위반이므로 실거래소 데이터 확보 파이프라인 선행 필수. HITL(인간 검토) 게이트 포함.
+
+3. **킬 스위치와 서킷브레이커는 전략보다 먼저 배포**: 일일 MDD 3% 자동 중단, API 오류 시 신규 진입 차단, Telegram 즉시 알림이 없는 봇은 라이브 운영 불가. Freqtrade의 `/stopentry` + `/forceexit all` 패턴을 `src/risk/` 서킷브레이커에 동등하게 구현할 것.

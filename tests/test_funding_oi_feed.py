@@ -48,9 +48,9 @@ class TestConnectorFundingRate:
     def test_fetch_funding_rate_empty_raises(self):
         conn = self._make_connector()
         conn._exchange.fetch_funding_rate.return_value = {}
-        # Empty dict is truthy, so no ValueError — but fundingRate key missing is ok
-        result = conn.fetch_funding_rate("BTC/USDT:USDT")
-        assert result == {}
+        # Empty dict is falsy → ValueError raised (no useful data)
+        with pytest.raises(ValueError, match="No funding rate"):
+            conn.fetch_funding_rate("BTC/USDT:USDT")
 
     def test_fetch_funding_rate_none_raises(self):
         conn = self._make_connector()

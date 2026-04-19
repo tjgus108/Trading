@@ -1,13 +1,34 @@
 # Next Steps
 
-_Last updated: 2026-04-20 (Cycle 160 완료)_
+_Last updated: 2026-04-20 (Cycle 161 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 161
-- 161 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** 패턴
+### 로테이션: Cycle 162
+- 162 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴
+
+### ✅ Cycle 162 완료 사항
+
+#### A(품질): 코드 품질 + 테스트 커버리지 점검 ✅ COMPLETE
+- **connector.py 버그 2건 수정:**
+  - `pool.shutdown(cancel_futures=True)` → Python 3.7 호환 fallback 추가
+  - `fn.__name__` → `getattr(fn, '__name__', str(fn))` — Mock 객체 AttributeError 방지
+- **test_funding_oi_feed.py 테스트 수정:** empty dict falsy 오류 수정 (6 FAIL → 0 FAIL)
+- **drawdown_monitor 테스트 5건 추가:** MDD 4단계 (NORMAL/WARN/BLOCK_ENTRY/LIQUIDATE/FULL_HALT) 단위 테스트 + streak_cooldown_seconds/MDD 파라미터 직렬화 round-trip
+- **최종: 307 passed, 0 failed, 4 skipped**
+
+### ✅ Cycle 161 완료 사항
+
+#### C(데이터): FR/OI 파이프라인 end-to-end 검증 ✅ COMPLETE
+- `tests/test_fr_oi_pipeline_e2e.py` 25개 테스트 추가, 전부 PASS
+- 피처 수 차이 검증 (14→15→16→17), Trainer 레벨 n_features 차이 확인
+- NaN/Inf graceful handling 6종 (NaN FR, NaN OI, Inf FR, zero OI, all-NaN, mixed)
+- 엣지케이스 4종 (상수 FR, 음수 OI, 극대/극소 FR)
+- SHAP 선택 + FR/OI 조합 3종, DataFeed↔FeatureBuilder 일관성 2종
+- Triple Barrier + FR/OI 조합 2종
+- 기존 70개 테스트 (6 skip) 유지, 파이프라인 이슈 없음
 
 ### ✅ Cycle 160 완료 사항
 

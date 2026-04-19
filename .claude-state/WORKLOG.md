@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-04-20] Cycle 161 — A (품질) + C (데이터) + SIM (라이브 리뷰) + F (리서치)
+
+**[A] 코드 품질 점검 + 버그 수정:**
+- `connector.py`: pool.shutdown cancel_futures Python 3.7 호환 fallback 추가
+- `connector.py`: _timed_call fn.__name__ → getattr fallback (Mock 호환)
+- `test_funding_oi_feed.py`: empty dict falsy assertion 오류 수정
+- `tests/test_drawdown_monitor.py`: MDD 4단계+직렬화 테스트 5건 추가
+- 최종: 307 passed, 0 failed, 4 skipped
+
+**[C] FR/OI 파이프라인 E2E 통합 테스트 (`tests/test_fr_oi_pipeline_e2e.py`):**
+- 피처 수 차이 검증 (base14→FR15→FR+OI16→+BTC17), Trainer 통합 4건
+- NaN/Inf 방어 6건, 엣지케이스 4건, SHAP+FR/OI 3건, 일관성 2건, TB+FR/OI 2건
+- 총 25개 테스트 전체 PASS, 기존 70개 유지
+- 파이프라인 데이터→FeatureBuilder→Trainer 전 구간 정상 확인
+
+**[SIM] live_paper_trader 코드 리뷰 (917줄):**
+- 배포 준비도: **78%** — 즉시 7일 페이퍼 테스트 가능
+- ✅ Kelly quarter-cap, MDD 4단계, ML 필터, DriftMonitor, AccuracyDriftMonitor, 레짐 사이징 통합 확인
+- ⚠️ 누락: 최대 손실 한계(50% 자동 중단), Bybit API 재시도 강화, min_accuracy 0.52→0.55 권장
+- test_paper_trader.py: 34 PASS
+
+**[F] 리서치: Paper→Live 전환 실패/성공 사례:**
+- 슬리피지 반영 재백테스트 없이 라이브 전환 금지 (73% 봇 6개월 내 실패 원인)
+- 드리프트 감지: PSI>0.2 또는 3일 연속 하락 시 재학습 트리거
+- 킬 스위치가 전략 코드보다 먼저 배포되어야 함 (일일 MDD 3% 자동 중단)
+
 ## [2026-04-20] Cycle 160 — D (ML) + E (실행) + SIM (검증) + F (리서치)
 
 **[D] SHAP 피처 선택 + ExtraTrees 옵션 (`src/ml/trainer.py`):**
@@ -12728,3 +12754,6 @@ Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-19 20:19 UTC] Cycle 160 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-19 20:36 UTC] Cycle 161 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -186,10 +186,15 @@ class ExchangeConnector:
                 f"{fn_name} did not respond within {timeout}s — possible hang"
             )
         finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+            try:
+                pool.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                # Python <3.9: cancel_futures not supported
+                pool.shutdown(wait=False)
 
     def _timed_call(self, fn, *args, **kwargs):
         """API 호출을 래핑해 응답 시간 추적 + 강제 타임아웃. 느린 응답 시 경고/halt."""
+        fn_name = getattr(fn, '__name__', str(fn))
         start = time.time()
         try:
             result = self._call_with_deadline(fn, *args, timeout=API_CALL_TIMEOUT, **kwargs)
@@ -198,13 +203,13 @@ class ExchangeConnector:
                 self._consecutive_failures += 1
                 logger.error(
                     "API call %.0fms (>%dms halt threshold): %s [consecutive=%d]",
-                    elapsed_ms, self._LATENCY_HALT_MS, fn.__name__,
+                    elapsed_ms, self._LATENCY_HALT_MS, fn_name,
                     self._consecutive_failures,
                 )
             elif elapsed_ms > self._LATENCY_WARN_MS:
                 logger.warning(
                     "Slow API call %.0fms (>%dms): %s",
-                    elapsed_ms, self._LATENCY_WARN_MS, fn.__name__,
+                    elapsed_ms, self._LATENCY_WARN_MS, fn_name,
                 )
             return result
         except ccxt.RequestTimeout:
@@ -213,12 +218,12 @@ class ExchangeConnector:
             elapsed_ms = (time.time() - start) * 1000
             logger.error(
                 "API call TIMEOUT after %.0fms: %s [consecutive=%d]",
-                elapsed_ms, fn.__name__, self._consecutive_failures,
+                elapsed_ms, fn_name, self._consecutive_failures,
             )
             raise
         except Exception:
             elapsed_ms = (time.time() - start) * 1000
-            logger.debug("API call failed after %.0fms: %s", elapsed_ms, fn.__name__)
+            logger.debug("API call failed after %.0fms: %s", elapsed_ms, fn_name)
             raise
 
     def _retry(self, fn, *args, max_retries: int = 2, **kwargs):

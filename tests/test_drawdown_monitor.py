@@ -1,6 +1,6 @@
 """tests/test_drawdown_monitor.py — DrawdownMonitor 3층 서킷브레이커 테스트."""
 import pytest
-from src.risk.drawdown_monitor import AlertLevel, DrawdownMonitor
+from src.risk.drawdown_monitor import AlertLevel, DrawdownMonitor, MddLevel
 
 
 # ── 기존 MDD 동작 유지 ────────────────────────────────────────
@@ -374,3 +374,73 @@ def test_to_dict_from_dict_includes_new_state():
     assert m2.consecutive_losses == 2
     assert m2.loss_streak_threshold == 3
     assert m2.cooldown_seconds == 1800
+
+
+# ── 4단계 MDD 레벨 단위 테스트 ────────────────────────────────────
+
+
+def test_mdd_level_normal():
+    """MDD < 5% → NORMAL, multiplier=1.0."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(9600)  # 4% < 5%
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    assert m.get_mdd_size_multiplier() == 1.0
+    assert m.should_liquidate_all() is False
+
+
+def test_mdd_level_warn():
+    """5% <= MDD < 10% → WARN, multiplier=0.5."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(9300)  # 7%
+    assert m.get_mdd_level() == MddLevel.WARN
+    assert m.get_mdd_size_multiplier() == 0.5
+    assert m.should_liquidate_all() is False
+
+
+def test_mdd_level_block_entry():
+    """10% <= MDD < 15% → BLOCK_ENTRY, multiplier=0.0."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(8800)  # 12%
+    assert m.get_mdd_level() == MddLevel.BLOCK_ENTRY
+    assert m.get_mdd_size_multiplier() == 0.0
+    assert m.should_liquidate_all() is False
+
+
+def test_mdd_level_liquidate_and_full_halt():
+    """15% <= MDD < 20% → LIQUIDATE; MDD >= 20% → FULL_HALT. 둘 다 should_liquidate_all=True."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(8300)  # 17% → LIQUIDATE
+    assert m.get_mdd_level() == MddLevel.LIQUIDATE
+    assert m.should_liquidate_all() is True
+
+    m.update(7900)  # 21% → FULL_HALT
+    assert m.get_mdd_level() == MddLevel.FULL_HALT
+    assert m.should_liquidate_all() is True
+
+
+def test_to_dict_from_dict_mdd_and_streak_cooldown():
+    """to_dict/from_dict round-trip이 streak_cooldown_seconds + MDD 파라미터 보존."""
+    m = DrawdownMonitor(
+        streak_cooldown_seconds=7200,
+        mdd_warn_pct=0.06,
+        mdd_block_pct=0.12,
+        mdd_liquidate_pct=0.18,
+        mdd_halt_pct=0.25,
+    )
+    m.update(10000)
+    m.update(9200)  # 8% → WARN with custom thresholds (>6%)
+
+    d = m.to_dict()
+    m2 = DrawdownMonitor.from_dict(d)
+
+    assert m2.streak_cooldown_seconds == 7200
+    assert m2.mdd_warn_pct == 0.06
+    assert m2.mdd_block_pct == 0.12
+    assert m2.mdd_liquidate_pct == 0.18
+    assert m2.mdd_halt_pct == 0.25
+    assert m2.get_mdd_level() == m.get_mdd_level()
+    assert m2.current_drawdown() == m.current_drawdown()
