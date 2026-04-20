@@ -33,7 +33,7 @@ walk-forward validation: 시계열 순서 반드시 유지.
 
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, List
+from typing import Dict, List, Optional, Tuple
 
 
 DEFAULT_FORWARD_N = 5       # 5캔들 후 수익률로 레이블 생성
@@ -298,3 +298,247 @@ class FeatureBuilder:
             "macd_hist",
             "bb_position",
         ]
+
+
+# ---------------------------------------------------------------------------
+# Regime Detection + Dynamic Feature Selection (Cycle 170+)
+# ---------------------------------------------------------------------------
+
+# 레짐별 PFI/SHAP 기반 top-K 피처 사전 정의.
+# bull: 추세 피처 우선 (EMA, 수익률, 볼륨)
+# bear: 변동성·위험 피처 우선 (ATR, Donchian, BB)
+# ranging: 오실레이터 피처 우선 (BB, MACD, 볼륨)
+# crisis: 보수적 — 변동성·단기 수익률만
+REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
+    "bull": [
+        "return_1", "return_3", "return_5", "return_10",
+        "ema_ratio", "price_vs_ema20", "price_vs_ema50",
+        "volume_ratio_20", "donchian_pct",
+        "macd_hist",
+    ],
+    "bear": [
+        "return_1", "return_3", "return_5",
+        "atr_pct", "volatility_20",
+        "donchian_pct", "bb_position",
+        "macd_hist", "price_vs_ema50",
+    ],
+    "ranging": [
+        "return_1", "return_3",
+        "atr_pct", "volatility_20",
+        "bb_position", "macd_hist",
+        "volume_ratio_20", "donchian_pct",
+    ],
+    "crisis": [
+        "return_1", "return_3",
+        "atr_pct", "volatility_20",
+        "bb_position",
+    ],
+}
+
+# 각 레짐의 base 피처 외에 선택적 피처 (df에 컬럼 있으면 추가)
+REGIME_OPTIONAL_FEATURES: Dict[str, List[str]] = {
+    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction"],
+    "bear":    ["delta_fr", "fr_oi_interaction"],
+    "ranging": ["btc_close_lag1"],
+    "crisis":  ["delta_fr"],
+}
+
+
+def detect_regime(df: pd.DataFrame, lookback: int = 20) -> str:
+    """
+    최근 lookback 캔들의 가격 움직임으로 시장 레짐 감지.
+
+    로직:
+    - EMA20 vs EMA50 기울기: bull/bear 판별
+    - ATR 기반 변동성: crisis 판별 (ATR_pct > 2σ)
+    - Donchian 채널 폭: ranging 판별 (채널 폭 < 중앙값)
+
+    Returns:
+        str: "bull" | "bear" | "ranging" | "crisis"
+    """
+    if len(df) < lookback + 1:
+        return "ranging"
+
+    close = df["close"].values
+    high = df["high"].values
+    low = df["low"].values
+
+    recent = close[-lookback:]
+
+    # EMA20/EMA50 (전체 시계열로 계산 후 최근 값 사용)
+    close_s = pd.Series(close)
+    ema20 = close_s.ewm(span=20, adjust=False).mean().values
+    ema50 = close_s.ewm(span=50, adjust=False).mean().values
+    ema20_now = ema20[-1]
+    ema50_now = ema50[-1]
+
+    # 변동성 (ATR_pct)
+    atr_vals = (high[-lookback:] - low[-lookback:]) / (close[-lookback:] + 1e-9)
+    atr_mean = float(np.mean(atr_vals))
+    atr_std_hist = float(np.std(atr_vals)) if len(atr_vals) > 1 else 0.0
+
+    # 이전 60봉 ATR 기준 z-score
+    lookback_long = min(60, len(close))
+    atr_long = (high[-lookback_long:] - low[-lookback_long:]) / (close[-lookback_long:] + 1e-9)
+    atr_long_mean = float(np.mean(atr_long))
+    atr_long_std = float(np.std(atr_long)) if len(atr_long) > 1 else 1e-9
+    atr_zscore = (atr_mean - atr_long_mean) / (atr_long_std + 1e-9)
+
+    # Donchian 채널 폭 (최근 lookback)
+    high20 = np.max(high[-lookback:])
+    low20 = np.min(low[-lookback:])
+    channel_width = (high20 - low20) / (low20 + 1e-9)
+
+    # 이전 60봉 채널 폭 중앙값
+    lookback_long2 = min(60, len(close) - lookback)
+    if lookback_long2 > 0:
+        channel_widths_hist = [
+            (np.max(high[i:i+lookback]) - np.min(low[i:i+lookback])) / (np.min(low[i:i+lookback]) + 1e-9)
+            for i in range(lookback_long2)
+        ]
+        channel_median = float(np.median(channel_widths_hist)) if channel_widths_hist else channel_width
+    else:
+        channel_median = channel_width
+
+    # 레짐 판별
+    # 1. Crisis: ATR z-score > 2.0 (비정상 변동성)
+    if atr_zscore > 2.0:
+        return "crisis"
+
+    # 2. Ranging: 채널 폭 < 중앙값 (좁은 박스권)
+    if channel_width < channel_median * 0.8:
+        return "ranging"
+
+    # 3. Bull / Bear: EMA 방향
+    if ema20_now > ema50_now:
+        return "bull"
+    else:
+        return "bear"
+
+
+class RegimeAwareFeatureBuilder:
+    """
+    레짐별 동적 피처 선택 파이프라인 (Cycle 170+).
+
+    기존 FeatureBuilder를 래핑하여:
+    1. detect_regime()으로 현재 레짐 감지
+    2. REGIME_FEATURE_CONFIG에서 해당 레짐 피처 서브셋 선택
+    3. 선택된 피처만 반환 (학습/예측 모두 동일 로직)
+
+    사용법:
+        builder = RegimeAwareFeatureBuilder()
+        X, y, regime = builder.build_with_regime(df)
+        # 예측 시:
+        X_live, regime = builder.build_features_regime(df)
+    """
+
+    def __init__(
+        self,
+        forward_n: int = DEFAULT_FORWARD_N,
+        threshold: float = DEFAULT_THRESHOLD,
+        binary: bool = False,
+        triple_barrier: bool = False,
+        tb_tp_pct: float = DEFAULT_TB_TP_PCT,
+        tb_sl_pct: float = DEFAULT_TB_SL_PCT,
+        regime_lookback: int = 20,
+        feature_config: Optional[Dict[str, List[str]]] = None,
+    ):
+        self._base = FeatureBuilder(
+            forward_n=forward_n,
+            threshold=threshold,
+            binary=binary,
+            triple_barrier=triple_barrier,
+            tb_tp_pct=tb_tp_pct,
+            tb_sl_pct=tb_sl_pct,
+        )
+        self.regime_lookback = regime_lookback
+        # 외부에서 커스텀 config 주입 가능
+        self._config: Dict[str, List[str]] = feature_config or REGIME_FEATURE_CONFIG
+
+    # ----------------------------------------------------------------
+    # Public API
+    # ----------------------------------------------------------------
+
+    def build_with_regime(
+        self, df: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.Series, str]:
+        """
+        레짐 감지 후 해당 레짐 피처 서브셋으로 X, y 반환.
+
+        Returns:
+            X: 레짐별 피처 서브셋 DataFrame
+            y: 레이블 Series
+            regime: 감지된 레짐 문자열
+        """
+        regime = detect_regime(df, lookback=self.regime_lookback)
+        X_all, y = self._base.build(df)
+        X = self._select(X_all, regime, df)
+        return X, y, regime
+
+    def build_features_regime(
+        self, df: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, str]:
+        """
+        레짐 감지 후 피처만 반환 (추론 전용).
+
+        Returns:
+            X: 레짐별 피처 서브셋 DataFrame
+            regime: 감지된 레짐 문자열
+        """
+        regime = detect_regime(df, lookback=self.regime_lookback)
+        X_all = self._base.build_features_only(df)
+        X = self._select(X_all, regime, df)
+        return X, regime
+
+    def get_regime_features(self, regime: str, df: Optional[pd.DataFrame] = None) -> List[str]:
+        """
+        레짐별 피처 리스트 반환.
+
+        Args:
+            regime: "bull" | "bear" | "ranging" | "crisis"
+            df: 선택적 피처(FR/OI/BTC) 존재 여부 확인용
+
+        Returns:
+            List[str]: 해당 레짐에서 사용될 피처명 목록
+        """
+        base_feats = list(self._config.get(regime, self._config.get("ranging", [])))
+        if df is not None:
+            optionals = REGIME_OPTIONAL_FEATURES.get(regime, [])
+            for feat in optionals:
+                # 선택적 피처는 실제 컬럼 존재 여부로 판별
+                source_col = {
+                    "btc_close_lag1": "btc_close",
+                    "delta_fr": "funding_rate",
+                    "fr_oi_interaction": "open_interest",
+                }.get(feat, feat)
+                if source_col in df.columns:
+                    base_feats.append(feat)
+        return base_feats
+
+    # ----------------------------------------------------------------
+    # Internal helpers
+    # ----------------------------------------------------------------
+
+    def _select(
+        self, X_all: pd.DataFrame, regime: str, df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """X_all에서 regime에 해당하는 피처 컬럼만 추출."""
+        wanted = self.get_regime_features(regime, df)
+        available = [c for c in wanted if c in X_all.columns]
+        if len(available) < 2:
+            # fallback: 전체 피처 사용
+            return X_all
+        return X_all[available]
+
+    # 기존 FeatureBuilder API 위임 (기존 코드와 호환)
+    def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+        """기존 FeatureBuilder.build() 호환 — 레짐 감지 없이 전체 피처 반환."""
+        return self._base.build(df)
+
+    def build_features_only(self, df: pd.DataFrame) -> pd.DataFrame:
+        """기존 FeatureBuilder.build_features_only() 위임."""
+        return self._base.build_features_only(df)
+
+    @property
+    def feature_names(self) -> List[str]:
+        return self._base.feature_names

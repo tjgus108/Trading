@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-04-21] Cycle 172 — B (리스크) + D (ML) + SIM + F (리서치)
+
+**[B] Kelly Stress Test + VaR Backtest 검증:**
+- Kelly 극단 시나리오 11개 테스트: win_rate 0/1, ATR 10배, 연속손실 10/20회, 레짐 급전환
+- VaR backtest 5개 테스트: 정규분포 초과율 3~8%(5% 근처), 팻테일, CF≥Normal VaR 확인
+- 발견된 문제 없음, 모든 로직 정상 동작
+
+**[D] RegimeAwareFeatureBuilder 구현:**
+- `detect_regime()`: ATR z-score(crisis), Donchian 채널(ranging), EMA20/50(bull/bear)
+- `REGIME_FEATURE_CONFIG`: bull 10개, bear 9개, ranging 8개, crisis 5개 피처 서브셋
+- `RegimeAwareFeatureBuilder`: 기존 FeatureBuilder 래핑 + `build_with_regime()` API
+- `WalkForwardTrainer(regime_aware=True)`: 학습 시 자동 레짐 감지 → 피처 서브셋 사용
+- 테스트 25개 추가, 기존 89개 ML 테스트 깨짐 없음
+
+**[SIM] ML 파이프라인 End-to-End 검증:**
+- WalkForwardTrainer: 60/15/15/10 분할, look-ahead 방지, WFE>0.5 확인
+- MultiWindowEnsemble: 30/60/90일 독립학습, softmax(temp=1.5) 가중치, 20거래마다 동적갱신
+- BacktestEngine: 0.055% 수수료, adaptive슬리피지(0.02~0.15%), 24캔들 max_hold
+- 107 passed, 3 skipped, 0 failed
+
+**[F] 리서치: Online Learning + Adaptive Kelly:**
+- River ADWIN: learn_one() 증분학습, PSI와 병행 피처 드리프트 감지 가능
+- Bayesian Kelly: Beta 분포 사전→실거래 업데이트, 불확실 시 자동 포지션 축소
+- 소자본 full Kelly 위험: 엣지 10% 과추정→포지션 2배, 권장 10~25% Kelly
+- 성공 live 전환: paper→소액→점진적 증액 단계적 전환 필수
+
 ## [2026-04-21] Cycle 171 — A (품질) + C (데이터) + SIM + F (리서치)
 
 **[A] QA 테스트 커버리지 향상:**

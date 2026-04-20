@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from src.ml.features import FeatureBuilder
+from src.ml.features import FeatureBuilder, RegimeAwareFeatureBuilder, detect_regime
 
 # XGBoost optional import — 없으면 RF 단독 유지
 try:
@@ -69,6 +69,8 @@ class TrainingResult:
     ensemble_weight: float = 0.0
     # SHAP/importance 기반 선택된 피처 목록 (선택)
     selected_features: Optional[List[str]] = None
+    # 레짐 감지 결과 (regime_aware=True 시)
+    detected_regime: Optional[str] = None
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -82,6 +84,8 @@ class TrainingResult:
             f"  ensemble_weight: {self.ensemble_weight:.4f}",
             f"  verdict: {verdict}",
         ]
+        if self.detected_regime:
+            lines.append(f"  detected_regime: {self.detected_regime}")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         if self.model_path:
@@ -161,6 +165,7 @@ class WalkForwardTrainer:
         ensemble: bool = True,
         model_type: str = "rf",
         use_shap_selection: bool = False,
+        regime_aware: bool = False,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
@@ -176,17 +181,23 @@ class WalkForwardTrainer:
         else:
             self.model_type = model_type
         self.use_shap_selection = use_shap_selection  # SHAP/importance 기반 피처 선택
-        self.feature_builder = FeatureBuilder(
+        self.regime_aware = regime_aware  # 레짐별 동적 피처 선택 활성화
+        fb_kwargs = dict(
             forward_n=forward_n, threshold=threshold,
             binary=binary,
             triple_barrier=triple_barrier,
             tb_tp_pct=tb_tp_pct,
             tb_sl_pct=tb_sl_pct,
         )
+        if regime_aware:
+            self.feature_builder = RegimeAwareFeatureBuilder(**fb_kwargs)
+        else:
+            self.feature_builder = FeatureBuilder(**fb_kwargs)
         self._trained_model = None
         self._class_order: Optional[List[int]] = None
         self._feature_names: List[str] = []
         self._last_feature_importances: Dict[str, float] = {}
+        self._trained_regime: Optional[str] = None  # 학습 시 감지된 레짐
 
     def train(self, df: pd.DataFrame) -> TrainingResult:
         """
@@ -214,7 +225,15 @@ class WalkForwardTrainer:
         # 이유: 모든 rolling/ewm 피처는 shift(1) 기반 → 현재 바 미래 데이터 누출 없음.
         # 반면 분할 후 각 구간에서 피처 계산 시 val/test 구간 앞부분의
         # rolling warm-up NaN으로 유효 샘플이 크게 줄어드는 문제 방지.
-        X_all, y_all = self.feature_builder.build(df)
+
+        # 레짐별 동적 피처 선택 (regime_aware=True 시)
+        if self.regime_aware and isinstance(self.feature_builder, RegimeAwareFeatureBuilder):
+            X_all, y_all, regime = self.feature_builder.build_with_regime(df)
+            self._trained_regime = regime
+            logger.info("레짐 감지: %s → 피처 수=%d", regime, X_all.shape[1])
+        else:
+            X_all, y_all = self.feature_builder.build(df)
+            self._trained_regime = None
         # Int64 (nullable) → int64: sklearn 호환성 보장
         y_all = y_all.astype(int)
 
@@ -431,6 +450,7 @@ class WalkForwardTrainer:
             class_distribution=class_distribution,
             ensemble_weight=ensemble_weight,
             selected_features=selected_features,
+            detected_regime=self._trained_regime,
         )
         logger.info(result.summary())
         logger.info(result.feature_importance_report())
@@ -572,6 +592,7 @@ class WalkForwardTrainer:
             "feature_names": self._feature_names,
             "feature_importances": self._last_feature_importances,
             "train_date": str(date.today()),
+            "trained_regime": self._trained_regime,
         }
         with open(path, "wb") as f:
             pickle.dump(payload, f)
