@@ -505,6 +505,7 @@ def _make_cb(**kwargs) -> FullCircuitBreaker:
         flash_crash_pct=0.10,
         max_consecutive_losses=5,
         cooldown_periods=3,
+        max_daily_trades=0,
     )
     defaults.update(kwargs)
     return FullCircuitBreaker(**defaults)
@@ -1122,3 +1123,143 @@ def test_cf_var_normal_returns_consistent():
     )
     assert var_cf > 0.0
     assert cvar_cf >= var_cf - 1e-12
+
+
+# ── DrawdownMonitor 레짐별 동적 cooldown 테스트 ────────────────────────────────
+
+def test_dm_regime_cooldown_high_vol_longer():
+    """HIGH_VOL 레짐에서 단일 손실 쿨다운이 기본의 2배 길이여야 한다."""
+    monitor = DrawdownMonitor(
+        cooldown_seconds=3600.0,
+        single_loss_halt_pct=0.01,
+        loss_streak_threshold=999,
+    )
+    monitor.set_regime("HIGH_VOL")
+    assert monitor._effective_cooldown_seconds() == 7200.0  # 3600 * 2.0
+
+
+def test_dm_regime_cooldown_trend_up_shorter():
+    """TREND_UP 레짐에서 단일 손실 쿨다운이 기본의 0.5배여야 한다."""
+    monitor = DrawdownMonitor(
+        cooldown_seconds=3600.0,
+        single_loss_halt_pct=0.01,
+        loss_streak_threshold=999,
+    )
+    monitor.set_regime("TREND_UP")
+    assert monitor._effective_cooldown_seconds() == 1800.0  # 3600 * 0.5
+
+
+def test_dm_regime_streak_cooldown_high_vol():
+    """HIGH_VOL 레짐에서 streak 쿨다운이 기본의 2배 길이여야 한다."""
+    monitor = DrawdownMonitor(
+        streak_cooldown_seconds=14400.0,
+        loss_streak_threshold=3,
+        single_loss_halt_pct=1.0,
+    )
+    monitor.set_regime("HIGH_VOL")
+    assert monitor._effective_streak_cooldown_seconds() == 28800.0  # 14400 * 2.0
+
+
+def test_dm_regime_cooldown_default_no_regime():
+    """레짐 미설정 시 배수는 1.0 (기본 cooldown 그대로)."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    assert monitor._regime_cooldown_multiplier() == 1.0
+    assert monitor._effective_cooldown_seconds() == 3600.0
+
+
+def test_dm_regime_cooldown_trend_down():
+    """TREND_DOWN 레짐에서 cooldown 배수 1.5x."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("TREND_DOWN")
+    assert monitor._effective_cooldown_seconds() == 5400.0  # 3600 * 1.5
+
+
+def test_dm_regime_cooldown_ranging():
+    """RANGING 레짐에서 cooldown 배수 1.0x (기본과 동일)."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("RANGING")
+    assert monitor._effective_cooldown_seconds() == 3600.0  # 3600 * 1.0
+
+
+# ── CircuitBreaker 일일 거래 횟수 제한 테스트 ─────────────────────────────────
+
+def test_cb_daily_trade_limit_triggers_when_exceeded():
+    """일일 거래 횟수 max_daily_trades 초과 시 check()가 triggered=True."""
+    cb = _make_cb(max_daily_trades=3)
+    # 3번 거래 기록
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    assert cb.daily_trade_count == 3
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "거래 횟수" in result["reason"]
+
+
+def test_cb_daily_trade_limit_not_triggered_below():
+    """거래 횟수가 한계 미만이면 triggered=False."""
+    cb = _make_cb(max_daily_trades=5)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=True)
+    assert cb.daily_trade_count == 2
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_daily_trade_limit_zero_means_unlimited():
+    """max_daily_trades=0이면 거래 횟수 제한 없음."""
+    cb = _make_cb(max_daily_trades=0)
+    for _ in range(100):
+        cb.record_trade_result(is_loss=False)
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_daily_trade_count_resets_on_daily_reset():
+    """reset_daily() 호출 시 daily_trade_count가 0으로 초기화."""
+    cb = _make_cb(max_daily_trades=3)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    assert cb.daily_trade_count == 3
+    cb.reset_daily(daily_start_balance=10000)
+    assert cb.daily_trade_count == 0
+    # 리셋 후 다시 거래 가능
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_daily_trade_count_resets_on_reset_all():
+    """reset_all() 호출 시 daily_trade_count가 0으로 초기화."""
+    cb = _make_cb(max_daily_trades=3)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    cb.reset_all()
+    assert cb.daily_trade_count == 0
+
+
+def test_cb_daily_trade_count_serialization():
+    """to_dict/from_dict이 daily_trade_count를 올바르게 직렬화/복원."""
+    cb = _make_cb(max_daily_trades=10)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=False)
+    state = cb.to_dict()
+    assert state["daily_trade_count"] == 3
+
+    cb2 = _make_cb(max_daily_trades=10)
+    cb2.from_dict(state)
+    assert cb2.daily_trade_count == 3
+
+
+def test_cb_daily_trade_limit_reset_clears_trigger():
+    """일일 거래 횟수 초과로 트리거된 후 reset_daily()로 해제."""
+    cb = _make_cb(max_daily_trades=2)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    # check()로 트리거 설정
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    # reset_daily로 해제
+    cb.reset_daily(daily_start_balance=10000)
+    assert cb.daily_trade_count == 0

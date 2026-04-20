@@ -96,3 +96,114 @@ class TestCacheTTLBoundaries:
         
         # fetch_ohlcv 호출은 1번만
         assert connector.fetch_ohlcv.call_count == 1
+
+
+class TestRegimeAwareCacheTTL:
+    """레짐 기반 캐시 TTL 차별화 테스트."""
+
+    def _make_feed(self, cache_ttl=60):
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 41900, 100],
+        ]
+        return DataFeed(connector, cache_ttl=cache_ttl)
+
+    def test_high_volatility_shorter_ttl(self):
+        """고변동성 레짐 → TTL이 base의 0.33배."""
+        feed = self._make_feed(cache_ttl=60)
+        feed.cache_regime("BTC/USDT", "high_volatility")
+        assert feed._effective_ttl("BTC/USDT") == pytest.approx(60 * 0.33, abs=0.1)
+
+    def test_low_volatility_longer_ttl(self):
+        """저변동성 레짐 → TTL이 base의 1.5배."""
+        feed = self._make_feed(cache_ttl=60)
+        feed.cache_regime("BTC/USDT", "low_volatility")
+        assert feed._effective_ttl("BTC/USDT") == pytest.approx(90.0, abs=0.1)
+
+    def test_crisis_very_short_ttl(self):
+        """위기 레짐 → TTL이 base의 0.2배."""
+        feed = self._make_feed(cache_ttl=100)
+        feed.cache_regime("BTC/USDT", "crisis")
+        assert feed._effective_ttl("BTC/USDT") == pytest.approx(100 * 0.2, abs=0.1)
+
+    def test_no_regime_uses_base_ttl(self):
+        """레짐 미설정 → 기본 TTL 사용."""
+        feed = self._make_feed(cache_ttl=60)
+        assert feed._effective_ttl("BTC/USDT") == 60
+
+    def test_unknown_regime_uses_base_ttl(self):
+        """알 수 없는 레짐 → 기본 TTL 사용 (multiplier 1.0)."""
+        feed = self._make_feed(cache_ttl=60)
+        feed.cache_regime("BTC/USDT", "some_unknown_regime")
+        assert feed._effective_ttl("BTC/USDT") == 60
+
+    def test_regime_ttl_forces_cache_miss(self):
+        """고변동성 레짐 설정 시 짧은 TTL로 캐시 미스 유도."""
+        import time as _time
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 41900, 100],
+        ]
+        feed = DataFeed(connector, cache_ttl=60)
+
+        # 첫 fetch → miss
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        assert feed.cache_stats()['miss_count'] == 1
+
+        # 고변동성 레짐 설정 (effective TTL = 20초)
+        feed.cache_regime("BTC/USDT", "high_volatility")
+
+        # 캐시 타임스탬프를 30초 전으로 조작 → base TTL(60s)로는 히트, regime TTL(20s)로는 미스
+        key = ("BTC/USDT", "1h", 500)
+        cached_summary, _ = feed._cache[key]
+        feed._cache[key] = (cached_summary, _time.time() - 30)
+
+        feed.fetch("BTC/USDT", "1h", limit=500)
+        assert feed.cache_stats()['miss_count'] == 2  # regime TTL 때문에 미스
+
+    def test_cache_stats_includes_regime_cache_size(self):
+        """cache_stats에 regime_cache_size 포함."""
+        feed = self._make_feed(cache_ttl=60)
+        feed.cache_regime("BTC/USDT", "high_volatility")
+        feed.cache_regime("ETH/USDT", "low_volatility")
+        stats = feed.cache_stats()
+        assert stats['regime_cache_size'] == 2
+
+
+class TestTimestampGapDetection:
+    """타임스탬프 갭 감지 테스트."""
+
+    def test_no_gaps_clean_data(self):
+        """갭 없는 정상 데이터 → 갭 이상 없음."""
+        connector = MagicMock()
+        dates = pd.date_range('2024-01-01', periods=100, freq='1h', tz='UTC')
+        raw = [[int(d.timestamp() * 1000), 100, 101, 99, 100, 50] for d in dates]
+        connector.fetch_ohlcv.return_value = raw
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h")
+        assert not any("timestamp gaps" in a for a in result.anomalies)
+
+    def test_large_gap_detected(self):
+        """큰 갭 (>3x median) 있으면 감지."""
+        connector = MagicMock()
+        dates = list(pd.date_range('2024-01-01', periods=50, freq='1h', tz='UTC'))
+        # 50번째 캔들 이후 10시간 갭
+        gap_dates = list(pd.date_range(dates[-1] + pd.Timedelta(hours=10), periods=50, freq='1h', tz='UTC'))
+        all_dates = dates + gap_dates
+        raw = [[int(d.timestamp() * 1000), 100, 101, 99, 100, 50] for d in all_dates]
+        connector.fetch_ohlcv.return_value = raw
+
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h")
+        assert any("timestamp gaps" in a for a in result.anomalies)
+
+    def test_single_candle_no_crash(self):
+        """단일 캔들 → 갭 감지 없이 정상 처리."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = [
+            [1704067200000, 42000, 42500, 41800, 41900, 100],
+        ]
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h")
+        assert not any("timestamp gaps" in a for a in result.anomalies)

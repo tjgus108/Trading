@@ -177,16 +177,33 @@ class DataSummary:
 
 
 class DataFeed:
+    # Regime-aware TTL multipliers: high volatility → shorter cache
+    REGIME_TTL_MULTIPLIER = {
+        "high_volatility": 0.33,   # 1/3 of base TTL
+        "crisis": 0.2,             # 1/5 of base TTL
+        "low_volatility": 1.5,     # 1.5x longer cache in calm markets
+        "trending": 0.5,           # half TTL in trending regimes
+    }
+
     def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3, max_cache_size: int = 128):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
-        self._cache_ttl = cache_ttl  # 초
+        self._cache_ttl = cache_ttl  # 초 (base TTL)
         self._max_cache_size = max_cache_size  # 최대 캐시 엔트리 수
         self._max_retries = max_retries
         self._hit_count = 0          # 캐시 히트 수
         self._miss_count = 0         # 캐시 미스 수
         self._regime_cache: dict = {}  # symbol -> (regime_value, timestamp)
         self._circuit_breaker = CircuitBreaker()  # Cascading failure prevention
+
+    def _effective_ttl(self, symbol: str) -> float:
+        """레짐 기반 캐시 TTL 계산. 고변동성이면 짧게, 저변동성이면 길게."""
+        regime = self.get_cached_regime(symbol)
+        if regime is None:
+            return self._cache_ttl
+        multiplier = self.REGIME_TTL_MULTIPLIER.get(regime, 1.0)
+        effective = self._cache_ttl * multiplier
+        return effective
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         # Circuit breaker check: reject if too many cascading failures
@@ -195,16 +212,27 @@ class DataFeed:
                 f"DataFeed circuit breaker OPEN: too many failures. "
                 f"Will retry after {self._circuit_breaker.recovery_timeout}s"
             )
-        
+
         key = (symbol, timeframe, limit)
         now = time.time()
+        effective_ttl = self._effective_ttl(symbol)
         if key in self._cache:
             cached_summary, ts = self._cache[key]
-            if now - ts < self._cache_ttl:
+            if now - ts < effective_ttl:
                 self._hit_count += 1
+                logger.debug(
+                    "Cache HIT: %s %s (ttl=%.1fs, regime=%s)",
+                    symbol, timeframe, effective_ttl,
+                    self.get_cached_regime(symbol) or "default",
+                )
                 return cached_summary  # 캐시 히트
         # 캐시 미스: 실제 fetch (retry 포함)
         self._miss_count += 1
+        logger.debug(
+            "Cache MISS: %s %s (ttl=%.1fs, regime=%s)",
+            symbol, timeframe, effective_ttl,
+            self.get_cached_regime(symbol) or "default",
+        )
         try:
             summary = self._fetch_with_retry(symbol, timeframe, limit)
             self._circuit_breaker.record_success()  # Success: reset failure count
@@ -355,6 +383,7 @@ class DataFeed:
             'hit_rate': hit_rate,
             'cached_keys': len(self._cache),
             'max_cache_size': self._max_cache_size,
+            'regime_cache_size': len(self._regime_cache),
         }
 
 
@@ -483,6 +512,21 @@ class DataFeed:
                 max_consecutive = max(max_consecutive, consecutive_dups)
             if max_consecutive >= 5:
                 anomalies.append(f"stale feed: {max_consecutive} consecutive identical closes")
+        # 타임스탬프 갭 감지 (연속된 캔들 사이 예상 간격의 3배 초과)
+        if len(df) >= 2:
+            time_diffs = df.index.to_series().diff().dropna()
+            if not time_diffs.empty:
+                median_diff = time_diffs.median()
+                if median_diff.total_seconds() > 0:
+                    large_gaps = time_diffs[time_diffs > median_diff * 3]
+                    if not large_gaps.empty:
+                        gap_count = len(large_gaps)
+                        max_gap = large_gaps.max()
+                        max_gap_at = large_gaps.idxmax()
+                        anomalies.append(
+                            f"timestamp gaps: {gap_count} gaps detected, "
+                            f"largest={max_gap} at {max_gap_at}"
+                        )
         return anomalies
 
     def _validate_ohlc_relationships(self, df: pd.DataFrame) -> List[str]:

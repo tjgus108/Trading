@@ -1,5 +1,27 @@
 # Work Log
 
+## [2026-04-20] Cycle 169 — C (데이터) + B (리스크) + F (리서치)
+
+**[C] DataFeed 캐시 TTL + 갭 감지 (`src/data/feed.py`):**
+- `REGIME_TTL_MULTIPLIER`: high_volatility 0.33x, crisis 0.2x, low_volatility 1.5x, trending 0.5x
+- `_effective_ttl(symbol)`: 레짐 기반 동적 TTL + HIT/MISS 로깅
+- `_detect_anomalies()`: 캔들 간 시간 간격 median 3배 초과 갭 자동 감지
+- 테스트 10개 추가 → 118 passed
+
+**[B] DrawdownMonitor 동적 cooldown + CircuitBreaker 일일 제한:**
+- `REGIME_COOLDOWN_MULTIPLIERS`: HIGH_VOL 2.0x, TREND_DOWN 1.5x, TREND_UP 0.5x
+- 단일/연속 손실 cooldown 모두 레짐 배수 반영
+- CircuitBreaker `max_daily_trades` 파라미터 (기본 0=무제한), 초과 시 거래 차단
+- `reset_daily()` / to_dict/from_dict 직렬화 호환
+- 테스트 15개 추가 → 173 passed
+
+**[F] 리서치: 소자본 + 레짐별 리스크 관리:**
+- 소자본($200) 50회/일 거래 시 수수료+슬리피지 $4+ 잠식
+- 성공 사례: Donchian $2,241→$2,546 (APR 43.8%), 낮은 거래 빈도가 핵심
+- 소자본 포지션 한도($5K): 단일 0.5~1%, 동시 3~5개, 30~50% 예비
+- 레짐별 cooldown 차별화: Bull 3연손→6h, Bear 2연손→12h, 횡보 4연손→8h
+- Stress-Gated Mutation: 드로다운 중 파라미터 급변경 금지 패턴
+
 ## [2026-04-20] Cycle 168 — E (실행) + A (품질) + F (리서치)
 
 **[E] HealthChecker + Notifier 구현:**

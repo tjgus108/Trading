@@ -6,6 +6,7 @@ Circuit Breaker: 다층 자동 거래 중단.
 - 상관관계 급증: 전략 간 상관계수 ≥ corr_threshold → size_multiplier=0.7 축소
 - 플래시 크래시 감지: 단일 캔들 가격 변동 ≥ flash_crash_pct → 즉시 완전 차단
 - 연속 손실 쿨다운: 연속 손실 ≥ max_consecutive_losses → cooldown_periods 동안 거래 차단
+- 일일 거래 횟수 제한: max_daily_trades 초과 시 당일 거래 차단 (0=무제한)
 """
 import logging
 from typing import Optional
@@ -25,6 +26,7 @@ class CircuitBreaker:
         flash_crash_pct: float = 0.10,        # 단일 캔들 10% 이상 변동 → 즉시 차단
         max_consecutive_losses: int = 5,      # 연속 손실 한계
         cooldown_periods: int = 3,            # 쿨다운 기간 (트레이드 횟수 단위)
+        max_daily_trades: int = 0,            # 일일 최대 거래 횟수 (0=무제한)
         correlation_tracker: Optional[SignalCorrelationTracker] = None,
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
@@ -34,12 +36,14 @@ class CircuitBreaker:
         self.flash_crash_pct = flash_crash_pct
         self.max_consecutive_losses = max_consecutive_losses
         self.cooldown_periods = cooldown_periods
+        self.max_daily_trades = max_daily_trades
         self._correlation_tracker = correlation_tracker
         self._triggered: bool = False
         self._reason: str = ""
         self._daily_start_balance: float = 0.0
         self._consecutive_losses: int = 0
         self._cooldown_remaining: int = 0
+        self._daily_trade_count: int = 0
 
     # ── 내부 헬퍼 ──────────────────────────────────────────────────────────────
     def _make_result(
@@ -64,7 +68,10 @@ class CircuitBreaker:
     def record_trade_result(self, is_loss: bool) -> None:
         """트레이드 결과 기록. 손실 시 연속 손실 카운터 증가, 수익 시 초기화.
         연속 손실이 max_consecutive_losses에 도달하면 쿨다운 시작.
+        일일 거래 횟수도 증가시킨다.
         """
+        self._daily_trade_count += 1
+
         if self._cooldown_remaining > 0:
             # 쿨다운 중에는 카운터 변경 없음
             return
@@ -175,6 +182,15 @@ class CircuitBreaker:
             logger.warning("CircuitBreaker COOLDOWN ACTIVE: %s", reason)
             return self._make_result(True, reason, worst, size_multiplier=0.0)
 
+        # ── 일일 거래 횟수 제한 체크 ──────────────────────────────────────────
+        if self.max_daily_trades > 0 and self._daily_trade_count >= self.max_daily_trades:
+            reason = (
+                f"일일 거래 횟수 초과: {self._daily_trade_count}회 ≥ "
+                f"한계 {self.max_daily_trades}회"
+            )
+            logger.warning("CircuitBreaker DAILY TRADE LIMIT: %s", reason)
+            return self._make_result(True, reason, worst, size_multiplier=0.0)
+
         # ── ATR 변동성 급등 체크 ──────────────────────────────────────────────
         atr_surge = False
         atr_reason = ""
@@ -243,7 +259,8 @@ class CircuitBreaker:
     def reset_daily(self, daily_start_balance: float):
         """매일 자정 리셋 — 일일 트리거만 해제, 전체 낙폭 트리거는 수동 해제 필요."""
         self._daily_start_balance = daily_start_balance
-        if self._triggered and "일일" in self._reason:
+        self._daily_trade_count = 0
+        if self._triggered and ("일일" in self._reason or "거래 횟수" in self._reason):
             self._triggered = False
             self._reason = ""
             logger.info("CircuitBreaker: 일일 리셋 완료 (start_balance=%.2f)", daily_start_balance)
@@ -254,6 +271,7 @@ class CircuitBreaker:
         self._reason = ""
         self._consecutive_losses = 0
         self._cooldown_remaining = 0
+        self._daily_trade_count = 0
         logger.info("CircuitBreaker: 전체 리셋")
 
     @property
@@ -268,6 +286,10 @@ class CircuitBreaker:
     def cooldown_remaining(self) -> int:
         return self._cooldown_remaining
 
+    @property
+    def daily_trade_count(self) -> int:
+        return self._daily_trade_count
+
     # ── 직렬화 ────────────────────────────────────────────────────────────────
     def to_dict(self) -> dict:
         """현재 상태를 직렬화 가능한 dict로 반환."""
@@ -276,6 +298,7 @@ class CircuitBreaker:
             "reason": self._reason,
             "consecutive_losses": self._consecutive_losses,
             "cooldown_remaining": self._cooldown_remaining,
+            "daily_trade_count": self._daily_trade_count,
         }
 
     def from_dict(self, state: dict) -> None:
@@ -284,3 +307,4 @@ class CircuitBreaker:
         self._reason = str(state.get("reason", ""))
         self._consecutive_losses = int(state.get("consecutive_losses", 0))
         self._cooldown_remaining = int(state.get("cooldown_remaining", 0))
+        self._daily_trade_count = int(state.get("daily_trade_count", 0))
