@@ -80,6 +80,7 @@ MAX_PER_SYMBOL_POSITIONS = 2  # 심볼당 최대 2개
 SL_ATR_MULT = 2.5             # SL = ATR * 2.5 (기존 1.5 → 노이즈 방지)
 TP_ATR_MULT = 4.0             # TP = ATR * 4.0 (기존 3.0 → R:R 1.6)
 MAX_HOLD_CANDLES = 48         # 48시간 강제 청산 (기존 24)
+MAX_LOSS_PCT = 0.50           # 초기 자본 대비 50% 손실 시 자동 중단
 INITIAL_BALANCE = 10_000.0
 # 레짐별 포지션 사이즈 배수 (RANGING은 진입 자체를 차단하므로 제외)
 REGIME_SIZE_MULT: dict = {
@@ -325,9 +326,12 @@ class LiveState:
 # ── 메인 루프 ──────────────────────────────────────────
 
 class LivePaperTrader:
-    def __init__(self, days: int = DEFAULT_DAYS, interval: int = DEFAULT_INTERVAL):
+    def __init__(self, days: int = DEFAULT_DAYS, interval: int = DEFAULT_INTERVAL,
+                 max_loss_pct: float = MAX_LOSS_PCT):
         self.days = days
         self.interval = interval
+        self.max_loss_pct = max_loss_pct
+        self._halted = False  # 최대 손실 한계 도달 시 True → 수동 재시작 필요
         self.state = LiveState.load()
         self.paper = PaperTrader(
             initial_balance=self.state.portfolio_balance,
@@ -438,8 +442,32 @@ class LivePaperTrader:
             return False
         return True
 
+    def _check_max_loss(self) -> bool:
+        """초기 자본 대비 최대 손실 한계 체크. 한계 도달 시 True 반환."""
+        if self._halted:
+            return True
+        loss_pct = (INITIAL_BALANCE - self.state.portfolio_balance) / INITIAL_BALANCE
+        if loss_pct >= self.max_loss_pct:
+            self._halted = True
+            logger.critical(
+                "MAX LOSS LIMIT REACHED: %.1f%% loss (threshold: %.1f%%). "
+                "Balance: $%.2f / Initial: $%.2f. ALL TRADING HALTED. "
+                "Manual restart required (--reset).",
+                loss_pct * 100, self.max_loss_pct * 100,
+                self.state.portfolio_balance, INITIAL_BALANCE,
+            )
+            # 상태 저장 (halted 기록)
+            self.state.save()
+            return True
+        return False
+
     def tick(self):
         """매 interval마다 실행: 모든 심볼 순회."""
+        # 최대 손실 한계 체크 — 도달 시 모든 거래 중단
+        if self._check_max_loss():
+            logger.warning("Trading halted due to max loss limit. Skipping tick.")
+            return
+
         self.state.tick_count += 1
         self.state.last_tick = datetime.utcnow().isoformat()
 
@@ -559,7 +587,7 @@ class LivePaperTrader:
                             # 예측: UP=1, DOWN=0; 실제: BUY→UP=1, SELL→DOWN=0
                             if symbol not in self._accuracy_monitors:
                                 self._accuracy_monitors[symbol] = AccuracyDriftMonitor(
-                                    window=100, min_accuracy=0.52
+                                    window=100, min_accuracy=0.55
                                 )
                             actual_label = 1 if sig.action == Action.BUY else 0
                             pred_label = 1 if ml_label == "UP" else 0

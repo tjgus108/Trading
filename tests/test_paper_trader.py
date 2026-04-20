@@ -1,5 +1,6 @@
 """tests/test_paper_trader.py — PaperTrader 단위 테스트"""
 import pytest
+from unittest.mock import patch, MagicMock
 from src.exchange.paper_trader import PaperTrader, PaperAccount, PaperTrade
 
 
@@ -509,3 +510,50 @@ def test_sell_fee_accumulated_across_multiple_trades():
     # total_pnl은 SELL 기준이므로 BUY fee는 잔액에서만 빠짐
     summary = pt.get_summary()
     assert summary["total_pnl"] == pytest.approx(expected_total, abs=1e-6)
+
+
+# ── LivePaperTrader 최대 손실 한계 테스트 (Cycle 163) ─────────────────
+
+def _make_live_trader(balance: float, max_loss_pct: float = 0.5):
+    """LivePaperTrader를 heavy deps 없이 최소 생성."""
+    from scripts.live_paper_trader import LivePaperTrader, LiveState, INITIAL_BALANCE
+
+    with patch.object(LiveState, 'load') as mock_load, \
+         patch('scripts.live_paper_trader.CircuitBreaker'), \
+         patch('scripts.live_paper_trader.StrategyRotationManager'), \
+         patch('scripts.live_paper_trader.MarketRegimeDetector'), \
+         patch('scripts.live_paper_trader.SignalCorrelationTracker'), \
+         patch('scripts.live_paper_trader.DriftMonitor'), \
+         patch('signal.signal'):
+        state = LiveState()
+        state.portfolio_balance = balance
+        mock_load.return_value = state
+        trader = LivePaperTrader(days=1, interval=60, max_loss_pct=max_loss_pct)
+        trader.state = state
+        return trader
+
+
+def test_max_loss_halts_trading():
+    """초기 자본 대비 50% 이상 손실 시 _halted=True, tick 중단."""
+    trader = _make_live_trader(balance=4000.0, max_loss_pct=0.5)
+    # balance=4000, initial=10000 → 60% 손실 → 한계 초과
+    assert trader._check_max_loss() is True
+    assert trader._halted is True
+
+
+def test_max_loss_not_triggered_above_threshold():
+    """손실이 한계 미만이면 거래 계속."""
+    trader = _make_live_trader(balance=6000.0, max_loss_pct=0.5)
+    # balance=6000, initial=10000 → 40% 손실 → 한계 미달
+    assert trader._check_max_loss() is False
+    assert trader._halted is False
+
+
+def test_max_loss_halted_stays_halted():
+    """한번 halted 되면 잔액 회복해도 halted 유지 (수동 재시작 필요)."""
+    trader = _make_live_trader(balance=4000.0, max_loss_pct=0.5)
+    assert trader._check_max_loss() is True
+    assert trader._halted is True
+    # 잔액을 인위적으로 회복시켜도 halted 유지
+    trader.state.portfolio_balance = 9000.0
+    assert trader._check_max_loss() is True  # 여전히 halted

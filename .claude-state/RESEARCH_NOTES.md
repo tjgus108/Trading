@@ -1,3 +1,81 @@
+## Cycle 163 Research Notes — 실시간 모델 드리프트 대응 & 소자본 운영 현실
+
+### 주제 1: ML 트레이딩봇 실시간 모델 드리프트 대응
+
+#### 핵심 인사이트
+
+1. **PSI가 금융 서비스 표준, 역치는 PSI > 0.2** — PSI(Population Stability Index)는 reference 분포 대비 현재 피처 분포 변화를 quantize된 bin으로 계산. PSI < 0.1은 안정, 0.1~0.2는 경고, > 0.2는 재학습 트리거. 금융 서비스에서 가장 광범위하게 배포된 드리프트 감지 메트릭. 이전 리서치에서 이미 PSI > 0.2 재학습 기준이 우리 프로젝트에 언급됨 — 이 기준은 업계 표준과 일치.
+
+2. **앙상블이 드리프트에 가장 강건** — 서로 다른 시간 구간에 학습된 여러 모델을 앙상블하면 단일 모델 드리프트에 덜 민감. 핵심 메커니즘: 하나의 컴포넌트 모델이 특정 레짐에서 드리프트해도 나머지 모델이 보완. 실제 구현 패턴: 최근 30일 모델 + 60일 모델 + 90일 모델 가중 앙상블, 최근 정확도가 높은 모델에 더 높은 가중치 부여.
+
+3. **폴백 전략(Fallback) 필수 — 규칙 기반으로 후퇴** — 드리프트 감지 시 ML 모델을 신뢰할 수 없는 구간에서 더 단순하고 robust한 규칙 기반 로직(예: 이동평균, 모멘텀 필터)으로 자동 전환. "rogue model보다 덜 정확하지만 더 robust한 휴리스틱" 원칙. 모델 신뢰도 낮을 때 포지션 사이즈 축소 또는 HOLD도 폴백 전략의 일종.
+
+4. **재학습 주기 best practice: 드리프트 트리거 > 고정 주기** — 2시간마다 재학습하는 구현 사례도 있으나, 업계 best practice는 고정 스케줄보다 PSI/정확도 드리프트 트리거 기반 재학습이 우월. 크립토처럼 레짐 변화가 불규칙한 시장에서는 고정 주기(예: 매일)가 오히려 안정 구간에서 불필요한 재학습 야기. 권장: PSI > 0.2 OR 최근 N거래 정확도가 기준(예: 55%) 이하 시 재학습 트리거.
+
+5. **데이터 윈도우 크기: 롤링 90~180일이 크립토 표준** — 너무 짧으면(30일 이하) 노이즈 과학습, 너무 길면(1년 이상) 이전 레짐 데이터가 현재 레짐 학습을 방해. 크립토 고변동성 특성상 금융권 표준(1~3년)보다 짧은 윈도우 권장. Freqtrade 오픈소스 봇 커뮤니티 기준: rolling 90일 학습 + 최근 30일 검증이 가장 많이 사용되는 조합.
+
+#### 드리프트 감지 메트릭 비교
+
+| 메트릭 | 민감도 | 금융 표준 | 계산 비용 | 적합 용도 |
+|--------|--------|-----------|-----------|-----------|
+| PSI | 중간 | 최고 | 낮음 | 피처 분포 모니터링 |
+| KL Divergence | 높음 | 중간 | 낮음 | 큰 분포 변화 포착 |
+| KS Test | 중간 | 중간 | 낮음 | 수치형 피처 단변량 |
+| 정확도 추적 | 낮음(지연) | 높음 | 낮음 | 모델 출력 성능 모니터링 |
+
+---
+
+### 주제 2: 소규모 자본($1K-$10K) 크립토 봇 운영 현실
+
+#### 핵심 인사이트
+
+1. **73% 실패율, 수수료가 핵심 원인** — 자동화 크립토 트레이딩 계좌의 73%가 6개월 내 실패. 80% 이상의 소매 자동화 봇 사용자가 단순 Buy-and-Hold보다 낮은 성과(수수료 + 슬리피지 반영 후). $1,000 자본으로 0.2% 수익 거래 시 gross $2, 수수료 약 $1.5 제하면 net $0.5 — 스케일링 자체가 불가능.
+
+2. **Bybit 수수료 구조 (2026 기준)** — Taker: 0.055%, Maker: 0.020%. VIP 최고 등급 시 Taker 0.030%, Maker 0.000%(rebate). 소자본 봇의 수수료 최소화 핵심: **지정가 주문(limit order) = maker 주문 = 0.020%**. 시장가 주문(taker) 사용 시 round-trip 수수료 0.11% — 0.2% 목표 수익에서 55%가 수수료. 스캘핑 전략은 수학적으로 소자본에서 작동 어려움.
+
+3. **$5,000이 현실적 최소 자본 — 스캘핑 기준** — $1,000 이하는 수수료 비율이 수익을 구조적으로 잠식. $5,000부터 수학적으로 수익 가능한 구조 시작. 스캘핑 봇은 0.1~0.5% 목표 수익/거래, tight stop-loss 0.1~0.2% — 월 현실적 수익 3~6% 상한(좋은 달 기준). **스윙 전략이 소자본에 더 유리**: 거래 빈도 낮아 수수료 부담 감소, 슬리피지 영향도 낮음.
+
+4. **슬리피지 과소추정이 실패 2위 원인** — BTC/USDT $10,000 주문 기준 슬리피지 0.1% 미만(주요 거래소). 그러나 변동성 구간에서 0.6~1.5%+로 급등. 2025년 5월 플래시 크래시 당시 AI 봇들이 3분 만에 $20억 매도 → 유동성 부족 구간 진입 시 슬리피지 폭발. **백테스트에 0.1% 고정 슬리피지 적용은 과소추정** — 변동성 레짐별 가변 슬리피지(low_vol: 0.05%, high_vol: 0.3~0.5%) 적용 필요.
+
+5. **레버리지가 소자본 실패의 3위 원인** — 소자본 + 고레버리지 조합은 MDD를 기하급수적으로 증폭. 성공 사례(3Commas DCA 20x)는 매우 정교한 파라미터 검증 후 적용. 소자본 첫 실전 운용 권장 레버리지: 1~3x. 레버리지 없이 전략 엣지 먼저 실증 후 점진적 증가.
+
+#### 전략 유형별 소자본 적합성
+
+| 전략 유형 | 거래 빈도 | 수수료 영향 | 슬리피지 영향 | $1K-$10K 적합도 |
+|-----------|-----------|-------------|---------------|-----------------|
+| 스캘핑(1m-5m) | 매우 높음 | 매우 높음 | 높음 | 낮음 |
+| 단타(15m-1h) | 높음 | 높음 | 중간 | 중간 |
+| 스윙(4h-1d) | 낮음 | 낮음 | 낮음 | 높음 |
+| DCA/Grid | 조건부 | 낮음(maker) | 낮음 | 높음(ranging) |
+
+---
+
+### 이 프로젝트에 적용 가능한 구체적 권장사항
+
+1. **PSI 기반 자동 재학습 트리거 구현** — `src/ml/` 또는 `src/risk/` 에 PSI 계산 모듈 추가. 학습 시점의 피처 분포를 reference로 저장, 실시간 피처 분포와 비교해 PSI > 0.2 시 재학습 플래그 발생. 이미 이전 리서치에서 PSI > 0.2 기준이 언급됐으므로 구현 단계로 진행 가능.
+
+2. **XGBoost 앙상블을 다시간 윈도우 앙상블로 설계** — 다음 구현 대상인 XGBoost 앙상블을 단순 배깅이 아니라 "90일 모델 + 60일 모델 + 30일 모델" 3-way 앙상블로 설계. 각 모델의 최근 정확도(rolling 20거래 기준)로 가중치 동적 조정. 드리프트 시 최신 30일 모델 가중치가 자동으로 올라가는 구조.
+
+3. **백테스트 엔진에 현실적 수수료/슬리피지 적용** — 현재 BacktestEngine의 수수료 설정 확인 필요. 실전 기준: Taker fee 0.055%, 레짐별 가변 슬리피지(ATR 상위 20% 구간: 0.3%, 하위 80%: 0.08%). ML 모델(4h 스윙 기준) 수수료는 낮지만, 백테스트가 시장가 진입 가정이면 taker fee 0.055% 반드시 반영.
+
+---
+
+### 출처
+
+- [Model Drift Detection: Preventing Silent Accuracy Decay](https://wetranscloud.com/blog/model-drift-detection-accuracy-decay)
+- [AI Model Drift & Retraining: A Guide for ML System Maintenance](https://smartdev.com/ai-model-drift-retraining-a-guide-for-ml-system-maintenance/)
+- [Strategies for Managing Model Drift in Deployed ML Systems](https://moldstud.com/articles/p-effective-strategies-for-managing-model-drift-in-deployed-machine-learning-systems)
+- [Autoregressive Drift Detection Method (ADDM) in Trading](https://blog.quantinsti.com/autoregressive-drift-detection-method/)
+- [GitHub: freqtrade/freqtrade — open source crypto trading bot](https://github.com/freqtrade/freqtrade)
+- [How to Backtest a Crypto Bot: Realistic Fees, Slippage, and Paper Trading](https://paybis.com/blog/how-to-backtest-crypto-bot/)
+- [7 Hidden Risks of Crypto Bots: Advanced Dangers Traders Must Avoid](https://www.altrady.com/blog/crypto-bots/7-hidden-risks)
+- [Why Most Trading Bots Lose Money](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [Bybit Trading Fee Structure](https://www.bybit.com/en/help-center/article/Trading-Fee-Structure)
+- [The 2025 Crypto Scalping Bot Landscape: ROI, Risk, and Technological Edge](https://www.ainvest.com/news/2025-crypto-scalping-bot-landscape-roi-risk-technological-edge-2512/)
+- [Crypto Slippage Explained: How I Fixed My Arbitrage Bot's #1 Problem](https://medium.com/@swaphunt/slippage-in-crypto-swaps-why-your-arbitrage-bot-keeps-crying-and-what-i-did-about-it-e561c0603e86)
+
+---
+
 ## Cycle 133 Research Notes
 
 ### 실패 사례
