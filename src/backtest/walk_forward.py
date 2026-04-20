@@ -414,7 +414,7 @@ class WalkForwardValidator:
         self,
         df: pd.DataFrame,
         strategy: BaseStrategy,
-        fee_rate: float = 0.001,
+        fee_rate: float = 0.00055,   # Bybit taker 0.055%
         slippage_pct: float = 0.0005,
     ) -> WalkForwardValidationResult:
         """

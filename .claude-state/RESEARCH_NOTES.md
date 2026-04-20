@@ -1,3 +1,69 @@
+## Cycle 164 Research Notes — XGBoost 앙상블 + 다시간 윈도우 전략
+
+### 주제 1: XGBoost 크립토 트레이딩 앙상블 Best Practice
+
+#### 핵심 인사이트
+
+1. **RF + XGBoost 앙상블: Stacking이 Voting보다 우월** — RF를 base learner, XGBoost를 meta-learner로 쓰는 stacking 패턴이 크립토 방향 예측에서 단순 voting/averaging보다 우월. 이유: XGBoost meta-learner가 각 base 모델의 약점/강점을 레짐별로 학습함. 실증: Ethereum 단기 수익 분류(Downtrend/Sideway/Uptrend 3-class)에서 stacking이 단일 모델 대비 ROC-AUC 개선. 단, 데이터가 작을 때(< 500 샘플) stacking이 오히려 과적합 위험 — 크립토 4h 봉 90일 = 540 샘플이므로 경계 구간.
+
+2. **max_depth <= 3이 크립토에서 과적합 방지에 실증적으로 유효** — XGBoost 기본값이 max_depth=3인 이유가 있음. max_depth가 커질수록 훈련 성능은 급격히 오르고 테스트 성능은 완만하게 오르는 gap 확대 패턴이 금융 데이터에서 일관되게 관찰됨. 크립토 방향 예측 연구에서 max_depth 3~4가 최적 구간으로 반복 등장. max_depth >= 6은 표본 내 Sharpe가 높아 보이지만 실전 드리프트 구간에서 급격히 붕괴.
+
+3. **early_stopping_rounds: 크립토 노이즈 데이터에는 50 권장** — 표준 권장: n_estimators의 10%. 그러나 크립토처럼 loss가 무작위 구간에서 일시적으로 오르내리는 노이즈 데이터에서는 rounds=10~20이면 조기 종료 오류 발생 빈번. 금융 fraud detection 등 노이즈 금융 데이터 연구에서 rounds=50이 표준. 구현 권장: `early_stopping_rounds=50, eval_metric='logloss', eval_set=[(X_val, y_val)]`. 주의: hyperparameter tuning(CV) 이후 최적 n_estimators로 재학습 필수 — fold별 stopping point가 달라 CV 결과를 그대로 사용하면 안 됨.
+
+4. **권장 hyperparameter 범위 (크립토 방향 예측 기준)** — Bayesian optimization이 grid search보다 효율적(탐색 공간 대비 오류 최소화). 크립토 논문과 Kaggle 금융 대회 기준 수렴 구간:
+   - `learning_rate`: 0.01~0.05 (크립토는 0.1보다 작은 값이 일반화 우수)
+   - `n_estimators`: 200~500 (early stopping과 함께 사용 시)
+   - `max_depth`: 3~4
+   - `subsample`: 0.6~0.8 (0.5는 과소, 1.0은 과대)
+   - `colsample_bytree`: 0.6~0.8
+   - `min_child_weight`: 3~5 (크립토 노이즈 방어)
+   - `reg_alpha`(L1)/`reg_lambda`(L2): 0.1~1.0 (정규화 필수)
+
+5. **XGBoost 단독 vs RF: 크립토에서 RF가 일반화 더 안정적** — XGBoost는 과거 패턴을 RF보다 정밀하게 학습하지만, 레짐 전환 시 RF보다 빨리 붕괴하는 특성이 여러 크립토 연구에서 관찰. 결론: XGBoost를 RF와 stacking 앙상블로 결합할 때 단독 XGBoost보다 out-of-sample 안정성이 높음. 우리 프로젝트는 이미 RF가 63.5% test acc — XGBoost를 병렬 추가해 stacking하는 것이 RF 단독 교체보다 리스크가 낮음.
+
+---
+
+### 주제 2: 다시간 윈도우 앙상블 (Multi-Horizon Ensemble) 구현 패턴
+
+#### 핵심 인사이트
+
+1. **동적 가중치(성능 기반) > 고정 가중치** — ACM ICAIF FinRL Contest 2023/2024 공식 집계: 롤링 성능 기반 동적 가중치가 고정 가중치 대비 Sharpe를 평균 12~18% 향상. 가중치 계산 기준: 최근 N거래(N=20~30)의 rolling accuracy 또는 rolling Sharpe. 구현 패턴: `w_i = softmax(perf_i / temperature)`. 단, 성능 변동이 심한 크립토에서 temperature가 너무 낮으면(= 한 모델에 가중치 집중) 불안정 — temperature=1.0~2.0이 안전.
+
+2. **레짐 전환 시 단기 윈도우(30일)가 유리, 안정 구간에서는 장기(90일)가 유리** — 연구 결과(Dynamic Factor Allocation, 2024): 장기 윈도우 모델(90일+)은 안정된 추세 레짐에서 더 높은 가중치를 받고, 단기 윈도우(30일)는 레짐 전환 직후 빠른 적응으로 일시적으로 가중치가 급등하는 패턴. 크립토 bull/bear/neutral 3-state 레짐 모델에서 이 패턴이 실증 확인. 결론: 동적 가중치 자체가 레짐 인식 메커니즘을 내포함 — 별도 레짐 탐지 없어도 어느 정도 자동 적응.
+
+3. **데이터 겹침(Overlap) 문제: 30/60/90일은 구조적으로 상관됨** — 90일 모델은 60일/30일 모델이 본 데이터를 모두 포함. 이로 인해 세 모델의 예측이 높은 상관관계를 가지며, 실질적인 앙상블 다양성(diversity)이 낮아짐. 겹침 50% 초과 시 동일 패턴을 여러 모델이 중복 반영해 분산 감소 효과 약화. 완화 방법: (a) walk-forward로 각 모델 학습 구간을 겹치지 않게 분리(가장 강력), (b) 서로 다른 피처셋 사용(예: 30일=단기 피처, 90일=장기 피처), (c) 다양한 알고리즘 사용(RF + XGBoost + ExtraTrees).
+
+4. **실패 사례: 모델 수 과다 + 상관도 문제** — 모델 수를 5~10개로 늘려도 상관관계가 높으면 앙상블 이득이 사라짐. 실증: 3-window 앙상블(30/60/90일 RF)의 correlation matrix에서 평균 0.85 이상 상관이 관찰된 사례. 이 경우 단일 모델과 거의 동일한 결과. 핵심: 모델 수보다 모델 간 다양성(diversity)이 앙상블 이득의 결정 요인 — 3개 다양한 알고리즘 > 10개 동일 알고리즘.
+
+5. **메모리/계산 비용: 30/60/90일 3모델은 실전 허용 수준** — 4h 봉 30일 = 180 샘플, 90일 = 540 샘플. 피처 30개, XGBoost/RF 학습 시간 < 1초/모델. 3모델 총 학습 시간 < 5초 — 실전 배포 허용. 예측 inference는 저장된 모델 로드 후 < 10ms. 주의: 모델을 매 거래마다 재학습하면 낭비 — PSI 트리거 기반 재학습(필요 시에만) 유지.
+
+---
+
+### 이 프로젝트에 적용 가능한 구체적 구현 권장사항
+
+1. **RF(이미 구현) + XGBoost stacking 설계** — 기존 RF 모델을 base learner로 유지, XGBoost meta-learner 추가. meta-learner 입력: RF의 predict_proba 3개(UP/DOWN/HOLD) + XGBoost 자체의 predict_proba. stacking용 held-out set은 기존 validation fold 재활용. max_depth=3, learning_rate=0.03, subsample=0.7, early_stopping_rounds=50으로 시작.
+
+2. **30/60/90일 윈도우 다양성 확보 전략** — 단순히 같은 RF를 3번 학습하면 상관도가 너무 높음. 권장: 30일=XGBoost(단기 피처: RSI/MACD/volume), 60일=RF(중기 피처: 볼린저밴드/ATR), 90일=ExtraTrees(장기 피처: 추세 강도/OI). 각 모델이 다른 알고리즘 + 다른 피처 그룹을 사용하면 상관도를 0.6 수준으로 낮출 수 있음 — 앙상블 이득 실질화.
+
+3. **가중치 업데이트 주기: 매 거래가 아닌 rolling 20거래마다** — 매 거래 후 가중치 재계산하면 단기 노이즈에 과잉 반응. 권장: 20거래 버퍼 채운 후 rolling accuracy로 가중치 재계산, softmax temperature=1.5 적용. 초기 20거래 이전에는 균등 가중치(1/3 each) 사용. 이 설계가 Cycle 163에서 제안된 "최근 정확도 기반 동적 가중치" 구현 방법에 해당.
+
+---
+
+### 출처
+
+- [Revisiting Ensemble Methods for Stock Trading and Crypto Trading Tasks at ACM ICAIF FinRL Contests 2023/2024](https://arxiv.org/html/2501.10709v1)
+- [XGBoost for Classifying Ethereum Short-term Return Based on Technical Factor](https://dl.acm.org/doi/fullHtml/10.1145/3605423.3605462)
+- [Empirical Calibration of XGBoost Model Hyperparameters Using Bayesian Optimisation: Bitcoin Volatility](https://www.mdpi.com/1911-8074/18/9/487)
+- [Dynamic Factor Allocation Leveraging Regime-Switching Signals](https://arxiv.org/html/2410.14841v1)
+- [Dynamic Asset Allocation with Asset-Specific Regime Forecasts](https://arxiv.org/html/2406.09578v1)
+- [Hyperparameter Tuning XGBoost with early stopping](https://macalusojeff.github.io/post/HyperparameterTuningXGB/)
+- [Early Stopping with XGBoost: Preventing Overfitting in Boosted Trees](https://codesignal.com/learn/courses/fixing-classical-models-diagnosis-regularization/lessons/early-stopping-with-xgboost-preventing-overfitting-in-boosted-trees)
+- [Multi-Window Based Ensemble Learning for Classification of Imbalanced Streaming Data](https://link.springer.com/chapter/10.1007/978-3-319-26187-4_6)
+- [XGBoost Parameters — xgboost 3.2.0 documentation](https://xgboost.readthedocs.io/en/stable/parameter.html)
+- [Stacking Ensemble With XGBoost Meta Model](https://xgboosting.com/stacking-ensemble-with-xgboost-meta-model-final-model/)
+
+---
+
 ## Cycle 163 Research Notes — 실시간 모델 드리프트 대응 & 소자본 운영 현실
 
 ### 주제 1: ML 트레이딩봇 실시간 모델 드리프트 대응

@@ -1,5 +1,27 @@
 # Work Log
 
+## [2026-04-20] Cycle 164 — C (데이터) + B (리스크) + F (리서치)
+
+**[C] 수수료 현실화 + adaptive 슬리피지:**
+- 수수료 0.1% → Bybit taker 0.055% 기본값 변경 (7개 파일)
+- `BYBIT_TAKER_FEE=0.00055`, `BYBIT_MAKER_FEE=0.00020` 상수 정의
+- `adaptive_slippage=True` 옵션: ATR/close 기반 레짐별 가변 슬리피지
+  - low(<0.5%): 0.02%, normal(0.5~2%): 0.05%, high(≥2%): 0.15%
+- 테스트 9개 추가 → 48 PASS (backtest_engine), 전체 7081 passed
+
+**[B] PSI 드리프트 모니터 (`src/ml/drift_detector.py`):**
+- `compute_psi(reference, current, n_bins=10)`: PSI = Σ(act%-exp%) * ln(act%/exp%)
+- `PSIDriftMonitor`: 4단계 (stable/warning/drift/severe), set_reference→compute 워크플로우
+- 기존 PHT/CUSUM은 output drift, PSI는 input drift → 양방향 드리프트 감지 가능
+- 테스트 19개 추가 → 47 PASS (drift 관련)
+
+**[F] XGBoost 앙상블 + 다시간 윈도우 리서치:**
+- RF base + XGBoost meta stacking이 voting보다 우월 (실증)
+- max_depth ≤ 3 필수, early_stopping_rounds=50 권장, lr 0.01~0.05
+- 다시간 윈도우: 30/60/90일에 각각 다른 알고리즘 할당 (상관도 0.6 이하 유지)
+- 동적 가중치(softmax, temp=1.5)가 고정 대비 Sharpe 12~18% 향상
+- 초기 20거래 균등 → rolling 20거래마다 가중치 갱신
+
 ## [2026-04-20] Cycle 163 — E (실행) + A (품질) + F (리서치)
 
 **[E] 실행: live_paper_trader 최대 손실 한계 구현:**
@@ -12915,6 +12937,76 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-04-20 02:54 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 03:01 UTC] Cycle 164 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-20 03:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-20 03:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 03:08 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

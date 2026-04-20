@@ -35,6 +35,20 @@ ANNUALIZATION = {
     "1d": 252,
 }
 
+# Bybit 실제 수수료 (2024-2025 기준)
+BYBIT_TAKER_FEE = 0.00055   # 0.055%
+BYBIT_MAKER_FEE = 0.00020   # 0.020%
+DEFAULT_FEE_RATE = BYBIT_TAKER_FEE  # 백테스트는 시장가(taker) 기준
+
+# 레짐별 슬리피지 기본값 (ATR 비율 기반)
+# 저변동성: 0.02%, 보통: 0.05%, 고변동성: 0.15%
+SLIPPAGE_REGIME = {
+    "low":    0.0002,   # 0.02%
+    "normal": 0.0005,   # 0.05%
+    "high":   0.0015,   # 0.15%
+}
+DEFAULT_SLIPPAGE = 0.0005  # 0.05% (보통 레짐)
+
 
 @dataclass
 class BacktestResult:
@@ -85,15 +99,16 @@ class BacktestEngine:
     def __init__(
         self,
         initial_balance: float = 10_000.0,
-        commission: float = 0.001,   # 0.1% per trade (deprecated alias: use fee_rate)
-        fee_rate: Optional[float] = None,  # 진입/청산 각 0.1%, 왕복 0.2%
+        commission: float = DEFAULT_FEE_RATE,  # Bybit taker 0.055% (deprecated alias: use fee_rate)
+        fee_rate: Optional[float] = None,  # 진입/청산 각 taker fee, 왕복 0.11%
         atr_multiplier_sl: float = 1.5,
         atr_multiplier_tp: float = 3.0,
-        slippage: float = 0.001,
-        slippage_pct: Optional[float] = None,  # 0.1% 슬리피지 (Cycle 140: 0.05→0.1%)
+        slippage: float = DEFAULT_SLIPPAGE,
+        slippage_pct: Optional[float] = None,  # 기본 0.05% (보통 레짐)
         timeframe: str = "1h",
         funding_cost_per_candle: float = 0.0,
         dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
+        adaptive_slippage: bool = False,  # True면 ATR 기반 레짐별 가변 슬리피지
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -107,6 +122,7 @@ class BacktestEngine:
         self.timeframe = timeframe
         self.funding_cost_per_candle = funding_cost_per_candle
         self.dsr_threshold = dsr_threshold
+        self.adaptive_slippage = adaptive_slippage
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -141,9 +157,10 @@ class BacktestEngine:
             # 열린 포지션 청산 체크
             if position:
                 position["hold_candles"] += 1
+                exit_slip = self._get_slippage(candle)
                 # MAX_HOLD_CANDLES 초과 시 강제 청산
                 if position["hold_candles"] >= MAX_HOLD_CANDLES:
-                    pnl, fee, slip = self._market_close(position, candle["close"])
+                    pnl, fee, slip = self._market_close(position, candle["close"], exit_slip)
                     balance += pnl
                     trades.append(pnl)
                     total_fees += fee
@@ -151,7 +168,7 @@ class BacktestEngine:
                     peak_balance = max(peak_balance, balance)
                     position = None
                 else:
-                    pnl, closed, fee, slip = self._check_exit(position, candle)
+                    pnl, closed, fee, slip = self._check_exit(position, candle, exit_slip)
                     if closed:
                         balance += pnl
                         trades.append(pnl)
@@ -174,12 +191,13 @@ class BacktestEngine:
                         size = risk_amt / sl_dist
                         close = candle["close"]
 
+                        cur_slip = self._get_slippage(candle)
                         if signal.action == Action.BUY:
-                            entry = close * (1 + self.slippage)
+                            entry = close * (1 + cur_slip)
                             sl = entry - sl_dist
                             tp = entry + atr * self.atr_multiplier_tp
                         else:
-                            entry = close * (1 - self.slippage)
+                            entry = close * (1 - cur_slip)
                             sl = entry + sl_dist
                             tp = entry - atr * self.atr_multiplier_tp
 
@@ -206,7 +224,8 @@ class BacktestEngine:
         # 미청산 포지션 시장가 청산
         if position:
             last = df.iloc[-1]
-            pnl, fee, slip = self._market_close(position, last["close"])
+            final_slip = self._get_slippage(last)
+            pnl, fee, slip = self._market_close(position, last["close"], final_slip)
             balance += pnl
             trades.append(pnl)
             total_fees += fee
@@ -246,42 +265,70 @@ class BacktestEngine:
                 result.passed = False
         return result
 
-    def _check_exit(self, position: dict, candle: pd.Series) -> Tuple[float, bool, float, float]:
+    def _get_slippage(self, candle: pd.Series) -> float:
+        """현재 캔들의 슬리피지를 반환.
+
+        adaptive_slippage=True이면 ATR/close 비율로 레짐 판별 후
+        SLIPPAGE_REGIME 딕셔너리에서 해당 레짐 값 반환.
+        False이면 고정 self.slippage 반환.
+
+        레짐 판별 기준 (ATR14 / close):
+          - < 0.5%  → low   (0.02%)
+          - < 2.0%  → normal (0.05%)
+          - >= 2.0% → high   (0.15%)
+        """
+        if not self.adaptive_slippage:
+            return self.slippage
+        atr = candle.get("atr14", 0.0)
+        close = candle.get("close", 1.0)
+        if close <= 0 or atr <= 0:
+            return self.slippage
+        atr_ratio = atr / close
+        if atr_ratio < 0.005:
+            return SLIPPAGE_REGIME["low"]
+        elif atr_ratio < 0.02:
+            return SLIPPAGE_REGIME["normal"]
+        else:
+            return SLIPPAGE_REGIME["high"]
+
+    def _check_exit(self, position: dict, candle: pd.Series, slippage: Optional[float] = None) -> Tuple[float, bool, float, float]:
         """반환: (pnl, closed, fee, slippage_cost)"""
+        slip = slippage if slippage is not None else self.slippage
         side = position["side"]
         sl, tp, size, entry = position["sl"], position["tp"], position["size"], position["entry"]
 
         if side == "BUY":
             if candle["low"] <= sl:
-                exit_price = sl * (1 - self.slippage)
+                exit_price = sl * (1 - slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(sl - exit_price)
                 return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost
             if candle["high"] >= tp:
-                exit_price = tp * (1 - self.slippage)
+                exit_price = tp * (1 - slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(tp - exit_price)
                 return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost
         else:
             if candle["high"] >= sl:
-                exit_price = sl * (1 + self.slippage)
+                exit_price = sl * (1 + slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(exit_price - sl)
                 return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost
             if candle["low"] <= tp:
-                exit_price = tp * (1 + self.slippage)
+                exit_price = tp * (1 + slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(exit_price - tp)
                 return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost
         return 0.0, False, 0.0, 0.0
 
-    def _market_close(self, position: dict, close_price: float) -> Tuple[float, float, float]:
+    def _market_close(self, position: dict, close_price: float, slippage: Optional[float] = None) -> Tuple[float, float, float]:
         """반환: (pnl, fee, slippage_cost)"""
+        slip = slippage if slippage is not None else self.slippage
         entry, size, side = position["entry"], position["size"], position["side"]
         if side == "BUY":
-            exit_price = close_price * (1 - self.slippage)
+            exit_price = close_price * (1 - slip)
         else:
-            exit_price = close_price * (1 + self.slippage)
+            exit_price = close_price * (1 + slip)
         commission_cost = size * exit_price * self.commission
         slip_cost = size * abs(close_price - exit_price)
         if side == "BUY":

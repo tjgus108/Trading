@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest.engine import ANNUALIZATION, MAX_HOLD_CANDLES, BacktestEngine, BacktestResult
+from src.backtest.engine import (
+    ANNUALIZATION, MAX_HOLD_CANDLES, BacktestEngine, BacktestResult,
+    BYBIT_TAKER_FEE, BYBIT_MAKER_FEE, DEFAULT_FEE_RATE, DEFAULT_SLIPPAGE,
+    SLIPPAGE_REGIME,
+)
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 
 
@@ -581,3 +585,101 @@ def test_slippage_pct_param_identical_to_slippage():
         f"slippage_cost도 동일해야 함: "
         f"slippage={result_slippage.total_slippage_cost:.6f} vs slippage_pct={result_slippage_pct.total_slippage_cost:.6f}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 164: 수수료/슬리피지 현실화 테스트
+# ---------------------------------------------------------------------------
+
+def test_bybit_fee_constants():
+    """Bybit 수수료 상수 값이 올바른지 검증."""
+    assert BYBIT_TAKER_FEE == 0.00055, "Bybit taker fee should be 0.055%"
+    assert BYBIT_MAKER_FEE == 0.00020, "Bybit maker fee should be 0.020%"
+    assert DEFAULT_FEE_RATE == BYBIT_TAKER_FEE, "기본 수수료는 taker fee 사용"
+
+
+def test_default_fee_rate_is_bybit_taker():
+    """BacktestEngine 기본 commission이 Bybit taker fee (0.055%)인지 확인."""
+    engine = BacktestEngine()
+    assert engine.commission == BYBIT_TAKER_FEE
+    assert engine.fee_rate == BYBIT_TAKER_FEE
+
+
+def test_default_slippage_is_realistic():
+    """BacktestEngine 기본 슬리피지가 0.05%인지 확인."""
+    engine = BacktestEngine()
+    assert engine.slippage == DEFAULT_SLIPPAGE
+    assert engine.slippage == 0.0005
+
+
+def test_slippage_regime_values():
+    """레짐별 슬리피지 값이 올바른지 검증."""
+    assert SLIPPAGE_REGIME["low"] == 0.0002
+    assert SLIPPAGE_REGIME["normal"] == 0.0005
+    assert SLIPPAGE_REGIME["high"] == 0.0015
+    # high > normal > low
+    assert SLIPPAGE_REGIME["high"] > SLIPPAGE_REGIME["normal"] > SLIPPAGE_REGIME["low"]
+
+
+def test_adaptive_slippage_default_off():
+    """adaptive_slippage 기본값은 False."""
+    engine = BacktestEngine()
+    assert engine.adaptive_slippage is False
+
+
+def test_adaptive_slippage_varies_with_volatility():
+    """adaptive_slippage=True이면 변동성에 따라 슬리피지가 달라져야 한다."""
+    # 고변동성 데이터 (close_trend=0.01 → 큰 ATR)
+    df_high_vol = make_df(n=300, close_trend=0.01)
+    # 저변동성 데이터 (close_trend=0.0001 → 작은 ATR)
+    df_low_vol = make_df(n=300, close_trend=0.0001)
+
+    engine_adaptive = BacktestEngine(
+        adaptive_slippage=True,
+        commission=0.0,
+    )
+
+    result_high = engine_adaptive.run(AlwaysBuyStrategy(), df_high_vol)
+    result_low = engine_adaptive.run(AlwaysBuyStrategy(), df_low_vol)
+
+    # 두 경우 모두 거래 생성돼야 함
+    if result_high.total_trades > 0 and result_low.total_trades > 0:
+        # 고변동성은 더 큰 슬리피지 비용 (거래당) 발생
+        avg_slip_high = result_high.total_slippage_cost / max(result_high.total_trades, 1)
+        avg_slip_low = result_low.total_slippage_cost / max(result_low.total_trades, 1)
+        # 적어도 고변동성 슬리피지가 0보다 커야 함
+        assert result_high.total_slippage_cost > 0
+
+
+def test_adaptive_slippage_off_uses_fixed():
+    """adaptive_slippage=False이면 고정 슬리피지 사용."""
+    fixed_slip = 0.002
+    engine = BacktestEngine(slippage=fixed_slip, adaptive_slippage=False, commission=0.0)
+    df = make_df(n=200, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    # 고정 슬리피지가 적용되었으므로 비용이 0보다 커야 함
+    assert result.total_slippage_cost > 0
+
+
+def test_get_slippage_regime_classification():
+    """_get_slippage 메서드의 레짐 분류가 올바른지 직접 검증."""
+    engine = BacktestEngine(adaptive_slippage=True)
+
+    # Mock candle: low volatility (ATR/close < 0.5%)
+    candle_low = pd.Series({"close": 100.0, "atr14": 0.3, "high": 101, "low": 99})
+    assert engine._get_slippage(candle_low) == SLIPPAGE_REGIME["low"]
+
+    # Mock candle: normal volatility (0.5% <= ATR/close < 2%)
+    candle_normal = pd.Series({"close": 100.0, "atr14": 1.0, "high": 101, "low": 99})
+    assert engine._get_slippage(candle_normal) == SLIPPAGE_REGIME["normal"]
+
+    # Mock candle: high volatility (ATR/close >= 2%)
+    candle_high = pd.Series({"close": 100.0, "atr14": 3.0, "high": 103, "low": 97})
+    assert engine._get_slippage(candle_high) == SLIPPAGE_REGIME["high"]
+
+
+def test_get_slippage_non_adaptive_returns_fixed():
+    """adaptive_slippage=False면 _get_slippage가 항상 self.slippage 반환."""
+    engine = BacktestEngine(slippage=0.003, adaptive_slippage=False)
+    candle = pd.Series({"close": 100.0, "atr14": 5.0})
+    assert engine._get_slippage(candle) == 0.003

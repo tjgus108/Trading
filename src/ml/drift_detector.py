@@ -7,6 +7,9 @@ river 라이브러리 없이 순수 numpy로 구현.
   - Page-Hinkley (PHT): 점진적 drift 감지에 최적화.
     평균 대비 누적 편차가 임계값 초과 시 드리프트 신호.
   - CUSUM: 이분점(changepoint) 감지. PHT의 대칭 버전.
+  - PSI (Population Stability Index): 피처 분포 변화 감지.
+    학습 시점 분포 vs 실시간 분포를 비교하여 재학습 필요성 판단.
+    PSI > 0.1 약간 변화, > 0.2 유의미 (재학습 필요), > 0.25 심각.
 
 사용법:
     detector = PageHinkleyDriftDetector(delta=0.005, lambda_=50.0)
@@ -20,6 +23,13 @@ river 라이브러리 없이 순수 numpy로 구현.
     monitor = AccuracyDriftMonitor(window=50, min_accuracy=0.55)
     monitor.update(prediction=1, actual=1)
     if monitor.should_retrain:
+        trigger_retrain()
+
+    # PSI 기반 피처 분포 드리프트 감지
+    monitor = PSIDriftMonitor(n_bins=10)
+    monitor.set_reference(training_feature_values)
+    psi = monitor.compute_psi(current_feature_values)
+    if monitor.drift_detected:
         trigger_retrain()
 """
 
@@ -285,4 +295,209 @@ class AccuracyDriftMonitor:
             f"should_retrain={self.should_retrain})\n"
             f"  {self._ph.summary()}\n"
             f"  {self._cusum.summary()}"
+        )
+
+
+def compute_psi(
+    reference: np.ndarray,
+    current: np.ndarray,
+    n_bins: int = 10,
+    eps: float = 1e-6,
+) -> float:
+    """
+    Population Stability Index (PSI) 계산.
+
+    학습 시점 분포(reference)와 현재 분포(current)의 차이를 정량화.
+    PSI = Σ (actual% - expected%) * ln(actual% / expected%)
+
+    금융 업계 표준 해석:
+      - PSI < 0.1  : 분포 변화 미미 (안정)
+      - 0.1 ≤ PSI < 0.2 : 약간 변화 (모니터링 필요)
+      - 0.2 ≤ PSI < 0.25 : 유의미 변화 (재학습 권고)
+      - PSI ≥ 0.25 : 심각한 변화 (즉시 재학습)
+
+    Args:
+        reference: 학습 시점 피처 값 배열.
+        current: 현재 피처 값 배열.
+        n_bins: 히스토그램 빈 수 (기본 10).
+        eps: 0 비율 방지용 스무딩 (기본 1e-6).
+
+    Returns:
+        PSI 값 (float). 음수 불가.
+
+    Raises:
+        ValueError: 입력 배열이 비어있거나 n_bins < 2인 경우.
+    """
+    reference = np.asarray(reference, dtype=float).ravel()
+    current = np.asarray(current, dtype=float).ravel()
+
+    if reference.size == 0 or current.size == 0:
+        raise ValueError("reference와 current 배열이 비어있을 수 없습니다.")
+    if n_bins < 2:
+        raise ValueError("n_bins는 2 이상이어야 합니다.")
+
+    # reference 기준으로 빈 경계 결정 (동일 빈 경계 사용)
+    bin_edges = np.linspace(reference.min(), reference.max(), n_bins + 1)
+    # current 범위가 reference 범위를 벗어나면 양쪽 경계 확장
+    bin_edges[0] = min(bin_edges[0], current.min()) - eps
+    bin_edges[-1] = max(bin_edges[-1], current.max()) + eps
+
+    ref_counts = np.histogram(reference, bins=bin_edges)[0].astype(float)
+    cur_counts = np.histogram(current, bins=bin_edges)[0].astype(float)
+
+    # 비율 변환 + eps 스무딩 (0 방지)
+    ref_pct = ref_counts / ref_counts.sum() + eps
+    cur_pct = cur_counts / cur_counts.sum() + eps
+
+    # PSI 계산
+    psi_value = float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
+    return max(psi_value, 0.0)  # 수치 오차로 인한 음수 방지
+
+
+class PSIDriftMonitor:
+    """
+    Population Stability Index (PSI) 기반 피처 분포 드리프트 모니터.
+
+    학습 시점의 피처 분포를 저장하고, 실시간 피처 분포와 비교하여
+    PSI가 임계값을 초과하면 재학습 플래그를 설정한다.
+
+    기존 PHT/CUSUM이 예측 정확도 기반인 반면,
+    PSI는 입력 피처 분포 자체의 변화를 감지하는 보완적 역할.
+
+    Args:
+        n_bins: 히스토그램 빈 수 (기본 10).
+        threshold_warning: 경고 임계값 (기본 0.1).
+        threshold_drift: 드리프트(재학습) 임계값 (기본 0.2).
+        threshold_severe: 심각 임계값 (기본 0.25).
+    """
+
+    # 드리프트 수준 상수
+    LEVEL_STABLE = "stable"
+    LEVEL_WARNING = "warning"
+    LEVEL_DRIFT = "drift"
+    LEVEL_SEVERE = "severe"
+
+    def __init__(
+        self,
+        n_bins: int = 10,
+        threshold_warning: float = 0.1,
+        threshold_drift: float = 0.2,
+        threshold_severe: float = 0.25,
+    ):
+        self.n_bins = n_bins
+        self.threshold_warning = threshold_warning
+        self.threshold_drift = threshold_drift
+        self.threshold_severe = threshold_severe
+
+        self._reference: Optional[np.ndarray] = None
+        self._last_psi: float = 0.0
+        self._last_level: str = self.LEVEL_STABLE
+        self.drift_detected: bool = False
+        self._check_count: int = 0
+
+    def set_reference(self, data: np.ndarray) -> None:
+        """
+        학습 시점의 피처 분포를 기준(reference)으로 저장.
+
+        Args:
+            data: 학습 데이터의 피처 값 배열.
+
+        Raises:
+            ValueError: 빈 배열인 경우.
+        """
+        data = np.asarray(data, dtype=float).ravel()
+        if data.size == 0:
+            raise ValueError("reference 데이터가 비어있습니다.")
+        self._reference = data.copy()
+        self._last_psi = 0.0
+        self._last_level = self.LEVEL_STABLE
+        self.drift_detected = False
+        self._check_count = 0
+        logger.debug(
+            "PSIDriftMonitor: reference set (n=%d, mean=%.4f, std=%.4f)",
+            data.size, data.mean(), data.std(),
+        )
+
+    def compute_psi(self, current: np.ndarray) -> float:
+        """
+        현재 분포를 reference와 비교하여 PSI를 계산하고 드리프트 상태 업데이트.
+
+        Args:
+            current: 현재 피처 값 배열.
+
+        Returns:
+            PSI 값 (float).
+
+        Raises:
+            RuntimeError: set_reference()가 호출되지 않은 경우.
+            ValueError: current가 비어있는 경우.
+        """
+        if self._reference is None:
+            raise RuntimeError("set_reference()를 먼저 호출해야 합니다.")
+
+        current = np.asarray(current, dtype=float).ravel()
+        if current.size == 0:
+            raise ValueError("current 데이터가 비어있습니다.")
+
+        self._last_psi = compute_psi(
+            self._reference, current, n_bins=self.n_bins
+        )
+        self._check_count += 1
+
+        # 수준 판정
+        if self._last_psi >= self.threshold_severe:
+            self._last_level = self.LEVEL_SEVERE
+        elif self._last_psi >= self.threshold_drift:
+            self._last_level = self.LEVEL_DRIFT
+        elif self._last_psi >= self.threshold_warning:
+            self._last_level = self.LEVEL_WARNING
+        else:
+            self._last_level = self.LEVEL_STABLE
+
+        self.drift_detected = self._last_psi >= self.threshold_drift
+
+        if self.drift_detected:
+            logger.warning(
+                "PSIDriftMonitor: DRIFT DETECTED — PSI=%.4f, level=%s, "
+                "threshold=%.2f, check_count=%d",
+                self._last_psi, self._last_level,
+                self.threshold_drift, self._check_count,
+            )
+        elif self._last_level == self.LEVEL_WARNING:
+            logger.info(
+                "PSIDriftMonitor: warning — PSI=%.4f (< drift threshold %.2f)",
+                self._last_psi, self.threshold_drift,
+            )
+
+        return self._last_psi
+
+    @property
+    def last_psi(self) -> float:
+        """마지막으로 계산된 PSI 값."""
+        return self._last_psi
+
+    @property
+    def last_level(self) -> str:
+        """마지막 드리프트 수준 (stable/warning/drift/severe)."""
+        return self._last_level
+
+    @property
+    def check_count(self) -> int:
+        """PSI 체크 횟수."""
+        return self._check_count
+
+    def reset(self) -> None:
+        """상태 초기화. reference는 유지."""
+        self._last_psi = 0.0
+        self._last_level = self.LEVEL_STABLE
+        self.drift_detected = False
+        self._check_count = 0
+        logger.debug("PSIDriftMonitor: reset (reference preserved)")
+
+    def summary(self) -> str:
+        ref_info = f"n={self._reference.size}" if self._reference is not None else "unset"
+        return (
+            f"PSIDriftMonitor(ref={ref_info}, last_psi={self._last_psi:.4f}, "
+            f"level={self._last_level}, checks={self._check_count}, "
+            f"drift={'YES' if self.drift_detected else 'NO'})"
         )

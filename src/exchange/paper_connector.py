@@ -22,7 +22,7 @@ class PaperConnector:
         self,
         symbol: str,
         initial_balance: float = 10000.0,
-        fee_rate: float = 0.001,
+        fee_rate: float = 0.00055,    # Bybit taker 0.055%
         slippage_pct: float = 0.05,
         partial_fill_prob: float = 0.05,
         timeout_prob: float = 0.01,

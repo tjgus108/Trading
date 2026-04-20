@@ -148,8 +148,8 @@ def run_audit():
     df = make_synthetic_data(500)
     engine = BacktestEngine(
         initial_balance=10_000,
-        fee_rate=0.001,
-        slippage_pct=0.0005,
+        fee_rate=0.00055,       # Bybit taker 0.055%
+        slippage_pct=0.0005,    # 0.05%
     )
 
     # 전략 탐색

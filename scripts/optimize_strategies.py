@@ -157,8 +157,8 @@ def walk_forward_optimize(
 
     engine = BacktestEngine(
         initial_balance=10_000,
-        fee_rate=0.001,
-        slippage_pct=0.001,
+        fee_rate=0.00055,       # Bybit taker 0.055%
+        slippage_pct=0.0005,    # 0.05%
     )
 
     n_candles = len(df)
@@ -283,8 +283,8 @@ def regime_analysis(
     detector = MarketRegimeDetector()
     engine = BacktestEngine(
         initial_balance=10_000,
-        fee_rate=0.001,
-        slippage_pct=0.001,
+        fee_rate=0.00055,       # Bybit taker 0.055%
+        slippage_pct=0.0005,    # 0.05%
     )
 
     regimes = _detect_regimes_vectorized(df, detector)
