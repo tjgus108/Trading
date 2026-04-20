@@ -292,6 +292,11 @@ class LiveState:
         self.last_report_time: float = 0
         self.last_reeval_time: float = 0
         self.regime_states: dict[str, dict] = {}  # symbol -> {regime: MarketRegime, skipped_count: int}
+        # Regime-based performance tracking: symbol -> {regime_type -> {wins, losses, avg_return, pnl}}
+        self.regime_performance: dict[str, dict[str, dict]] = {}
+        # Daily P&L log: [{"date": "2026-04-21", "trades": 5, "pnl": 150.0, "regime_distribution": {...}}]
+        self.daily_pnl_log: list[dict] = []
+        self.last_daily_summary_date: str = ""
 
     def save(self):
         data = {
@@ -308,6 +313,9 @@ class LiveState:
             "last_report_time": self.last_report_time,
             "last_reeval_time": self.last_reeval_time,
             "regime_states": self.regime_states,  # 레짐 상태 추적
+            "regime_performance": self.regime_performance,
+            "daily_pnl_log": self.daily_pnl_log[-365:],  # 최근 1년(365일)
+            "last_daily_summary_date": self.last_daily_summary_date,
         }
         LIVE_STATE_PATH.write_text(json.dumps(data, indent=2, default=str))
 
@@ -537,6 +545,7 @@ class LivePaperTrader:
             self._last_retrain_time = now
 
         if now - self.state.last_report_time >= REPORT_INTERVAL:
+            self._log_daily_pnl()
             self._generate_report()
             self._daily_start_balance = self.state.portfolio_balance
             self.state.last_report_time = now
@@ -817,6 +826,11 @@ class LivePaperTrader:
                     "hold_candles": pos["hold_candles"],
                 })
 
+                # Update regime-based performance tracking
+                is_win = pnl > 0
+                regime = self.state.regime_states.get(symbol, {}).get("regime", "N/A")
+                self._update_regime_performance(symbol, regime, is_win, pnl)
+
                 self.circuit_breaker.record_trade_result(is_loss=(pnl <= 0))
                 # 수익률 DriftMonitor 업데이트 (포지션 기준 pnl%)
                 entry_val = pos["entry"] * pos["size"]
@@ -873,6 +887,122 @@ class LivePaperTrader:
                     )
             except Exception as exc:
                 logger.error("Weekly retrain error for %s: %s", symbol, str(exc)[:120])
+
+    def _update_regime_performance(self, symbol: str, regime: str, is_win: bool, pnl: float):
+        """레짐별 거래 성과 추적."""
+        if symbol not in self.state.regime_performance:
+            self.state.regime_performance[symbol] = {}
+        
+        if regime not in self.state.regime_performance[symbol]:
+            self.state.regime_performance[symbol][regime] = {
+                "wins": 0,
+                "losses": 0,
+                "trades": 0,
+                "pnl": 0.0,
+                "avg_return": 0.0,
+            }
+        
+        perf = self.state.regime_performance[symbol][regime]
+        perf["trades"] += 1
+        perf["pnl"] += pnl
+        if is_win:
+            perf["wins"] += 1
+        else:
+            perf["losses"] += 1
+        
+        # 평균 수익 업데이트 (trade 당)
+        if perf["trades"] > 0:
+            perf["avg_return"] = perf["pnl"] / perf["trades"]
+
+    def _log_daily_pnl(self):
+        """일별 P&L 로깅 (매일 1회, last_report_time 갱신 시)."""
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        
+        # 이미 오늘자 요약이 있으면 스킵
+        if self.state.last_daily_summary_date == today:
+            return
+        
+        # 어제 종료 이후 거래의 PnL 집계
+        trades_today = []
+        for t in self.state.trade_log:
+            trade_date = t.get("time", "")[:10]
+            if trade_date == today:
+                trades_today.append(t)
+        
+        total_pnl = sum(t.get("pnl", 0.0) for t in trades_today)
+        wins = sum(1 for t in trades_today if t.get("pnl", 0.0) > 0)
+        losses = sum(1 for t in trades_today if t.get("pnl", 0.0) <= 0)
+        
+        # 레짐 분포 (오늘 거래된 레짐별 거래수)
+        regime_dist = {}
+        for symbol in SYMBOLS:
+            regime = self.state.regime_states.get(symbol, {}).get("regime", "N/A")
+            regime_dist[symbol] = regime
+        
+        daily_entry = {
+            "date": today,
+            "trades": len(trades_today),
+            "wins": wins,
+            "losses": losses,
+            "pnl": round(total_pnl, 2),
+            "regime_distribution": regime_dist,
+        }
+        
+        self.state.daily_pnl_log.append(daily_entry)
+        self.state.last_daily_summary_date = today
+        
+        logger.info("Daily P&L logged: %s (trades=%d, pnl=$%.2f, regime=%s)",
+                   today, len(trades_today), total_pnl, regime_dist)
+
+    def _print_session_summary(self):
+        """세션 시작/종료 시 요약 통계 출력."""
+        lines = []
+        lines.append("\n" + "="*70)
+        lines.append("SESSION SUMMARY")
+        lines.append("="*70)
+        lines.append(f"Duration: {self.state.start_time} to {datetime.utcnow().isoformat()}")
+        lines.append(f"Total Ticks: {self.state.tick_count}")
+        lines.append(f"Initial Balance: ${INITIAL_BALANCE:,.2f}")
+        lines.append(f"Final Balance: ${self.state.portfolio_balance:,.2f}")
+        total_return = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE
+        lines.append(f"Total Return: {total_return:+.2%}")
+        lines.append(f"Peak Balance: ${self.state.portfolio_peak:,.2f}")
+        
+        if self.state.portfolio_peak > 0:
+            max_dd = (self.state.portfolio_peak - self.state.portfolio_balance) / self.state.portfolio_peak
+            lines.append(f"Max Drawdown: {max_dd:.2%}")
+        
+        lines.append(f"\nTrades: {len(self.state.trade_log)}")
+        if self.state.trade_log:
+            wins = sum(1 for t in self.state.trade_log if t.get("pnl", 0.0) > 0)
+            total_pnl = sum(t.get("pnl", 0.0) for t in self.state.trade_log)
+            wr = wins / len(self.state.trade_log) if len(self.state.trade_log) > 0 else 0
+            lines.append(f"  Win Rate: {wr:.1%} ({wins}/{len(self.state.trade_log)})")
+            lines.append(f"  Total PnL: ${total_pnl:+.2f}")
+        
+        lines.append(f"\nRegime Performance:")
+        for symbol in SYMBOLS:
+            perf = self.state.regime_performance.get(symbol, {})
+            if perf:
+                lines.append(f"  {symbol}:")
+                for regime, stats in perf.items():
+                    wr = stats["wins"] / stats["trades"] if stats["trades"] > 0 else 0
+                    lines.append(
+                        f"    {regime:12s} — {stats['trades']:2d} trades, "
+                        f"{wr:5.1%} WR, ${stats['pnl']:+8.2f} PnL"
+                    )
+        
+        lines.append(f"\nDaily P&L Log ({len(self.state.daily_pnl_log)} days):")
+        if self.state.daily_pnl_log:
+            for entry in self.state.daily_pnl_log[-7:]:  # 최근 7일
+                lines.append(
+                    f"  {entry['date']} — {entry['trades']} trades, "
+                    f"${entry['pnl']:+7.2f} PnL"
+                )
+        
+        lines.append("="*70 + "\n")
+        summary_text = "\n".join(lines)
+        logger.info(summary_text)
 
     def _generate_report(self):
         """24시간마다 성과 리포트 생성."""
@@ -952,6 +1082,9 @@ class LivePaperTrader:
         if not self.initialize():
             return 1
 
+        # Print initial session info
+        self._print_session_summary()
+
         end_time = time.time() + self.days * 86400
         self.state.last_report_time = time.time()
         self.state.last_reeval_time = time.time()
@@ -969,6 +1102,7 @@ class LivePaperTrader:
 
         # 종료 정리
         logger.info("Shutting down...")
+        self._print_session_summary()
         self._generate_report()
         self.state.save()
         ret = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100

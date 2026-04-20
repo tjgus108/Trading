@@ -1,16 +1,20 @@
 """
-알림 모듈 스켈레톤: 3계층 알림 구조.
+알림 모듈: 3계층 알림 구조 with Telegram Bot API.
 
 계층:
   CRITICAL — 즉시 전송 (손실 한계, 보호 모드, 시스템 장애)
   SILENT   — 요약 배치로 전송 (일일 리포트, 성과 변동)
   SUPPRESS — 기록만 하고 전송 안 함 (디버그, 데이터 갱신)
 
-현재: 인터페이스만 정의. 실제 Telegram API 연동은 미구현.
+Telegram 연동:
+  - 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+  - 두 변수 모두 설정되어야 실제 전송 활성화
+  - 없으면 로깅만 수행 (프로덕션 대비)
 """
 from __future__ import annotations
 
 import logging
+import os
 from enum import Enum
 from typing import Optional
 
@@ -25,18 +29,35 @@ class AlertLevel(Enum):
 
 class Notifier:
     """
-    알림 인터페이스.
+    알림 인터페이스 with Telegram Bot API.
 
     사용법:
         notifier = Notifier()
         notifier.send("MAX LOSS REACHED", AlertLevel.CRITICAL)
         notifier.send("Daily report generated", AlertLevel.SILENT)
         notifier.send("Data refreshed", AlertLevel.SUPPRESS)
+        notifier.flush_silent()  # 일일 요약 전송
+    
+    Telegram 설정:
+        export TELEGRAM_BOT_TOKEN="your_bot_token"
+        export TELEGRAM_CHAT_ID="your_chat_id"
     """
 
     def __init__(self, enabled: bool = False):
         self._enabled = enabled
         self._pending_silent: list[str] = []
+        
+        # Telegram 환경변수 로드
+        self.telegram_token: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.telegram_chat_id: Optional[str] = os.getenv("TELEGRAM_CHAT_ID")
+        self.telegram_enabled: bool = bool(self.telegram_token and self.telegram_chat_id)
+        
+        if self.telegram_enabled:
+            logger.info("[Notifier] Telegram enabled (token len=%d, chat_id=%s)",
+                       len(self.telegram_token) if self.telegram_token else 0,
+                       self.telegram_chat_id[:10] + "..." if self.telegram_chat_id else "N/A")
+        else:
+            logger.debug("[Notifier] Telegram disabled (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)")
 
     def send(self, message: str, level: AlertLevel = AlertLevel.SILENT) -> bool:
         """
@@ -56,7 +77,7 @@ class Notifier:
         if level == AlertLevel.CRITICAL:
             logger.warning("[NOTIFIER:CRITICAL] %s", message)
             if self._enabled:
-                return self._deliver(message)
+                return self._deliver(f"🚨 CRITICAL: {message}")
             return False
 
         # SILENT — 배치 큐에 추가
@@ -68,25 +89,52 @@ class Notifier:
         """SILENT 큐 배치 전송 (일일 리포트 시점에 호출)."""
         if not self._pending_silent:
             return False
-        summary = "\n".join(f"- {m}" for m in self._pending_silent)
+        summary = "\n".join(f"• {m}" for m in self._pending_silent)
         logger.info("[NOTIFIER:FLUSH] %d silent messages", len(self._pending_silent))
         self._pending_silent.clear()
         if self._enabled:
-            return self._deliver(f"[Daily Summary]\n{summary}")
+            return self._deliver(f"📊 Daily Summary:\n{summary}")
         return False
 
     def _deliver(self, text: str) -> bool:
         """
-        실제 전송 (Telegram API).
-        현재는 스텁 — 실제 구현 시 여기에 연동.
+        Telegram Bot API로 메시지 전송.
+        
+        실제 전송은 telegram_enabled=True일 때만 수행.
+        환경변수가 없으면 로깅만 함.
         """
-        # TODO: Telegram Bot API 연동
-        # import requests
-        # url = f"https://api.telegram.org/bot{token}/sendMessage"
-        # resp = requests.post(url, json={"chat_id": chat_id, "text": text})
-        # return resp.ok
-        logger.info("[NOTIFIER:DELIVER] (stub) %s", text[:100])
-        return False
+        if not self.telegram_enabled:
+            logger.debug("[NOTIFIER:DELIVER] Telegram disabled, logging only: %s", text[:100])
+            return False
+        
+        try:
+            import requests
+        except ImportError:
+            logger.warning("[NOTIFIER:DELIVER] requests library not available")
+            return False
+        
+        try:
+            url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+            payload = {
+                "chat_id": self.telegram_chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+            }
+            
+            response = requests.post(url, json=payload, timeout=10)
+            if response.ok:
+                logger.info("[NOTIFIER:DELIVER] ✓ Telegram sent (%d bytes)", len(text))
+                return True
+            else:
+                logger.error("[NOTIFIER:DELIVER] ✗ Telegram failed (HTTP %d): %s",
+                           response.status_code, response.text[:100])
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error("[NOTIFIER:DELIVER] Telegram request failed: %s", str(e)[:100])
+            return False
+        except Exception as e:
+            logger.error("[NOTIFIER:DELIVER] Unexpected error: %s", str(e)[:100])
+            return False
 
     @property
     def pending_count(self) -> int:
