@@ -630,6 +630,129 @@ class TestShapFeatureSelection:
 
 
 # ---------------------------------------------------------------------------
+# XGBoost 모델 타입 테스트
+# ---------------------------------------------------------------------------
+
+class TestXGBoostModelType:
+
+    def test_xgboost_fallback_when_not_installed(self):
+        """xgboost 미설치 시 model_type이 'rf'로 fallback."""
+        import src.ml.trainer as trainer_mod
+        orig = trainer_mod._XGB_AVAILABLE
+        try:
+            trainer_mod._XGB_AVAILABLE = False
+            trainer = WalkForwardTrainer(
+                symbol="TEST/USDT", n_estimators=10, max_depth=3,
+                model_type="xgboost",
+            )
+            assert trainer.model_type == "rf"
+        finally:
+            trainer_mod._XGB_AVAILABLE = orig
+
+    def test_xgboost_fallback_trains_rf(self):
+        """xgboost 미설치 시 RF로 정상 학습."""
+        import src.ml.trainer as trainer_mod
+        orig = trainer_mod._XGB_AVAILABLE
+        try:
+            trainer_mod._XGB_AVAILABLE = False
+            trainer = WalkForwardTrainer(
+                symbol="TEST/USDT", n_estimators=10, max_depth=3,
+                model_type="xgboost",
+            )
+            df = _make_ohlcv(300)
+            result = trainer.train(df)
+            assert isinstance(result, TrainingResult)
+            assert result.n_samples > 0
+            # fallback이므로 rf_ 태그
+            assert result.model_name.startswith("rf_")
+        finally:
+            trainer_mod._XGB_AVAILABLE = orig
+
+    def test_xgboost_rf_model_type_unchanged(self):
+        """model_type='rf'는 _XGB_AVAILABLE 상관없이 유지."""
+        import src.ml.trainer as trainer_mod
+        orig = trainer_mod._XGB_AVAILABLE
+        try:
+            trainer_mod._XGB_AVAILABLE = False
+            trainer = WalkForwardTrainer(
+                symbol="TEST/USDT", model_type="rf",
+            )
+            assert trainer.model_type == "rf"
+        finally:
+            trainer_mod._XGB_AVAILABLE = orig
+
+    def test_xgboost_extra_trees_unchanged(self):
+        """model_type='extra_trees'는 _XGB_AVAILABLE 상관없이 유지."""
+        import src.ml.trainer as trainer_mod
+        orig = trainer_mod._XGB_AVAILABLE
+        try:
+            trainer_mod._XGB_AVAILABLE = False
+            trainer = WalkForwardTrainer(
+                symbol="TEST/USDT", model_type="extra_trees",
+            )
+            assert trainer.model_type == "extra_trees"
+        finally:
+            trainer_mod._XGB_AVAILABLE = orig
+
+    @pytest.mark.skipif(
+        not __import__("src.ml.trainer", fromlist=["_XGB_AVAILABLE"])._XGB_AVAILABLE,
+        reason="xgboost not installed",
+    )
+    def test_xgboost_train_returns_result(self):
+        """xgboost 설치 시 학습+예측 동작."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=20, max_depth=3,
+            model_type="xgboost",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert isinstance(result, TrainingResult)
+        assert result.n_samples > 0
+        assert result.n_features > 0
+        assert result.model_name.startswith("xgb_")
+
+    @pytest.mark.skipif(
+        not __import__("src.ml.trainer", fromlist=["_XGB_AVAILABLE"])._XGB_AVAILABLE,
+        reason="xgboost not installed",
+    )
+    def test_xgboost_max_depth_3(self):
+        """XGBoost max_depth=3 제한 확인."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=20, max_depth=10,
+            model_type="xgboost",
+        )
+        df = _make_ohlcv(300)
+        trainer.train(df)
+        # XGBoost에서는 max_depth=3 고정 (self.max_depth 무시)
+        base = trainer._trained_model
+        # CalibratedClassifierCV 래핑 가능 → base estimator 추출
+        actual_clf = getattr(base, "estimator", getattr(base, "base_estimator", base))
+        if hasattr(actual_clf, "max_depth"):
+            assert actual_clf.max_depth == 3
+
+    @pytest.mark.skipif(
+        not __import__("src.ml.trainer", fromlist=["_XGB_AVAILABLE"])._XGB_AVAILABLE,
+        reason="xgboost not installed",
+    )
+    def test_xgboost_same_interface_as_rf(self):
+        """XGBoost도 RF와 동일한 TrainingResult 필드 반환."""
+        trainer = WalkForwardTrainer(
+            symbol="TEST/USDT", n_estimators=20, max_depth=3,
+            model_type="xgboost",
+        )
+        df = _make_ohlcv(300)
+        result = trainer.train(df)
+        assert hasattr(result, "feature_importances")
+        assert hasattr(result, "val_accuracy")
+        assert hasattr(result, "test_accuracy")
+        assert hasattr(result, "split_info")
+        assert len(result.feature_importances) > 0
+        assert 0.0 <= result.train_accuracy <= 1.0
+        assert 0.0 <= result.val_accuracy <= 1.0
+        assert 0.0 <= result.test_accuracy <= 1.0
+
+
+# ---------------------------------------------------------------------------
 # sklearn 미설치 시 fallback 테스트
 # ---------------------------------------------------------------------------
 

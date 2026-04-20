@@ -293,6 +293,112 @@ class TestAccuracyDriftMonitor:
 
 
 # ---------------------------------------------------------------------------
+# AccuracyDriftMonitor + PSI 통합 테스트
+# ---------------------------------------------------------------------------
+
+class TestAccuracyDriftMonitorPSIIntegration:
+    """AccuracyDriftMonitor에 PSIDriftMonitor가 통합된 경우의 테스트."""
+
+    def test_psi_not_set_keeps_existing_behavior(self):
+        """PSI 미설정 시 기존 동작 유지 (하위호환)."""
+        mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52, ph_lambda=100.0)
+        # PSI 설정 안 함 → psi_drift_detected=False, 기존 로직만 동작
+        assert not mon.psi_drift_detected
+        assert mon.check_feature_drift(np.array([1, 2, 3])) == 0.0
+        # 정확도 높으면 should_retrain=False
+        for _ in range(80):
+            mon.update(prediction=1, actual=1)
+        assert not mon.should_retrain
+        assert not mon.psi_drift_detected
+
+    def test_psi_set_stable_distribution_no_retrain(self):
+        """PSI 설정 + 안정 분포 → should_retrain = False."""
+        rng = np.random.default_rng(42)
+        ref_features = rng.normal(0, 1, 1000)
+
+        mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52, ph_lambda=100.0)
+        mon.set_feature_reference(ref_features, n_bins=10)
+
+        # 동일 분포로 PSI 체크 → 드리프트 없음
+        psi = mon.check_feature_drift(ref_features)
+        assert psi < 0.1
+        assert not mon.psi_drift_detected
+
+        # 정확도도 높음 → should_retrain=False
+        for _ in range(80):
+            mon.update(prediction=1, actual=1)
+        assert not mon.should_retrain
+
+    def test_psi_drift_triggers_retrain_even_with_good_accuracy(self):
+        """PSI 설정 + 드리프트 분포 → 정확도 OK여도 should_retrain = True."""
+        rng = np.random.default_rng(42)
+        ref_features = rng.normal(0, 1, 1000)
+        drifted_features = rng.normal(5.0, 0.3, 1000)
+
+        mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52, ph_lambda=100.0)
+        mon.set_feature_reference(ref_features, n_bins=10)
+
+        # 피처 분포 드리프트 감지
+        psi = mon.check_feature_drift(drifted_features)
+        assert psi >= 0.2
+        assert mon.psi_drift_detected
+
+        # 정확도는 높지만, PSI 드리프트 때문에 should_retrain=True
+        # window//2=25 미만이면 below_threshold 체크 안 됨, ph/cusum도 감지 안 됨
+        # → PSI만으로 트리거
+        for _ in range(30):
+            result = mon.update(prediction=1, actual=1)
+        assert mon.should_retrain
+
+    def test_psi_and_accuracy_both_drift(self):
+        """PSI + 정확도 동시 드리프트 → should_retrain = True."""
+        rng = np.random.default_rng(42)
+        ref_features = rng.normal(0, 1, 1000)
+        drifted_features = rng.normal(5.0, 0.3, 1000)
+
+        mon = AccuracyDriftMonitor(window=20, min_accuracy=0.80, ph_lambda=999.0)
+        mon.set_feature_reference(ref_features, n_bins=10)
+
+        # 피처 드리프트
+        mon.check_feature_drift(drifted_features)
+        assert mon.psi_drift_detected
+
+        # 정확도도 낮음
+        triggered = False
+        for _ in range(50):
+            if mon.update(prediction=1, actual=0):
+                triggered = True
+                break
+        assert triggered
+        assert mon.should_retrain
+
+    def test_reset_detectors_clears_psi_drift(self):
+        """reset_detectors 후 PSI 드리프트 플래그도 초기화."""
+        rng = np.random.default_rng(42)
+        ref_features = rng.normal(0, 1, 1000)
+        drifted_features = rng.normal(5.0, 0.3, 1000)
+
+        mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52, ph_lambda=100.0)
+        mon.set_feature_reference(ref_features, n_bins=10)
+        mon.check_feature_drift(drifted_features)
+        assert mon.psi_drift_detected
+
+        mon.reset_detectors()
+        assert not mon.psi_drift_detected
+        assert not mon.should_retrain
+
+    def test_summary_includes_psi_when_set(self):
+        """PSI 설정 시 summary에 PSIDriftMonitor 정보 포함."""
+        rng = np.random.default_rng(42)
+        ref = rng.normal(0, 1, 100)
+        mon = AccuracyDriftMonitor()
+        mon.set_feature_reference(ref, n_bins=10)
+        mon.check_feature_drift(ref)
+        s = mon.summary()
+        assert "PSIDriftMonitor" in s
+
+
+# ---------------------------------------------------------------------------
 # compute_psi (함수)
 # ---------------------------------------------------------------------------
 

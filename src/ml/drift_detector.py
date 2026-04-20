@@ -219,6 +219,56 @@ class AccuracyDriftMonitor:
         self._retrain_count = 0
         self.should_retrain = False
 
+        # Optional PSI 피처 드리프트 모니터 (input drift 감지)
+        self._psi_monitor: Optional[PSIDriftMonitor] = None
+        self._psi_drift_detected: bool = False
+
+    # ----- PSI 피처 드리프트 연동 -----
+
+    def set_feature_reference(self, features: np.ndarray, **psi_kwargs) -> None:
+        """
+        학습 시점의 피처 분포를 PSIDriftMonitor에 저장.
+
+        호출하면 내부 PSIDriftMonitor가 활성화되고,
+        이후 check_feature_drift()로 input drift 체크 가능.
+        should_retrain 판정에 PSI 결과가 포함된다.
+
+        Args:
+            features: 학습 데이터 피처 값 배열 (1-D).
+            **psi_kwargs: PSIDriftMonitor 생성 파라미터
+                          (n_bins, threshold_warning, threshold_drift, threshold_severe).
+        """
+        self._psi_monitor = PSIDriftMonitor(**psi_kwargs)
+        self._psi_monitor.set_reference(features)
+        self._psi_drift_detected = False
+        logger.info(
+            "AccuracyDriftMonitor: PSI feature reference set (n=%d)",
+            np.asarray(features).size,
+        )
+
+    def check_feature_drift(self, current_features: np.ndarray) -> float:
+        """
+        현재 피처 분포를 reference와 비교하여 PSI 계산.
+
+        Args:
+            current_features: 현재 피처 값 배열 (1-D).
+
+        Returns:
+            PSI 값 (float). PSI 미설정 시 0.0 반환.
+        """
+        if self._psi_monitor is None:
+            return 0.0
+        psi_value = self._psi_monitor.compute_psi(current_features)
+        self._psi_drift_detected = self._psi_monitor.drift_detected
+        return psi_value
+
+    @property
+    def psi_drift_detected(self) -> bool:
+        """PSI 기반 피처 드리프트 감지 여부. PSI 미설정 시 False."""
+        return self._psi_drift_detected
+
+    # ----- 메인 업데이트 -----
+
     def update(self, prediction: int, actual: int) -> bool:
         """
         예측값과 실제값을 입력하여 drift 모니터링 업데이트.
@@ -244,7 +294,10 @@ class AccuracyDriftMonitor:
             and window_acc < self.min_accuracy
         )
 
-        self.should_retrain = ph_drift or cusum_drift or below_threshold
+        self.should_retrain = (
+            ph_drift or cusum_drift or below_threshold
+            or self._psi_drift_detected
+        )
 
         if self.should_retrain:
             reason = []
@@ -254,6 +307,11 @@ class AccuracyDriftMonitor:
                 reason.append(f"CUSUM drift")
             if below_threshold:
                 reason.append(f"window_acc={window_acc:.3f} < {self.min_accuracy}")
+            if self._psi_drift_detected:
+                psi_val = (
+                    self._psi_monitor.last_psi if self._psi_monitor else 0.0
+                )
+                reason.append(f"PSI feature drift (psi={psi_val:.4f})")
             logger.warning(
                 "AccuracyDriftMonitor: RETRAIN RECOMMENDED — %s (total_preds=%d)",
                 ", ".join(reason),
@@ -264,9 +322,12 @@ class AccuracyDriftMonitor:
         return self.should_retrain
 
     def reset_detectors(self) -> None:
-        """재학습 완료 후 호출. PHT/CUSUM 상태 리셋, 윈도우는 유지."""
+        """재학습 완료 후 호출. PHT/CUSUM/PSI 상태 리셋, 윈도우와 reference는 유지."""
         self._ph.reset()
         self._cusum.reset()
+        if self._psi_monitor is not None:
+            self._psi_monitor.reset()
+        self._psi_drift_detected = False
         self.should_retrain = False
         logger.info(
             "AccuracyDriftMonitor: detectors reset after retrain "
@@ -287,15 +348,18 @@ class AccuracyDriftMonitor:
     def summary(self) -> str:
         win_acc = self.window_accuracy
         win_str = f"{win_acc:.3f}" if win_acc is not None else "N/A"
-        return (
+        lines = [
             f"AccuracyDriftMonitor("
             f"total={self._total_predictions}, "
             f"window_acc={win_str}/{self.min_accuracy}, "
             f"retrain_count={self._retrain_count}, "
-            f"should_retrain={self.should_retrain})\n"
-            f"  {self._ph.summary()}\n"
-            f"  {self._cusum.summary()}"
-        )
+            f"should_retrain={self.should_retrain})",
+            f"  {self._ph.summary()}",
+            f"  {self._cusum.summary()}",
+        ]
+        if self._psi_monitor is not None:
+            lines.append(f"  {self._psi_monitor.summary()}")
+        return "\n".join(lines)
 
 
 def compute_psi(

@@ -1,3 +1,102 @@
+## Cycle 165 Research Notes — 라이브 트레이딩봇 운영 자동화 및 모니터링 Best Practice
+
+### 주제 1: 크립토 봇 자동 모니터링/알림 시스템
+
+#### 핵심 인사이트
+
+1. **알림 이벤트 계층화 — Freqtrade 패턴이 업계 표준** — Freqtrade 오픈소스가 사실상 알림 이벤트 표준을 정립. 핵심 이벤트 3계층:
+   - **즉시 알림(Critical)**: `stop_loss` 체결, `emergency_exit`, API 에러, MDD 임계값 돌파(>=5%), PSI 드리프트 감지
+   - **Silent 알림(Important)**: `entry_fill`, `exit_fill`, `protection_trigger` (소리/진동 없이 메시지만)
+   - **Off(노이즈 제거)**: 단순 `entry`/`exit` 주문 접수 (체결 전 이중 알림 방지)
+   핵심: entry != entry_fill — 주문 접수와 체결을 분리해야 중복 알림 방지. 드로다운 5% 이상은 Discord, 소규모 이벤트는 Telegram으로 채널 분리하는 패턴 권장.
+
+2. **Grafana + InfluxDB 조합이 크립토 봇 모니터링 사실상 표준** — freqtrade-dashboard(GitHub: thraizz), influx-crypto-trader(GitHub: clementpl) 등 오픈소스 대다수가 동일 스택 사용. 핵심 메트릭 5가지:
+   - `cumulative_pnl` (시계열, 기준선 대비)
+   - `current_drawdown` (실시간, 임계값 초과 시 색상 변경)
+   - `win_rate` (rolling 20거래)
+   - `open_positions` + `unrealized_pnl`
+   - `order_latency_ms` (API 응답 지연, >500ms 시 경보)
+   Prometheus + Grafana 조합(freqtrade 공식 지원)도 대안이나 InfluxDB가 시계열 쿼리에 최적화됨.
+
+3. **자동 복구 패턴 3가지** — 성공한 봇의 공통 구조:
+   - **API 재연결**: 지수 백오프(exponential backoff) — 1초, 2초, 4초, 8초... 최대 60초. NTP 서버 동기화 필수(클락 오차 시 HMAC 서명 실패). ccxt의 `exchange.reload_markets()` 주기적 호출 필요.
+   - **포지션 동기화**: 봇 재시작 시 거래소 실제 포지션과 내부 상태 비교. 불일치 시 "hold로 동기화" (강제 청산 금지) — Cryptohopper의 Auto Sync 패턴.
+   - **주문 상태 불일치**: 주문 ID 기반 polling (30초 간격), 미체결 주문이 일정 시간(예: 5분) 초과 시 취소 후 재제출. 시장가로 자동 전환하는 패턴은 슬리피지 위험으로 지양.
+
+4. **Health Check 패턴 — 봇 자체 자가진단** — 성공한 운영 봇의 공통 health check 루프:
+   - **liveness probe**: 5분마다 exchange.ping() 또는 잔고 조회, 실패 3회 연속 시 텔레그램 알림 + 자동 재시작
+   - **data freshness check**: 마지막 캔들 타임스탬프 확인, 현재 시간 대비 2개 봉 이상 지연 시 데이터 피드 재연결
+   - **model drift watchdog**: PSI 계산 주기(예: 매 거래 후), PSI > 0.2 시 신호 생성 중단 + 재학습 트리거
+   - **heartbeat**: 매 1시간 정상 운영 중 알림 전송 (무소식이 악소식인 경우 방지)
+
+5. **알림 피로(Alert Fatigue) 방지가 실제 운영의 핵심 과제** — 알림이 너무 많으면 무시하게 됨. 권장 원칙:
+   - 일일 정상 운영 시 알림 <= 5건 목표
+   - 볼륨 필터: 가격 변화 알림은 volume > $1M 이상 코인만
+   - 알림 집계(throttling): 같은 유형 알림 5분 내 중복 발송 금지
+   - 주간 요약 리포트(매주 월요일 자동 전송): PnL, 거래 수, 승률, 최대 드로다운
+
+---
+
+### 주제 2: Paper Trading → Live 전환 체크리스트
+
+#### 핵심 인사이트
+
+1. **전환 전 필수 성능 기준 (7일 paper 기준)** — 업계 권장 최소 검증 기간은 30~90일이나 현실적 7일 최소 기준:
+   - Sharpe >= 1.0, PF >= 1.5, MDD <= 20% (기존 백테스트 기준과 동일하게 paper에서도 충족)
+   - 일일 드로다운이 3%를 초과한 날 없을 것
+   - 드리프트 알람(PSI > 0.2) 발생 0회
+   - API 에러 0회 (또는 자동 복구 성공률 100%)
+   - 예상 수수료 대비 실제 수수료 오차 +-10% 이내 (fee 계산 정확도 검증)
+   **30일 이상 paper trading이 이상적** — 7일은 단기 레짐에만 노출될 위험.
+
+2. **자본 할당 전략 — 3단계 스케일업** — 성공한 운영자들의 공통 패턴:
+   - **1단계 (1~2주)**: 전체 예산의 10~20%. 목적: 실전 수수료/슬리피지 확인, 주문 체결 검증
+   - **2단계 (2~4주)**: 전체 예산의 30~50%. 조건: 1단계 일일 드로다운 < 3% 연속 10일
+   - **3단계 (4주+)**: 전체 예산의 50~70% (나머지 30%는 항상 reserve)
+   Kelly criterion 또는 고정 비율(1~2% per trade) 적용. 레버리지 없이 시작, 전략 엣지 실증 후에만 레버리지 추가.
+
+3. **첫 1주일 운영 프로토콜** — 모니터링 빈도 및 개입 기준:
+   - **모니터링 빈도**: 4h 봉 전략 기준 — 매 봉 마감 시 체크(4시간마다), 드로다운 > 2% 시 즉시 수동 검토
+   - **자동 중단 기준**: 일일 드로다운 3%, 주간 드로다운 7% (hard circuit breaker)
+   - **수동 개입 기준**: 연속 3거래 손실, 승률이 paper 대비 20% 이상 하락, 예상치 못한 대형 포지션
+   - **로그 확인**: 매일 저녁 주문 로그 검토 (entry price, exit price, fee, slippage 실제 vs 예상 비교)
+
+4. **전환 실패 시 롤백 절차** — 명확한 롤백 트리거와 프로세스:
+   - **Soft rollback (포지션 축소)**: MDD 10% 초과 또는 일일 손실 3% 초과 시 포지션 사이즈 50% 감소
+   - **Hard rollback (운영 중단 -> paper 복귀)**: MDD 15% 초과 또는 모델 PSI > 0.2 지속 3회, 또는 API 에러 연속 5회 미복구
+   - **롤백 후 진단**: (a) paper vs live 성과 gap 원인 분석 (수수료? 슬리피지? 레짐 변화?), (b) 최소 2주 paper 재운영, (c) gap 원인 수정 확인 후 재전환
+   Hard rollback은 자동 실행, 재전환은 반드시 수동 승인.
+
+5. **실패의 가장 흔한 원인 3가지** — 업계 통계 기반:
+   - **수수료/슬리피지 과소추정**: paper trading에서 0 수수료 또는 고정 수수료로 테스트 후 실전 전환 시 성과 급락. 우리 프로젝트는 0.055% taker fee 이미 반영 — 이 함정은 회피.
+   - **레짐 전환 미대응**: paper 기간이 단일 레짐(예: 상승장)에만 노출되면 실전 전환 후 레짐 변화 시 전략 붕괴
+   - **과도한 레버리지**: 소자본 + 고레버리지 첫 실전 조합이 가장 흔한 계좌 소멸 원인. 1~3x 무레버리지 또는 저레버리지 시작 원칙
+
+---
+
+### 이 프로젝트에 적용 가능한 구체적 권장사항
+
+1. **알림 이벤트 우선순위 3계층 즉시 적용** — `live_paper_trader`에 Telegram 알림 추가 시: (Critical) stop_loss 체결 + MDD >= 5% + PSI > 0.2 + API 에러 3회 연속; (Silent) entry_fill + exit_fill; (Suppress) 단순 주문 접수. 1시간 heartbeat로 무소식 감지. 알림 throttle: 동일 유형 5분 내 중복 방지.
+
+2. **7일 paper -> live 전환 체크리스트 도입** — 전환 전 gate 조건: Sharpe/PF/MDD paper 기간 충족 + 일일 드로다운 3% 초과일 0회 + API 안정성 100%. 1단계 자본 10~20% 시작, 2주 후 조건 충족 시 30~50%로 확대. Hard rollback 트리거(MDD 15%)는 자동, 재전환은 수동 승인 원칙.
+
+3. **Health Check 루프를 `live_paper_trader`에 통합** — 5분 주기 liveness probe(exchange.ping), 2봉 이상 데이터 지연 시 피드 재연결, PSI watchdog를 기존 PSI 드리프트 모니터와 연계해 모델 신호 자동 중단 로직 추가. NTP 동기화 확인을 시작 시 1회 체크.
+
+---
+
+### 출처
+
+- [Telegram - Freqtrade](https://docs.freqtrade.io/en/2024.11/telegram-usage/)
+- [GitHub: thraizz/freqtrade-dashboard](https://github.com/thraizz/freqtrade-dashboard)
+- [GitHub: clementpl/influx-crypto-trader](https://github.com/clementpl/influx-crypto-trader)
+- [Trading bot checklist 2026: essential criteria for crypto success](https://darkbot.io/blog/trading-bot-checklist-2026-essential-criteria-for-crypto-success)
+- [AI Trading Bot Risk Management: Complete 2025 Guide](https://3commas.io/blog/ai-trading-bot-risk-management-guide-2025)
+- [Cryptohopper Auto Sync Documentation](https://docs.cryptohopper.com/docs/trading-bot/what-are-the-settings-for-auto-sync/)
+- [Trading Bot Risk Management 2026](https://cripton.ai/en/guides/bot-risk-management)
+- [Why Most Trading Bots Lose Money](https://www.fortraders.com/blog/trading-bots-lose-money)
+
+---
+
 ## Cycle 164 Research Notes — XGBoost 앙상블 + 다시간 윈도우 전략
 
 ### 주제 1: XGBoost 크립토 트레이딩 앙상블 Best Practice

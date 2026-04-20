@@ -1,5 +1,28 @@
 # Work Log
 
+## [2026-04-20] Cycle 165 — D (ML) + E (실행) + F (리서치)
+
+**[D] XGBoost 모델 옵션 추가 (`src/ml/trainer.py`):**
+- `model_type="xgboost"` 옵션: max_depth=3, lr=0.03, subsample=0.7, early_stopping=50
+- 자동 multi-class 감지: 2-class → binary:logistic, 3+ → multi:softprob
+- xgboost 미설치 시 model_type="rf" fallback + 경고 로그
+- SHAP 피처 선택 재학습 시 XGBoost 분기 처리
+- 테스트 7개 추가 → 53 passed, 3 skipped (미설치 환경)
+
+**[E] PSI → AccuracyDriftMonitor 통합 (`src/ml/drift_detector.py`):**
+- `set_feature_reference(features)`: 학습 시점 피처 분포 저장 → PSIDriftMonitor 내부 생성
+- `check_feature_drift(current_features) -> float`: 실시간 PSI 값 반환
+- `should_retrain` 조건에 `or psi_drift_detected` 자동 추가
+- PSI 미설정 시 기존 동작 100% 유지 (하위호환)
+- 테스트 6개 추가 → 53 passed (기존 42 + PSI 11 → 통합 6)
+
+**[F] 리서치: 모니터링/알림 + Paper→Live 전환:**
+- 알림 3계층: Critical(MDD, PSI, API에러) / Silent(체결) / Suppress(주문접수)
+- Grafana+InfluxDB 표준, 5대 메트릭: PnL/drawdown/win_rate/positions/latency
+- Paper→Live gate: Sharpe≥1.0, PF≥1.5, MDD≤20%, PSI 알람 0회
+- 3단계 자본 스케일업: 10-20% → 30-50% → 최대 70% (30% reserve)
+- Hard rollback: MDD 15% 또는 PSI 3회 연속 → 자동 중단 + paper 복귀
+
 ## [2026-04-20] Cycle 164 — C (데이터) + B (리스크) + F (리서치)
 
 **[C] 수수료 현실화 + adaptive 슬리피지:**
@@ -13014,3 +13037,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 03:14 UTC] Cycle 165 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

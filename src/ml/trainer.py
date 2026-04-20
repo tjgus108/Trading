@@ -168,7 +168,13 @@ class WalkForwardTrainer:
         self.binary = binary
         self.triple_barrier = triple_barrier
         self.ensemble = ensemble  # XGBoost 앙상블 사용 여부 (XGBoost 미설치 시 자동 비활성)
-        self.model_type = model_type  # "rf" | "extra_trees"
+        # model_type: "rf" | "extra_trees" | "xgboost"
+        # xgboost 선택 시 미설치면 rf로 fallback
+        if model_type == "xgboost" and not _XGB_AVAILABLE:
+            logger.warning("xgboost 미설치 — model_type='rf'로 fallback")
+            self.model_type = "rf"
+        else:
+            self.model_type = model_type
         self.use_shap_selection = use_shap_selection  # SHAP/importance 기반 피처 선택
         self.feature_builder = FeatureBuilder(
             forward_n=forward_n, threshold=threshold,
@@ -257,21 +263,49 @@ class WalkForwardTrainer:
         # 학습
         # max_features='sqrt': 앙상블 다양성 확보 (기본값 'auto'='sqrt'이지만 명시)
         # max_depth=6: 과적합 방지 (기본 None에서 제한)
-        clf_kwargs = dict(
-            n_estimators=self.n_estimators,
-            max_depth=self.max_depth,
-            max_features="sqrt",
-            min_samples_leaf=max(10, len(X_train) // 20),
-            min_samples_split=20,
-            random_state=42,
-            n_jobs=-1,
-            class_weight="balanced",
-        )
-        if self.model_type == "extra_trees":
-            base_clf = ExtraTreesClassifier(**clf_kwargs)
+        if self.model_type == "xgboost" and _XGB_AVAILABLE:
+            # XGBoost: gradient boosting — RF/ET와 다른 하이퍼파라미터 체계
+            n_classes = len(np.unique(y_train))
+            xgb_objective = "binary:logistic" if n_classes <= 2 else "multi:softprob"
+            xgb_kwargs = dict(
+                n_estimators=self.n_estimators,
+                max_depth=3,  # boosting은 shallow tree 권장
+                learning_rate=0.03,
+                subsample=0.7,
+                min_child_weight=3,
+                reg_alpha=0.1,
+                reg_lambda=1.0,
+                objective=xgb_objective,
+                random_state=42,
+                n_jobs=-1,
+                use_label_encoder=False,
+                eval_metric="mlogloss" if n_classes > 2 else "logloss",
+            )
+            if n_classes > 2:
+                xgb_kwargs["num_class"] = n_classes
+            base_clf = xgb.XGBClassifier(**xgb_kwargs)
+            # early_stopping: eval_set으로 과적합 방지
+            base_clf.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
         else:
-            base_clf = RandomForestClassifier(**clf_kwargs)
-        base_clf.fit(X_train, y_train)
+            clf_kwargs = dict(
+                n_estimators=self.n_estimators,
+                max_depth=self.max_depth,
+                max_features="sqrt",
+                min_samples_leaf=max(10, len(X_train) // 20),
+                min_samples_split=20,
+                random_state=42,
+                n_jobs=-1,
+                class_weight="balanced",
+            )
+            if self.model_type == "extra_trees":
+                base_clf = ExtraTreesClassifier(**clf_kwargs)
+            else:
+                base_clf = RandomForestClassifier(**clf_kwargs)
+            base_clf.fit(X_train, y_train)
 
         # --- SHAP/importance 기반 피처 선택 (optional) ---
         selected_features: Optional[List[str]] = None
@@ -322,12 +356,20 @@ class WalkForwardTrainer:
                 X_cal = X_cal[selected_features]
                 X_test = X_test[selected_features]
 
-                clf_kwargs["min_samples_leaf"] = max(10, len(X_train) // 20)
-                if self.model_type == "extra_trees":
-                    base_clf = ExtraTreesClassifier(**clf_kwargs)
+                if self.model_type == "xgboost" and _XGB_AVAILABLE:
+                    base_clf = xgb.XGBClassifier(**xgb_kwargs)
+                    base_clf.fit(
+                        X_train, y_train,
+                        eval_set=[(X_val, y_val)],
+                        verbose=False,
+                    )
                 else:
-                    base_clf = RandomForestClassifier(**clf_kwargs)
-                base_clf.fit(X_train, y_train)
+                    clf_kwargs["min_samples_leaf"] = max(10, len(X_train) // 20)
+                    if self.model_type == "extra_trees":
+                        base_clf = ExtraTreesClassifier(**clf_kwargs)
+                    else:
+                        base_clf = RandomForestClassifier(**clf_kwargs)
+                    base_clf.fit(X_train, y_train)
             else:
                 logger.info("SHAP 선택: 모든 피처 유지 (%d개)", len(selected_features))
 
@@ -372,7 +414,7 @@ class WalkForwardTrainer:
         self._feature_names = list(X_train.columns)
         self._last_feature_importances = feat_importance
         label_mode = "tb" if self.triple_barrier else ("binary" if self.binary else "3class")
-        algo_tag = "et" if self.model_type == "extra_trees" else "rf"
+        algo_tag = "xgb" if self.model_type == "xgboost" else ("et" if self.model_type == "extra_trees" else "rf")
         model_name = f"{algo_tag}_{self.symbol.replace('/', '').lower()}_{label_mode}_{date.today()}"
 
         result = TrainingResult(
