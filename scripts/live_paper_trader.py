@@ -51,6 +51,7 @@ from src.strategy.base import Action, BaseStrategy
 from src.strategy.rotation import StrategyRotationManager
 from src.strategy.regime import MarketRegimeDetector, MarketRegime
 from src.exchange.paper_trader import PaperTrader
+from src.exchange.health_check import HealthChecker, HealthStatus
 from src.risk.circuit_breaker import CircuitBreaker
 from src.risk.manager import SignalCorrelationTracker
 from src.ml.drift_detector import AccuracyDriftMonitor
@@ -82,6 +83,9 @@ TP_ATR_MULT = 4.0             # TP = ATR * 4.0 (기존 3.0 → R:R 1.6)
 MAX_HOLD_CANDLES = 48         # 48시간 강제 청산 (기존 24)
 MAX_LOSS_PCT = 0.50           # 초기 자본 대비 50% 손실 시 자동 중단
 INITIAL_BALANCE = 10_000.0
+HEALTH_CHECK_INTERVAL = 300    # 5분마다 health check
+DATA_STALE_THRESHOLD = 600     # 10분 이상 데이터 없으면 stale
+MAX_RECONNECT_ATTEMPTS = 3     # 재연결 최대 시도 횟수
 # 레짐별 포지션 사이즈 배수 (RANGING은 진입 자체를 차단하므로 제외)
 REGIME_SIZE_MULT: dict = {
     'TREND_UP':   1.3,   # 추세 상승: 30% 확대
@@ -361,6 +365,15 @@ class LivePaperTrader:
         # symbol별로 관리: symbol -> AccuracyDriftMonitor
         self._accuracy_monitors: dict[str, AccuracyDriftMonitor] = {}
 
+        # Health Check 루프: 거래소 연결 상태 모니터링 + 자동 복구
+        self.health_checker = HealthChecker(
+            check_fn=self._health_check_fn,
+            reconnect_fn=self._health_reconnect_fn,
+            check_interval=HEALTH_CHECK_INTERVAL,
+            data_stale_threshold=DATA_STALE_THRESHOLD,
+            max_reconnect_attempts=MAX_RECONNECT_ATTEMPTS,
+        )
+
         # 수익률 분포 드리프트 모니터 (DriftMonitor) — CircuitBreaker 연동
         self._drift_monitor = DriftMonitor(
             window=30,
@@ -376,6 +389,30 @@ class LivePaperTrader:
     def _handle_shutdown(self, signum, frame):
         logger.info("Shutdown signal received. Saving state...")
         self.running = False
+
+    def _health_check_fn(self) -> dict:
+        """Health check용 거래소 연결 확인 (ccxt ping)."""
+        try:
+            import ccxt
+            ex = ccxt.bybit()
+            ex.timeout = 10000
+            ex.fetch_time()
+            return {"connected": True}
+        except Exception:
+            return {"connected": False}
+
+    def _health_reconnect_fn(self) -> bool:
+        """Health check 재연결 시도 (ccxt 재초기화)."""
+        try:
+            import ccxt
+            ex = ccxt.bybit()
+            ex.timeout = 15000
+            ex.fetch_time()
+            logger.info("Health reconnect: Bybit connection restored")
+            return True
+        except Exception as exc:
+            logger.warning("Health reconnect failed: %s", str(exc)[:100])
+            return False
 
     def _on_return_drift(self, state: DriftState, reason: str) -> None:
         """수익률 DriftMonitor 콜백 — DRIFT 시 CircuitBreaker 강제 트리거."""
@@ -468,6 +505,17 @@ class LivePaperTrader:
             logger.warning("Trading halted due to max loss limit. Skipping tick.")
             return
 
+        # Health check (check_interval 경과 시에만 실행)
+        if self.health_checker.should_check():
+            health = self.health_checker.run_check()
+            if health.status == HealthStatus.PROTECTED:
+                logger.warning(
+                    "PROTECTION MODE — skipping tick (new orders blocked, positions preserved)"
+                )
+                return
+            elif health.status == HealthStatus.DEGRADED:
+                logger.warning("DEGRADED — data may be stale, proceeding cautiously")
+
         self.state.tick_count += 1
         self.state.last_tick = datetime.utcnow().isoformat()
 
@@ -497,9 +545,16 @@ class LivePaperTrader:
 
     def _tick_symbol(self, symbol: str):
         """단일 심볼에 대한 tick 로직."""
+        # 보호 모드 시 신규 진입 차단 (포지션 관리만 수행)
+        if self.health_checker.is_order_blocked():
+            logger.debug("[%s] Orders blocked — protection mode", symbol)
+            return
+
         new_df = fetch_latest_candles(symbol=symbol, limit=50)
         if new_df is None:
             return
+        # 데이터 수신 성공 → health check 데이터 타이머 갱신
+        self.health_checker.record_data_received()
 
         if symbol in self._df_caches:
             combined = pd.concat([self._df_caches[symbol], new_df])

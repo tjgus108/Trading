@@ -1,24 +1,26 @@
 ======================================================================
-🔄 CYCLE 167 — 2026-04-20
+🔄 CYCLE 168 — 2026-04-20
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: 레짐별 Kelly 파라미터 검증, VaR 백테스트 정확도 개선
+### [E] Execution & Paper Trading
+- **Agent**: execution-agent
+- **Focus**: live_paper_trader 안정성 강화, Telegram 알림 또는 Health Check 루프 구현
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: XGBoost 다시간 앙상블 stacking (30/60/90일 윈도우)
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 기존 실패 테스트 수정, 테스트 커버리지 갭 해소
 
 ### [F] Research
 - **Agent**: strategy-researcher-agent
-- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 다시간 앙상블 실증 사례
+- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), Health Check 모니터링 사례
 
 ## 이전 사이클 현황
-**Cycle 165 COMPLETED — D + E + F**
-  - XGBoost 모델 옵션 추가, PSI-AccDrift 통합, 모니터링/Live전환 리서치
+**Cycle 167 COMPLETED — B + D + F**
+  - Kelly 레짐 스무딩(EMA) + Cornish-Fisher VaR
+  - MultiWindowEnsemble 30/60/90일 stacking
+  - 트레이딩봇 73% 실패 원인 리서치
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지

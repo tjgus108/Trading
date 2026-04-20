@@ -78,6 +78,9 @@ class TestCheckApiPermissions:
         conn.exchange_name = "bybit"
         conn.sandbox = False
         conn._exchange = None
+        conn._timeout_ms = 15000
+        conn._consecutive_failures = 0
+        conn._max_consecutive_failures = 5
 
         mock_exchange_instance = MagicMock()
         mock_exchange_instance.fetch_api_key_permissions.return_value = {

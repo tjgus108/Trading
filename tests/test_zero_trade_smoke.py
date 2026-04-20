@@ -6,11 +6,14 @@ Smoke test: pair_trading, ml_rf, ml_lstm 전략이 1000캔들 백테스트에서
 수정 후: heuristic fallback이 실제 신호를 생성해야 함.
 """
 
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.backtest.engine import BacktestEngine
+from src.ml.model import MLSignalGenerator
 from src.strategy.pair_trading import PairTradingStrategy
 from src.strategy.ml_strategy import MLRFStrategy
 from src.strategy.lstm_strategy import MLLSTMStrategy
@@ -99,7 +102,8 @@ class TestZeroTradeSmokeTest:
     def test_ml_rf_min_trades(self):
         """MLRFStrategy: 모델 없어도 EMA+RSI heuristic으로 거래 생성."""
         df = _make_ohlcv(N_CANDLES, seed=2)
-        strategy = MLRFStrategy()
+        with patch.object(MLSignalGenerator, "load_latest", return_value=False):
+            strategy = MLRFStrategy()
         assert strategy._generator._model is None, "테스트 환경에 모델 파일이 있어서는 안 됨"
         engine = BacktestEngine(initial_balance=10_000, timeframe="1h")
         result = engine.run(strategy, df)

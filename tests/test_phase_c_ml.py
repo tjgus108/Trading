@@ -4,6 +4,8 @@ C1: FeatureBuilder, WalkForwardTrainer, MLSignalGenerator, MLRFStrategy
 C2: LLMAnalyst (API 없음 → mock 모드)
 """
 
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -525,6 +527,7 @@ class TestWalkForwardTrainer:
         assert (
             result.split_info["n_train"]
             + result.split_info["n_val"]
+            + result.split_info.get("n_cal", 0)
             + result.split_info["n_test"]
             == result.n_samples
         )
@@ -707,7 +710,8 @@ class TestMLRFStrategy:
         gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
         df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
-        strategy = MLRFStrategy()
+        with patch.object(MLSignalGenerator, "load_latest", return_value=False):
+            strategy = MLRFStrategy()
         assert strategy._generator._model is None
         signal = strategy.generate(df)
         # 상승 추세 → BUY 기대 (최소한 HOLD는 아닌 것도 있어야 함)
@@ -738,7 +742,8 @@ class TestMLRFStrategy:
         gain = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()
         df["rsi14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
-        strategy = MLRFStrategy()
+        with patch.object(MLSignalGenerator, "load_latest", return_value=False):
+            strategy = MLRFStrategy()
         assert strategy._generator._model is None
         signal = strategy.generate(df)
         assert signal.action in (Action.SELL, Action.HOLD)
