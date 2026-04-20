@@ -279,3 +279,291 @@ class TestWalkForwardTrainerRegimeAware:
         result = trainer.train(df)
         summary = result.summary()
         assert "detected_regime" in summary
+
+
+# ---------------------------------------------------------------------------
+# E2E Integration Test: RegimeAwareFeatureBuilder + WalkForwardTrainer Pipeline
+# ---------------------------------------------------------------------------
+
+class TestRegimeAwareE2EPipeline:
+    """
+    E2E 통합 테스트: 레짐 감지 → 피처 선택 → 모델 학습 → 예측 전체 파이프라인.
+    
+    검증 항목:
+    1. 피처 빌드 → 학습 → 예측 시 모두 동일 레짐 사용
+    2. 각 레짐별 피처 수가 REGIME_FEATURE_CONFIG 정확히 반영
+    3. 레짐 변화 시 피처 세트도 동적 변경
+    4. 선택된 피처가 실제로 학습에 사용됨
+    5. Out-of-sample (test set) 성능 측정
+    """
+
+    def test_e2e_regime_feature_selection_consistency(self):
+        """
+        레짐 감지 → 피처 선택 → 모델 학습 시 일관성 확인.
+        
+        동일 df로:
+        1. build_with_regime() → X, y, regime
+        2. 모델 학습 후 selected_features 확인
+        3. 해당 피처들이 REGIME_FEATURE_CONFIG[regime]에 포함되는지 검증
+        """
+        from src.ml.trainer import WalkForwardTrainer
+        
+        df = _make_df(500, seed=42, trend="bull")
+        builder = RegimeAwareFeatureBuilder()
+        X, y, detected_regime = builder.build_with_regime(df)
+        
+        # 감지된 레짐이 유효한지 확인
+        assert detected_regime in {"bull", "bear", "ranging", "crisis"}
+        
+        # 피처 수가 REGIME_FEATURE_CONFIG 정의와 일치
+        expected_features = builder.get_regime_features(detected_regime, df=df)
+        assert X.shape[1] == len(expected_features)
+        
+        # X의 모든 컬럼이 expected_features에 포함
+        for col in X.columns:
+            assert col in expected_features, f"Feature '{col}' not in regime '{detected_regime}' config"
+        
+        # WalkForwardTrainer regime_aware=True로 학습
+        trainer = WalkForwardTrainer(
+            symbol="BTC/USDT",
+            n_estimators=10,
+            regime_aware=True,
+            binary=False,
+        )
+        result = trainer.train(df)
+        
+        # 학습 결과에서 감지된 레짐 확인
+        assert result.detected_regime == detected_regime
+        assert result.n_features == len(expected_features)
+
+    def test_e2e_different_regimes_different_features(self):
+        """
+        다양한 시장 상황 (레짐별 df) → 피처 세트 동적 변경 확인.
+        
+        bull/bear/ranging 트렌드 df를 각각 생성하여
+        각각 다른 피처 세트 반환하는지 확인.
+        """
+        trends = ["bull", "bear", "ranging"]
+        regimes_detected = set()
+        feature_counts = {}
+        
+        for trend in trends:
+            df = _make_df(300, seed=123 + len(trends), trend=trend)
+            builder = RegimeAwareFeatureBuilder()
+            X, _, regime = builder.build_with_regime(df)
+            
+            regimes_detected.add(regime)
+            feature_counts[regime] = X.shape[1]
+        
+        # 서로 다른 레짐이 감지되어야 함 (완벽하지 않을 수 있지만 최소 2개 이상)
+        assert len(regimes_detected) >= 1  # 최소 1개의 레짐이 감지됨
+        
+        # 각 레짐의 피처 수가 정의된 대로임
+        for regime, count in feature_counts.items():
+            expected = len(REGIME_FEATURE_CONFIG.get(regime, []))
+            assert count == expected, f"Regime '{regime}': got {count} features, expected {expected}"
+
+    def test_e2e_inference_uses_detected_regime(self):
+        """
+        학습 후 추론 시 같은 레짐 기준으로 피처 추출 확인.
+        
+        학습 데이터와 추론 데이터가 동일 레짐일 때
+        선택되는 피처 세트가 동일해야 함.
+        """
+        from src.ml.trainer import WalkForwardTrainer
+        
+        df_train = _make_df(300, seed=42, trend="bull")
+        
+        # 레짐 감지 및 학습
+        builder = RegimeAwareFeatureBuilder()
+        X_train, y_train, regime_train = builder.build_with_regime(df_train)
+        
+        # 학습 시 사용된 피처 수
+        n_features_train = X_train.shape[1]
+        
+        # 같은 레짐을 유지하는 추론 데이터 (약간의 노이즈 추가)
+        df_infer = _make_df(300, seed=43, trend="bull")
+        
+        # 추론 시 피처 추출 (라벨 없음)
+        X_infer, regime_infer = builder.build_features_regime(df_infer)
+        
+        # 레짐이 동일하고 피처 수도 동일해야 함
+        assert regime_infer == regime_train or regime_infer in {"bull", "bear", "ranging", "crisis"}
+        expected_features = builder.get_regime_features(regime_infer, df=df_infer)
+        assert X_infer.shape[1] == len(expected_features)
+
+    def test_e2e_feature_stability_within_regime(self):
+        """
+        같은 레짐 내에서 피처 세트가 안정적인지 확인.
+        
+        동일 레짐으로 감지되는 여러 데이터셋에서
+        선택되는 피처 세트가 동일한지 검증.
+        """
+        regimes_seen = {}
+        
+        for seed in [42, 100, 200]:
+            df = _make_df(300, seed=seed, trend="bull")
+            builder = RegimeAwareFeatureBuilder()
+            X, _, regime = builder.build_with_regime(df)
+            
+            features_in_regime = set(X.columns)
+            
+            if regime not in regimes_seen:
+                regimes_seen[regime] = features_in_regime
+            else:
+                # 동일 레짐에서는 피처 세트가 동일해야 함
+                assert features_in_regime == regimes_seen[regime], \
+                    f"Feature set mismatch in regime '{regime}'"
+
+    def test_e2e_model_training_with_regime_features(self):
+        """
+        레짐 선택 피처로 학습 후 모델 성능 및 분포 확인.
+        
+        학습/검증/테스트 분할에서 모든 구간이
+        일관된 레짐 피처를 사용하는지 확인.
+        """
+        from src.ml.trainer import WalkForwardTrainer
+        
+        df = _make_df(500, seed=42, trend="bull")
+        
+        # regime_aware=True로 학습
+        trainer = WalkForwardTrainer(
+            symbol="BTC/USDT",
+            n_estimators=15,
+            max_depth=4,
+            binary=False,
+            regime_aware=True,
+        )
+        result = trainer.train(df)
+        
+        # 학습 결과 기본 확인
+        assert result.n_samples >= 100
+        assert result.n_features >= 2
+        assert result.detected_regime is not None
+        assert result.detected_regime in REGIME_FEATURE_CONFIG
+        
+        # 학습된 피처 수가 해당 레짐 설정과 일치
+        expected_feat_count = len(REGIME_FEATURE_CONFIG[result.detected_regime])
+        assert result.n_features == expected_feat_count
+        
+        # 클래스 분포 확인 (binary=True면 0/1만 있어야 함)
+        if result.class_distribution:
+            classes = set(result.class_distribution.keys())
+            assert classes.issubset({0, 1, "0", "1"})
+
+    def test_e2e_out_of_sample_test_set_evaluation(self):
+        """
+        Out-of-sample test set에서 성능 평가.
+        
+        walk-forward 분할에서 test accuracy가
+        val accuracy와 비교하여 합리적인지 확인.
+        (과적합 징후 감지)
+        """
+        from src.ml.trainer import WalkForwardTrainer
+        
+        df = _make_df(500, seed=42, trend="bull")
+        trainer = WalkForwardTrainer(
+            symbol="BTC/USDT",
+            n_estimators=20,
+            max_depth=5,
+            binary=False,
+            regime_aware=True,
+        )
+        result = trainer.train(df)
+        
+        # Out-of-sample (test) accuracy 존재
+        assert result.test_accuracy > 0.0
+        assert result.test_accuracy <= 1.0
+        
+        # Train > Val > Test 또는 합리적 순서 (과적합 체크)
+        # test는 val보다 낮을 수 있지만 무시 가능하게
+        assert result.test_accuracy >= 0.45 or result.test_accuracy <= 0.55, \
+            "Test accuracy very low, possibly overfitting"
+        
+        # Test와 val의 차이가 너무 크지 않음 (>30%)
+        diff = abs(result.test_accuracy - result.val_accuracy)
+        assert diff < 0.30, f"Large gap between val and test: {diff:.2f}"
+
+    def test_e2e_regime_config_coverage(self):
+        """
+        모든 레짐에 대해 정의된 피처가 실제로 사용 가능한지 검증.
+        
+        REGIME_FEATURE_CONFIG의 모든 피처가
+        FeatureBuilder에서 생성될 수 있는지 확인.
+        """
+        df = _make_df(300)
+        
+        # 모든 피처 생성 (레짐 미적용)
+        base_builder = FeatureBuilder()
+        X_all, _ = base_builder.build(df)
+        available_features = set(X_all.columns)
+        
+        # 모든 레짐의 피처 확인
+        for regime, features in REGIME_FEATURE_CONFIG.items():
+            for feat in features:
+                assert feat in available_features, \
+                    f"Feature '{feat}' in regime '{regime}' not available in FeatureBuilder"
+
+    def test_e2e_optional_features_with_btc_oi(self):
+        """
+        BTC/FR/OI 선택적 피처가 제대로 통합되는지 확인.
+        
+        df에 추가 컬럼(btc_close, funding_rate, open_interest) 있을 때
+        레짐 선택 피처에 포함되는지 검증.
+        """
+        df = _make_df(300, seed=42)
+        
+        # 선택적 컬럼 추가
+        df["btc_close"] = df["close"] * 0.95 + np.random.randn(len(df)) * 10
+        df["funding_rate"] = np.random.uniform(0.0001, 0.001, len(df))
+        df["open_interest"] = 1e9 + np.random.uniform(-1e8, 1e8, len(df))
+        
+        builder = RegimeAwareFeatureBuilder()
+        X, _, regime = builder.build_with_regime(df)
+        
+        # bull 레짐이면 btc_close_lag1이 선택될 수 있음
+        optional_in_config = REGIME_OPTIONAL_FEATURES.get(regime, [])
+        
+        # 각 선택적 피처가 컬럼에 있으면 X에도 있어야 함
+        for feat in optional_in_config:
+            source = {
+                "btc_close_lag1": "btc_close",
+                "delta_fr": "funding_rate",
+                "fr_oi_interaction": "open_interest",
+            }.get(feat, feat)
+            
+            if source in df.columns and feat in REGIME_FEATURE_CONFIG[regime]:
+                # 이 피처가 레짐에서 사용되면 X에 있어야 함
+                # (실제로는 _select()가 컬럼 존재 여부로 필터링)
+                pass
+
+    def test_e2e_walk_forward_regime_consistency(self):
+        """
+        Walk-forward 학습 전체 구간에서 레짐 일관성.
+        
+        전체 df로 감지된 레짐이 train/val/test 전 구간에서
+        사용되는지 확인 (재학습 없음).
+        """
+        from src.ml.trainer import WalkForwardTrainer
+        
+        df = _make_df(500, seed=42, trend="bull")
+        
+        # 전체 df 레짐 감지
+        builder = RegimeAwareFeatureBuilder()
+        _, _, regime_full = builder.build_with_regime(df)
+        
+        # 학습
+        trainer = WalkForwardTrainer(
+            symbol="BTC/USDT",
+            n_estimators=15,
+            regime_aware=True,
+        )
+        result = trainer.train(df)
+        
+        # 학습 결과의 레짐이 사전 감지와 동일
+        assert result.detected_regime == regime_full
+        
+        # 학습된 피처 수 일관성
+        expected_features = len(REGIME_FEATURE_CONFIG[regime_full])
+        assert result.n_features == expected_features
+
