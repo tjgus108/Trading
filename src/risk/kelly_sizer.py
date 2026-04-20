@@ -35,6 +35,7 @@ class KellySizer:
         max_drawdown: Optional[float] = None,
         leverage: float = 1.0,
         kelly_cap: float = 0.25,
+        regime_smooth_alpha: float = 0.0,
     ) -> None:
         """
         Args:
@@ -46,6 +47,10 @@ class KellySizer:
             kelly_cap: Full Kelly fraction 상한 (기본 0.25 = Quarter-Kelly cap).
                        kelly_f * fraction 결과가 이 값을 초과하지 않도록 제한.
                        풀 Kelly → 파멸 경로 방지 핵심 안전장치.
+            regime_smooth_alpha: 레짐 전환 시 EMA 스무딩 계수 (0~1).
+                       0.0 = 스무딩 없음(즉시 전환, 기본값), 1 = 이전 스케일 유지.
+                       0.3 권장: 새 레짐 70% + 이전 스케일 30% 블렌딩.
+                       레짐이 실제로 바뀔 때만 적용 (동일 레짐 반복 시 그대로).
         """
         self.fraction = fraction
         self.max_fraction = max_fraction
@@ -53,6 +58,10 @@ class KellySizer:
         self.max_drawdown = max_drawdown
         self.leverage = leverage
         self.kelly_cap = kelly_cap
+        self.regime_smooth_alpha = float(np.clip(regime_smooth_alpha, 0.0, 1.0))
+        # 레짐 스무딩 상태: 이전 레짐명과 실효 스케일 추적
+        self._prev_regime: Optional[str] = None
+        self._prev_regime_scale: Optional[float] = None
 
     def compute(
         self,
@@ -123,9 +132,23 @@ class KellySizer:
             fractional_f = min(fractional_f, max_dd_constrained)
 
         # 레짐 스케일 조정 (compute()에 regime 전달 시 자동 적용)
+        # EMA 스무딩: 레짐 전환 시에만 이전 스케일과 블렌딩 (동일 레짐 유지 시는 즉시 적용)
         if regime is not None:
-            regime_scale = self._REGIME_SCALE.get(regime.upper(), self._DEFAULT_REGIME_SCALE)
-            fractional_f *= regime_scale
+            regime_upper = regime.upper()
+            target_scale = self._REGIME_SCALE.get(regime_upper, self._DEFAULT_REGIME_SCALE)
+            regime_changed = (self._prev_regime is not None and regime_upper != self._prev_regime)
+            if regime_changed and self.regime_smooth_alpha > 0.0 and self._prev_regime_scale is not None:
+                # 레짐 전환: EMA 블렌딩 (새 레짐 70% + 이전 스케일 30%)
+                effective_scale = (
+                    (1.0 - self.regime_smooth_alpha) * target_scale
+                    + self.regime_smooth_alpha * self._prev_regime_scale
+                )
+            else:
+                # 첫 호출이거나 동일 레짐 유지: target_scale 그대로 사용
+                effective_scale = target_scale
+            self._prev_regime = regime_upper
+            self._prev_regime_scale = effective_scale
+            fractional_f *= effective_scale
 
         # 상·하한 클리핑
         fractional_f = float(np.clip(fractional_f, self.min_fraction, self.max_fraction))

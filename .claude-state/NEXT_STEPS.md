@@ -1,30 +1,29 @@
 # Next Steps
 
-_Last updated: 2026-04-20 (Cycle 165 완료)_
+_Last updated: 2026-04-20 (Cycle 167 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 166
-- 166 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** 패턴
+### 로테이션: Cycle 168
+- 168 mod 5 = 3 → **E(실행) + A(품질) + F(리서치)** 패턴
 
-### ✅ Cycle 165 완료 사항
+### ✅ Cycle 167 완료 사항
 
-#### D(ML): XGBoost 모델 옵션 추가 ✅ COMPLETE
-- model_type="xgboost": max_depth=3, lr=0.03, early_stopping=50
-- xgboost 미설치 시 RF fallback, multi-class 자동 감지
-- 테스트 7개 추가 → 53 passed, 3 skipped
+#### B(리스크): Kelly 레짐 스무딩 + CF VaR ✅ COMPLETE
+- `regime_smooth_alpha` EMA 블렌딩 (opt-in, 기본 0.0)
+- Cornish-Fisher expansion: 왜도/첨도 반영 꼬리위험 VaR
+- 테스트 4개 추가 → 174 passed (risk)
 
-#### E(실행): PSI → AccuracyDriftMonitor 통합 ✅ COMPLETE
-- set_feature_reference + check_feature_drift + should_retrain 자동 PSI 반영
-- 기존 동작 100% 하위호환 (PSI 미설정 시)
-- 테스트 6개 추가 → 53 passed
+#### D(ML): MultiWindowEnsemble ✅ COMPLETE
+- 30/60/90일 윈도우 RF/ExtraTrees/XGBoost 독립 학습
+- softmax 동적 가중치 (temp=1.5), rolling 20거래 갱신
+- 테스트 9개 추가
 
-#### F(리서치): 모니터링 + Paper→Live 전환 ✅ COMPLETE
-- 알림 3계층 (Critical/Silent/Suppress) + 5분 throttle
-- Paper→Live gate: Sharpe≥1.0, PF≥1.5, MDD≤20%
-- 3단계 자본 스케일업, Hard rollback (MDD 15%)
+#### F(리서치): 실패/성공 사례 + 앙상블 실증 ✅ COMPLETE
+- 자동화 계좌 73% 6개월 내 실패 (RESEARCH_CYCLE167.md)
+- Stacking > Blending > Voting 실증 확인
 
 ### ⚠️ 핵심 문제: 전략 엣지 부재 → 해법 확인됨
 
@@ -35,8 +34,9 @@ _Last updated: 2026-04-20 (Cycle 165 완료)_
 
 **다음 구현 과제 (우선순위):**
 1. ~~FR delta + OI~~ ✅ | 2. ~~SHAP~~ ✅ | 3. ~~calibration~~ ✅ | 4. ~~ExtraTrees~~ ✅
-5. ~~XGBoost 모델~~ ✅ | 6. **XGBoost 다시간 앙상블** — stacking, 30/60/90일
+5. ~~XGBoost 모델~~ ✅ | 6. ~~XGBoost 다시간 앙상블~~ ✅
 7. ~~MDD CB~~ ✅ | 8. ~~max_loss_pct~~ ✅ | 9. ~~PSI~~ ✅ | 10. ~~수수료~~ ✅
-11. ~~PSI-AccDrift 통합~~ ✅ | 12. **live_paper_trader 7일 운영**
+11. ~~PSI-AccDrift 통합~~ ✅ | 12. **live_paper_trader 7일 운영** ← 다음 E 사이클
 13. **Telegram 알림** — Critical/Silent 3계층
 14. **Health check 루프** — 5분 liveness + 데이터 지연 감지
+15. ~~Kelly 레짐 스무딩~~ ✅ | 16. ~~CF VaR~~ ✅

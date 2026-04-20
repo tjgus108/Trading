@@ -853,3 +853,108 @@ class TestLLMAnalyst:
         assert "BUY" in prompt
         assert "EMA cross" in prompt
         assert "Do NOT give buy/sell recommendations" in prompt
+
+
+# ---------------------------------------------------------------------------
+# MultiWindowEnsemble
+# ---------------------------------------------------------------------------
+
+class TestMultiWindowEnsemble:
+    """다시간 앙상블 stacking 테스트."""
+
+    def test_init_uniform_weights(self):
+        """초기 가중치가 균등(1/3)임을 확인."""
+        from src.ml.trainer import MultiWindowEnsemble
+        mwe = MultiWindowEnsemble(symbol="BTC/USDT")
+        w = mwe.weights
+        assert len(w) == 3
+        assert abs(sum(w) - 1.0) < 1e-3  # rounded to 4 decimal places
+        for wi in w:
+            assert abs(wi - 1 / 3) < 1e-3
+
+    def test_predict_no_model_returns_hold(self):
+        """학습 전 predict는 HOLD, confidence=0."""
+        from src.ml.trainer import MultiWindowEnsemble
+        df = _make_df(300)
+        mwe = MultiWindowEnsemble()
+        result = mwe.predict(df)
+        assert result["action"] == "HOLD"
+        assert result["confidence"] == 0.0
+        assert "no model trained" in result.get("note", "")
+
+    def test_train_returns_three_results(self):
+        """train()은 윈도우 수(3)개의 TrainingResult를 반환."""
+        from src.ml.trainer import MultiWindowEnsemble, TrainingResult
+        df = _make_df(500)
+        mwe = MultiWindowEnsemble(n_estimators=20)
+        results = mwe.train(df)
+        assert len(results) == 3
+        for r in results:
+            assert isinstance(r, TrainingResult)
+
+    def test_weights_sum_to_one_after_train(self):
+        """학습 후 가중치 합이 1.0."""
+        from src.ml.trainer import MultiWindowEnsemble
+        df = _make_df(500)
+        mwe = MultiWindowEnsemble(n_estimators=20)
+        mwe.train(df)
+        w = mwe.weights
+        assert abs(sum(w) - 1.0) < 1e-3  # rounded to 4 decimal places
+
+    def test_softmax_weights_temperature(self):
+        """temperature가 높을수록 가중치가 더 균등해짐."""
+        from src.ml.trainer import MultiWindowEnsemble
+        import numpy as np
+        mwe_hot = MultiWindowEnsemble(temperature=10.0)
+        mwe_cold = MultiWindowEnsemble(temperature=0.1)
+
+        scores = np.array([0.6, 0.55, 0.52])
+        w_hot = mwe_hot._softmax_weights(scores)
+        w_cold = mwe_cold._softmax_weights(scores)
+
+        # temperature 높을수록 분산이 작아야 함
+        assert np.std(w_hot) < np.std(w_cold)
+
+    def test_update_performance_adds_to_rolling(self):
+        """update_performance가 rolling_accs에 추가됨."""
+        from src.ml.trainer import MultiWindowEnsemble
+        mwe = MultiWindowEnsemble()
+        mwe.update_performance(0, 0.62)
+        mwe.update_performance(0, 0.65)
+        assert len(mwe._rolling_accs[0]) == 2
+        assert mwe._rolling_accs[0][0] == pytest.approx(0.62)
+
+    def test_weights_update_after_update_every_predictions(self):
+        """update_every 횟수 예측 후 가중치가 갱신됨."""
+        from src.ml.trainer import MultiWindowEnsemble
+        df = _make_df(500)
+        mwe = MultiWindowEnsemble(n_estimators=20, update_every=5)
+        mwe.train(df)
+        # 성능 차이를 크게 주어 가중치 변화 유도
+        mwe._rolling_accs[0] = [0.75] * 5
+        mwe._rolling_accs[1] = [0.50] * 5
+        mwe._rolling_accs[2] = [0.50] * 5
+        mwe._update_weights()
+        w = mwe.weights
+        # 윈도우 0(성능 높음)의 가중치가 나머지보다 커야 함
+        assert w[0] > w[1]
+        assert w[0] > w[2]
+
+    def test_predict_returns_valid_action_after_train(self):
+        """학습 후 predict가 유효한 action을 반환."""
+        from src.ml.trainer import MultiWindowEnsemble
+        df = _make_df(500)
+        mwe = MultiWindowEnsemble(n_estimators=20)
+        mwe.train(df)
+        result = mwe.predict(df)
+        assert result["action"] in {"BUY", "SELL", "HOLD"}
+        assert 0.0 <= result["confidence"] <= 1.0
+        assert abs(result["proba_buy"] + result["proba_sell"] + result["proba_hold"] - 1.0) < 1e-4
+
+    def test_window_fallback_small_data(self):
+        """데이터가 90일치보다 작아도 오류 없이 학습."""
+        from src.ml.trainer import MultiWindowEnsemble
+        df = _make_df(200)  # < 90*24=2160 rows → fallback to full df
+        mwe = MultiWindowEnsemble(n_estimators=20)
+        results = mwe.train(df)
+        assert len(results) == 3

@@ -1,5 +1,28 @@
 # Work Log
 
+## [2026-04-20] Cycle 167 — B (리스크) + D (ML) + F (리서치)
+
+**[B] Kelly 레짐 스무딩 + Cornish-Fisher VaR (`src/risk/`):**
+- `regime_smooth_alpha` 파라미터 추가 (기본 0.0 = opt-in): 레짐 전환 시 EMA 블렌딩
+- alpha=0.3 시 TREND_UP→HIGH_VOL 전환에서 0.3x 급락 대신 ~0.51x 부드러운 전환
+- Cornish-Fisher expansion: z_cf = z + (z²-1)S/6 + (z³-3z)K/24 - (2z³-5z)S²/36
+- 왜도/첨도 반영 CF VaR vs Normal VaR 중 보수적(큰) 값 자동 선택
+- 테스트 4개 추가 → 174 passed (risk)
+
+**[D] MultiWindowEnsemble 구현 (`src/ml/trainer.py`):**
+- 30/60/90일 윈도우에 RF/ExtraTrees/XGBoost 독립 학습
+- softmax 동적 가중치 (temperature=1.5), rolling 20거래마다 갱신
+- XGBoost 미설치 시 RF fallback, 데이터 부족 시 전체 df fallback
+- predict → action/confidence/proba + weights/model 반환
+- 테스트 9개 추가 → 63+ passed (ml)
+
+**[F] 리서치: 트레이딩봇 실패/성공 + 다시간 앙상블 실증:**
+- 자동화 계좌 73%가 6개월 내 실패 (과적합, 슬리피지, 레짐변화 순)
+- Paper→Live 갭: 실행 레이턴시·슬리피지·주문서 충격 미검증이 주 원인
+- Stacking > Blending > Voting 순서 실증, XGBoost+LightGBM+CatBoost 5~15% 향상
+- Tickeron FLMs(XGBoost기반) 연 +48%, PF 4.0+ 달성 사례
+- 즉시 적용: (1) 30/60/90 Stacking ✅ (2) Health Check+알림 (3) 레짐 필터
+
 ## [2026-04-20] Cycle 165 — D (ML) + E (실행) + F (리서치)
 
 **[D] XGBoost 모델 옵션 추가 (`src/ml/trainer.py`):**
@@ -13040,3 +13063,6 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-04-20 03:14 UTC] Cycle 165 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-20 09:24 UTC] Cycle 166 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

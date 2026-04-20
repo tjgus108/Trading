@@ -190,9 +190,14 @@ class PortfolioOptimizer:
     def _parametric_var_cvar(
         port_returns: np.ndarray, confidence: float = 0.95
     ) -> tuple:
-        """정규분포 가정 Parametric VaR/CVaR (Cornish-Fisher 보정 없이).
+        """Cornish-Fisher 보정 Parametric VaR/CVaR.
 
         소표본에서 historical VaR의 불안정성을 보완하기 위한 크로스체크 용도.
+        정규분포 가정 대신 Cornish-Fisher expansion으로 왜도(skewness)와
+        초과 첨도(excess kurtosis)를 반영해 꼬리 위험을 더 정확히 측정한다.
+
+        CF expansion: z_cf = z + (z^2-1)*S/6 + (z^3-3z)*K/24 - (2z^3-5z)*S^2/36
+        CF VaR과 Normal VaR 중 보수적(큰) 값을 반환한다.
 
         Args:
             port_returns: 수익률 배열
@@ -210,9 +215,30 @@ class PortfolioOptimizer:
             return 0.0, 0.0
         # z-score for the (1-confidence) quantile
         z = norm.ppf(1.0 - confidence)  # e.g. -1.645 for 95%
-        # Parametric VaR = -(mu + z * sigma)
-        p_var = -(mu + z * sigma)
-        # Parametric CVaR (Expected Shortfall under normal)
+
+        # Cornish-Fisher expansion: 왜도/첨도로 z 보정
+        n = len(port_returns)
+        if n >= 4:
+            std_r = (port_returns - mu) / sigma
+            S = float(np.mean(std_r ** 3))          # 왜도 (skewness)
+            K = float(np.mean(std_r ** 4)) - 3.0    # 초과 첨도 (excess kurtosis)
+            # CF: z_cf = z + (z^2-1)*S/6 + (z^3-3z)*K/24 - (2z^3-5z)*S^2/36
+            z_cf = (z
+                    + (z ** 2 - 1.0) * S / 6.0
+                    + (z ** 3 - 3.0 * z) * K / 24.0
+                    - (2.0 * z ** 3 - 5.0 * z) * S ** 2 / 36.0)
+            # CF가 수렴 불안정하면 Normal z fallback
+            if not np.isfinite(z_cf):
+                z_cf = z
+            # VaR는 보수적(더 큰 손실) 쪽 선택
+            z_var = min(z_cf, z)  # z는 음수이므로 min = 더 낮은(더 나쁜) quantile
+        else:
+            z_cf = z
+            z_var = z
+
+        # Parametric VaR = -(mu + z_var * sigma)
+        p_var = -(mu + z_var * sigma)
+        # Parametric CVaR (Expected Shortfall under normal, using original z)
         # ES = -(mu - sigma * pdf(z) / (1-confidence))
         p_cvar = -(mu - sigma * norm.pdf(z) / (1.0 - confidence))
         return max(0.0, p_var), max(0.0, p_cvar)

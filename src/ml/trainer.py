@@ -579,6 +579,235 @@ class WalkForwardTrainer:
         return path
 
 
+class MultiWindowEnsemble:
+    """
+    다시간 앙상블 stacking: 30/60/90일 윈도우에 RF/ExtraTrees/XGBoost 할당.
+
+    - softmax 동적 가중치 (temperature=1.5)
+    - 초기 20거래 균등 가중치, rolling 20거래마다 갱신
+    - predict_proba → 가중 평균 → BUY/SELL/HOLD
+    """
+
+    WINDOWS = [30, 60, 90]
+    DEFAULT_MODEL_TYPES = ["rf", "extra_trees", "xgboost"]
+
+    def __init__(
+        self,
+        symbol: str = "BTC/USDT",
+        temperature: float = 1.5,
+        update_every: int = 20,
+        n_estimators: int = 100,
+        forward_n: int = 5,
+        threshold: float = 0.003,
+    ):
+        self.symbol = symbol
+        self.temperature = temperature
+        self.update_every = update_every
+        self.n_estimators = n_estimators
+        self.forward_n = forward_n
+        self.threshold = threshold
+
+        # 각 윈도우별 WalkForwardTrainer
+        self._trainers: List[WalkForwardTrainer] = []
+        # 가중치 (uniform until first update)
+        self._weights: np.ndarray = np.ones(3) / 3.0
+        # rolling 성능 누적 (val+test acc)
+        self._rolling_accs: List[List[float]] = [[], [], []]
+        self._trade_count: int = 0
+        self._last_results: List[Optional[TrainingResult]] = [None, None, None]
+
+        # 윈도우별 모델 타입 결정 (xgboost 미설치 시 fallback)
+        model_types = list(self.DEFAULT_MODEL_TYPES)
+        if not _XGB_AVAILABLE:
+            model_types[2] = "rf"
+            logger.warning("xgboost 미설치 — 90일 윈도우 model_type='rf'로 fallback")
+
+        for mtype in model_types:
+            self._trainers.append(
+                WalkForwardTrainer(
+                    symbol=symbol,
+                    n_estimators=n_estimators,
+                    forward_n=forward_n,
+                    threshold=threshold,
+                    model_type=mtype,
+                )
+            )
+
+    def train(self, df: pd.DataFrame) -> List[TrainingResult]:
+        """
+        각 윈도우(30/60/90일)로 슬라이싱 후 독립 학습.
+        df는 최소 90일치 이상 캔들 필요 (시간봉 기준 90*24=2160 캔들 이상 권장).
+        """
+        results = []
+        window_sizes_rows = [self.WINDOWS[i] * 24 for i in range(3)]  # 시간봉 기준
+
+        for i, (trainer, nrows) in enumerate(zip(self._trainers, window_sizes_rows)):
+            if len(df) < nrows:
+                # 데이터 부족 → 전체 df 사용
+                df_window = df
+                logger.warning(
+                    "윈도우 %d일: 데이터 부족 (%d < %d) — 전체 df 사용",
+                    self.WINDOWS[i], len(df), nrows,
+                )
+            else:
+                df_window = df.iloc[-nrows:]
+
+            result = trainer.train(df_window)
+            results.append(result)
+            self._last_results[i] = result
+            if result.passed:
+                self._rolling_accs[i].append(
+                    (result.val_accuracy + result.test_accuracy) / 2.0
+                )
+
+        self._update_weights()
+        return results
+
+    def _softmax_weights(self, scores: np.ndarray) -> np.ndarray:
+        """softmax with temperature scaling."""
+        scaled = scores / self.temperature
+        shifted = scaled - scaled.max()  # numerical stability
+        exp_s = np.exp(shifted)
+        return exp_s / exp_s.sum()
+
+    def _update_weights(self) -> None:
+        """rolling 평균 성능 기반 softmax 가중치 갱신."""
+        scores = []
+        for accs in self._rolling_accs:
+            if len(accs) == 0:
+                scores.append(0.5)  # neutral
+            else:
+                recent = accs[-self.update_every :]
+                scores.append(float(np.mean(recent)))
+
+        scores_arr = np.array(scores, dtype=float)
+        self._weights = self._softmax_weights(scores_arr)
+        logger.info(
+            "MultiWindowEnsemble 가중치 갱신: w30=%.3f w60=%.3f w90=%.3f",
+            *self._weights,
+        )
+
+    def predict(self, df: pd.DataFrame) -> dict:
+        """
+        세 모델의 predict_proba를 가중 평균하여 BUY/SELL/HOLD 반환.
+
+        Returns:
+            dict with keys: action, confidence, proba_buy, proba_sell, proba_hold,
+                           weights, model
+        """
+        trained = [t for t in self._trainers if t._trained_model is not None]
+        if not trained:
+            return {
+                "action": "HOLD",
+                "confidence": 0.0,
+                "proba_buy": 0.0,
+                "proba_sell": 0.0,
+                "proba_hold": 1.0,
+                "weights": self._weights.tolist(),
+                "model": "MultiWindowEnsemble",
+                "note": "no model trained",
+            }
+
+        # 각 모델에서 predict_proba 계산 후 가중 평균
+        probas = []  # shape: (n_trained, 3) — [buy, sell, hold]
+        active_weights = []
+
+        for i, trainer in enumerate(self._trainers):
+            if trainer._trained_model is None:
+                continue
+
+            # 피처 빌드
+            fb = trainer.feature_builder
+            try:
+                feat = fb.build_features_only(df)
+                if trainer._feature_names:
+                    feat = feat.reindex(columns=trainer._feature_names, fill_value=0.0)
+                X_live = feat.iloc[[-1]]
+            except Exception as e:
+                logger.warning("MultiWindowEnsemble 피처 빌드 실패 (윈도우 %d): %s", self.WINDOWS[i], e)
+                continue
+
+            try:
+                proba_raw = trainer._trained_model.predict_proba(X_live)[0]
+            except Exception as e:
+                logger.warning("MultiWindowEnsemble predict_proba 실패 (윈도우 %d): %s", self.WINDOWS[i], e)
+                continue
+
+            # class_order → [buy=1, sell=-1, hold=0] 순으로 정렬
+            class_order = trainer._class_order or []
+            proba_map = dict(zip(class_order, proba_raw))
+            p_buy = float(proba_map.get(1, proba_map.get(1.0, 0.0)))
+            p_sell = float(proba_map.get(-1, proba_map.get(-1.0, 0.0)))
+            p_hold = float(proba_map.get(0, proba_map.get(0.0, 0.0)))
+
+            total_p = p_buy + p_sell + p_hold
+            if total_p > 0:
+                p_buy /= total_p
+                p_sell /= total_p
+                p_hold /= total_p
+
+            probas.append([p_buy, p_sell, p_hold])
+            active_weights.append(self._weights[i])
+
+        if not probas:
+            return {
+                "action": "HOLD",
+                "confidence": 0.0,
+                "proba_buy": 0.0,
+                "proba_sell": 0.0,
+                "proba_hold": 1.0,
+                "weights": self._weights.tolist(),
+                "model": "MultiWindowEnsemble",
+                "note": "prediction failed",
+            }
+
+        # 가중 평균
+        w_arr = np.array(active_weights, dtype=float)
+        w_arr = w_arr / w_arr.sum()
+        probas_arr = np.array(probas)
+        weighted = (probas_arr * w_arr[:, None]).sum(axis=0)
+
+        p_buy, p_sell, p_hold = float(weighted[0]), float(weighted[1]), float(weighted[2])
+        max_idx = int(np.argmax(weighted))
+        actions = ["BUY", "SELL", "HOLD"]
+        action = actions[max_idx]
+        confidence = float(weighted[max_idx])
+
+        # rolling 성능 누적 (거래 카운터 기반 갱신)
+        self._trade_count += 1
+        if self._trade_count % self.update_every == 0:
+            self._update_weights()
+
+        return {
+            "action": action,
+            "confidence": round(confidence, 4),
+            "proba_buy": round(p_buy, 4),
+            "proba_sell": round(p_sell, 4),
+            "proba_hold": round(p_hold, 4),
+            "weights": [round(float(w), 4) for w in self._weights],
+            "model": f"MultiWindowEnsemble(30/60/90d)",
+        }
+
+    def update_performance(self, window_idx: int, accuracy: float) -> None:
+        """
+        외부에서 거래 결과 기반 성능 업데이트.
+
+        Args:
+            window_idx: 0=30일, 1=60일, 2=90일
+            accuracy: 최근 거래 정확도 (0~1)
+        """
+        if 0 <= window_idx < 3:
+            self._rolling_accs[window_idx].append(accuracy)
+            logger.debug(
+                "MultiWindowEnsemble 성능 업데이트: window=%d acc=%.3f",
+                self.WINDOWS[window_idx], accuracy,
+            )
+
+    @property
+    def weights(self) -> List[float]:
+        return [round(float(w), 4) for w in self._weights]
+
+
 def combinatorial_purged_cv(
     X: pd.DataFrame,
     y: pd.Series,

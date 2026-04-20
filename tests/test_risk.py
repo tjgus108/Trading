@@ -1042,3 +1042,83 @@ def test_mdd_boundary_just_below_halt():
     dm.update(8001)  # dd = 1999/10000 = 19.99%
     assert dm.get_mdd_level() == MddLevel.LIQUIDATE
     assert dm.get_mdd_size_multiplier() == 0.0
+
+
+# ── 레짐 스무딩 테스트 ───────────────────────────────────────────────────────
+def test_kelly_regime_smooth_alpha_transition():
+    """regime_smooth_alpha=0.3 이면 레짐 전환 시 EMA 블렌딩이 적용된다."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.50, regime_smooth_alpha=0.3)
+    kwargs = dict(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=50000)
+
+    # 첫 호출: TREND_UP → smoothing 없음 (prev=None)
+    size_up = sizer.compute(**kwargs, regime="TREND_UP")
+
+    # 두 번째 호출: HIGH_VOL로 전환 → EMA 블렌딩
+    size_high_vol_smooth = sizer.compute(**kwargs, regime="HIGH_VOL")
+
+    # alpha=0 (smoothing 없음) 으로 비교
+    sizer_no_smooth = KellySizer(fraction=0.5, max_fraction=0.50, regime_smooth_alpha=0.0)
+    sizer_no_smooth.compute(**kwargs, regime="TREND_UP")  # prev 세팅
+    size_high_vol_raw = sizer_no_smooth.compute(**kwargs, regime="HIGH_VOL")
+
+    # 스무딩 버전은 이전 스케일(1.0) 30%를 유지하므로 raw(0.3x)보다 커야 함
+    assert size_high_vol_smooth > size_high_vol_raw, (
+        f"smooth={size_high_vol_smooth:.6f} should > raw={size_high_vol_raw:.6f}"
+    )
+
+
+def test_kelly_regime_smooth_same_regime_no_blend():
+    """동일 레짐 반복 호출 시 스무딩 없이 target_scale이 그대로 적용된다."""
+    sizer = KellySizer(fraction=0.5, max_fraction=0.50, regime_smooth_alpha=0.3)
+    kwargs = dict(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=50000)
+
+    size1 = sizer.compute(**kwargs, regime="TREND_DOWN")
+    size2 = sizer.compute(**kwargs, regime="TREND_DOWN")
+    # 동일 레짐 반복 → 결과가 동일해야 함 (블렌딩 없음)
+    assert size1 == size2, f"Same regime repeated: {size1} != {size2}"
+
+
+# ── Cornish-Fisher VaR 테스트 ──────────────────────────────────────────────
+from src.risk.portfolio_optimizer import PortfolioOptimizer
+
+
+def test_cf_var_fat_tails_at_99():
+    """99% 신뢰수준에서 두꺼운 꼬리(t-분포) 수익률에 CF VaR이 Normal VaR보다 크다."""
+    rng = np.random.default_rng(99)
+    # t(df=3): 정규분포보다 훨씬 두꺼운 꼬리 (excess kurtosis > 0)
+    fat_tail_returns = rng.standard_t(df=3, size=200) * 0.01
+
+    var_cf, _ = PortfolioOptimizer._parametric_var_cvar(fat_tail_returns, confidence=0.99)
+
+    # Normal VaR (alpha=0 → no CF)
+    from scipy.stats import norm
+    mu = float(fat_tail_returns.mean())
+    sigma = float(fat_tail_returns.std(ddof=1))
+    z = norm.ppf(0.01)
+    normal_var = max(0.0, -(mu + z * sigma))
+
+    # 99% CF VaR은 두꺼운 꼬리에서 더 보수적이어야 함
+    assert var_cf >= normal_var - 1e-8, (
+        f"CF VaR {var_cf:.6f} should >= Normal VaR {normal_var:.6f} for fat tails at 99%"
+    )
+
+
+def test_cf_var_normal_returns_consistent():
+    """정규분포 수익률에서 CF VaR은 Normal VaR과 근사해야 한다 (skew≈0, kurt≈0)."""
+    rng = np.random.default_rng(42)
+    normal_returns = rng.normal(0.0, 0.01, 500)
+
+    var_cf, cvar_cf = PortfolioOptimizer._parametric_var_cvar(normal_returns, confidence=0.95)
+
+    from scipy.stats import norm
+    mu = float(normal_returns.mean())
+    sigma = float(normal_returns.std(ddof=1))
+    z = norm.ppf(0.05)
+    normal_var = max(0.0, -(mu + z * sigma))
+
+    # 정규분포에서는 CF ≈ Normal (편차 10% 이내)
+    assert abs(var_cf - normal_var) <= normal_var * 0.10, (
+        f"CF VaR {var_cf:.6f} should be within 10% of Normal VaR {normal_var:.6f}"
+    )
+    assert var_cf > 0.0
+    assert cvar_cf >= var_cf - 1e-12
