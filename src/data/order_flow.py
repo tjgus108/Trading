@@ -15,6 +15,7 @@ import urllib.error
 import json
 
 import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -125,36 +126,113 @@ class VPINCalculator:
     - VPIN = sum|buy_vol - sell_vol| / total_vol (n_buckets 이동평균)
 
     해석: VPIN > 0.5 → 고독성 (informed trader 활동), 방향성 강함
+    
+    Edge case 처리:
+    - 거래량 0인 캔들: 무시 (중립으로 처리)
+    - 윈도우 내 전체 거래량 0: NaN → 0.5로 보정
+    - 극단적 스프레드 (high == low): 무시
     """
 
-    def __init__(self, n_buckets: int = 50):
+    def __init__(self, n_buckets: int = 50, min_bucket_vol: float = 0.0):
         if n_buckets <= 0:
             raise ValueError(f"n_buckets must be > 0, got {n_buckets}")
         self.n_buckets = n_buckets
+        self.min_bucket_vol = min_bucket_vol  # 최소 거래량 필터 (기본 비활성)
 
     def compute(self, df: pd.DataFrame) -> pd.Series:
         """
         df: OHLCV DataFrame (close, open, volume 컬럼 필요)
         returns: VPIN 시리즈 (0~1), 길이 = len(df)
-        """
-        # close > open: BUY (1.0), close == open: NEUTRAL (0.5), close < open: SELL (0.0)
-        buy_frac = pd.Series(0.0, index=df.index)
-        buy_frac[df["close"] > df["open"]] = 1.0
-        buy_frac[df["close"] == df["open"]] = 0.5
         
-        buy_vol = df["volume"] * buy_frac
-        sell_vol = df["volume"] * (1 - buy_frac)
+        Edge cases:
+        - 0 거래량 봉: buy_frac=0.5 (중립)
+        - High==Low (극단 스프레드): close와 open 비교로 방향 결정
+        - 윈도우 거래량 0: NaN → 0.5로 보정
+        """
+        if df.empty:
+            return pd.Series([], dtype=float)
+        
+        # 거래량 검증: 음수 or NaN 제거
+        volume = df["volume"].fillna(0.0).clip(lower=0.0)
+        
+        # close > open: BUY (1.0), close == open: NEUTRAL (0.5), close < open: SELL (0.0)
+        buy_frac = pd.Series(0.5, index=df.index, dtype=float)
+        buy_frac[df["close"] > df["open"]] = 1.0
+        buy_frac[df["close"] < df["open"]] = 0.0
+        
+        # 0 거래량 봉은 명시적으로 0.5 (중립)
+        buy_frac[volume == 0] = 0.5
+        
+        buy_vol = volume * buy_frac
+        sell_vol = volume * (1 - buy_frac)
         imbalance = (buy_vol - sell_vol).abs()
-        total_vol = df["volume"]
-        rolling_vol = total_vol.rolling(self.n_buckets).sum()
-        # 거래량 0인 윈도우는 NaN 처리 (replace(0,1)은 오류값 생성)
-        vpin = imbalance.rolling(self.n_buckets).sum() / rolling_vol.replace(0, float('nan'))
-        return vpin.clip(0, 1)
-
+        
+        rolling_vol = volume.rolling(self.n_buckets).sum()
+        rolling_imbalance = imbalance.rolling(self.n_buckets).sum()
+        
+        # 윈도우 거래량 > 0 인 경우만 계산, 아니면 NaN
+        vpin = rolling_imbalance / rolling_vol.replace(0, float('nan'))
+        
+        # NaN → 0.5로 보정 (데이터 부족 상태)
+        vpin = vpin.fillna(0.5)
+        
+        # 0~1 범위로 클리핑
+        vpin = vpin.clip(0, 1)
+        
+        return vpin
 
     def get_latest(self, df: pd.DataFrame) -> float:
-        """마지막 VPIN 값 반환. 데이터 부족 시 0.5"""
-        result = self.compute(df)
-        if result.empty or result.iloc[-1] != result.iloc[-1]:  # NaN check
+        """
+        마지막 VPIN 값 반환. 데이터 부족 시 0.5
+        
+        안전 처리:
+        - 빈 DataFrame: 0.5
+        - NaN 마지막 값: 0.5
+        """
+        if df.empty:
             return 0.5
-        return float(result.iloc[-1])
+        
+        result = self.compute(df)
+        if result.empty:
+            return 0.5
+        
+        latest = result.iloc[-1]
+        # NaN 체크 (latest != latest는 NaN 검증)
+        if latest != latest or np.isnan(latest):
+            return 0.5
+        
+        return float(latest)
+
+    def validate_inputs(self, df: pd.DataFrame) -> tuple:
+        """
+        데이터 검증 및 통계 반환.
+        
+        Returns:
+            (is_valid, stats_dict)
+            - is_valid: 계산 가능 여부
+            - stats_dict: {"zero_vol_count", "nan_count", "total_vol", "min_vol", "max_vol"}
+        """
+        if df.empty:
+            return False, {"error": "empty_dataframe"}
+        
+        if "volume" not in df.columns or "close" not in df.columns or "open" not in df.columns:
+            return False, {"error": "missing_columns"}
+        
+        volume = df["volume"].fillna(0.0)
+        zero_vol_count = (volume == 0).sum()
+        nan_count = df["volume"].isna().sum()
+        total_vol = volume.sum()
+        
+        stats = {
+            "zero_vol_count": int(zero_vol_count),
+            "nan_count": int(nan_count),
+            "total_vol": float(total_vol),
+            "min_vol": float(volume.min()),
+            "max_vol": float(volume.max()),
+            "rows": len(df),
+        }
+        
+        # 유효: 최소 n_buckets개 행 + 0이 아닌 거래량 존재
+        is_valid = len(df) >= self.n_buckets and total_vol > 0
+        
+        return is_valid, stats

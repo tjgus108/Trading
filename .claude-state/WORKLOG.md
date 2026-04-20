@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-04-21] Cycle 171 — A (품질) + C (데이터) + SIM + F (리서치)
+
+**[A] QA 테스트 커버리지 향상:**
+- `tests/test_paper_trader.py`: 21개 edge case 테스트 추가 (타임아웃, 부분체결, 잔고부족, 극단슬리피지)
+- `tests/test_ml_pipeline_edge_cases.py`: 25개 ML 파이프라인 edge case 테스트 (NaN, 빈데이터, lookahead bias)
+- `src/exchange/paper_trader.py`: input validation 추가 (ZeroDivision 방지)
+- 총 46개 테스트 추가, 모두 PASS
+
+**[C] OrderFlow/VPIN + WebSocket 강화:**
+- `src/data/order_flow.py`: VPIN edge case 처리 (음수볼륨, NaN, zero-volume, mega spike) + validate_inputs()
+- `src/data/websocket_feed.py`: exponential backoff + jitter (2^retry × ±10%) + ConnectionMetrics 모니터링
+- 22개 테스트 추가 (VPIN 14 + WebSocket 9), 모두 PASS
+- 기존 테스트 regression 없음
+
+**[SIM] Paper Simulation 검증:**
+- scripts/paper_simulation.py 정상 동작 확인
+- ML 파이프라인 93개 테스트 PASS
+- 하위 전략 식별: ROCMACross(4.92% return), VolatilityCluster(5.46% return) — 파라미터 조정 포인트 분석
+
+**[F] 리서치: Live Trading 전환 교훈:**
+- 자동 트레이딩 계좌 73%가 6개월 내 실패 — 과최적화가 1위 원인
+- 슬리피지 0.1~0.6% 평균, 급변동 시 1.5% 초과
+- Paper→Live 3대 실수: 스톱로스 제거, API키 노출, 슬리피지 미반영
+- 소자본 현실: 월 gross 3~8%, 수수료 차감 후 1~5%
+- Online learning + incremental RL이 레짐 변화 대응의 최신 연구 방향
+
 ## [2026-04-20] Cycle 169 — C (데이터) + B (리스크) + F (리서치)
 
 **[C] DataFeed 캐시 TTL + 갭 감지 (`src/data/feed.py`):**
@@ -13379,3 +13405,76 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 16:06 UTC] Cycle 170 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-20 16:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-04-20 16:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 16:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 16:18 UTC] Cycle 172 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

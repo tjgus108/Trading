@@ -80,6 +80,12 @@ class PaperTrader:
         action = action.upper()
         if action not in ("BUY", "SELL"):
             return {"status": "error", "reason": f"unknown action: {action}"}
+        
+        # Input validation
+        if quantity <= 0:
+            return {"status": "rejected", "reason": "quantity must be positive"}
+        if price <= 0:
+            return {"status": "rejected", "reason": "price must be positive"}
 
         # 타임아웃 체크
         if random.random() < self.timeout_prob:

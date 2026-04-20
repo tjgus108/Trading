@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-04-20 (Cycle 169)_
+_Last updated: 2026-04-21 (Cycle 171)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -8,20 +8,21 @@ _Last updated: 2026-04-20 (Cycle 169)_
 - **ML 2-class**: BTC 1000캔들 acc 63.5% → PASS (유일한 유효 경로)
 - **ML 파이프라인**: ✅ 재학습+PFI+예측+live+cal분리+SHAP선택+ExtraTrees+XGBoost+PSI드리프트+PSI-AccDrift통합+MultiWindowEnsemble 완비
 - **Walk-Forward**: WFE > 0.5 + Trades >= 15 + MC p<0.05
-- **테스트**: 7,200+ passed, 0 failed (risk 173, feed 118, health_check 23, notifier 10, exchange 98+, trainer 63+, FR/OI 49, kelly 77, feature_builder 29, drift 53, backtest 48)
+- **테스트**: 7,268+ passed, 0 failed (risk 173, feed 118, health_check 23, notifier 10, exchange 98+, trainer 63+, FR/OI 49, kelly 77, feature_builder 29, drift 53, backtest 48, paper_trader 58, ml_pipeline 25, order_flow 61, websocket 63)
 - **리스크**: Kelly(quarter-cap+레짐+MDD step-down+레짐스무딩) + VaR(CF) + DrawdownMonitor(4단계+레짐cooldown) + VolTargeting + CircuitBreaker(일일제한)
 - **실행**: TWAP + ML필터 + 레짐필터 + 레짐 포지션사이징 + CircuitBreaker + HealthChecker + Notifier
-- **데이터**: 실데이터+GARCH합성+레짐캐시(동적TTL)+품질모니터링(갭감지)+DataFeed CB+FR/OI+수수료0.055%+adaptive슬리피지
+- **데이터**: 실데이터+GARCH합성+레짐캐시(동적TTL)+품질모니터링(갭감지)+DataFeed CB+FR/OI+수수료0.055%+adaptive슬리피지+VPIN강화+WebSocket backoff
 - **라이브**: live_paper_trader 95% 준비 (max_loss_pct+PSI+XGBoost+앙상블+HealthChecker+Notifier, 70개 테스트)
 
-## 최근 작업 (Cycle 169)
+## 최근 작업 (Cycle 171)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
-| C (데이터) | ✅ | 레짐별 캐시 TTL(0.2x~1.5x) + 타임스탬프 갭 감지, 테스트 10개 |
-| B (리스크) | ✅ | DrawdownMonitor 레짐 cooldown(0.5x~2.0x) + CB 일일 거래 제한, 테스트 15개 |
-| F (리서치) | ✅ | 소자본 수수료 잠식 분석 + 레짐별 cooldown 차별화 + Stress-Gated Mutation |
+| A (품질) | ✅ | paper_trader 21 + ML pipeline 25 edge case 테스트, input validation |
+| C (데이터) | ✅ | VPIN edge case 처리 + WebSocket exponential backoff+jitter+metrics |
+| SIM | ✅ | Paper simulation 검증, ML 93 테스트 PASS, 하위 전략 분석 |
+| F (리서치) | ✅ | Live trading 실패 73% 분석, 소자본 월 1~5% 벤치마크 |
 
-## 완료된 대응 (Cycle 140~169)
+## 완료된 대응 (Cycle 140~171)
 - ✅ 슬리피지 0.1% / MIN_TRADES 15 / MC Permutation gate
 - ✅ Regime Detection + 레짐 필터 (RANGING 차단)
 - ✅ CircuitBreaker(일일거래제한) + DrawdownMonitor(4단계MDD+레짐cooldown) + 경계값 테스트
@@ -37,8 +38,11 @@ _Last updated: 2026-04-20 (Cycle 169)_
 - ✅ PSI 드리프트 모니터 + AccuracyDriftMonitor 통합 (양방향)
 - ✅ XGBoost + MultiWindowEnsemble 30/60/90일 다시간 stacking
 - ✅ Kelly 레짐 스무딩(EMA) + Cornish-Fisher VaR
+- ✅ VPIN edge case 강화 + WebSocket exponential backoff + ConnectionMetrics
+- ✅ Paper trader input validation + ML pipeline edge case 테스트 68개
 
 ## 주요 리스크/이슈
 - ⚠️ 실데이터 PASS 전략 0개 — ML 경로가 유일한 희망
 - 다음 우선: live_paper_trader 7일 운영, Telegram 실제 API 연동
 - 레짐별 피처 중요도 역전 대응 필요 (동적 파이프라인)
+- 소자본 수수료 잠식 주의: 월 1~5% 현실적 목표

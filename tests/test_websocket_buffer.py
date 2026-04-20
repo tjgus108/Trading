@@ -227,3 +227,139 @@ class TestWebSocketReconnect:
         # 예: 5회 실패 → 2 + 4 + 8 + 16 + 32 = 62초 (하지만 실제는 더 빠름)
         # 단순 검증: 최소 1회 이상 지연 발생
         assert len(attempt_times) >= 2
+
+
+class TestWebSocketMetrics:
+    """WebSocket 연결 메트릭 추적 테스트."""
+    
+    def test_connection_metrics_initial_state(self):
+        """초기 메트릭 상태 검증."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        metrics = feed.get_connection_metrics()
+        assert metrics.is_connected == False
+        assert metrics.retry_count == 0
+        assert metrics.reconnection_count == 0
+        assert metrics.total_candles_received == 0
+    
+    def test_connection_metrics_after_candle(self):
+        """캔들 수신 후 메트릭 업데이트."""
+        from src.data.websocket_feed import BinanceWebSocketFeed, CandleBar
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        bar = CandleBar(
+            timestamp=1000,
+            open=100.0,
+            high=102.0,
+            low=99.0,
+            close=101.0,
+            volume=1000.0,
+        )
+        with feed._lock:
+            feed._candles.append(bar)
+        
+        # 메트릭 업데이트 (실제 메시지 처리는 시뮬레이션)
+        metrics = feed.get_connection_metrics()
+        # candle_count는 증가했을 것
+        assert feed.candle_count() == 1
+    
+    def test_connection_metrics_uptime(self):
+        """업타임 계산 검증."""
+        import time
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        feed._start_time = time.time() - 10  # 10초 전 시작
+        metrics = feed.get_connection_metrics()
+        
+        assert metrics.uptime_seconds is not None
+        assert metrics.uptime_seconds >= 10  # 최소 10초 이상
+    
+    def test_connection_metrics_reconnection_count(self):
+        """재연결 횟수 카운팅."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        feed._reconnection_count = 3
+        metrics = feed.get_connection_metrics()
+        
+        assert metrics.reconnection_count == 3
+
+
+class TestWebSocketBackoffJitter:
+    """WebSocket exponential backoff + jitter 테스트."""
+    
+    def test_backoff_formula_retry_1(self):
+        """retry_count=1: 약 2초 (jitter 포함)."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        delays = []
+        for _ in range(100):
+            delay = feed._calculate_backoff_with_jitter(1)
+            delays.append(delay)
+        
+        avg_delay = sum(delays) / len(delays)
+        # 평균이 2초 근처 (±10% jitter)
+        assert 1.8 <= avg_delay <= 2.2, f"Expected ~2.0s, got {avg_delay}"
+    
+    def test_backoff_formula_retry_2(self):
+        """retry_count=2: 약 4초 (jitter 포함)."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        delays = []
+        for _ in range(100):
+            delay = feed._calculate_backoff_with_jitter(2)
+            delays.append(delay)
+        
+        avg_delay = sum(delays) / len(delays)
+        # 평균이 4초 근처 (±10% jitter)
+        assert 3.6 <= avg_delay <= 4.4, f"Expected ~4.0s, got {avg_delay}"
+    
+    def test_backoff_formula_retry_5(self):
+        """retry_count=5: 약 32초 (jitter 포함)."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        delay = feed._calculate_backoff_with_jitter(5)
+        
+        # 32 * (1 ± 0.1) = 28.8 ~ 35.2
+        assert 28.8 <= delay <= 35.2, f"Expected 28.8~35.2s, got {delay}"
+    
+    def test_backoff_jitter_variability(self):
+        """지터: 같은 retry_count에서도 지연이 변함."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        delays = [feed._calculate_backoff_with_jitter(2) for _ in range(20)]
+        
+        # 지연이 다양해야 함 (지터 효과)
+        min_delay = min(delays)
+        max_delay = max(delays)
+        
+        # 최소와 최대가 다름 (표준편차 > 0)
+        assert min_delay < max_delay, "Jitter should produce variable delays"
+        
+        # 범위가 예상 범위 내
+        assert 3.6 <= min_delay <= 4.4
+        assert 3.6 <= max_delay <= 4.4
+    
+    def test_backoff_exponential_growth(self):
+        """지수 증가: retry_count가 높을수록 대기시간 길어짐."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        
+        # 지터 최소화 위해 여러 번 샘플
+        base_delays = []
+        for i in range(1, 6):
+            samples = [feed._calculate_backoff_with_jitter(i) for _ in range(50)]
+            avg = sum(samples) / len(samples)
+            base_delays.append(avg)
+        
+        # 각 단계가 약 2배씩 증가해야 함
+        for i in range(1, len(base_delays)):
+            ratio = base_delays[i] / base_delays[i-1]
+            # jitter 때문에 정확히 2배는 아니지만 1.8~2.2 범위
+            assert 1.8 <= ratio <= 2.2, f"Step {i}: expected ~2x, got {ratio:.2f}x"

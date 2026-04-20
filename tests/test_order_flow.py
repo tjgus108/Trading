@@ -339,3 +339,172 @@ class TestVPINCalculator(unittest.TestCase):
         # imbalance dominance = strong sell signal
         self.assertGreaterEqual(result.iloc[-1], 0.8)
         self.assertLessEqual(result.iloc[-1], 1.0)
+
+
+class TestVPINValidateInputs(unittest.TestCase):
+    """VPIN validate_inputs() 메서드 테스트"""
+    
+    def setUp(self):
+        from src.data.order_flow import VPINCalculator
+        self.calc = VPINCalculator(n_buckets=10)
+    
+    def test_validate_empty_dataframe(self):
+        """빈 DataFrame: is_valid=False"""
+        import pandas as pd
+        df = pd.DataFrame()
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertFalse(is_valid)
+        self.assertIn("error", stats)
+    
+    def test_validate_missing_columns(self):
+        """필수 컬럼 부족: is_valid=False"""
+        import pandas as pd
+        df = pd.DataFrame({"price": [100.0, 101.0]})
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertFalse(is_valid)
+        self.assertIn("error", stats)
+    
+    def test_validate_all_zero_volume(self):
+        """모든 거래량 0: is_valid=False"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 15,
+            "close": [105.0] * 15,
+            "volume": [0.0] * 15
+        })
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertFalse(is_valid)
+        self.assertEqual(stats["total_vol"], 0.0)
+    
+    def test_validate_sufficient_data(self):
+        """충분한 데이터: is_valid=True"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 15,
+            "close": [105.0] * 15,
+            "volume": [100.0] * 15
+        })
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertTrue(is_valid)
+        self.assertEqual(stats["zero_vol_count"], 0)
+        self.assertEqual(stats["total_vol"], 1500.0)
+    
+    def test_validate_counts_zero_volumes(self):
+        """0 거래량 봉 카운트"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 15,
+            "close": [105.0] * 15,
+            "volume": [100.0, 0.0, 100.0, 0.0, 0.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+        })
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertEqual(stats["zero_vol_count"], 3)
+    
+    def test_validate_min_max_vol(self):
+        """최소/최대 거래량 통계"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 10,
+            "close": [105.0] * 10,
+            "volume": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
+        })
+        is_valid, stats = self.calc.validate_inputs(df)
+        self.assertAlmostEqual(stats["min_vol"], 10.0)
+        self.assertAlmostEqual(stats["max_vol"], 100.0)
+
+
+class TestVPINEdgeCases(unittest.TestCase):
+    """VPIN 극단값 처리 테스트"""
+    
+    def setUp(self):
+        from src.data.order_flow import VPINCalculator
+        self.calc = VPINCalculator(n_buckets=5)
+    
+    def test_vpin_all_zero_volume_window(self):
+        """모든 봉이 0 거래량: 안전 처리"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 10,
+            "close": [100.0] * 10,
+            "volume": [0.0] * 10
+        })
+        result = self.calc.compute(df)
+        # 거래량 0이면 모든 VPIN은 0.5 (보정)
+        self.assertTrue((result == 0.5).all())
+    
+    def test_vpin_negative_volume_clipped(self):
+        """음수 거래량: 0으로 클리핑"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 105.0, 105.0, 105.0, 105.0],
+            "volume": [-10.0, 100.0, 100.0, 100.0, 100.0]  # first is negative
+        })
+        result = self.calc.compute(df)
+        # 음수는 0으로 클리핑되어야 함
+        self.assertFalse(result.isna().all())
+        self.assertGreaterEqual(result.iloc[-1], 0.0)
+    
+    def test_vpin_nan_volume_filled(self):
+        """NaN 거래량: 0으로 채우기"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 105.0, 105.0, 105.0, 105.0],
+            "volume": [100.0, float('nan'), 100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # NaN은 0으로 채워져야 함
+        self.assertFalse(result.isna().all())
+    
+    def test_vpin_mixed_zero_and_nonzero_volumes(self):
+        """0 거래량과 정상 거래량 혼합"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0, 100.0, 100.0, 100.0, 100.0],
+            "close": [105.0, 100.0, 105.0, 100.0, 105.0],  # B, N, B, N, B
+            "volume": [100.0, 0.0, 100.0, 0.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # 정상 계산되어야 함
+        self.assertFalse(result.isna().all())
+        latest = result.iloc[-1]
+        self.assertGreaterEqual(latest, 0.0)
+        self.assertLessEqual(latest, 1.0)
+    
+    def test_vpin_single_large_spike(self):
+        """극단 거래량 스파이크: 안전 처리"""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 10,
+            "close": [105.0] * 10,  # All buy
+            "volume": [100.0, 100.0, 100.0, 1e9, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+        })
+        result = self.calc.compute(df)
+        # 스파이크도 안전하게 처리
+        self.assertFalse(result.isna().all())
+        for val in result.dropna():
+            self.assertGreaterEqual(val, 0.0)
+            self.assertLessEqual(val, 1.0)
+
+
+class TestVPINEmptyInputs(unittest.TestCase):
+    """VPIN 빈 입력 처리"""
+    
+    def test_vpin_compute_empty_dataframe(self):
+        """compute() with empty DataFrame"""
+        from src.data.order_flow import VPINCalculator
+        import pandas as pd
+        calc = VPINCalculator(n_buckets=5)
+        df = pd.DataFrame()
+        result = calc.compute(df)
+        self.assertTrue(result.empty)
+    
+    def test_vpin_get_latest_empty_dataframe(self):
+        """get_latest() with empty DataFrame"""
+        from src.data.order_flow import VPINCalculator
+        import pandas as pd
+        calc = VPINCalculator(n_buckets=5)
+        df = pd.DataFrame()
+        latest = calc.get_latest(df)
+        self.assertEqual(latest, 0.5)
