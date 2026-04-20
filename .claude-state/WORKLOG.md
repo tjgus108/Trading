@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-04-21] Cycle 173 — E (실행) + A (품질) + SIM + F (리서치)
+
+**[E] live_paper_trader 운영 준비 + Telegram API:**
+- 레짐별 성과 추적: regime_performance dict (win/loss/avg_return per regime per symbol)
+- 일별 P&L 로깅: daily_pnl_log (날짜, 거래수, 순손익, 레짐), 365일 상한
+- 세션 시작/종료 요약 통계 메서드
+- Telegram 실제 API 연동: TELEGRAM_BOT_TOKEN/CHAT_ID 환경변수 기반, 없으면 로깅만
+- tests/test_notifier_new.py 10개 ���스트 추가 → 68/68 PASS
+
+**[A] RegimeAwareFeatureBuilder E2E 통합 테스트:**
+- test_regime_feature_selector.py 확장: 9개 E2E 테스트 (레짐일관성, 피처안정성, OOS과적합감지)
+- test_ml_backtest_integration.py 신규: 11개 통합 테스트 (수수료영향, 다시간프레임, equity curve)
+- 총 20개 추가, 137개 테스트 PASS, regression 없음
+
+**[SIM] 레짐 감지 검증:**
+- detect_regime() 7개 시장 패턴(bull/bear/ranging/crisis/gap) 정확 분류 확인
+- edge case: n < 21 → "ranging" 안전 폴백 확인
+- 피처 축소: 레짐별 4~10개 vs 기본 17개
+
+**[F] 리서치: Bayesian Kelly + 모니터링:**
+- Weakly informative prior (α=2, β=3) 권장, uninformative는 초기 과도 포지션 유발
+- 소자본 fractional Kelly 25~33% 표준, 최소 50거래 후 신뢰 가능
+- Alert fatigue 방지: 3단계 계층(Critical/Warning/Info), 세션당 Critical 3~5개 이내
+- 수동 개입 규칙 코드 명문화 필수 (MDD>15% 자동 halt 외 개입 금지)
+
 ## [2026-04-21] Cycle 172 — B (리스크) + D (ML) + SIM + F (리서치)
 
 **[B] Kelly Stress Test + VaR Backtest 검증:**
@@ -13504,3 +13529,6 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-04-20 16:18 UTC] Cycle 172 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-20 16:28 UTC] Cycle 173 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
