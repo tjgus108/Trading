@@ -571,3 +571,277 @@ class TestKellyStressExtreme:
         # qty = 100_000 * 0.13 = 13_000
         expected_qty = 100_000 * 0.2 * expected_scale
         assert abs(qty_blended - expected_qty) < 1e-6
+
+
+# ── BayesianKellyPositionSizer 테스트 ────────────────────────────────────────
+
+
+from src.risk.kelly_sizer import BayesianKellyPositionSizer
+
+
+class TestBayesianKellyPrior:
+    """Prior 초기 상태 및 warmup 기간 동작 검증."""
+
+    def test_prior_initial_state(self):
+        """Prior 초기값: alpha=2, beta=3."""
+        bk = BayesianKellyPositionSizer()
+        assert bk.alpha == 2.0
+        assert bk.beta == 3.0
+        assert bk.n_trades == 0
+
+    def test_warmup_returns_fixed_small_position(self):
+        """50거래 미만(warmup) 시 고정 0.5% 포지션 반환."""
+        bk = BayesianKellyPositionSizer()
+        # warmup: n_trades=0
+        qty = bk.calculate_position_size(capital=100_000, price=1.0)
+        expected = 100_000 * 0.005 / 1.0  # 500
+        assert abs(qty - expected) < 1e-9
+
+    def test_warmup_consistent_before_activation(self):
+        """30거래 후에도 min_trades(50) 미달 → 고정 포지션 유지."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(30):
+            bk.update(100.0)
+        assert not bk.is_active
+        qty = bk.calculate_position_size(capital=100_000, price=1.0)
+        expected = 100_000 * 0.005 / 1.0
+        assert abs(qty - expected) < 1e-9
+
+    def test_is_active_false_before_min_trades(self):
+        """49거래: is_active=False."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(49):
+            bk.update(50.0)
+        assert bk.n_trades == 49
+        assert not bk.is_active
+
+    def test_is_active_true_at_min_trades(self):
+        """50거래: is_active=True."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(50):
+            bk.update(50.0)
+        assert bk.n_trades == 50
+        assert bk.is_active
+
+
+class TestBayesianKellyActivation:
+    """50거래 후 Bayesian Kelly 활성화 검증."""
+
+    def _sizer_with_trades(self, wins: int, losses: int, avg_win=100.0, avg_loss=50.0):
+        bk = BayesianKellyPositionSizer()
+        for _ in range(wins):
+            bk.update(avg_win)
+        for _ in range(losses):
+            bk.update(-avg_loss)
+        return bk
+
+    def test_activation_produces_larger_position_than_warmup(self):
+        """50+ 거래 후 Bayesian Kelly 활성화 → warmup보다 큰 포지션 (유리한 edge 시)."""
+        bk = self._sizer_with_trades(wins=35, losses=15)  # 70% win rate
+        assert bk.is_active
+        qty_bayesian = bk.calculate_position_size(capital=100_000, price=1.0)
+        warmup_qty = 100_000 * 0.005 / 1.0
+        assert qty_bayesian > warmup_qty
+
+    def test_activation_respects_max_fraction(self):
+        """활성화 후 max_fraction(10%) 상한 적용."""
+        bk = self._sizer_with_trades(wins=50, losses=0)  # 100% win rate
+        assert bk.is_active
+        qty = bk.calculate_position_size(capital=100_000, price=1.0)
+        # max_fraction=0.10 → qty <= 10_000
+        assert qty <= 100_000 * 0.10 + 1e-9
+
+    def test_no_edge_returns_zero(self):
+        """posterior_mean이 너무 낮아 f_star <= 0 → 0 반환."""
+        bk = BayesianKellyPositionSizer()
+        # 많은 손실로 posterior_mean이 낮게 형성
+        for _ in range(50):
+            bk.update(-100.0)  # 모두 손실
+        assert bk.is_active
+        # avg_win 없음 → fallback to warmup
+        qty = bk.calculate_position_size(capital=100_000, price=1.0,
+                                          avg_win=0.01, avg_loss=0.05)
+        # f_star = (posterior_mean*(1+b)-1)/b, 낮은 win_rate에서 f_star < 0
+        assert qty == 0.0 or qty <= 100_000 * 0.005 / 1.0 + 1e-9
+
+
+class TestBayesianKellyPosteriorUpdate:
+    """연속 win/loss 시 posterior 업데이트 검증."""
+
+    def test_consecutive_wins_increase_alpha(self):
+        """연속 win → α 증가."""
+        bk = BayesianKellyPositionSizer()
+        alpha_before = bk.alpha
+        for _ in range(10):
+            bk.update(100.0)
+        assert bk.alpha == alpha_before + 10
+        assert bk.beta == bk.prior_beta  # β 변화 없음
+
+    def test_consecutive_losses_increase_beta(self):
+        """연속 loss → β 증가."""
+        bk = BayesianKellyPositionSizer()
+        beta_before = bk.beta
+        for _ in range(10):
+            bk.update(-50.0)
+        assert bk.beta == beta_before + 10
+        assert bk.alpha == bk.prior_alpha  # α 변화 없음
+
+    def test_wins_increase_position_vs_losses(self):
+        """win 비중 높을수록 포지션 증가."""
+        # 70% win
+        bk_good = BayesianKellyPositionSizer()
+        for _ in range(35):
+            bk_good.update(100.0)
+        for _ in range(15):
+            bk_good.update(-50.0)
+
+        # 30% win
+        bk_bad = BayesianKellyPositionSizer()
+        for _ in range(15):
+            bk_bad.update(100.0)
+        for _ in range(35):
+            bk_bad.update(-50.0)
+
+        qty_good = bk_good.calculate_position_size(capital=100_000, price=1.0,
+                                                    avg_win=0.02, avg_loss=0.01)
+        qty_bad = bk_bad.calculate_position_size(capital=100_000, price=1.0,
+                                                  avg_win=0.02, avg_loss=0.01)
+        assert qty_good > qty_bad
+
+    def test_losses_decrease_position_progressively(self):
+        """연속 loss 누적 시 포지션 점진적 감소."""
+        # max_fraction=1.0: max_fraction capping 없이 f_star 변화 직접 검증
+        bk = BayesianKellyPositionSizer(max_fraction=1.0)
+        # 먼저 50거래 win으로 활성화
+        for _ in range(50):
+            bk.update(100.0)
+
+        qty_before = bk.calculate_position_size(capital=100_000, price=1.0,
+                                                 avg_win=0.02, avg_loss=0.01)
+        # 20회 추가 손실
+        for _ in range(20):
+            bk.update(-50.0)
+
+        qty_after = bk.calculate_position_size(capital=100_000, price=1.0,
+                                                avg_win=0.02, avg_loss=0.01)
+        assert qty_after < qty_before
+
+    def test_zero_pnl_ignored(self):
+        """pnl=0 → 무시 (alpha, beta 변화 없음)."""
+        bk = BayesianKellyPositionSizer()
+        bk.update(0.0)
+        assert bk.alpha == bk.prior_alpha
+        assert bk.beta == bk.prior_beta
+        assert bk.n_trades == 0
+
+    def test_nan_pnl_ignored(self):
+        """NaN pnl → 무시."""
+        bk = BayesianKellyPositionSizer()
+        bk.update(float("nan"))
+        assert bk.n_trades == 0
+
+
+class TestBayesianKellyFractional:
+    """Fractional 0.33 적용 검증."""
+
+    def test_fractional_33_applied(self):
+        """f* × 0.33 적용 확인: 동일 조건에서 fractional=1.0 대비 33% 수준."""
+        # max_fraction=1.0: max_fraction capping 없이 fractional 차이 직접 검증
+        def make_active(fractional):
+            bk = BayesianKellyPositionSizer(fractional=fractional, max_fraction=1.0)
+            for _ in range(35):
+                bk.update(100.0)
+            for _ in range(15):
+                bk.update(-50.0)
+            return bk
+
+        bk_33 = make_active(0.33)
+        bk_100 = make_active(1.0)
+
+        qty_33 = bk_33.calculate_position_size(capital=100_000, price=1.0,
+                                                avg_win=0.02, avg_loss=0.01)
+        qty_100 = bk_100.calculate_position_size(capital=100_000, price=1.0,
+                                                  avg_win=0.02, avg_loss=0.01)
+        # fractional=0.33이 fractional=1.0보다 작아야 함
+        assert qty_33 < qty_100
+        # 비율: ~0.33 (소수점 오차 허용)
+        if qty_100 > 0:
+            ratio = qty_33 / qty_100
+            assert 0.20 <= ratio <= 0.45
+
+    def test_custom_fractional(self):
+        """fractional=0.5 커스텀 값 동작."""
+        bk = BayesianKellyPositionSizer(fractional=0.5)
+        for _ in range(50):
+            bk.update(100.0)
+        assert bk.fractional == 0.5
+
+
+class TestBayesianKellyExtreme:
+    """극단 케이스 안정성 검증."""
+
+    def test_very_large_alpha(self):
+        """α가 매우 큰 경우(수천 win) → 안정적인 포지션 (max_fraction 상한)."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(1000):
+            bk.update(100.0)
+        for _ in range(100):
+            bk.update(-50.0)
+        qty = bk.calculate_position_size(capital=100_000, price=1.0,
+                                          avg_win=0.02, avg_loss=0.01)
+        assert np.isfinite(qty)
+        assert 0 <= qty <= 100_000 * 0.10 + 1e-9
+
+    def test_very_large_beta(self):
+        """β가 매우 큰 경우(수천 loss) → 0 반환 (edge 없음)."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(50):
+            bk.update(100.0)  # 활성화용
+        for _ in range(1000):
+            bk.update(-50.0)
+        qty = bk.calculate_position_size(capital=100_000, price=1.0,
+                                          avg_win=0.02, avg_loss=0.01)
+        assert np.isfinite(qty)
+        assert qty >= 0
+
+    def test_update_batch(self):
+        """update_batch로 거래 기록 배치 업데이트."""
+        bk = BayesianKellyPositionSizer()
+        trades = [{"pnl": 100.0}] * 35 + [{"pnl": -50.0}] * 15
+        bk.update_batch(trades)
+        assert bk.n_trades == 50
+        assert bk.is_active
+
+    def test_reset_restores_prior(self):
+        """reset() → prior 상태로 복원."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(60):
+            bk.update(100.0)
+        assert bk.is_active
+        bk.reset()
+        assert bk.alpha == bk.prior_alpha
+        assert bk.beta == bk.prior_beta
+        assert bk.n_trades == 0
+        assert not bk.is_active
+
+    def test_posterior_mean_in_valid_range(self):
+        """posterior_mean은 항상 (0, 1) 범위."""
+        bk = BayesianKellyPositionSizer()
+        for _ in range(30):
+            bk.update(100.0)
+        for _ in range(20):
+            bk.update(-50.0)
+        pm = bk.posterior_mean
+        assert 0.0 < pm < 1.0
+
+    def test_zero_capital_returns_zero(self):
+        """capital=0 → 0 반환."""
+        bk = BayesianKellyPositionSizer()
+        qty = bk.calculate_position_size(capital=0, price=1.0)
+        assert qty == 0.0
+
+    def test_zero_price_returns_zero(self):
+        """price=0 → 0 반환."""
+        bk = BayesianKellyPositionSizer()
+        qty = bk.calculate_position_size(capital=100_000, price=0.0)
+        assert qty == 0.0

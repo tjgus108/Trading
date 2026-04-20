@@ -787,3 +787,80 @@ class DataFeed:
             return False
         
         return True
+
+    # ------------------------------------------------------------------
+    # Regime detection + caching pipeline (Cycle 174+)
+    # ------------------------------------------------------------------
+
+    def detect_and_cache_regime(
+        self, symbol: str, df: pd.DataFrame, ttl: int = 300
+    ) -> str:
+        """
+        DataFrame 기반 레짐 감지 및 캐싱 (DataFeed 내부 파이프라인).
+        
+        Args:
+            symbol: 심볼
+            df: OHLCV DataFrame (detect_regime 입력)
+            ttl: 레짐 캐시 TTL (초, 기본 5분)
+        
+        Returns:
+            감지된 레짐 문자열 ("bull" | "bear" | "ranging" | "crisis")
+        
+        Notes:
+            - 이 메서드는 fetch 시 자동으로 호출됨
+            - 결과는 regime_cache에 저장되어 RegimeAwareFeatureBuilder에서 활용 가능
+        """
+        # 지연 임포트: 순환 의존성 방지
+        from src.ml.features import detect_regime
+        
+        try:
+            regime = detect_regime(df, lookback=20)
+            self.cache_regime(symbol, regime, ttl=ttl)
+            logger.debug(
+                "Regime detected and cached: %s → %s (ttl=%d)",
+                symbol, regime, ttl
+            )
+            return regime
+        except Exception as e:
+            logger.warning(
+                "Failed to detect regime for %s: %s (falling back to cached/default)",
+                symbol, e
+            )
+            # 캐시된 레짐 반환 또는 None (fallback)
+            return self.get_cached_regime(symbol) or "ranging"
+
+    def fetch_with_regime(
+        self, symbol: str, timeframe: str, limit: int = 500
+    ) -> tuple:
+        """
+        OHLCV 데이터 fetch + 레짐 감지 (end-to-end 파이프라인).
+        
+        DataFeed → detect_regime() → RegimeAwareFeatureBuilder 연결점.
+        
+        Args:
+            symbol: 거래 심볼
+            timeframe: 타임프레임
+            limit: 캔들 개수
+        
+        Returns:
+            (DataSummary, regime_str): 데이터 + 감지된 레짐
+        
+        Example:
+            >>> feed = DataFeed(connector)
+            >>> summary, regime = feed.fetch_with_regime("BTC/USDT", "1h")
+            >>> builder = RegimeAwareFeatureBuilder()
+            >>> X, y, detected_regime = builder.build_with_regime(summary.df)
+            >>> # detected_regime == regime (동일한 레짐 사용)
+        """
+        # 일반 fetch 수행
+        summary = self.fetch(symbol, timeframe, limit)
+        
+        # 레짐 감지 + 캐싱 (TTL은 effective_ttl 기반)
+        effective_ttl = int(self._effective_ttl(symbol))
+        regime = self.detect_and_cache_regime(symbol, summary.df, ttl=effective_ttl)
+        
+        logger.info(
+            "DataFeed: %s %s — regime=%s, candles=%d",
+            symbol, timeframe, regime, summary.candles
+        )
+        return summary, regime

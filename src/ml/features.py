@@ -32,11 +32,14 @@ walk-forward validation: 시계열 순서 반드시 유지.
 """
 
 import numpy as np
+import logging
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
 
 
 DEFAULT_FORWARD_N = 5       # 5캔들 후 수익률로 레이블 생성
+
+logger = logging.getLogger(__name__)
 DEFAULT_THRESHOLD = 0.003   # 0.3% 초과 시 BUY/SELL
 DEFAULT_BINARY_THRESHOLD = 0.01  # 2-class 모드: 1% 이상만 학습
 DEFAULT_TB_TP_PCT = 0.02    # Triple Barrier: TP 배리어 2% (기본)
@@ -542,3 +545,74 @@ class RegimeAwareFeatureBuilder:
     @property
     def feature_names(self) -> List[str]:
         return self._base.feature_names
+
+    def build_with_cached_regime(
+        self, df: pd.DataFrame, feed_regime: Optional[str] = None
+    ) -> Tuple[pd.DataFrame, pd.Series, str]:
+        """
+        DataFeed 캐시 레짐을 사용하는 방식 (Cycle 174+).
+        
+        DataFeed.fetch_with_regime() 또는 get_cached_regime()의 결과를
+        직접 전달하여 사용, detect_regime()을 재계산하지 않음.
+        
+        Args:
+            df: OHLCV DataFrame
+            feed_regime: DataFeed에서 캐시된 레짐 ("bull", "bear", "ranging", "crisis")
+                        None이면 내부 detect_regime() 호출 (기존 동작)
+        
+        Returns:
+            X: 선택된 피처 DataFrame
+            y: 레이블 Series
+            regime: 사용된 레짐 문자열
+        
+        Example:
+            >>> feed = DataFeed(connector)
+            >>> summary, feed_regime = feed.fetch_with_regime("BTC/USDT", "1h")
+            >>> builder = RegimeAwareFeatureBuilder()
+            >>> X, y, regime = builder.build_with_cached_regime(summary.df, feed_regime)
+            >>> # regime == feed_regime (DataFeed와 동일한 레짐 사용)
+        """
+        if feed_regime is None:
+            # Fallback: 내부 detect_regime() 호출
+            return self.build_with_regime(df)
+        
+        # feed_regime 검증
+        if feed_regime not in self._config:
+            logger.warning(
+                "Invalid regime '%s' from feed, falling back to detect_regime()",
+                feed_regime
+            )
+            return self.build_with_regime(df)
+        
+        # 캐시된 레짐 사용
+        X_all, y = self._base.build(df)
+        X = self._select(X_all, feed_regime, df)
+        return X, y, feed_regime
+
+    def build_features_with_cached_regime(
+        self, df: pd.DataFrame, feed_regime: Optional[str] = None
+    ) -> Tuple[pd.DataFrame, str]:
+        """
+        DataFeed 캐시 레짐 기반 피처 추출 (추론용).
+        
+        Args:
+            df: OHLCV DataFrame
+            feed_regime: DataFeed 캐시 레짐 (None이면 내부 detect_regime())
+        
+        Returns:
+            X: 선택된 피처 DataFrame
+            regime: 사용된 레짐 문자열
+        """
+        if feed_regime is None:
+            return self.build_features_regime(df)
+        
+        if feed_regime not in self._config:
+            logger.warning(
+                "Invalid regime '%s' from feed, falling back to detect_regime()",
+                feed_regime
+            )
+            return self.build_features_regime(df)
+        
+        X_all = self._base.build_features_only(df)
+        X = self._select(X_all, feed_regime, df)
+        return X, feed_regime

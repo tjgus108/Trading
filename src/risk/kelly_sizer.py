@@ -285,3 +285,181 @@ class KellySizer:
         """
         scale = self._REGIME_SCALE.get(regime.upper(), self._DEFAULT_REGIME_SCALE)
         return float(np.clip(self.fraction * scale, self.min_fraction, self.max_fraction))
+
+
+class BayesianKellyPositionSizer:
+    """Beta 분포 기반 Bayesian Kelly 포지션 사이저.
+
+    Prior: Beta(alpha=2, beta=3) — weakly informative (승률 ~40% 예상)
+    Posterior 업데이트: win → alpha+1, loss → beta+1
+    Kelly fraction = f* = (posterior_mean * (1+b) - 1) / b
+      where b = avg_win / avg_loss (win:loss 비율)
+    Fractional Kelly: f* × 0.33 (보수적)
+    활성화 조건: alpha + beta >= 54 (= prior(5) + 50 거래 경험)
+    활성화 전: 고정 소액 포지션 0.5% of capital
+    """
+
+    PRIOR_ALPHA: float = 2.0   # weakly informative prior
+    PRIOR_BETA: float = 3.0    # weakly informative prior
+    FRACTIONAL: float = 0.33   # 보수적 fractional Kelly
+    MIN_TRADES: int = 50        # 활성화 전까지의 최소 거래 수
+    WARMUP_FRACTION: float = 0.005  # warmup 기간 고정 포지션 비율 (0.5%)
+    MAX_FRACTION: float = 0.10  # 자본 대비 최대 포지션 비율
+
+    def __init__(
+        self,
+        prior_alpha: float = 2.0,
+        prior_beta: float = 3.0,
+        fractional: float = 0.33,
+        min_trades: int = 50,
+        warmup_fraction: float = 0.005,
+        max_fraction: float = 0.10,
+    ) -> None:
+        """
+        Args:
+            prior_alpha: Beta 분포 prior α (기본 2.0)
+            prior_beta: Beta 분포 prior β (기본 3.0)
+            fractional: Fractional Kelly 배율 (기본 0.33)
+            min_trades: Bayesian Kelly 활성화에 필요한 최소 거래 수 (기본 50)
+            warmup_fraction: 활성화 전 고정 포지션 비율 (기본 0.005 = 0.5%)
+            max_fraction: 자본 대비 최대 포지션 비율 (기본 0.10 = 10%)
+        """
+        self.prior_alpha = float(prior_alpha)
+        self.prior_beta = float(prior_beta)
+        self.fractional = float(fractional)
+        self.min_trades = int(min_trades)
+        self.warmup_fraction = float(warmup_fraction)
+        self.max_fraction = float(max_fraction)
+
+        # Posterior 상태 (prior로 초기화)
+        self._alpha = self.prior_alpha
+        self._beta = self.prior_beta
+
+        # avg_win / avg_loss 누적 추적
+        self._win_sum: float = 0.0
+        self._win_count: int = 0
+        self._loss_sum: float = 0.0
+        self._loss_count: int = 0
+
+    # ── Posterior 업데이트 ──────────────────────────────────────────────────
+
+    def update(self, pnl: float) -> None:
+        """거래 결과로 posterior 업데이트.
+
+        Args:
+            pnl: 거래 손익 (양수 = 수익, 음수 = 손실, 0 = 무시)
+        """
+        if not np.isfinite(pnl) or pnl == 0.0:
+            return
+        if pnl > 0:
+            self._alpha += 1.0
+            self._win_sum += pnl
+            self._win_count += 1
+        else:
+            self._beta += 1.0
+            self._loss_sum += abs(pnl)
+            self._loss_count += 1
+
+    def update_batch(self, trades: List[dict]) -> None:
+        """거래 기록 배치 업데이트.
+
+        Args:
+            trades: [{"pnl": float}, ...] 형태
+        """
+        for t in trades:
+            self.update(t.get("pnl", 0.0))
+
+    # ── Posterior 속성 ──────────────────────────────────────────────────────
+
+    @property
+    def alpha(self) -> float:
+        """현재 posterior α."""
+        return self._alpha
+
+    @property
+    def beta(self) -> float:
+        """현재 posterior β."""
+        return self._beta
+
+    @property
+    def n_trades(self) -> int:
+        """기록된 거래 수 (prior 제외)."""
+        return int(self._alpha - self.prior_alpha + self._beta - self.prior_beta)
+
+    @property
+    def posterior_mean(self) -> float:
+        """Beta posterior 평균 = α / (α + β)."""
+        return self._alpha / (self._alpha + self._beta)
+
+    @property
+    def is_active(self) -> bool:
+        """Bayesian Kelly 활성화 여부 (min_trades 이상 누적 시 True)."""
+        return self.n_trades >= self.min_trades
+
+    # ── 포지션 계산 ─────────────────────────────────────────────────────────
+
+    def calculate_position_size(
+        self,
+        capital: float,
+        price: float,
+        avg_win: Optional[float] = None,
+        avg_loss: Optional[float] = None,
+    ) -> float:
+        """포지션 사이즈 (단위 수량) 반환.
+
+        활성화 전(n_trades < min_trades): warmup_fraction × capital / price
+        활성화 후: Bayesian Kelly fraction × capital / price (max_fraction 상한)
+
+        Args:
+            capital: 총 자본 (통화)
+            price: 현재 가격
+            avg_win: 평균 수익 비율 (선택; None이면 내부 누적값 사용)
+            avg_loss: 평균 손실 비율 (선택; None이면 내부 누적값 사용, 양수)
+
+        Returns:
+            포지션 사이즈 (수량). 0.0이면 진입 불가.
+        """
+        if capital <= 0 or price <= 0:
+            return 0.0
+
+        # warmup 기간: 고정 소액 포지션
+        if not self.is_active:
+            position_capital = capital * self.warmup_fraction
+            return position_capital / price
+
+        # avg_win / avg_loss 결정
+        aw = avg_win if avg_win is not None else (
+            self._win_sum / self._win_count if self._win_count > 0 else None
+        )
+        al = avg_loss if avg_loss is not None else (
+            self._loss_sum / self._loss_count if self._loss_count > 0 else None
+        )
+
+        # win 또는 loss 기록이 전혀 없으면 warmup 포지션으로 fallback
+        if aw is None or al is None or aw <= 0 or al <= 0:
+            position_capital = capital * self.warmup_fraction
+            return position_capital / price
+
+        # b = win:loss 비율
+        b = aw / al
+
+        # Bayesian Kelly: f* = (posterior_mean * (1 + b) - 1) / b
+        f_star = (self.posterior_mean * (1.0 + b) - 1.0) / b
+
+        if f_star <= 0:
+            return 0.0
+
+        # Fractional Kelly
+        f_fractional = float(np.clip(f_star * self.fractional, 0.0, self.max_fraction))
+
+        position_capital = capital * f_fractional
+        return position_capital / price
+
+    def reset(self) -> None:
+        """Prior로 상태 초기화."""
+        self._alpha = self.prior_alpha
+        self._beta = self.prior_beta
+        self._win_sum = 0.0
+        self._win_count = 0
+        self._loss_sum = 0.0
+        self._loss_count = 0
