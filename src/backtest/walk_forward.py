@@ -363,6 +363,185 @@ def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardRe
 
 
 # ------------------------------------------------------------------
+# RollingOOSValidator — 5-Strategy Bundle Rolling OOS 검증
+# ------------------------------------------------------------------
+
+
+@dataclass
+class OOSFoldResult:
+    """단일 OOS fold 결과."""
+    fold_id: int
+    is_sharpe: float
+    oos_sharpe: float
+    is_mdd: float
+    oos_mdd: float
+    wfe: float
+    oos_pf: float
+    oos_trades: int
+    passed: bool
+    fail_reasons: List[str]
+
+
+@dataclass
+class BundleOOSResult:
+    """5-Strategy Bundle OOS 검증 전체 결과."""
+    strategy_name: str
+    folds: List[OOSFoldResult]
+    avg_wfe: float
+    avg_oos_sharpe: float
+    avg_oos_pf: float
+    all_passed: bool
+    fail_reasons: List[str]
+
+    def summary(self) -> str:
+        verdict = "PASS" if self.all_passed else "FAIL"
+        lines = [
+            f"BUNDLE_OOS: {self.strategy_name}",
+            f"  folds: {len(self.folds)}",
+            f"  avg_wfe: {self.avg_wfe:.3f}",
+            f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
+            f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
+            f"  verdict: {verdict}",
+        ]
+        if self.fail_reasons:
+            lines.append(f"  fail_reasons: {self.fail_reasons}")
+        return "\n".join(lines)
+
+
+class RollingOOSValidator:
+    """Rolling IS/OOS 검증기 (파라미터 최적화 없이 고정 전략 평가).
+
+    Cycle 178 A: 6개월 IS / 2개월 OOS, 2개월씩 슬라이드.
+    WFE ≥ 0.50, OOS Sharpe ≥ IS Sharpe × 0.60, OOS MDD ≤ IS MDD × 2.0.
+    """
+
+    def __init__(
+        self,
+        is_bars: int = 1080,       # 6개월 × 30일 × 6 (4h봉) = 1080
+        oos_bars: int = 360,       # 2개월 × 30일 × 6 = 360
+        slide_bars: int = 360,     # 2개월씩 슬라이드
+        min_wfe: float = 0.5,
+        sharpe_decay_max: float = 0.60,
+        mdd_expand_max: float = 2.0,
+    ):
+        self.is_bars = is_bars
+        self.oos_bars = oos_bars
+        self.slide_bars = slide_bars
+        self.min_wfe = min_wfe
+        self.sharpe_decay_max = sharpe_decay_max
+        self.mdd_expand_max = mdd_expand_max
+
+    def validate(
+        self,
+        strategy: BaseStrategy,
+        df: pd.DataFrame,
+        fee_rate: float = 0.00055,
+        slippage_pct: float = 0.0005,
+    ) -> BundleOOSResult:
+        """전략을 Rolling IS/OOS로 검증."""
+        engine = BacktestEngine(fee_rate=fee_rate, slippage_pct=slippage_pct)
+        min_required = self.is_bars + self.oos_bars
+
+        if len(df) < min_required:
+            return BundleOOSResult(
+                strategy_name=strategy.name,
+                folds=[],
+                avg_wfe=0.0,
+                avg_oos_sharpe=0.0,
+                avg_oos_pf=0.0,
+                all_passed=False,
+                fail_reasons=[f"데이터 부족: {len(df)} < {min_required}"],
+            )
+
+        folds: List[OOSFoldResult] = []
+        start = 0
+        fold_id = 0
+
+        while start + self.is_bars + self.oos_bars <= len(df):
+            is_end = start + self.is_bars
+            oos_end = is_end + self.oos_bars
+
+            is_df = df.iloc[start:is_end]
+            oos_df = df.iloc[is_end:oos_end]
+
+            is_result = engine.run(strategy, is_df)
+            oos_result = engine.run(strategy, oos_df)
+
+            is_sharpe = max(is_result.sharpe_ratio, 0.001)
+            wfe = oos_result.sharpe_ratio / is_sharpe if is_sharpe > 0 else 0.0
+
+            fold_fails = []
+            if wfe < self.min_wfe:
+                fold_fails.append(f"WFE {wfe:.3f} < {self.min_wfe}")
+            if oos_result.sharpe_ratio < is_result.sharpe_ratio * self.sharpe_decay_max:
+                fold_fails.append(
+                    f"OOS Sharpe {oos_result.sharpe_ratio:.2f} < "
+                    f"IS×{self.sharpe_decay_max} ({is_result.sharpe_ratio * self.sharpe_decay_max:.2f})"
+                )
+            if is_result.max_drawdown > 0 and oos_result.max_drawdown > is_result.max_drawdown * self.mdd_expand_max:
+                fold_fails.append(
+                    f"OOS MDD {oos_result.max_drawdown:.1%} > "
+                    f"IS×{self.mdd_expand_max} ({is_result.max_drawdown * self.mdd_expand_max:.1%})"
+                )
+
+            fold = OOSFoldResult(
+                fold_id=fold_id,
+                is_sharpe=round(is_result.sharpe_ratio, 3),
+                oos_sharpe=round(oos_result.sharpe_ratio, 3),
+                is_mdd=round(is_result.max_drawdown, 4),
+                oos_mdd=round(oos_result.max_drawdown, 4),
+                wfe=round(wfe, 4),
+                oos_pf=round(oos_result.profit_factor, 3),
+                oos_trades=oos_result.total_trades,
+                passed=len(fold_fails) == 0,
+                fail_reasons=fold_fails,
+            )
+            folds.append(fold)
+
+            logger.info(
+                "OOS Fold %d: IS_Sharpe=%.2f OOS_Sharpe=%.2f WFE=%.3f PF=%.2f %s",
+                fold_id, is_result.sharpe_ratio, oos_result.sharpe_ratio,
+                wfe, oos_result.profit_factor, "PASS" if fold.passed else "FAIL",
+            )
+
+            start += self.slide_bars
+            fold_id += 1
+
+        if not folds:
+            return BundleOOSResult(
+                strategy_name=strategy.name,
+                folds=[],
+                avg_wfe=0.0,
+                avg_oos_sharpe=0.0,
+                avg_oos_pf=0.0,
+                all_passed=False,
+                fail_reasons=["유효 fold 없음"],
+            )
+
+        avg_wfe = sum(f.wfe for f in folds) / len(folds)
+        avg_sharpe = sum(f.oos_sharpe for f in folds) / len(folds)
+        avg_pf = sum(f.oos_pf for f in folds) / len(folds)
+        all_passed = all(f.passed for f in folds)
+
+        bundle_fails = []
+        if not all_passed:
+            failed_ids = [f.fold_id for f in folds if not f.passed]
+            bundle_fails.append(f"Failed folds: {failed_ids}")
+
+        result = BundleOOSResult(
+            strategy_name=strategy.name,
+            folds=folds,
+            avg_wfe=round(avg_wfe, 4),
+            avg_oos_sharpe=round(avg_sharpe, 3),
+            avg_oos_pf=round(avg_pf, 3),
+            all_passed=all_passed,
+            fail_reasons=bundle_fails,
+        )
+        logger.info(result.summary())
+        return result
+
+
+# ------------------------------------------------------------------
 # WalkForwardValidator — rolling train/test window 검증
 # ------------------------------------------------------------------
 

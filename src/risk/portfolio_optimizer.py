@@ -354,3 +354,95 @@ class PortfolioOptimizer:
 
     def _equal_weight(self, n: int) -> np.ndarray:
         return np.ones(n) / n
+
+
+# ------------------------------------------------------------------
+# StrategyCorrelationAnalyzer — 전략 간 상관관계 + Risk Parity 가중치
+# ------------------------------------------------------------------
+
+
+@dataclass
+class StrategyWeightResult:
+    """전략별 가중치 결과."""
+    weights: Dict[str, float]
+    correlation_matrix: Dict[str, Dict[str, float]]
+    high_corr_pairs: list
+    method: str
+
+    def summary(self) -> str:
+        w_str = ", ".join(f"{s}: {v:.3f}" for s, v in self.weights.items())
+        lines = [
+            f"STRATEGY_WEIGHTS ({self.method}):",
+            f"  weights: {{{w_str}}}",
+            f"  high_corr_pairs: {len(self.high_corr_pairs)}",
+        ]
+        for a, b, r in self.high_corr_pairs:
+            lines.append(f"    {a} ↔ {b}: r={r:+.3f}")
+        return "\n".join(lines)
+
+
+class StrategyCorrelationAnalyzer:
+    """전략 간 일일 수익률 상관관계 분석 + Risk Parity 가중치 계산.
+
+    입력: 전략별 거래 PnL 시리즈 → 상관행렬 + inv-vol 가중치.
+    """
+
+    def __init__(
+        self,
+        corr_threshold: float = 0.30,
+        min_trades: int = 15,
+        rebalance_window: int = 20,
+    ):
+        self.corr_threshold = corr_threshold
+        self.min_trades = min_trades
+        self.rebalance_window = rebalance_window
+
+    def analyze(
+        self,
+        strategy_pnls: Dict[str, pd.Series],
+    ) -> StrategyWeightResult:
+        """전략별 PnL Series → 상관행렬 + Risk Parity 가중치."""
+        names = list(strategy_pnls.keys())
+        n = len(names)
+
+        if n == 0:
+            return StrategyWeightResult(
+                weights={}, correlation_matrix={},
+                high_corr_pairs=[], method="empty",
+            )
+        if n == 1:
+            return StrategyWeightResult(
+                weights={names[0]: 1.0},
+                correlation_matrix={names[0]: {names[0]: 1.0}},
+                high_corr_pairs=[], method="single",
+            )
+
+        df = pd.DataFrame(strategy_pnls).fillna(0.0)
+
+        corr_matrix = df.corr()
+        corr_dict: Dict[str, Dict[str, float]] = {}
+        high_pairs = []
+        for i, a in enumerate(names):
+            corr_dict[a] = {}
+            for j, b in enumerate(names):
+                r = float(corr_matrix.iloc[i, j])
+                corr_dict[a][b] = round(r, 4)
+                if i < j and abs(r) > self.corr_threshold:
+                    high_pairs.append((a, b, round(r, 4)))
+
+        high_pairs.sort(key=lambda x: -abs(x[2]))
+
+        recent = df.tail(self.rebalance_window)
+        stds = recent.std()
+        stds = stds.replace(0, 1e-8)
+
+        inv_vol = 1.0 / stds
+        weights_raw = inv_vol / inv_vol.sum()
+        weights = {name: round(float(weights_raw[name]), 4) for name in names}
+
+        return StrategyWeightResult(
+            weights=weights,
+            correlation_matrix=corr_dict,
+            high_corr_pairs=high_pairs,
+            method="risk_parity_inv_vol",
+        )

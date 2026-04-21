@@ -1,5 +1,26 @@
 # Work Log
 
+## [2026-04-21] Cycle 178 — A (전략) + B (리스크) + C (데이터)
+
+**[A] Rolling OOS Validator 구현:**
+- `RollingOOSValidator`: 6m IS/2m OOS Rolling 검증, 2개월 슬라이드
+- WFE ≥ 0.50, OOS Sharpe ≥ IS×0.60, OOS MDD ≤ IS×2.0 체크
+- `BundleOOSResult` + `OOSFoldResult` dataclass로 결과 구조화
+- walk_forward.py에 추가, 4개 테스트 PASS
+
+**[B] Strategy Correlation + Risk Parity:**
+- `StrategyCorrelationAnalyzer`: 전략 간 PnL 상관행렬 + inv-vol 가중치
+- 높은 상관관계 쌍 자동 감지 (|r| > threshold)
+- portfolio_optimizer.py에 추가, 6개 테스트 PASS
+
+**[C] Performance Monitor + Telegram 연동:**
+- `LivePerformanceTracker`에 `get_rolling_pf()`, `get_rolling_mdd()` 추가
+- `PerformanceMonitor`: Rolling Sharpe/PF 추적 + 임계값 알림 콜백
+- MDD ≥ 10% WARNING, ≥ 15% CRITICAL, 레짐 전환 알림
+- performance_tracker.py에 추가, 11개 테스트 PASS
+
+**총 21개 신규 테스트 ALL PASS, 기존 1287개 테스트 정상**
+
 ## [2026-04-21] Cycle 175 — D (ML) + E (실행) + SIM + F (리서치)
 
 **[D] ADWIN 드리프트 감지 구현:**
@@ -13726,3 +13747,6 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-04-20 22:52 UTC] Cycle 175 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-21 12:23 UTC] Cycle 176 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
