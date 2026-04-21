@@ -1,5 +1,33 @@
 # Work Log
 
+## [2026-04-21] Cycle 175 — D (ML) + E (실행) + SIM + F (리서치)
+
+**[D] ADWIN 드리프트 감지 구현:**
+- ADWINDriftDetector: 순수 Python, Hoeffding 경계, 가변 윈도우, delta=0.05
+- DualGateADWINMonitor: 피처별 ADWIN(조기경보) + 모델출력 ADWIN(확정)
+- retrain_cooldown으로 과잉 재학습 방지, soft/hard reset 분리
+- 29개 테스트 추가, 전체 PASS
+
+**[E] BayesianKelly → live_paper_trader 통합:**
+- BayesianKellyPositionSizer 통합: warmup 50거래 → Bayesian Kelly 자동 활성화
+- size = min(bk_size, atr_size, max_size) ATR 상한 안전장치
+- 상태 저장/복원: bayesian_kelly_state JSON (세션 재시작 시 posterior 유지)
+- 에러 복구: 연속 tick 에러 5회→상태저장+5분대기, 데이터 페치 실패 카운터
+- 13개 통합 테스트 추가, 125 total PASS
+
+**[SIM] Paper Simulation 실데이터 검증:**
+- 22개 합성 PASS 전략 → 실데이터 PASS 0개 (Sharpe -2.84, PF 0.85)
+- 3개 전략 거래수 0 (volume_breakout, price_cluster, dema_cross)
+- 5개 전략 거래수 미달 (8~13 vs 15 필요)
+- 레짐 필터링 필수: Trend(ADX>25), Range(ATR<mean), Crisis(ATR>2x) 매핑
+
+**[F] 리서치: 트레이딩봇 실패/성공 + ADWIN + 레짐 로테이션:**
+- 실패: 888개 전략 연구 R²<0.025, 52%가 3개월 내 손실, 레짐 미감지가 주원인
+- 성공: 크로스체인 아비트라지(24만건/$868M), 레버리지DCA+AI리스크(193%ROI)
+- ADWIN: delta=0.01+debounce 3회, rolling volatility 입력, raw close 비권장
+- 레짐 로테이션: SJM논문 IR 0.05→0.4~0.5, HMM 3분류로 시작 권장
+- Walk-forward: 크립토는 6개월train/1개월test (전통 11:1보다 짧게)
+
 ## [2026-04-21] Cycle 174 — C (데이터) + B (리스크) + SIM + F (리서치)
 
 **[C] DataFeed-RegimeAwareFeatureBuilder E2E 파이프라인:**
@@ -13695,3 +13723,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-20 22:52 UTC] Cycle 175 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

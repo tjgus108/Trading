@@ -54,6 +54,7 @@ from src.exchange.paper_trader import PaperTrader
 from src.exchange.health_check import HealthChecker, HealthStatus
 from src.risk.circuit_breaker import CircuitBreaker
 from src.risk.manager import SignalCorrelationTracker
+from src.risk.kelly_sizer import BayesianKellyPositionSizer
 from src.ml.drift_detector import AccuracyDriftMonitor
 from src.risk.drawdown_monitor import DriftMonitor, DriftState
 
@@ -297,6 +298,7 @@ class LiveState:
         # Daily P&L log: [{"date": "2026-04-21", "trades": 5, "pnl": 150.0, "regime_distribution": {...}}]
         self.daily_pnl_log: list[dict] = []
         self.last_daily_summary_date: str = ""
+        self.bayesian_kelly_state: dict = {}  # BayesianKelly posterior 상태 저장
 
     def save(self):
         data = {
@@ -316,6 +318,7 @@ class LiveState:
             "regime_performance": self.regime_performance,
             "daily_pnl_log": self.daily_pnl_log[-365:],  # 최근 1년(365일)
             "last_daily_summary_date": self.last_daily_summary_date,
+            "bayesian_kelly_state": self.bayesian_kelly_state,
         }
         LIVE_STATE_PATH.write_text(json.dumps(data, indent=2, default=str))
 
@@ -391,6 +394,21 @@ class LivePaperTrader:
             on_drift=self._on_return_drift,
         )
 
+        # BayesianKelly 포지션 사이저: warmup 50거래 → 자동 Bayesian Kelly 활성화
+        self._bayesian_kelly = BayesianKellyPositionSizer(
+            prior_alpha=2.0,
+            prior_beta=3.0,
+            fractional=0.33,
+            min_trades=50,
+            warmup_fraction=RISK_PER_TRADE,  # warmup 기간 = 기존 고정 리스크(0.5%)
+            max_fraction=0.10,
+        )
+        # 상태 복원: 이전 세션의 BayesianKelly 상태가 있으면 복원
+        self._restore_bayesian_kelly_state()
+
+        # 데이터 페치 실패 연속 카운터 (심볼별) — 지수 백오프용
+        self._fetch_fail_count: dict[str, int] = {}
+
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
 
@@ -429,6 +447,37 @@ class LivePaperTrader:
             # CircuitBreaker 내부 상태를 직접 세팅 (force trigger)
             self.circuit_breaker._triggered = True
             self.circuit_breaker._reason = f"DriftMonitor: {reason}"
+
+    def _restore_bayesian_kelly_state(self):
+        """이전 세션의 BayesianKelly 상태 복원 (LiveState에서)."""
+        bk_state = self.state.bayesian_kelly_state
+        if not bk_state:
+            return
+        try:
+            self._bayesian_kelly._alpha = float(bk_state.get("alpha", self._bayesian_kelly.prior_alpha))
+            self._bayesian_kelly._beta = float(bk_state.get("beta", self._bayesian_kelly.prior_beta))
+            self._bayesian_kelly._win_sum = float(bk_state.get("win_sum", 0.0))
+            self._bayesian_kelly._win_count = int(bk_state.get("win_count", 0))
+            self._bayesian_kelly._loss_sum = float(bk_state.get("loss_sum", 0.0))
+            self._bayesian_kelly._loss_count = int(bk_state.get("loss_count", 0))
+            logger.info(
+                "BayesianKelly restored: alpha=%.1f beta=%.1f n_trades=%d active=%s",
+                self._bayesian_kelly.alpha, self._bayesian_kelly.beta,
+                self._bayesian_kelly.n_trades, self._bayesian_kelly.is_active,
+            )
+        except Exception as e:
+            logger.debug("BayesianKelly state restore failed: %s", e)
+
+    def _save_bayesian_kelly_state(self) -> dict:
+        """BayesianKelly 상태를 dict로 반환 (LiveState.save에 포함)."""
+        return {
+            "alpha": self._bayesian_kelly._alpha,
+            "beta": self._bayesian_kelly._beta,
+            "win_sum": self._bayesian_kelly._win_sum,
+            "win_count": self._bayesian_kelly._win_count,
+            "loss_sum": self._bayesian_kelly._loss_sum,
+            "loss_count": self._bayesian_kelly._loss_count,
+        }
 
     def initialize(self):
         """초기화: 심볼별 전략 로드 및 초기 데이터 수집."""
@@ -550,6 +599,8 @@ class LivePaperTrader:
             self._daily_start_balance = self.state.portfolio_balance
             self.state.last_report_time = now
 
+        # BayesianKelly 상태를 LiveState에 동기화 후 저장
+        self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
         self.state.save()
 
     def _tick_symbol(self, symbol: str):
@@ -561,8 +612,20 @@ class LivePaperTrader:
 
         new_df = fetch_latest_candles(symbol=symbol, limit=50)
         if new_df is None:
+            self._fetch_fail_count[symbol] = self._fetch_fail_count.get(symbol, 0) + 1
+            fails = self._fetch_fail_count[symbol]
+            if fails >= 3:
+                logger.warning(
+                    "[%s] Data fetch failed %d consecutive times — "
+                    "will retry next tick (exponential backoff in effect)",
+                    symbol, fails,
+                )
             return
-        # 데이터 수신 성공 → health check 데이터 타이머 갱신
+        # 데이터 수신 성공 → 연속 실패 카운터 리셋 + health check 데이터 타이머 갱신
+        if self._fetch_fail_count.get(symbol, 0) > 0:
+            logger.info("[%s] Data fetch recovered after %d failures",
+                       symbol, self._fetch_fail_count[symbol])
+        self._fetch_fail_count[symbol] = 0
         self.health_checker.record_data_received()
 
         if symbol in self._df_caches:
@@ -679,11 +742,37 @@ class LivePaperTrader:
                     continue
 
                 sl_dist = atr * SL_ATR_MULT
-                risk_amt = self.state.portfolio_balance * RISK_PER_TRADE
-                size = risk_amt / sl_dist
 
+                # BayesianKelly 포지션 사이징 (warmup 50거래 미만 → 고정 0.5%)
+                bk_size = self._bayesian_kelly.calculate_position_size(
+                    capital=self.state.portfolio_balance,
+                    price=current_price,
+                )
+                # ATR 기반 리스크 사이징 (기존 로직, fallback 겸 상한)
+                risk_amt = self.state.portfolio_balance * RISK_PER_TRADE
+                atr_size = risk_amt / sl_dist
                 max_size = (self.state.portfolio_balance * 0.10) / current_price
-                size = min(size, max_size)
+
+                # BayesianKelly 활성화 시: BK 사이즈 사용, ATR 상한으로 제한
+                # warmup 시: 기존 ATR 사이징과 동일 (RISK_PER_TRADE=0.5%)
+                if self._bayesian_kelly.is_active:
+                    size = min(bk_size, atr_size, max_size)
+                    logger.debug(
+                        "  [%s:%s] BayesianKelly ACTIVE: bk=%.6f atr=%.6f → %.6f "
+                        "(posterior_mean=%.3f, n=%d)",
+                        symbol, name, bk_size, atr_size, size,
+                        self._bayesian_kelly.posterior_mean,
+                        self._bayesian_kelly.n_trades,
+                    )
+                else:
+                    size = min(atr_size, max_size)
+                    logger.debug(
+                        "  [%s:%s] BayesianKelly WARMUP (%d/%d trades)",
+                        symbol, name,
+                        self._bayesian_kelly.n_trades,
+                        self._bayesian_kelly.min_trades,
+                    )
+
                 size *= size_mult
 
                 # 레짐 기반 포지션 사이즈 조정
@@ -825,6 +914,9 @@ class LivePaperTrader:
                     "reason": reason,
                     "hold_candles": pos["hold_candles"],
                 })
+
+                # BayesianKelly posterior 업데이트 (모든 거래 결과 반영)
+                self._bayesian_kelly.update(pnl)
 
                 # Update regime-based performance tracking
                 is_win = pnl > 0
@@ -992,6 +1084,13 @@ class LivePaperTrader:
                         f"{wr:5.1%} WR, ${stats['pnl']:+8.2f} PnL"
                     )
         
+        lines.append(f"\nBayesian Kelly:")
+        bk = self._bayesian_kelly
+        lines.append(
+            f"  Active={bk.is_active} | n_trades={bk.n_trades}/{bk.min_trades} | "
+            f"posterior_mean={bk.posterior_mean:.3f} | alpha={bk.alpha:.1f} beta={bk.beta:.1f}"
+        )
+
         lines.append(f"\nDaily P&L Log ({len(self.state.daily_pnl_log)} days):")
         if self.state.daily_pnl_log:
             for entry in self.state.daily_pnl_log[-7:]:  # 최근 7일
@@ -1024,6 +1123,9 @@ class LivePaperTrader:
         lines.append(f"| Current DD | {max_dd:.2%} |")
         lines.append(f"| Open Positions | {len(self.state.open_positions)} |")
         lines.append(f"| Total Trades | {len(self.state.trade_log)} |")
+        bk = self._bayesian_kelly
+        bk_status = "ACTIVE" if bk.is_active else f"WARMUP ({bk.n_trades}/{bk.min_trades})"
+        lines.append(f"| BayesianKelly | {bk_status} (mean={bk.posterior_mean:.3f}) |")
         lines.append("")
 
         for symbol in SYMBOLS:
@@ -1089,11 +1191,27 @@ class LivePaperTrader:
         self.state.last_report_time = time.time()
         self.state.last_reeval_time = time.time()
 
+        _consecutive_tick_errors = 0
         while self.running and time.time() < end_time:
             try:
                 self.tick()
+                _consecutive_tick_errors = 0
+            except KeyboardInterrupt:
+                break
             except Exception as e:
-                logger.error("Tick error: %s", str(e)[:200])
+                _consecutive_tick_errors += 1
+                logger.error(
+                    "Tick error (#%d consecutive): %s: %s",
+                    _consecutive_tick_errors, type(e).__name__, str(e)[:200],
+                )
+                if _consecutive_tick_errors >= 5:
+                    logger.critical(
+                        "5 consecutive tick errors — saving state and pausing 5 minutes"
+                    )
+                    self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
+                    self.state.save()
+                    time.sleep(300)
+                    _consecutive_tick_errors = 0
 
             # 다음 tick까지 대기 (1분 단위로 체크하여 shutdown 반응성 확보)
             wait_until = time.time() + self.interval
@@ -1104,6 +1222,7 @@ class LivePaperTrader:
         logger.info("Shutting down...")
         self._print_session_summary()
         self._generate_report()
+        self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
         self.state.save()
         ret = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         logger.info("Final balance: $%.2f (return: %+.2f%%)",

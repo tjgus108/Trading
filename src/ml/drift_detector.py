@@ -10,6 +10,11 @@ river 라이브러리 없이 순수 numpy로 구현.
   - PSI (Population Stability Index): 피처 분포 변화 감지.
     학습 시점 분포 vs 실시간 분포를 비교하여 재학습 필요성 판단.
     PSI > 0.1 약간 변화, > 0.2 유의미 (재학습 필요), > 0.25 심각.
+  - ADWIN (ADaptive WINdowing): 가변 윈도우 기반 drift 감지.
+    두 부분 윈도우의 평균 차이가 통계적으로 유의미하면 오래된 쪽 제거.
+    delta=0.05~0.1 (금융 시계열 권장).
+  - DualGateADWINMonitor: 이중 게이트 패턴.
+    피처 ADWIN + 모델출력 ADWIN 모두 확인, 재학습 트리거.
 
 사용법:
     detector = PageHinkleyDriftDetector(delta=0.005, lambda_=50.0)
@@ -31,11 +36,20 @@ river 라이브러리 없이 순수 numpy로 구현.
     psi = monitor.compute_psi(current_feature_values)
     if monitor.drift_detected:
         trigger_retrain()
+
+    # ADWIN 이중 게이트 드리프트 감지 (금융 시계열 권장)
+    monitor = DualGateADWINMonitor(delta=0.05, feature_names=["rsi", "ema_ratio"])
+    monitor.update_feature(feature_name="rsi", value=0.65)
+    monitor.update_model_output(proba=0.72)
+    if monitor.should_retrain:
+        trigger_retrain()
+        monitor.reset()
 """
 
 import logging
+import math
 from collections import deque
-from typing import Deque, List, Optional
+from typing import Dict, Deque, List, Optional, Tuple
 
 import numpy as np
 
@@ -564,4 +578,389 @@ class PSIDriftMonitor:
             f"PSIDriftMonitor(ref={ref_info}, last_psi={self._last_psi:.4f}, "
             f"level={self._last_level}, checks={self._check_count}, "
             f"drift={'YES' if self.drift_detected else 'NO'})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# ADWIN (ADaptive WINdowing) — 순수 numpy/math 구현
+# ---------------------------------------------------------------------------
+
+class ADWINDriftDetector:
+    """
+    ADWIN (ADaptive WINdowing) 드리프트 감지기 — 순수 Python 구현.
+
+    River 라이브러리 없이 ADWIN 알고리즘을 재현한다.
+    가변 크기 윈도우를 유지하며, 두 부분 윈도우의 평균 차이가
+    Hoeffding/Bernstein 경계를 초과하면 오래된 데이터를 제거한다.
+
+    금융 시계열 권장값:
+      - delta=0.05: 중간 민감도 (false positive 적고 반응 적당)
+      - delta=0.1: 낮은 민감도 (안정적, 느린 감지)
+      - delta=0.002: 높은 민감도 (빠른 감지, false positive 多)
+
+    Args:
+        delta: 신뢰 파라미터 (0 < delta < 1). 낮을수록 민감. 기본 0.05.
+        min_window: 드리프트 체크 최소 윈도우 크기. 기본 32.
+        grace_period: 초기 학습 기간 (이 샘플 수 이전에는 드리프트 미감지). 기본 30.
+        clock: 내부 검사 주기 (매 clock 샘플마다 경계 재계산). 기본 32.
+
+    Attributes:
+        drift_detected (bool): 최신 update() 호출 후 드리프트 감지 여부.
+        n_samples (int): 총 처리된 샘플 수.
+        window_size (int): 현재 유효 윈도우 크기.
+        total_drifts (int): 누적 드리프트 감지 횟수.
+    """
+
+    def __init__(
+        self,
+        delta: float = 0.05,
+        min_window: int = 32,
+        grace_period: int = 30,
+        clock: int = 32,
+    ):
+        if not (0 < delta < 1):
+            raise ValueError(f"delta는 (0, 1) 범위여야 합니다. 입력값: {delta}")
+        self.delta = delta
+        self.min_window = min_window
+        self.grace_period = grace_period
+        self.clock = clock
+        self.reset()
+
+    def reset(self) -> None:
+        """윈도우와 통계 완전 초기화."""
+        # 윈도우 데이터: deque of float
+        self._window: Deque[float] = deque()
+        self._n: int = 0           # 총 샘플 수
+        self._total_drifts: int = 0
+        self.drift_detected: bool = False
+        logger.debug("ADWIN: reset")
+
+    def update(self, value: float) -> bool:
+        """
+        새 관측값을 윈도우에 추가하고 드리프트 여부를 판정.
+
+        Args:
+            value: 새 관측값 (예: 정확도 0/1, 또는 연속 피처 값).
+
+        Returns:
+            bool: 드리프트 감지 여부.
+        """
+        self._n += 1
+        self._window.append(float(value))
+        self.drift_detected = False
+
+        # grace_period 또는 min_window 미만이면 스킵
+        if self._n < self.grace_period or len(self._window) < self.min_window:
+            return False
+
+        # clock 주기마다 경계 검사 (매 샘플마다 검사하면 O(n^2) 비용)
+        if self._n % self.clock != 0:
+            return False
+
+        if self._detect_change():
+            self.drift_detected = True
+            self._total_drifts += 1
+            logger.info(
+                "ADWIN DRIFT DETECTED: n=%d, window_size=%d, drift_count=%d",
+                self._n, len(self._window), self._total_drifts,
+            )
+            return True
+
+        return False
+
+    def _detect_change(self) -> bool:
+        """
+        ADWIN 경계 검사: 윈도우를 두 부분으로 나눠 평균 차이가
+        Hoeffding 경계를 초과하면 오래된 부분을 제거.
+
+        Returns:
+            bool: 드리프트 감지 및 윈도우 축소 여부.
+        """
+        w = list(self._window)
+        n = len(w)
+        if n < self.min_window:
+            return False
+
+        total_sum = sum(w)
+        total_mean = total_sum / n
+
+        # 두 부분 윈도우를 순회하며 Hoeffding 경계 계산
+        # 분할점: cut_idx in [min_window//2 .. n - min_window//2]
+        drift_found = False
+        cut_start = max(1, self.min_window // 2)
+        cut_end = n - cut_start
+
+        right_sum = total_sum
+        right_n = n
+
+        for cut in range(cut_start, cut_end):
+            # 왼쪽: w[0..cut-1], 오른쪽: w[cut..n-1]
+            left_val = w[cut - 1]
+            right_sum -= left_val
+            right_n -= 1
+            left_n = cut
+            left_sum = total_sum - right_sum
+
+            left_mean = left_sum / left_n
+            right_mean = right_sum / right_n
+
+            # Hoeffding 경계: epsilon_cut
+            # ADWIN 논문: ε = sqrt( (1/2n_0 + 1/2n_1) * ln(4*n/delta) )
+            # 여기서 n = 전체 윈도우, delta = 신뢰 파라미터
+            harmonic = 0.5 / left_n + 0.5 / right_n
+            log_term = math.log(4.0 * n / self.delta)
+            epsilon_cut = math.sqrt(harmonic * log_term)
+
+            if abs(left_mean - right_mean) >= epsilon_cut:
+                # 왼쪽(오래된 데이터) 제거
+                for _ in range(cut):
+                    self._window.popleft()
+                drift_found = True
+                logger.debug(
+                    "ADWIN: window shrunk by %d (left_mean=%.4f, right_mean=%.4f, "
+                    "epsilon=%.4f, new_window=%d)",
+                    cut, left_mean, right_mean, epsilon_cut, len(self._window),
+                )
+                break
+
+        return drift_found
+
+    @property
+    def n_samples(self) -> int:
+        """총 처리된 샘플 수."""
+        return self._n
+
+    @property
+    def window_size(self) -> int:
+        """현재 유효 윈도우 크기."""
+        return len(self._window)
+
+    @property
+    def total_drifts(self) -> int:
+        """누적 드리프트 감지 횟수."""
+        return self._total_drifts
+
+    @property
+    def window_mean(self) -> Optional[float]:
+        """현재 윈도우의 평균. 윈도우가 비어있으면 None."""
+        if not self._window:
+            return None
+        return float(sum(self._window) / len(self._window))
+
+    def summary(self) -> str:
+        mean_str = f"{self.window_mean:.4f}" if self.window_mean is not None else "N/A"
+        return (
+            f"ADWIN(delta={self.delta}, n={self._n}, window={self.window_size}, "
+            f"mean={mean_str}, total_drifts={self._total_drifts}, "
+            f"drift={'YES' if self.drift_detected else 'NO'})"
+        )
+
+
+class DualGateADWINMonitor:
+    """
+    이중 게이트 ADWIN 드리프트 모니터.
+
+    두 개의 독립 ADWIN 게이트를 운용한다:
+      1. 피처 게이트: 여러 피처별로 개별 ADWINDriftDetector 유지.
+         피처 값의 분포 변화 감지 (input drift).
+      2. 모델출력 게이트: 모델 출력 확률(proba)의 분포 변화 감지
+         (output drift / concept drift).
+
+    두 게이트 중 하나라도 드리프트 감지 시 should_retrain=True.
+    금융 시계열 기본값 delta=0.05 (중간 민감도).
+
+    Args:
+        delta: ADWIN 신뢰 파라미터 (기본 0.05, 금융 시계열 권장).
+        feature_names: 모니터링할 피처 이름 목록. 없으면 동적 추가.
+        min_window: 각 ADWIN 최소 윈도우 크기 (기본 32).
+        grace_period: 초기 학습 기간 (기본 30).
+        retrain_cooldown: 재학습 후 최소 대기 샘플 수 (기본 50, 과잉 재학습 방지).
+
+    Example::
+
+        monitor = DualGateADWINMonitor(delta=0.05)
+        # 피처 값 업데이트 (각 피처별로 독립 ADWIN)
+        monitor.update_feature("rsi", 0.65)
+        monitor.update_feature("ema_ratio", 1.02)
+        # 모델 출력 확률 업데이트
+        monitor.update_model_output(proba=0.72)
+        if monitor.should_retrain:
+            retrain_model()
+            monitor.reset()
+    """
+
+    def __init__(
+        self,
+        delta: float = 0.05,
+        feature_names: Optional[List[str]] = None,
+        min_window: int = 32,
+        grace_period: int = 30,
+        retrain_cooldown: int = 50,
+    ):
+        self.delta = delta
+        self.min_window = min_window
+        self.grace_period = grace_period
+        self.retrain_cooldown = retrain_cooldown
+
+        # 게이트 1: 피처별 ADWIN (feature_name → detector)
+        self._feature_detectors: Dict[str, ADWINDriftDetector] = {}
+        if feature_names:
+            for name in feature_names:
+                self._feature_detectors[name] = ADWINDriftDetector(
+                    delta=delta, min_window=min_window, grace_period=grace_period
+                )
+
+        # 게이트 2: 모델 출력 ADWIN
+        self._output_detector = ADWINDriftDetector(
+            delta=delta, min_window=min_window, grace_period=grace_period
+        )
+
+        self.should_retrain: bool = False
+        self._retrain_count: int = 0
+        self._samples_since_retrain: int = 0
+        self._last_drift_gate: str = ""    # "feature:<name>" or "output"
+        self._last_drift_feature: str = ""
+
+    def update_feature(self, feature_name: str, value: float) -> bool:
+        """
+        피처 게이트 업데이트.
+
+        Args:
+            feature_name: 피처 이름 (없으면 자동 생성).
+            value: 피처 값 (float).
+
+        Returns:
+            bool: 이 피처에서 드리프트 감지 여부.
+        """
+        if feature_name not in self._feature_detectors:
+            self._feature_detectors[feature_name] = ADWINDriftDetector(
+                delta=self.delta,
+                min_window=self.min_window,
+                grace_period=self.grace_period,
+            )
+
+        detector = self._feature_detectors[feature_name]
+        drift = detector.update(value)
+        self._samples_since_retrain += 1
+
+        if drift and self._samples_since_retrain >= self.retrain_cooldown:
+            self._trigger_retrain(gate=f"feature:{feature_name}")
+            return True
+
+        return False
+
+    def update_model_output(self, proba: float) -> bool:
+        """
+        모델 출력 게이트 업데이트.
+
+        Args:
+            proba: 모델의 최대 클래스 확률 (0~1).
+
+        Returns:
+            bool: 모델 출력에서 드리프트 감지 여부.
+        """
+        drift = self._output_detector.update(proba)
+        self._samples_since_retrain += 1
+
+        if drift and self._samples_since_retrain >= self.retrain_cooldown:
+            self._trigger_retrain(gate="output")
+            return True
+
+        return False
+
+    def update(
+        self,
+        feature_values: Optional[Dict[str, float]] = None,
+        model_proba: Optional[float] = None,
+    ) -> bool:
+        """
+        피처와 모델 출력을 한 번에 업데이트하는 편의 메서드.
+
+        Args:
+            feature_values: {feature_name: value} 딕셔너리.
+            model_proba: 모델 최대 클래스 확률.
+
+        Returns:
+            bool: 어느 게이트든 드리프트 감지 시 True.
+        """
+        any_drift = False
+
+        if feature_values:
+            for name, val in feature_values.items():
+                if self.update_feature(name, val):
+                    any_drift = True
+
+        if model_proba is not None:
+            if self.update_model_output(model_proba):
+                any_drift = True
+
+        return any_drift
+
+    def _trigger_retrain(self, gate: str) -> None:
+        """내부: 재학습 플래그 설정 및 로깅."""
+        self.should_retrain = True
+        self._retrain_count += 1
+        self._last_drift_gate = gate
+        self._samples_since_retrain = 0
+        logger.warning(
+            "DualGateADWIN: RETRAIN TRIGGERED — gate=%s, retrain_count=%d",
+            gate, self._retrain_count,
+        )
+
+    def reset(self) -> None:
+        """
+        재학습 완료 후 호출. should_retrain 플래그와 쿨다운 리셋.
+        각 ADWIN 윈도우는 유지 (연속성 보존).
+        """
+        self.should_retrain = False
+        self._samples_since_retrain = 0
+        # 개별 ADWIN의 drift_detected 플래그만 클리어
+        for det in self._feature_detectors.values():
+            det.drift_detected = False
+        self._output_detector.drift_detected = False
+        logger.info(
+            "DualGateADWIN: reset after retrain (total_retrains=%d)",
+            self._retrain_count,
+        )
+
+    def hard_reset(self) -> None:
+        """
+        완전 초기화. 모든 ADWIN 윈도우 포함.
+        재학습이 아닌 모델 교체 시 호출.
+        """
+        for det in self._feature_detectors.values():
+            det.reset()
+        self._output_detector.reset()
+        self.should_retrain = False
+        self._samples_since_retrain = 0
+        self._last_drift_gate = ""
+        logger.info("DualGateADWIN: hard_reset — all windows cleared")
+
+    @property
+    def retrain_count(self) -> int:
+        """누적 재학습 트리거 횟수."""
+        return self._retrain_count
+
+    @property
+    def feature_drift_status(self) -> Dict[str, bool]:
+        """각 피처별 ADWIN 드리프트 상태 딕셔너리."""
+        return {name: det.drift_detected for name, det in self._feature_detectors.items()}
+
+    @property
+    def output_drift_detected(self) -> bool:
+        """모델 출력 게이트 드리프트 여부."""
+        return self._output_detector.drift_detected
+
+    def summary(self) -> str:
+        feat_summaries = "\n".join(
+            f"    [{name}] {det.summary()}"
+            for name, det in self._feature_detectors.items()
+        ) or "    (no feature detectors)"
+        return (
+            f"DualGateADWINMonitor(\n"
+            f"  delta={self.delta}, should_retrain={self.should_retrain}, "
+            f"retrain_count={self._retrain_count},\n"
+            f"  last_drift_gate={self._last_drift_gate!r},\n"
+            f"  [output] {self._output_detector.summary()},\n"
+            f"  [features]\n{feat_summaries}\n)"
         )
