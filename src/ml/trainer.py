@@ -199,13 +199,71 @@ class WalkForwardTrainer:
         self._last_feature_importances: Dict[str, float] = {}
         self._trained_regime: Optional[str] = None  # 학습 시 감지된 레짐
 
-    def train(self, df: pd.DataFrame) -> TrainingResult:
+    def select_features_pfi(
+        self,
+        clf,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        top_k: int = 8,
+    ) -> List[str]:
+        """
+        PFI(Permutation Feature Importance) 기반 상위 top_k 피처 선택.
+
+        학습된 clf로 X_train에서 각 피처를 셔플하여 정확도 감소량을 측정.
+        감소량이 큰 피처 순으로 top_k개 반환.
+
+        Args:
+            clf: 학습된 sklearn 분류기
+            X_train: 학습 피처 DataFrame
+            y_train: 학습 레이블 Series
+            top_k: 선택할 피처 수 (기본 8)
+
+        Returns:
+            List[str]: 상위 top_k 피처명 목록
+        """
+        try:
+            from sklearn.inspection import permutation_importance
+        except ImportError:
+            # sklearn 구버전 fallback: MDI 사용
+            logger.warning("permutation_importance 미지원 — MDI fallback으로 피처 선택")
+            importances = clf.feature_importances_
+            feat_names = list(X_train.columns)
+            ranked = sorted(zip(feat_names, importances), key=lambda x: x[1], reverse=True)
+            k = max(2, min(top_k, len(feat_names)))
+            return [f for f, _ in ranked[:k]]
+
+        result = permutation_importance(
+            clf, X_train, y_train,
+            n_repeats=5,
+            random_state=42,
+            n_jobs=-1,
+        )
+        feat_names = list(X_train.columns)
+        pfi_scores = result.importances_mean
+        ranked = sorted(zip(feat_names, pfi_scores), key=lambda x: x[1], reverse=True)
+        k = max(2, min(top_k, len(feat_names)))
+        selected = [f for f, _ in ranked[:k]]
+        removed = [f for f, _ in ranked[k:]]
+        if removed:
+            logger.info(
+                "PFI 피처 선택: %d→%d (top_k=%d, 제거: %s)",
+                len(feat_names), len(selected), top_k, removed,
+            )
+        return selected
+
+    def train(self, df: pd.DataFrame, feature_selection: bool = False, top_k: int = 8) -> TrainingResult:
         """
         walk-forward 학습 실행 (데이터 누출 방지).
         df: DataFeed.fetch() 반환 DataFrame (지표 포함, 최소 200 캔들 권장)
 
         중요: 전체 df로 피처 계산 후 시계열 분할 (shift(1) 기반 피처는 look-ahead 없음).
         이 방식으로 val/test 구간의 rolling warm-up NaN으로 인한 유효 샘플 손실 방지.
+
+        Args:
+            df: OHLCV DataFrame
+            feature_selection: True이면 1차 학습 후 PFI 상위 top_k 피처로 재학습.
+                               False(기본)이면 기존 동작과 동일.
+            top_k: feature_selection=True 시 선택할 피처 수 (기본 8).
         """
         try:
             from sklearn.calibration import CalibratedClassifierCV
@@ -326,6 +384,37 @@ class WalkForwardTrainer:
                 base_clf = RandomForestClassifier(**clf_kwargs)
             base_clf.fit(X_train, y_train)
 
+        # --- train() 파라미터 기반 PFI 피처 선택 (feature_selection=True 시) ---
+        _pfi_selected_features: Optional[List[str]] = None
+        if feature_selection:
+            pfi_selected = self.select_features_pfi(base_clf, X_train, y_train, top_k=top_k)
+            _pfi_selected_features = pfi_selected
+            if len(pfi_selected) < len(list(X_train.columns)):
+                logger.info(
+                    "feature_selection: %d→%d 피처로 재학습",
+                    X_train.shape[1], len(pfi_selected),
+                )
+                X_train = X_train[pfi_selected]
+                X_val = X_val[pfi_selected]
+                X_cal = X_cal[pfi_selected]
+                X_test = X_test[pfi_selected]
+
+                # 선택된 피처로 재학습
+                if self.model_type == "xgboost" and _XGB_AVAILABLE:
+                    base_clf = xgb.XGBClassifier(**xgb_kwargs)
+                    base_clf.fit(
+                        X_train, y_train,
+                        eval_set=[(X_val, y_val)],
+                        verbose=False,
+                    )
+                else:
+                    clf_kwargs["min_samples_leaf"] = max(10, len(X_train) // 20)
+                    if self.model_type == "extra_trees":
+                        base_clf = ExtraTreesClassifier(**clf_kwargs)
+                    else:
+                        base_clf = RandomForestClassifier(**clf_kwargs)
+                    base_clf.fit(X_train, y_train)
+
         # --- SHAP/importance 기반 피처 선택 (optional) ---
         selected_features: Optional[List[str]] = None
         if self.use_shap_selection:
@@ -436,6 +525,9 @@ class WalkForwardTrainer:
         algo_tag = "xgb" if self.model_type == "xgboost" else ("et" if self.model_type == "extra_trees" else "rf")
         model_name = f"{algo_tag}_{self.symbol.replace('/', '').lower()}_{label_mode}_{date.today()}"
 
+        # PFI 선택 피처 우선, 없으면 use_shap_selection 결과 사용
+        final_selected_features = _pfi_selected_features if _pfi_selected_features is not None else selected_features
+
         result = TrainingResult(
             model_name=model_name,
             n_samples=n,
@@ -449,7 +541,7 @@ class WalkForwardTrainer:
             split_info=split_info,
             class_distribution=class_distribution,
             ensemble_weight=ensemble_weight,
-            selected_features=selected_features,
+            selected_features=final_selected_features,
             detected_regime=self._trained_regime,
         )
         logger.info(result.summary())

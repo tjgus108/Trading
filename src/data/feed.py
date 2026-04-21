@@ -195,6 +195,10 @@ class DataFeed:
         self._miss_count = 0         # 캐시 미스 수
         self._regime_cache: dict = {}  # symbol -> (regime_value, timestamp)
         self._circuit_breaker = CircuitBreaker()  # Cascading failure prevention
+        # ─ Stale cache fallback (Cycle 176 개선)
+        self._stale_cache: dict = {}  # (symbol, timeframe, limit) → (DataSummary, timestamp)
+        self._fallback_count = 0       # 캐시 폴백 사용 횟수
+        self._last_error_time: Optional[float] = None  # 마지막 에러 발생 시간
 
     def _effective_ttl(self, symbol: str) -> float:
         """레짐 기반 캐시 TTL 계산. 고변동성이면 짧게, 저변동성이면 길게."""
@@ -204,6 +208,42 @@ class DataFeed:
         multiplier = self.REGIME_TTL_MULTIPLIER.get(regime, 1.0)
         effective = self._cache_ttl * multiplier
         return effective
+
+    def _get_stale_cache(self, key: tuple) -> Optional[tuple]:
+        """만료된 캐시 데이터 반환 (폴백용). (DataSummary, age_seconds) 또는 None."""
+        if key not in self._stale_cache:
+            return None
+        summary, ts = self._stale_cache[key]
+        age = time.time() - ts
+        return (summary, age)
+
+    def _store_stale_cache(self, key: tuple, summary: DataSummary) -> None:
+        """현재 캐시 데이터를 stale_cache에 저장 (폴백용)."""
+        self._stale_cache[key] = (summary, time.time())
+
+    def _use_cache_fallback(self, key: tuple) -> Optional[DataSummary]:
+        """캐시 폴백 시도: 만료된 캐시 → 스테일 캐시 순서로 시도."""
+        # 1. 만료된 hot cache 사용
+        if key in self._cache:
+            summary, ts = self._cache[key]
+            age = time.time() - ts
+            logger.info(
+                "Cache fallback: using expired hot cache (age=%.1fs) for %s",
+                age, key
+            )
+            return summary
+        
+        # 2. stale cache 사용
+        stale_result = self._get_stale_cache(key)
+        if stale_result:
+            summary, age = stale_result
+            logger.info(
+                "Cache fallback: using stale cache (age=%.1fs) for %s",
+                age, key
+            )
+            return summary
+        
+        return None
 
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         # Circuit breaker check: reject if too many cascading failures
@@ -237,10 +277,24 @@ class DataFeed:
             summary = self._fetch_with_retry(symbol, timeframe, limit)
             self._circuit_breaker.record_success()  # Success: reset failure count
             self._cache[key] = (summary, now)
+            self._store_stale_cache(key, summary)  # 성공 데이터를 stale 캐시에 저장
             self._evict_if_needed()
             return summary
         except Exception as e:
             self._circuit_breaker.record_failure()  # Track failure
+            self._last_error_time = time.time()
+            
+            # Transient 에러 시 캐시 폴백 시도
+            if _is_transient_error(e):
+                logger.warning(
+                    "Fetch failed with transient error (%s): attempting cache fallback for %s %s",
+                    type(e).__name__, symbol, timeframe
+                )
+                fallback = self._use_cache_fallback(key)
+                if fallback:
+                    self._fallback_count += 1
+                    return fallback
+            
             raise
 
     def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
@@ -384,6 +438,8 @@ class DataFeed:
             'cached_keys': len(self._cache),
             'max_cache_size': self._max_cache_size,
             'regime_cache_size': len(self._regime_cache),
+            'fallback_count': self._fallback_count,
+            'stale_cache_size': len(self._stale_cache),
         }
 
 
