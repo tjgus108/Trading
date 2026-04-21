@@ -2,11 +2,17 @@
 Paper Trading (모의거래) 모드.
 실제 API 호출 없이 신호를 기록하고 가상 P&L 추적.
 슬리피지, 부분체결, 타임아웃 시뮬레이션 포함.
+RegimeDetector 통합: 매 틱마다 레짐 감지 → 전략 라우팅 + CRISIS 포지션 스케일링.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import Callable, Dict, List, Optional
 import time
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,8 +48,9 @@ class PaperTrader:
       + 60% adverse 방향 편향 + 40% 랜덤 노이즈
     - 부분체결: 확률 partial_fill_prob로 50~80% 만 채워짐
     - 타임아웃: timeout_prob 확률로 타임아웃 (잔량은 취소됨)
+    - RegimeDetector 통합: update_regime(df) 호출 → 레짐 전환 시 콜백 + CRISIS 포지션 스케일링
     """
-    
+
     def __init__(
         self,
         initial_balance: float = 10000.0,
@@ -51,6 +58,9 @@ class PaperTrader:
         slippage_pct: float = 0.05,   # 양방향 최대 0.05% (±)
         partial_fill_prob: float = 0.05,  # 부분체결 확률 5%
         timeout_prob: float = 0.01,  # 타임아웃 확률 1%
+        regime_detector=None,         # src.ml.regime_detector.RegimeDetector (선택)
+        regime_router=None,           # src.strategy.regime_router.RegimeStrategyRouter (선택)
+        performance_monitor=None,     # src.risk.performance_tracker.PerformanceMonitor (선택)
     ):
         self.account = PaperAccount(
             initial_balance=initial_balance,
@@ -60,6 +70,72 @@ class PaperTrader:
         self.slippage_pct = slippage_pct  # 최대 편차 (%)
         self.partial_fill_prob = partial_fill_prob
         self.timeout_prob = timeout_prob
+
+        # ── Regime integration ──────────────────────────────────────────────
+        self._regime_detector = regime_detector
+        self._regime_router = regime_router
+        self._performance_monitor = performance_monitor
+        self._current_regime: str = "RANGE"  # 초기 기본값
+
+    # ── Regime interface ────────────────────────────────────────────────────
+
+    def update_regime(self, df) -> str:
+        """매 틱/봉마다 호출. RegimeDetector로 레짐을 갱신하고 전환 시 콜백을 발행.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            OHLCV DataFrame (high/low/close 필수)
+
+        Returns
+        -------
+        str
+            현재 레짐 ('TREND' | 'RANGE' | 'CRISIS')
+        """
+        if self._regime_detector is None:
+            return self._current_regime
+
+        prev = self._current_regime
+        new_regime = self._regime_detector.detect(df)
+
+        if new_regime != prev:
+            logger.info("Regime change: %s → %s", prev, new_regime)
+            self._current_regime = new_regime
+
+            # PerformanceMonitor 레짐 전환 알림
+            if self._performance_monitor is not None:
+                try:
+                    self._performance_monitor.regime_change_alert(prev, new_regime)
+                except Exception as exc:
+                    logger.warning("regime_change_alert failed: %s", exc)
+
+        return self._current_regime
+
+    @property
+    def current_regime(self) -> str:
+        """현재 레짐 문자열 반환."""
+        return self._current_regime
+
+    def get_position_scale(self) -> float:
+        """현재 레짐에 따른 포지션 배율 반환 (CRISIS=0.5, 나머지=1.0)."""
+        if self._regime_detector is not None:
+            from src.ml.regime_detector import RegimeDetector
+            return RegimeDetector.get_position_scale(self._current_regime)
+        return 1.0
+
+    def should_skip_strategy(self, strategy_name: str) -> bool:
+        """RegimeStrategyRouter를 통해 현재 레짐에서 전략을 스킵해야 하면 True."""
+        if self._regime_router is None:
+            return False
+        return self._regime_router.should_skip(strategy_name, self._current_regime)
+
+    def get_active_strategies(self) -> List[str]:
+        """현재 레짐에서 활성화된 전략 목록 반환."""
+        if self._regime_router is None:
+            return []
+        return self._regime_router.get_active_strategies(self._current_regime)
+
+    # ── Trade execution ──────────────────────────────────────────────────────
 
     def execute_signal(
         self,
@@ -71,16 +147,35 @@ class PaperTrader:
         confidence: str,
     ) -> dict:
         """신호를 모의 실행. 실제 API 없음.
-        
+
+        RegimeDetector 연동 시:
+          - CRISIS 레짐: quantity에 0.5 배율 자동 적용
+          - RegimeRouter로 skip 판정된 전략은 "skipped" 상태 반환
+
         Returns:
-            - status: "filled" | "partial" | "timeout" | "rejected" | "error"
+            - status: "filled" | "partial" | "timeout" | "rejected" | "error" | "skipped"
             - slippage_pct: 실제 체결 가격 대비 슬리피지 (%)
             - actual_quantity: 실제 체결 수량
+            - regime: 현재 레짐 (문자열)
         """
         action = action.upper()
         if action not in ("BUY", "SELL"):
             return {"status": "error", "reason": f"unknown action: {action}"}
-        
+
+        # Regime-based strategy skip (BUY만 체크; SELL은 항상 허용)
+        if action == "BUY" and self.should_skip_strategy(strategy):
+            return {
+                "status": "skipped",
+                "reason": f"strategy '{strategy}' skipped in regime '{self._current_regime}'",
+                "regime": self._current_regime,
+            }
+
+        # Regime-based position scaling (BUY만 적용)
+        if action == "BUY":
+            scale = self.get_position_scale()
+            if scale != 1.0:
+                quantity = quantity * scale
+
         # Input validation
         if quantity <= 0:
             return {"status": "rejected", "reason": "quantity must be positive"}
@@ -181,6 +276,7 @@ class PaperTrader:
             "slippage_bps": round(slippage_bps, 2),  # Basis points for accuracy
             "slippage_pct": round(slippage_range, 4),  # % for backwards compatibility
             "balance": round(self.account.balance, 2),
+            "regime": self._current_regime,
         }
 
     def get_summary(self) -> dict:

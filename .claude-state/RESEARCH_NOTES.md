@@ -338,3 +338,164 @@
 - **DSR 계산 추가**: 현재 raw Sharpe >= 1.0 기준을 DSR >= 1.0으로 전환. 다중 전략 테스트 시 선택 편향 자동 보정. 구현: `scipy.stats`로 비정규성 보정 + log(전략 수) 패널티 적용.
 - **PBO 모니터링**: 현재 355개 전략 조합 수가 많을수록 PBO 극단적으로 높음. 전략 수 축소(355 → 상위 20개)가 PBO 감소의 핵심. 더 많은 전략 추가는 과최적화를 악화시킴.
 - **CPCV 장기 과제**: WFO를 CPCV로 전환하면 신뢰도 향상, mlfinlab 또는 자체 구현 필요. 단기 대안: WFO 윈도우/피트니스 함수를 한 번 결정 후 절대 변경 안 하는 규율 도입.
+
+---
+
+## Cycle 179 Research Notes — Paper Trading 자동화 + 트레이딩봇 실패/성공 사례 (2025-2026)
+
+### 주제 1: 트레이딩봇 실패 사례 (2025-2026 최신)
+
+#### 핵심 인사이트
+
+1. **R² < 0.025 — 백테스트 Sharpe는 실전 성과의 예측 인자가 아님** — 888개 알고리즘 전략 분석 결과(2025), 인샘플 Sharpe ratio와 아웃오브샘플 성과 간 R²가 0.025 미만. 발표된 전략의 44%가 새 데이터에서 재현 실패. 78%의 발표된 전략이 아웃오브샘플에서 실패하며 Sharpe가 평균 63% 하락. **우리 프로젝트(355개 전략 중 실전 PASS 2개)는 정확히 이 패턴의 교과서적 사례.**
+
+2. **2025년 5월 플래시 크래시 — AI 봇 3분 내 $20억 매도** — 레짐 감지 없는 AI 봇들이 경제 지표 발표 직후 일제히 동일한 방향으로 매도 주문 실행. 3분 만에 $20억 상당 자산 매도. 유동성 공급자에서 소비자로 순간 전환된 봇들이 플래시 크래시를 가속화. 교훈: 레짐 전환 감지 없는 정적 봇은 "시장 위기의 증폭기"가 됨.
+
+3. **Paper-to-Live 실패의 4가지 구조적 원인** — 2025 분석 결과:
+   - **Curve Fitting**: 과거 데이터에 최적화된 봇이 레짐 변화 시 즉각 붕괴. 특히 파라미터 수가 많을수록 실전 실패 확률 급증
+   - **슬리피지 과소추정**: paper trading은 체결 가격을 중간값으로 가정하지만 실전에서 변동성 구간(ATR 상위 20%)에서 슬리피지 0.3~0.5%로 폭등
+   - **API 장애 미대응**: 연결 끊김, 타임아웃, rate limit 초과 시 포지션 상태 불일치 → 미청산 포지션 방치 또는 이중 주문
+   - **단일 레짐 노출**: paper 기간이 상승장 또는 횡보장에만 노출되면 다른 레짐에서 전략이 그대로 무너짐
+
+4. **$0 수수료 paper trading의 함정** — 많은 플랫폼이 paper trading 모드에서 수수료를 0으로 설정하거나 단순 고정값으로 처리. Bybit 실전 Taker 0.055% 미반영 시, round-trip 0.11%가 PF 계산을 심각하게 왜곡. PF 1.8 → 실전 PF 1.4 수준으로 하락 가능. **우리 프로젝트 BacktestEngine은 이미 0.055% 반영 — 이 함정 회피.**
+
+5. **Moss.sh 실험 (2025): $1,000 × 10봇 결과** — 고빈도 스캘핑 봇: API 레이턴시 문제로 즉시 실패. 그리드 봇: 횡보장에서 양호 → 추세 발생 시 대규모 손실. DCA 봇: 하락장 물타기 누적 → 추세 역전 시 회복 불가. 교훈: 봇 유형과 레짐의 미스매치가 핵심 실패 원인.
+
+---
+
+### 주제 2: Paper Trading 성공 전환 사례 및 권장 기간
+
+#### 핵심 인사이트
+
+1. **권장 paper trading 기간: 4~8주가 업계 표준** — 구체적 권장:
+   - **최소 2주**: API 연결성, 실전 수수료, 체결 속도, 시스템 안정성을 검증하는 절대 최소
+   - **4주(권장 기준선)**: 다양한 변동성 구간(low_vol + high_vol 각 1회 이상) 포함 필요
+   - **8주(고신뢰 기준)**: 레짐 전환을 최소 1회 이상 경험 후 전환 권장
+   - **중요**: "4주 연속 안정"이 아니라 "4주 중 5% 급락 구간을 포함"해야 의미 있음. 상승장 4주는 불충분.
+   - Freqtrade 공식 문서: 최소 7일 드라이런 후 라이브 — 이는 "기술 검증"용. 전략 검증을 위한 최소 기간은 별도(4주+).
+
+2. **성공적인 paper-to-live 전환 체크리스트 (Freqtrade/Darkbot 2025 기준)** — 전환 전 통과 조건:
+   - PF >= 1.4, MDD <= 15%, Sharpe >= 0.8 (paper 기간 전체)
+   - 연속 손실 최대 3회 이내 (실전에서는 더 길어질 가능성)
+   - API 에러율 0% (자동 복구 포함)
+   - 수수료 예상 vs 실제 오차 +-10% 이내
+   - 5% 급락 구간 최소 1회 포함한 paper 결과
+   - 긴급 중단 절차(Telegram /stopbuy) 테스트 완료
+   - 하드웨어: CPU < 50%, RAM < 70%, 디스크 > 10GB
+
+3. **자본 스케일업 3단계 — 성공 봇들의 공통 패턴**:
+   - **1단계 (1~2주)**: 예산의 10~20%. 목적: 수수료/슬리피지 실전 검증
+   - **2단계 (2~4주)**: 예산의 30~50%. 조건: 1단계 일일 드로다운 < 3% 연속 10일 + API 에러 0회
+   - **3단계 (4주+)**: 예산의 50~70%. 나머지 30%는 항상 reserve. 레버리지는 이 단계에서만 검토
+
+---
+
+### 주제 3: Paper Trading 자동화 설계 — 4주 자동 실행 + 주간 체크
+
+#### 핵심 인사이트
+
+1. **자동 Go/No-Go 판정 기준 — 주간 체크 권장 수치**:
+   
+   | 지표 | Go 조건 | No-Go 트리거 |
+   |------|---------|-------------|
+   | Profit Factor | >= 1.4 | < 1.0 즉시 중단 |
+   | MDD | <= 15% | > 20% 즉시 중단 |
+   | Sharpe (rolling 4주) | >= 0.8 | < 0.3 |
+   | WFE (OOS/IS 수익 비율) | >= 0.50 | < 0.30 |
+   | 주간 승률 | >= 45% | < 30% |
+   | API 에러율 | 0% | >= 1% 경고, >= 3% 중단 |
+   | PSI 드리프트 | < 0.1 | > 0.2 신호 중단 |
+   
+   WFE = paper_period_return / backtest_is_return. 0.50 이상이면 백테스트의 50% 이상이 실전에서 재현됨.
+
+2. **스케줄러 설계 — 트레이딩봇에 최적 선택**:
+   
+   | 도구 | 장점 | 단점 | 트레이딩봇 적합도 |
+   |------|------|------|-----------------|
+   | **cron** | 단순, battle-tested, 이식성 최고 | 실패 시 재시작 없음, 로그 약함 | 보조 작업(일간 리포트)에 적합 |
+   | **systemd** | 자동 재시작, journalctl 통합, 의존성 관리 | Linux 전용 | 메인 봇 프로세스에 최적 |
+   | **supervisor** | HTTP 대시보드, 멀티프로세스 관리, 개발 친화적 | systemd보다 무거움 | 개발/스테이징 환경에 적합 |
+   | **Docker + cron/Ofelia** | 환경 격리, 포터빌리티, 로그 통합 | 오버헤드 | 클라우드/VPS 배포 시 최적 |
+   
+   **권장**: 로컬/VPS 단독 운영 → systemd. Docker 환경 → Ofelia(mcuadros/ofelia, Go 기반). systemd는 `Restart=always` + `RestartSec=10s` 설정으로 프로세스 크래시 자동 복구.
+
+3. **API 장애 자동 복구 — 생산 검증된 3가지 패턴**:
+   
+   **패턴 1 — 지수 백오프 (Exponential Backoff)**:
+   ```python
+   for attempt in range(5):
+       try:
+           data = exchange.fetch_ohlcv(...)
+           break
+       except (ccxt.NetworkError, ccxt.RequestTimeout) as e:
+           wait = min(2 ** attempt, 60)  # 1, 2, 4, 8, 16, 최대 60초
+           time.sleep(wait)
+   ```
+   CCXT 자체에 `options.enableRateLimit = True` 설정 시 429 자동 처리.
+   
+   **패턴 2 — Circuit Breaker**:
+   연속 실패 3회 → trading_disabled 플래그 설정 + Telegram 알림 → 5분 대기 후 재시도. 연속 실패 10회 → 완전 중단 + 수동 재시작 요구.
+   
+   **패턴 3 — 포지션 동기화**:
+   재시작 시 거래소 실제 포지션 조회 후 내부 상태와 비교. 불일치 시 "hold로 동기화" (강제 청산 금지). 30초 주기 order-status polling, 5분 미체결 주문 취소 후 재제출.
+
+4. **4주 자동화 paper trading 실행 흐름**:
+   
+   ```
+   Week 0: 초기 설정
+   - 백테스트 IS 수익 기록 (WFE 분모)
+   - PSI reference 분포 저장
+   - paper_trading_start 타임스탬프 저장
+   
+   Week 1~4: 자동 주간 체크 (cron: 매 월요일 09:00 UTC)
+   - 이번 주 PF, MDD, Sharpe, 승률 계산
+   - WFE = 누적 paper 수익 / IS 수익
+   - PSI 드리프트 계산
+   - No-Go 조건 해당 시 자동 trading_disabled + Telegram 경고
+   - 주간 요약 Telegram 전송
+   
+   Week 4: 최종 Go/No-Go 판정
+   - 전체 4주 메트릭 집계
+   - 5% 급락 구간 포함 여부 확인
+   - 모든 Go 조건 통과 시: Telegram "PAPER PASS — 실전 전환 준비" 알림
+   - 미통과 시: 추가 2주 paper 연장 또는 전략 재검토
+   ```
+
+5. **실전 투입 전 최종 체크 — "시스템 안정성 게이트"**:
+   
+   기술 검증 항목 (Freqtrade 기준 확장):
+   - NTP 동기화 확인 (HMAC 서명 클락 오차 방지)
+   - exchange.reload_markets() 주기적 호출 설정 (24시간마다)
+   - liveness probe: 5분마다 exchange.ping() — 3회 연속 실패 시 Telegram + 자동 재시작
+   - data freshness: 마지막 캔들 타임스탬프 현재 시간 대비 2봉 이상 지연 시 재연결
+   - heartbeat: 1시간마다 "운영 중" Telegram 메시지
+
+---
+
+### 이 프로젝트 적용 권장사항
+
+1. **paper trading 최소 4주 기간 설정** — 현재 `live_paper_trader`가 Go/No-Go 판정 기간을 명시하고 있는지 확인 필요. 4주 동안 5% 급락 구간 최소 1회 포함 여부를 자동 체크하는 로직 추가.
+
+2. **WFE >= 0.50 조건을 Go/No-Go 기준에 추가** — 현재 기준(PF >= 1.4, MDD <= 15%)에 WFE >= 0.50 추가. 구현: `WFE = paper_cumulative_return / backtest_is_return`. BacktestEngine IS 수익을 paper 시작 시 저장하고 매주 비교.
+
+3. **systemd unit 파일 설계** — VPS/서버 배포 시 `freqtrade-paper.service` 대신 자체 봇 systemd unit 설계:
+   `Restart=always`, `RestartSec=10s`, `After=network.target`, `StandardOutput=journal`. cron은 주간 WFE 체크 스크립트 실행에만 사용.
+
+4. **Circuit Breaker 3단계 구현** — 현재 API 재연결 로직이 exponential backoff만 구현됐다면, circuit breaker 패턴 추가: (1) 연속 3회 실패 → trading_disabled + Telegram, (2) 5분 대기 후 재시도, (3) 10회 실패 → 완전 중단 + 수동 재시작 플래그.
+
+---
+
+### 출처
+
+- [Bitunix: Common Pitfalls in Crypto Bot Trading (2025)](https://blog.bitunix.com/en/2025/06/02/common-pitfalls-crypto-trading-bots/)
+- [CoinBureau: Crypto Trading Bot Mistakes to Avoid](https://coinbureau.com/guides/crypto-trading-bot-mistakes-to-avoid)
+- [Gainium: Paper Trading Walkthrough Guide (2026)](https://gainium.io/blog/paper-trading-walkthrough-guide)
+- [Darkbot: Trading Bot Checklist 2026](https://darkbot.io/blog/trading-bot-checklist-2026-essential-criteria-for-crypto-success)
+- [Freqtrade Pre-Live Trading Checklist (DEV Community)](https://dev.to/henry_lin_3ac6363747f45b4/lesson-22-freqtrade-pre-live-trading-checklist-1i8e)
+- [AWS Prescriptive Guidance: Retry with Backoff Pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html)
+- [3Commas: AI Trading Bot Risk Management 2025](https://3commas.io/blog/ai-trading-bot-risk-management-guide-2025)
+- [GitHub: mcuadros/ofelia — Docker job scheduler](https://github.com/mcuadros/ofelia)
+- [Linux: Cron Jobs vs Systemd Timers](https://cloudenthusiastic.hashnode.dev/cron-jobs-vs-systemd-timers-when-to-use-what)
+- [Paybis: How to Backtest a Crypto Bot](https://paybis.com/blog/how-to-backtest-crypto-bot/)
+- [ForTraders: Why Most Trading Bots Lose Money](https://www.fortraders.com/blog/trading-bots-lose-money)
+

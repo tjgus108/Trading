@@ -1,39 +1,59 @@
 # Next Steps
 
-_Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
+_Last updated: 2026-04-22 (Cycle 179 D+E+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 177 진행 중
-- 177 mod 5 = 2 → **D(ML) + E(실행) + F(리서치)** 패턴
+### 로테이션: Cycle 179 완료
+- 179 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
 
-### ✅ Cycle 177 완료 사항
+### 🎯 Cycle 180 권장 작업 (180 mod 5 = 0 → A+C+F)
 
-#### D(ML): RegimeDetector 구현 ✅ COMPLETE
-- `src/ml/regime_detector.py` — `RegimeDetector` 구현 완료
-  - ADX(14) Wilder 평활 + ATR(20) EWM 계산
-  - 상태머신: TREND(ADX>25) / RANGE(ATR<ATR_MA & ADX<20) / CRISIS(ATR>2×ATR_MA)
-  - confirm_bars=2 연속 확인 후 전환 (거짓 전환 방지)
-  - `get_position_scale()`: CRISIS=0.5, TREND/RANGE=1.0
-- `tests/test_ml_regime_detector.py` — 16개 테스트 ALL PASS
-- **다음**: RegimeDetector를 RegimeStrategyRouter 또는 live orchestrator에 연결
+#### A(품질): 실데이터 OOS 실행
+- `python3 scripts/run_bundle_oos.py`로 5-Bundle 실데이터 OOS 검증
+- WFE ≥ 0.50, OOS Sharpe ≥ IS×0.60 확인
+- 실패 전략 분석 및 파라미터 조정 여부 판단
 
-#### E(실행): Regime-Aware Strategy Router 통합 ✅ COMPLETE
-- `src/strategy/regime_router.py` — `RegimeStrategyRouter` 구현 완료
-  - `get_active_strategies(regime)`: TREND 7전략 / RANGE 7전략 / CRISIS 전체 반환
-  - `scale_position(regime, base_size)`: CRISIS 0.5x, 나머지 1.0x
-  - `should_skip(strategy, regime)`: 레짐 불일치 전략 스킵, CRISIS는 스킵 없이 크기 감소
-- `tests/test_regime_router.py` — 20개 테스트 ALL PASS
-- **다음**: execution loop(`src/exchange/paper_trader.py` 또는 orchestrator)에 Router 연결 필요
+#### C(데이터): DataFeed 안정성 + 실데이터 수집 검증
+- Bybit 4h봉 데이터 수집 안정성 확인
+- WebSocket reconnect/backoff 로직 검증
+- 레짐 피처 실데이터 파이프라인 E2E 테스트
 
-#### F(리서치): OOS 검증 + 라이브 배포 준비 ✅ COMPLETE
-- Walk-Forward (IS 70%/OOS 30%, Rolling 6m/2m fold) 방법론 확정
-- CPCV 적용 범위: cmf/elder_impulse (파라미터 민감) 우선, rule-based는 WFA로 충분
-- Monte Carlo 기준 확인: p-value < 0.05 (engine.py에 이미 구현)
-- 5-bundle 상관관계 관리: Risk Parity(1/σ) 가중치 권장
-- 라이브 배포 체크리스트 전면 업데이트 (하단 참조)
+#### F(리서치): 포지션 동기화 + 장애 복구 패턴 심화
+- API 장애 시 포지션 동기화 구현 방안 리서치
+- systemd unit 파일 설계 리서치
+- 실전 배포 전 보안 체크리스트 리서치
+
+### ✅ Cycle 179 완료 사항
+
+#### F(리서치): Paper Trading 자동화 + 봇 실패/성공 사례 ✅ COMPLETE
+- 2025-2026 최신 봇 실패 사례: R² < 0.025 (백테스트 Sharpe가 실전 성과 예측 불가), 5월 플래시 크래시($20억 3분 매도), 4가지 구조적 실패 원인 정리
+- Paper trading 권장 기간: 4~8주, 5% 급락 구간 포함 필수
+- 자동 Go/No-Go 판정 기준: PF ≥ 1.4, MDD ≤ 15%, WFE ≥ 0.50, 주간 승률 ≥ 45%
+- 스케줄러 비교: VPS → systemd 권장, Docker → Ofelia 권장
+- API 장애 복구 3패턴: 지수 백오프 + Circuit Breaker + 포지션 동기화
+- **결과물**: `.claude-state/RESEARCH_NOTES.md` Cycle 179 섹션 추가
+
+#### D(ML): RegimeDetector → paper_trader 연결 ✅ COMPLETE
+- `src/exchange/paper_trader.py`에 RegimeDetector/RegimeStrategyRouter/PerformanceMonitor 연결
+- update_regime(df) 매 틱 호출, CRISIS 0.5x 자동 적용, 라우터 스킵 구현
+- `tests/test_paper_trader_regime.py` — 23개 테스트 ALL PASS
+- **다음**: 실데이터로 run_bundle_oos.py 실행 + 4주 paper trading 시작
+
+#### E(실행): 5-Bundle OOS 인프라 + PerformanceMonitor 연결 ✅ COMPLETE
+- `scripts/run_bundle_oos.py` -- 5-Bundle Rolling OOS 검증 실행 스크립트 생성
+  - Bybit 실데이터 수집 (4h 기본, 페이지네이션), 5전략 순차 검증
+  - 요약 테이블 + Fold별 상세 Markdown 리포트 자동 생성
+  - 실행: `python3 scripts/run_bundle_oos.py [--symbol BTC/USDT] [--timeframe 4h]`
+- `scripts/live_paper_trader.py` -- PerformanceMonitor 통합
+  - `LivePerformanceTracker` + `PerformanceMonitor` 초기화
+  - 거래 완료 시 `record_trade()` 자동 호출
+  - 매 tick마다 `check_all()` -- Rolling PF/MDD/Sharpe 추적
+  - MDD >= 10% WARNING, >= 15% CRITICAL -- CircuitBreaker 트리거
+  - 세션 요약에 전략별 Rolling 성과 출력
+- `tests/test_bundle_oos.py` -- 11개 테스트 ALL PASS (기존 88개 영향 없음, 전체 99개 PASS)
 
 ---
 
@@ -54,22 +74,21 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 - MDD ≥ 10% WARNING, ≥ 15% CRITICAL 알림, 레짐 전환 알림
 - **다음**: paper_trader.py에 PerformanceMonitor 연결
 
-### 🎯 Cycle 179 권장 작업 (179 mod 5 = 4 → D+E+F)
+### 🎯 Cycle 180 권장 작업 (180 mod 5 = 0 → A+B+C)
 
-#### D(ML): RegimeDetector → paper_trader 연결
-- RegimeDetector 출력을 paper_trader 루프에 통합
-- 레짐 전환 시 PerformanceMonitor.regime_change_alert() 호출
-- 2봉 연속 확인 후 전략 스위칭 로직
+#### A(전략): RegimeDetector → paper_trader 실제 연결
+- `src/exchange/paper_trader.py` 에 RegimeDetector + RegimeStrategyRouter 통합
+- PerformanceMonitor.regime_change_alert() 호출 연결
+- 2봉 연속 확인 후 전략 스위칭 로직 구현
 
-#### E(실행): 5-Bundle 실데이터 OOS 실행
+#### B(리스크): 5-Bundle 실데이터 OOS 실행
 - Bybit BTCUSDT 4h봉 데이터로 RollingOOSValidator 실행
-- cmf, elder_impulse, wick_reversal, narrow_range, value_area 각각 검증
-- StrategyCorrelationAnalyzer로 상관행렬 실측
+- 5전략 WFE, Sharpe decay, MDD expand 실측
 
-#### F(리서치): Paper Trading 자동화 리서치
-- 4주 paper trading 자동 실행 + 주간 WFE 체크 방법론
-- Go/No-Go 기준 자동 판정 스크립트 설계
-- API 장애 복구 retry/fallback 패턴 리서치
+#### C(데이터): Paper Trading 4주 자동화 스크립트
+- 주간 WFE 체크 자동 스크립트 (cron 기반)
+- Go/No-Go 판정 자동화: PF ≥ 1.4, MDD ≤ 15%, WFE ≥ 0.50
+- 5% 급락 구간 포함 여부 자동 체크
 
 ---
 
@@ -94,16 +113,27 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 - **Fold 단위:** IS 6개월 / OOS 2개월 (3:1), 다음 fold는 2개월씩 슬라이드
 - **WFE 기준:** OOS_ann_profit / IS_ann_profit ≥ 0.50 → PASS
 - **Overfitting 탐지:** OOS Sharpe < IS Sharpe × 0.60 OR OOS MDD > IS MDD × 2.0 → FAIL
-- **Rolling vs Anchored:** Rolling 권장 (intraday 크립토). Anchored는 전체 안정성 보조 확인용
 
 #### CPCV 적용 범위
 - cmf, elder_impulse (파라미터 민감): CPCV 5-fold + 1봉 embargo → DSR 계산
 - wick_reversal, narrow_range, value_area (rule-based): Walk-Forward만으로 충분
-- DSR 계산: `src/backtest/report.py`의 `deflated_sharpe_ratio` 이미 구현됨
 
-#### Monte Carlo 기준 (engine.py 기존 설정 유지)
-- MC_N_PERMUTATIONS = 500, MC_P_THRESHOLD = 0.05
-- 5-bundle IS 평균 Sharpe ~5.5 → OOS 최소 3.3 이상 목표
+---
+
+### 📋 Paper Trading 자동화 판정 기준 (Cycle 179 F 리서치 결과)
+
+| 지표 | Go 조건 | No-Go 트리거 |
+|------|---------|-------------|
+| Profit Factor | ≥ 1.4 | < 1.0 즉시 중단 |
+| MDD | ≤ 15% | > 20% 즉시 중단 |
+| Sharpe (rolling 4주) | ≥ 0.8 | < 0.3 |
+| WFE (OOS/IS 수익 비율) | ≥ 0.50 | < 0.30 |
+| 주간 승률 | ≥ 45% | < 30% |
+| API 에러율 | 0% | ≥ 3% 중단 |
+| PSI 드리프트 | < 0.1 | > 0.2 신호 중단 |
+
+스케줄러: VPS → systemd (`Restart=always`), Docker → Ofelia
+API 복구: 지수 백오프(1/2/4/8/16초) + Circuit Breaker(3회 실패→disabled) + 포지션 동기화
 
 ---
 
@@ -117,15 +147,8 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 
 #### 가중치 방법
 - Risk Parity(1/σ) 권장: 크립토 CVaR 연구에서 하락장 MDD 30% 감소 확인
-- mean-variance 비권장: 하락장 inter-strategy 상관 0.85+ 급증으로 무효화
 - 공식: `w_i = (1/σ_i) / sum(1/σ_j)`, σ = 최근 20거래 수익률 표준편차, 매주 재계산
 - Crisis 레짐 시: 가중치 무관, 전체 포지션 0.5x 적용
-
-#### 신호 충돌 처리
-1. 레짐 필터 우선: TREND → cmf > elder_impulse, RANGE → wick_reversal > value_area
-2. 같은 레짐 같은 방향: 최고 Sharpe 전략 단독 실행 (중복 포지션 금지)
-3. 반대 방향 동시 신호: flat 유지
-4. 신호 만료: 발생 후 2봉 이내 미체결 → 자동 만료
 
 ---
 
@@ -158,7 +181,7 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 
 ---
 
-### 🚀 라이브 배포 체크리스트 (Cycle 177 F 업데이트)
+### 🚀 라이브 배포 체크리스트 (Cycle 179 F 업데이트)
 
 **5-Strategy Bundle:** cmf (TREND, 6.85) / elder_impulse (TREND, 6.29) / wick_reversal (RANGE, 6.51) / narrow_range (RANGE/BO, 4.31) / value_area (RANGE, 5.24)
 
@@ -174,20 +197,19 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 - [ ] 5-strategy 일일 수익률 상관행렬 (목표: |r| < 0.30)
 - [ ] cmf-elder_impulse 상관 > 0.50 시 → TREND 레짐 cmf 단독 전환
 - [ ] Risk Parity 가중치 계산 및 적용
-- [ ] Equal Weight vs Risk Parity OOS 비교
 
 #### Phase 3: 모니터링 인프라 (Cycle 178 C)
 - [ ] Rolling 4주 Sharpe/PF 실시간 추적 (4h 업데이트)
 - [ ] MDD > 10% → Telegram 경고
 - [ ] MDD > 15% → 자동 포지션 청산 + 중단 (circuit breaker)
-- [ ] 레짐 전환 → 2봉 연속 확인 후 전략 스위칭
-- [ ] API 장애: retry 3회(1s/2s/4s) → REST 폴백 → 포지션 청산 + 알림
+- [ ] API 장애: 지수 백오프(1/2/4/8/16초) → Circuit Breaker(3회→disabled) → 포지션 동기화
 
-#### Phase 4: Paper Trading
-- [ ] Regime switching 통합 완료 (D+E Cycle 177 ✅)
+#### Phase 4: Paper Trading (4주 자동화)
+- [ ] Regime switching 통합 완료 (D+E Cycle 179 대기 중)
 - [ ] 레짐별 > 15거래 확인
-- [ ] 4주 paper trading (매주 WFE 확인)
-- [ ] OOS PF > 1.4 달성
+- [ ] 4주 paper trading 자동 실행 (5% 급락 구간 포함 필수)
+- [ ] 주간 WFE 자동 체크 (cron 또는 systemd timer)
+- [ ] Go/No-Go 자동 판정: PF ≥ 1.4, MDD ≤ 15%, WFE ≥ 0.50
 
 #### Go/No-Go 기준
 | 지표 | 기준 |
@@ -198,8 +220,9 @@ _Last updated: 2026-04-21 (Cycle 178 A+B+C 완료)_
 | OOS Sharpe | ≥ 3.0 (IS 5.5 기준 60%) |
 | Regime 정확도 | ≥ 80% |
 | API 장애 복구 | ≤ 30초 |
+| 5% 급락 구간 포함 | 최소 1회 |
 
 ---
 
-**상태**: Cycle 178 A+B+C 완료 → Cycle 179 D+E+F (RegimeDetector 통합 + 실데이터 OOS + Paper Trading 리서치)
-**다음 담당자 접수 사항**: RegimeDetector→paper_trader 연결 + 실데이터 OOS 실행 + Paper Trading 자동화
+**상태**: Cycle 179 D+E+F 완료 → Cycle 180 A(실데이터 OOS 실행) + B(RegimeDetector 통합) + C(paper 자동화)
+**다음 담당자 접수 사항**: `python3 scripts/run_bundle_oos.py` 실행 + RegimeDetector→paper_trader 연결 + 4주 자동 paper trading 스크립트

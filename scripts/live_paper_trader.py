@@ -55,6 +55,7 @@ from src.exchange.health_check import HealthChecker, HealthStatus
 from src.risk.circuit_breaker import CircuitBreaker
 from src.risk.manager import SignalCorrelationTracker
 from src.risk.kelly_sizer import BayesianKellyPositionSizer
+from src.risk.performance_tracker import LivePerformanceTracker, PerformanceMonitor
 from src.ml.drift_detector import AccuracyDriftMonitor
 from src.risk.drawdown_monitor import DriftMonitor, DriftState
 
@@ -394,6 +395,18 @@ class LivePaperTrader:
             on_drift=self._on_return_drift,
         )
 
+        # PerformanceMonitor: Rolling 4주 PF/MDD/Sharpe 추적 + 임계값 알림
+        self._perf_tracker = LivePerformanceTracker()
+        self._perf_monitor = PerformanceMonitor(
+            tracker=self._perf_tracker,
+            on_alert=self._performance_alert,
+            sharpe_warn=1.0,
+            pf_warn=1.4,
+            mdd_warn_pct=0.10,
+            mdd_halt_pct=0.15,
+            check_interval=14400.0,  # 4시간 쿨다운
+        )
+
         # BayesianKelly 포지션 사이저: warmup 50거래 → 자동 Bayesian Kelly 활성화
         self._bayesian_kelly = BayesianKellyPositionSizer(
             prior_alpha=2.0,
@@ -447,6 +460,17 @@ class LivePaperTrader:
             # CircuitBreaker 내부 상태를 직접 세팅 (force trigger)
             self.circuit_breaker._triggered = True
             self.circuit_breaker._reason = f"DriftMonitor: {reason}"
+
+    def _performance_alert(self, level: str, message: str) -> None:
+        """PerformanceMonitor 알림 콜백 — 로그 출력 + CRITICAL 시 CircuitBreaker 트리거."""
+        if level == "CRITICAL":
+            logger.critical("PerformanceMonitor CRITICAL: %s", message)
+            self.circuit_breaker._triggered = True
+            self.circuit_breaker._reason = f"PerformanceMonitor: {message}"
+        elif level == "WARNING":
+            logger.warning("PerformanceMonitor WARNING: %s", message)
+        else:
+            logger.info("PerformanceMonitor: %s", message)
 
     def _restore_bayesian_kelly_state(self):
         """이전 세션의 BayesianKelly 상태 복원 (LiveState에서)."""
@@ -587,6 +611,23 @@ class LivePaperTrader:
         })
 
         self.circuit_breaker.tick_cooldown()
+
+        # PerformanceMonitor: 전략별 Rolling PF/MDD/Sharpe 체크 + 알림
+        all_strategy_names = []
+        for sym_strats in self.state.active_strategies.values():
+            for s in sym_strats:
+                # pos_key format: "symbol:strategy"
+                for symbol in SYMBOLS:
+                    key = f"{symbol}:{s}"
+                    if key not in all_strategy_names:
+                        all_strategy_names.append(key)
+        if all_strategy_names:
+            perf_results = self._perf_monitor.check_all(all_strategy_names)
+            critical = [k for k, v in perf_results.items() if v["level"] == "CRITICAL"]
+            if critical:
+                logger.critical(
+                    "PerformanceMonitor CRITICAL strategies: %s", critical
+                )
 
         now = time.time()
         if self.ml_filter_enabled and now - self._last_retrain_time >= WEEKLY_RETRAIN_INTERVAL:
@@ -918,6 +959,14 @@ class LivePaperTrader:
                 # BayesianKelly posterior 업데이트 (모든 거래 결과 반영)
                 self._bayesian_kelly.update(pnl)
 
+                # PerformanceMonitor에 거래 기록 (rolling PF/MDD/Sharpe 추적)
+                self._perf_tracker.record_trade(
+                    strategy=name,
+                    pnl=pnl,
+                    entry_price=pos["entry"],
+                    exit_price=exit_price,
+                )
+
                 # Update regime-based performance tracking
                 is_win = pnl > 0
                 regime = self.state.regime_states.get(symbol, {}).get("regime", "N/A")
@@ -1091,6 +1140,22 @@ class LivePaperTrader:
             f"posterior_mean={bk.posterior_mean:.3f} | alpha={bk.alpha:.1f} beta={bk.beta:.1f}"
         )
 
+        # PerformanceMonitor 요약: 전략별 Rolling Sharpe/PF/MDD
+        lines.append(f"\nPerformance Monitor (Rolling 30-trade):")
+        for sym_strats in self.state.active_strategies.values():
+            for s in sym_strats:
+                for symbol in SYMBOLS:
+                    key = f"{symbol}:{s}"
+                    summary = self._perf_tracker.get_summary(key)
+                    if summary["total_trades"] > 0:
+                        sharpe_str = f"{summary['live_sharpe']:.2f}" if summary["live_sharpe"] is not None else "N/A"
+                        pf_str = f"{summary['rolling_pf']:.2f}" if summary["rolling_pf"] is not None else "N/A"
+                        lines.append(
+                            f"  {key:30s} — trades={summary['total_trades']:3d}, "
+                            f"Sharpe={sharpe_str}, PF={pf_str}, "
+                            f"MDD={summary['rolling_mdd']:.1%}"
+                        )
+
         lines.append(f"\nDaily P&L Log ({len(self.state.daily_pnl_log)} days):")
         if self.state.daily_pnl_log:
             for entry in self.state.daily_pnl_log[-7:]:  # 최근 7일
@@ -1098,7 +1163,7 @@ class LivePaperTrader:
                     f"  {entry['date']} — {entry['trades']} trades, "
                     f"${entry['pnl']:+7.2f} PnL"
                 )
-        
+
         lines.append("="*70 + "\n")
         summary_text = "\n".join(lines)
         logger.info(summary_text)

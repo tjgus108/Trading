@@ -1,5 +1,28 @@
 # Work Log
 
+## [2026-04-22] Cycle 179 — D (ML) + E (실행) + F (리서치)
+
+**[D] RegimeDetector → paper_trader 통합:**
+- `src/exchange/paper_trader.py`에 RegimeDetector/RegimeStrategyRouter/PerformanceMonitor 연결
+- `update_regime(df)`: 매 틱 호출 → 전환 시 regime_change_alert() 발행
+- `get_position_scale()`: CRISIS=0.5, 나머지=1.0
+- `should_skip_strategy()` / `get_active_strategies()`: router 위임
+- `execute_signal()`: CRISIS 자동 0.5배, 라우터 스킵 시 skipped 반환
+- `tests/test_paper_trader_regime.py` — 23개 테스트 ALL PASS
+
+**[E] 5-Bundle OOS 인프라 + PerformanceMonitor 연결:**
+- `scripts/run_bundle_oos.py` — 5-Bundle Rolling OOS 검증 스크립트 (Bybit 실데이터, 요약 테이블)
+- `scripts/live_paper_trader.py` — PerformanceMonitor 통합 (record_trade, check_all, CRITICAL→CB)
+- `tests/test_bundle_oos.py` — 11개 테스트 ALL PASS
+
+**[F] 리서치: Paper Trading 자동화 + 봇 실패/성공:**
+- 실패: R²<0.025 (백테스트 Sharpe 실전 예측 불가), 78% 전략 OOS Sharpe 63% 하락
+- Paper 권장: 4~8주, 5% 급락 포함 필수. Go/No-Go: PF≥1.4, MDD≤15%, WFE≥0.50
+- 스케줄러: VPS→systemd, Docker→Ofelia. API 복구: 지수백오프+CB+포지션동기화
+- `.claude-state/RESEARCH_NOTES.md` Cycle 179 섹션 추가
+
+**총 34개 신규 테스트 ALL PASS, 기존 테스트 정상**
+
 ## [2026-04-21] Cycle 178 — A (전략) + B (리스크) + C (데이터)
 
 **[A] Rolling OOS Validator 구현:**
@@ -13750,3 +13773,6 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-21 12:23 UTC] Cycle 176 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-21 18:57 UTC] Cycle 178 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
