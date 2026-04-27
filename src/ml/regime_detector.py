@@ -12,10 +12,12 @@ RegimeDetector: ADX(14) + ATR(20) 기반 상태머신으로 시장 레짐 감지
 
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 from typing import List, Optional
 
+logger = logging.getLogger(__name__)
 
 REGIMES = ("TREND", "RANGE", "CRISIS")
 DEFAULT_REGIME = "RANGE"
@@ -46,9 +48,33 @@ class RegimeDetector:
 
     # ── public interface ──────────────────────────────────────────────────────
 
+    @property
+    def minimum_warmup_bars(self) -> int:
+        """ADX/ATR 계산에 필요한 최소 데이터 포인트 수."""
+        return max(self.adx_period + 1, self.atr_period + self.atr_ma_period)
+
     def detect(self, df: pd.DataFrame) -> str:
-        """OHLCV DataFrame을 받아 현재 레짐 문자열 반환."""
-        if df is None or len(df) < max(self.adx_period + 1, self.atr_period + self.atr_ma_period):
+        """OHLCV DataFrame을 받아 현재 레짐 문자열 반환.
+
+        데이터 부족/NaN 과다 시 이전 레짐 유지 (안전 fallback).
+        """
+        if df is None or len(df) < self.minimum_warmup_bars:
+            logger.debug(
+                "RegimeDetector: insufficient data (%d bars, need %d), keeping %s",
+                0 if df is None else len(df),
+                self.minimum_warmup_bars,
+                self._current_regime,
+            )
+            return self._current_regime
+
+        # 데이터 갭 안전 처리: OHLCV NaN 비율 체크
+        ohlcv_cols = ["high", "low", "close"]
+        nan_ratio = df[ohlcv_cols].iloc[-self.minimum_warmup_bars:].isna().mean().max()
+        if nan_ratio > 0.1:
+            logger.warning(
+                "RegimeDetector: high NaN ratio (%.1f%%) in recent %d bars, keeping %s",
+                nan_ratio * 100, self.minimum_warmup_bars, self._current_regime,
+            )
             return self._current_regime
 
         adx = self._calc_adx(df)

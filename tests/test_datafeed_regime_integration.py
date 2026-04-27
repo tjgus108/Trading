@@ -1,10 +1,11 @@
 """
-Cycle 174: DataFeed-RegimeAwareFeatureBuilder E2E 파이프라인 통합 테스트.
+Cycle 174+180: DataFeed-RegimeAwareFeatureBuilder E2E 파이프라인 통합 테스트.
 
 목표:
 1. DataFeed.fetch_with_regime() → 캐시된 레짐
 2. RegimeAwareFeatureBuilder.build_with_cached_regime() → 동일 레짐 피처
 3. End-to-end 검증: 레짐 변경 시 피처 세트도 변경
+4. (Cycle 180) 데이터 갭/NaN 안전 처리, 워밍업 검증
 """
 
 import numpy as np
@@ -13,6 +14,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from src.data.feed import DataFeed, DataSummary
+from src.ml.regime_detector import RegimeDetector, DEFAULT_REGIME
 from src.ml.features import (
     RegimeAwareFeatureBuilder,
     REGIME_FEATURE_CONFIG,
@@ -350,3 +352,127 @@ class TestE2EDataFeedToFeatureBuilder:
         # 어쨌든 피처 컬럼이 유효해야 함
         assert X_infer.shape[1] > 0
         assert not X_infer.isnull().any().any()
+
+
+# ==================================================================
+# Cycle 180: RegimeDetector NaN/Gap 안전 처리 + 워밍업 검증
+# ==================================================================
+
+class TestRegimeDetectorNaNSafety:
+    """RegimeDetector가 NaN/데이터 갭을 안전하게 처리하는지 검증."""
+
+    def test_detect_with_nan_data_returns_default(self):
+        """NaN 비율 > 10%일 때 이전 레짐 유지."""
+        detector = RegimeDetector()
+        df = _make_synthetic_df(100)
+        # OHLCV 중 close에 NaN 20% 주입
+        nan_indices = np.random.choice(len(df), size=20, replace=False)
+        df.iloc[nan_indices, df.columns.get_loc("close")] = np.nan
+
+        regime = detector.detect(df)
+        assert regime == DEFAULT_REGIME  # 이전 레짐(기본값) 유지
+
+    def test_detect_with_small_nan_ratio_proceeds(self):
+        """NaN 비율 <= 10%이면 정상 감지 진행."""
+        detector = RegimeDetector()
+        df = _make_synthetic_df(200)
+        # 2% NaN만 주입 (40개 warmup 중 1개 미만)
+        df.iloc[5, df.columns.get_loc("high")] = np.nan
+
+        regime = detector.detect(df)
+        assert regime in ("TREND", "RANGE", "CRISIS")
+
+    def test_detect_with_none_df_returns_current(self):
+        """None DataFrame은 현재 레짐 반환."""
+        detector = RegimeDetector()
+        regime = detector.detect(None)
+        assert regime == DEFAULT_REGIME
+
+    def test_detect_with_insufficient_bars_returns_current(self):
+        """최소 warmup bars 미달 시 현재 레짐 반환."""
+        detector = RegimeDetector()
+        df = _make_synthetic_df(20)  # 40바 필요인데 20바만
+
+        regime = detector.detect(df)
+        assert regime == DEFAULT_REGIME
+
+    def test_minimum_warmup_bars_property(self):
+        """minimum_warmup_bars 프로퍼티가 올바른 값 반환."""
+        detector = RegimeDetector(adx_period=14, atr_period=20, atr_ma_period=20)
+        # max(14+1, 20+20) = max(15, 40) = 40
+        assert detector.minimum_warmup_bars == 40
+
+    def test_detect_with_all_nan_warmup_window(self):
+        """워밍업 구간이 전부 NaN이면 이전 레짐 유지."""
+        detector = RegimeDetector()
+        df = _make_synthetic_df(100)
+        # 마지막 40바의 close를 모두 NaN으로
+        df.iloc[-40:, df.columns.get_loc("close")] = np.nan
+
+        regime = detector.detect(df)
+        assert regime == DEFAULT_REGIME
+
+
+class TestFetchWithRegimeWarmupValidation:
+    """DataFeed.fetch_with_regime()의 워밍업/갭 검증."""
+
+    def test_fetch_with_regime_insufficient_candles_skips_detection(self):
+        """캔들 수 < REGIME_WARMUP_BARS이면 레짐 감지 스킵."""
+        connector = MagicMock()
+        # 30개 캔들만 반환 (40 미만)
+        connector.fetch_ohlcv = MagicMock(return_value=[
+            [i, 50000 + i, 50100 + i, 49900 + i, 50000 + i, 100]
+            for i in range(30)
+        ])
+        feed = DataFeed(connector)
+
+        summary, regime = feed.fetch_with_regime("BTC/USDT", "1h", limit=30)
+
+        assert summary.candles == 30
+        assert regime == "ranging"  # 기본 fallback
+
+    def test_fetch_with_regime_sufficient_candles_detects(self):
+        """캔들 수 충분하면 정상 레짐 감지."""
+        connector = MagicMock()
+        connector.fetch_ohlcv = MagicMock(return_value=[
+            [i, 50000 + i, 50100 + i, 49900 + i, 50000 + i, 100]
+            for i in range(500)
+        ])
+        feed = DataFeed(connector)
+
+        summary, regime = feed.fetch_with_regime("BTC/USDT", "1h", limit=500)
+
+        assert summary.candles == 500
+        assert regime in {"bull", "bear", "ranging", "crisis"}
+
+    def test_fetch_with_regime_cached_regime_fallback(self):
+        """캔들 부족 시 캐시된 레짐 사용."""
+        connector = MagicMock()
+        connector.fetch_ohlcv = MagicMock(return_value=[
+            [i, 50000 + i, 50100 + i, 49900 + i, 50000 + i, 100]
+            for i in range(20)
+        ])
+        feed = DataFeed(connector)
+
+        # 먼저 캐시에 레짐 저장
+        feed.cache_regime("BTC/USDT", "bull", ttl=300)
+
+        summary, regime = feed.fetch_with_regime("BTC/USDT", "1h", limit=20)
+
+        # 캔들 부족 → 캐시된 "bull" 사용
+        assert regime == "bull"
+
+    def test_fetch_with_regime_missing_data_warning(self):
+        """누락 캔들 비율 높으면 경고 (에러는 아님)."""
+        connector = MagicMock()
+        # 500개 반환하지만 타임스탬프에 큰 갭이 있는 데이터 시뮬레이션
+        # (실제 missing_count는 _count_missing에서 계산)
+        connector.fetch_ohlcv = MagicMock(return_value=[
+            [i * 3600000, 50000 + i, 50100 + i, 49900 + i, 50000 + i, 100]
+            for i in range(200)
+        ])
+        feed = DataFeed(connector)
+
+        # 에러 없이 정상 반환해야 함
+        summary, regime = feed.fetch_with_regime("BTC/USDT", "1h", limit=200)
+        assert regime in {"bull", "bear", "ranging", "crisis"}

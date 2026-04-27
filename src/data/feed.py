@@ -885,22 +885,25 @@ class DataFeed:
             # 캐시된 레짐 반환 또는 None (fallback)
             return self.get_cached_regime(symbol) or "ranging"
 
+    # Minimum bars needed for RegimeDetector (ADX14 + ATR20/MA20 warmup)
+    REGIME_WARMUP_BARS = 40
+
     def fetch_with_regime(
         self, symbol: str, timeframe: str, limit: int = 500
     ) -> tuple:
         """
         OHLCV 데이터 fetch + 레짐 감지 (end-to-end 파이프라인).
-        
+
         DataFeed → detect_regime() → RegimeAwareFeatureBuilder 연결점.
-        
+
         Args:
             symbol: 거래 심볼
             timeframe: 타임프레임
             limit: 캔들 개수
-        
+
         Returns:
             (DataSummary, regime_str): 데이터 + 감지된 레짐
-        
+
         Example:
             >>> feed = DataFeed(connector)
             >>> summary, regime = feed.fetch_with_regime("BTC/USDT", "1h")
@@ -910,11 +913,29 @@ class DataFeed:
         """
         # 일반 fetch 수행
         summary = self.fetch(symbol, timeframe, limit)
-        
+
+        # 워밍업 검증: 캔들 수 부족하면 레짐 감지 스킵
+        if summary.candles < self.REGIME_WARMUP_BARS:
+            logger.warning(
+                "DataFeed: %s %s — only %d candles (need >=%d for regime), skipping detection",
+                symbol, timeframe, summary.candles, self.REGIME_WARMUP_BARS,
+            )
+            regime = self.get_cached_regime(symbol) or "ranging"
+            return summary, regime
+
+        # 데이터 갭 검증: 누락률이 높으면 레짐 감지 신뢰도 경고
+        if summary.candles > 0 and summary.missing > 0:
+            missing_ratio = summary.missing / summary.candles
+            if missing_ratio > 0.1:
+                logger.warning(
+                    "DataFeed: %s %s — %.1f%% missing candles, regime detection may be unreliable",
+                    symbol, timeframe, missing_ratio * 100,
+                )
+
         # 레짐 감지 + 캐싱 (TTL은 effective_ttl 기반)
         effective_ttl = int(self._effective_ttl(symbol))
         regime = self.detect_and_cache_regime(symbol, summary.df, ttl=effective_ttl)
-        
+
         logger.info(
             "DataFeed: %s %s — regime=%s, candles=%d",
             symbol, timeframe, regime, summary.candles

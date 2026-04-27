@@ -467,8 +467,13 @@ class RollingOOSValidator:
             is_result = engine.run(strategy, is_df)
             oos_result = engine.run(strategy, oos_df)
 
-            is_sharpe = max(is_result.sharpe_ratio, 0.001)
-            wfe = oos_result.sharpe_ratio / is_sharpe if is_sharpe > 0 else 0.0
+            # WFE 계산: BacktestEngine.apply_wfe와 동일 로직
+            if is_result.sharpe_ratio > 0:
+                wfe = oos_result.sharpe_ratio / is_result.sharpe_ratio
+            elif oos_result.sharpe_ratio > 0:
+                wfe = 1.0  # IS<=0 but OOS>0 → 과최적화 아님
+            else:
+                wfe = 0.0  # IS<=0 and OOS<=0 → 과최적화 가능
 
             fold_fails = []
             if wfe < self.min_wfe:

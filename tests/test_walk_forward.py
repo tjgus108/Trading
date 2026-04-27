@@ -303,3 +303,122 @@ def test_ratio_negative_is_positive_oos():
         ratio2 = 0.0
 
     assert ratio2 == 0.0, f"IS<=0 OOS<=0 should be overfit (ratio=0.0), got {ratio2}"
+
+
+# ---------------------------------------------------------------------------
+# RollingOOSValidator 테스트 (Cycle 180)
+# ---------------------------------------------------------------------------
+
+class AlwaysSellStrategy(BaseStrategy):
+    """항상 SELL 신호 → 하락장에서 수익."""
+    name = "always_sell"
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        return Signal(
+            action=Action.SELL,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test",
+            invalidation="none",
+        )
+
+
+def make_oos_df(n: int = 2000) -> pd.DataFrame:
+    """RollingOOSValidator용 대형 DataFrame (기본 IS 1080 + OOS 360 = 1440 필요)."""
+    np.random.seed(42)
+    closes = 100.0 * np.cumprod(1 + 0.0005 + np.random.randn(n) * 0.002)
+    highs = closes * 1.005
+    lows = closes * 0.995
+    atr14 = np.full(n, 1.0)
+    return pd.DataFrame({"close": closes, "high": highs, "low": lows, "atr14": atr14})
+
+
+# 테스트 15: RollingOOSValidator 인스턴스 생성
+def test_rolling_oos_instantiation():
+    from src.backtest.walk_forward import RollingOOSValidator
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50)
+    assert v.is_bars == 100
+    assert v.oos_bars == 50
+    assert v.slide_bars == 50
+
+
+# 테스트 16: 데이터 부족 시 graceful 처리
+def test_rolling_oos_insufficient_data():
+    from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+    v = RollingOOSValidator(is_bars=1080, oos_bars=360)
+    df = make_df(500)  # 500 < 1080 + 360
+    result = v.validate(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BundleOOSResult)
+    assert not result.all_passed
+    assert len(result.folds) == 0
+    assert "데이터 부족" in result.fail_reasons[0]
+
+
+# 테스트 17: 빈 데이터 (0행)
+def test_rolling_oos_empty_data():
+    from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+    v = RollingOOSValidator(is_bars=100, oos_bars=50)
+    df = pd.DataFrame({"close": [], "high": [], "low": [], "atr14": []})
+    result = v.validate(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BundleOOSResult)
+    assert not result.all_passed
+    assert len(result.folds) == 0
+
+
+# 테스트 18: 정확히 최소 데이터 (is_bars + oos_bars)로 1 fold 생성
+def test_rolling_oos_exact_minimum_data():
+    from src.backtest.walk_forward import RollingOOSValidator
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50)
+    df = make_oos_df(150)  # 정확히 100 + 50
+    result = v.validate(AlwaysBuyStrategy(), df)
+    assert len(result.folds) == 1
+
+
+# 테스트 19: WFE 계산 — IS Sharpe 음수일 때 올바른 처리
+def test_rolling_oos_wfe_negative_is_sharpe():
+    """IS Sharpe가 음수일 때 WFE가 apply_wfe와 동일 로직으로 계산되는지 검증."""
+    from src.backtest.walk_forward import RollingOOSValidator
+    # 작은 윈도우로 빠른 검증
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50)
+    df = make_oos_df(200)
+    result = v.validate(HoldStrategy(), df)
+    # HoldStrategy는 거래 없음 → Sharpe 0 또는 매우 낮음
+    for fold in result.folds:
+        # WFE는 0.0 또는 1.0 (음수 IS 처리에 따라)이어야 함
+        # 절대로 극단적 큰 값(>10)이 되면 안 됨
+        assert fold.wfe <= 10.0, f"WFE too large: {fold.wfe} (broken negative IS handling)"
+
+
+# 테스트 20: 여러 fold가 올바르게 슬라이드되는지 확인
+def test_rolling_oos_multiple_folds():
+    from src.backtest.walk_forward import RollingOOSValidator
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50)
+    df = make_oos_df(400)  # 100+50=150, 슬라이드 50씩 → 여러 fold
+    result = v.validate(AlwaysBuyStrategy(), df)
+    # 400봉, start=0→end=150, start=50→end=200, ..., start=200→end=350, start=250→end=400
+    assert result.folds is not None
+    assert len(result.folds) >= 2
+    # fold_id는 순차적
+    for i, fold in enumerate(result.folds):
+        assert fold.fold_id == i
+
+
+# 테스트 21: BundleOOSResult.summary() 포맷 검증
+def test_bundle_oos_result_summary_format():
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.5, oos_sharpe=1.0,
+        is_mdd=0.05, oos_mdd=0.08, wfe=0.667,
+        oos_pf=1.8, oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.667, avg_oos_sharpe=1.0, avg_oos_pf=1.8,
+        all_passed=True, fail_reasons=[],
+    )
+    summary = result.summary()
+    assert "test_strat" in summary
+    assert "PASS" in summary
+    assert "0.667" in summary

@@ -499,3 +499,207 @@
 - [Paybis: How to Backtest a Crypto Bot](https://paybis.com/blog/how-to-backtest-crypto-bot/)
 - [ForTraders: Why Most Trading Bots Lose Money](https://www.fortraders.com/blog/trading-bots-lose-money)
 
+
+## Cycle 180 Research Notes — Paper-to-Live 전환 실패 + 포지션 동기화 + systemd 운영
+
+### 주제 1: Paper-to-Live 전환 실패 사례 (2025-2026)
+
+#### 핵심 인사이트
+
+1. **Paper 결과가 Live보다 15~30% 과대평가됨 — 구조적 원인** — Alpaca Markets 2025 데이터: paper trading은 평균 15~30% 성과를 과대평가. Interactive Brokers 분석: 이 실행 차이가 paper 20% 수익을 실전 손익분기점으로 만들 수 있음. 구체적 원인:
+   - **슬리피지**: BTC/USDT $10K 주문 기준 일반 구간 0.1% 미만, 변동성 구간(ATR 상위 20%) 0.3~1.5%로 폭등
+   - **수수료 누적**: 그리드 봇 ETH/USDT paper 1%/일 → 수수료(0.055% taker) + 슬리피지 + 펀딩비 = 실질 수익 거의 0
+   - **시장 충격(Market Impact)**: 대형 주문이 실전에서 체결 전에 가격을 밀어냄 — paper에서는 미반영
+   - **체결 지연**: retail 봇은 기관 봇보다 수백 배 느림 — 유효 진입 윈도우를 놓침
+
+2. **2025년 5월 플래시 크래시 — 실행 지연이 치명적** — AI 봇들이 경제 지표 발표 직후 3분 내 $20억 매도. 시장가 주문이 order book 유동성을 소진시킨 구간에서 잔여 봇들의 슬리피지가 폭발적으로 증가. 평상시 0.1% 슬리피지 → 급락 구간 2~5%+로 확대. 교훈: **변동성 레짐 감지 없이 시장가 주문을 쓰는 봇은 위기 시 자기강화 손실 구조**.
+
+3. **첫 1주일 발생 주요 문제 5가지** — 커뮤니티 실사례 집계:
+   - **주문 미체결 누적**: 지정가 주문이 변동성 구간에서 체결 안 됨 → 봇은 "체결됨"으로 착각 → 포지션 불일치
+   - **rate limit 충돌**: 첫 실전에서 신호 빈도가 paper보다 높아지며 API 429 에러 → 봇 중단
+   - **자본 규모 부족**: 소자본 봇이 거래소 최소 주문 금액($5~$10)보다 작은 포지션 계산 → 주문 거부
+   - **레짐 미스매치**: paper 기간이 상승장이었다가 실전 첫 주에 횡보/하락 레짐 진입 → 전략 붕괴
+   - **미청산 포지션 방치**: API 오류로 exit 신호가 전달 안 됨 → 포지션이 수일간 방치
+
+4. **자본 규모별 현실적 포지션 사이징** — 업계 커뮤니티 기준(1~2% risk/trade 규칙):
+   
+   | 자본 규모 | 1% 리스크/거래 | 2% 리스크/거래 | 권장 최대 포지션 | 적정 전략 |
+   |-----------|--------------|--------------|----------------|---------|
+   | $1,000 | $10 | $20 | $100~$200 | 스윙(4h+), DCA |
+   | $10,000 | $100 | $200 | $1,000~$2,000 | 스윙, 트렌드팔로잉 |
+   | $100,000 | $1,000 | $2,000 | $10,000~$20,000 | 다전략 포트폴리오 |
+   
+   $1K 이하는 수수료 round-trip 0.11%가 0.2% 목표 수익의 55%를 잠식 — 수학적으로 스캘핑 불가. $10K+부터 스윙 전략 수익 구조 성립.
+
+5. **크립토 봇의 실전 평균 수명** — 73%가 6개월 내 실패. 성공한 봇도 평균 3~6개월 후 성과 저하(레짐 전환 + 전략 decay). 예외: 구조적 엣지 기반 봇(차익거래, DCA 파라미터 정밀 검증)은 12개월+ 유지 사례 존재. Crypto Quant Strategy Index (2025년 7월): AI-assisted ROI 6개월 34%, 완전자동 29%, 수동 19% — **모두 레짐 안정 구간 기준으로 레짐 전환 시 급락 가능**.
+
+---
+
+### 주제 2: 포지션 동기화 패턴 (봇 재시작 시)
+
+#### 핵심 인사이트
+
+1. **Freqtrade의 알려진 재시작 버그 (Issue #10436)** — 미체결 진입 주문이 있는 상태에서 봇 재시작 시, 봇이 해당 주문을 "이미 체결된 포지션"으로 잘못 인식. 결과: 해당 페어가 거래 불가 상태가 됨 + 불필요한 손절 주문 생성. 2025년 5월 Freqtrade 2025.5 버전에서도 재시작 시 포지션 처리 에러 보고됨. **교훈: 봇 재시작은 항상 거래소 실제 상태 대조가 필수.**
+
+2. **ccxt 포지션 동기화 패턴 — 표준 구현** — 재시작 시 동기화 절차:
+   ```python
+   # Step 1: 거래소 실제 상태 조회
+   open_positions = exchange.fetch_positions()   # 선물: 실제 보유 포지션
+   open_orders = exchange.fetch_open_orders()    # 미체결 주문 (진입 대기 포함)
+   
+   # Step 2: 내부 상태와 비교
+   for pos in open_positions:
+       if pos['contracts'] > 0:
+           # 거래소에 포지션 있음 → 내부 상태에 없으면 "orphan position"
+           sync_internal_state(pos)
+   
+   # Step 3: 미체결 주문 처리
+   for order in open_orders:
+       if order not in internal_orders:
+           # 알 수 없는 주문 → 취소 또는 hold 결정
+           handle_unknown_order(order)  # 권장: hold (강제 취소 금지)
+   ```
+   **주의**: `fetch_positions()`는 exchange마다 반환 구조가 다름. Bybit Futures는 `symbol`, `side`, `contracts`, `entryPrice`, `unrealizedPnl` 포함.
+
+3. **동기화 실패 시 안전 폴백 전략** — 업계 표준:
+   - **기본 원칙**: "알 수 없는 포지션은 hold, 강제 청산 금지" (Cryptohopper Auto Sync 패턴)
+   - **이유**: 강제 청산 시 슬리피지 + 잘못된 타이밍의 이중 비용 발생 가능
+   - **안전한 폴백 절차**: (1) 불일치 포지션 감지 → (2) Telegram 알림 발송 → (3) trading_disabled 플래그 → (4) 수동 확인 후 재개
+   - **예외**: 포지션이 손절 레벨을 이미 초과한 경우 → 자동 청산 허용 (사전 정의된 비상 청산 조건)
+
+4. **Freqtrade의 재시작 복구 메커니즘** — 공식 설계:
+   - DB에 열린 거래 기록 유지 → 재시작 시 DB와 거래소 상태 대조
+   - `open_trade_count` 확인 후 새 신호 차단 또는 허용 결정
+   - `/reload_config` 커맨드: config/전략 변경 후 재시작 없이 반영 (상태 보존)
+   - **권장**: 재시작 전 열린 포지션 0 상태 만들기 (가능하면). 불가능하면 DB 백업 후 재시작.
+
+5. **ccxt rate limit 고려사항** — 동기화 시 API 호출 주의:
+   - `fetch_positions()` + `fetch_open_orders()` 동시 호출 시 rate limit 초과 위험
+   - 권장: 재시작 시 순차 호출 (positions → orders → 내부 상태 업데이트)
+   - WebSocket 활용: 폴링 대신 실시간 포지션 업데이트 수신 (Bybit: `positions` channel)
+   - ccxt `options.enableRateLimit = True` 설정으로 자동 429 처리
+
+---
+
+### 주제 3: systemd 운영 안정성
+
+#### 핵심 인사이트
+
+1. **크립토 봇용 systemd unit 파일 모범 사례** — Freqtrade 공식 + 업계 권장:
+   ```ini
+   [Unit]
+   Description=Crypto Trading Bot
+   After=network-online.target
+   Wants=network-online.target
+   
+   [Service]
+   Type=notify
+   User=botuser
+   WorkingDirectory=/opt/tradingbot
+   ExecStart=/opt/tradingbot/venv/bin/python -m src.main --logfile journald
+   Restart=always
+   RestartSec=10s
+   StartLimitIntervalSec=120
+   StartLimitBurst=5
+   
+   # Watchdog: 봇이 30초마다 heartbeat를 systemd에 전송해야 함
+   # 미전송 시 systemd가 봇 강제 재시작
+   WatchdogSec=60s
+   
+   # 리소스 제한
+   MemoryMax=512M
+   CPUQuota=50%
+   
+   # 로그
+   StandardOutput=journal
+   StandardError=journal
+   SyslogIdentifier=tradingbot
+   
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   `WatchdogSec`: 봇이 `sd_notify("WATCHDOG=1")`을 주기적으로 전송해야 함. Freqtrade는 `internals.sd_notify: true` 설정으로 활성화. Docker 컨테이너 내에서는 sd_notify가 작동 안 함 — 주의.
+
+2. **로그 로테이션: journald vs logrotate** — 비교:
+   
+   | 방법 | 장점 | 단점 | 권장 용도 |
+   |------|------|------|---------|
+   | **journald** | systemd 통합, 자동 로테이션, `journalctl -u` 필터링 | 바이너리 형식 — 직접 grep 불가 | systemd 서비스 실시간 로그 |
+   | **logrotate** | 텍스트 파일, 외부 도구 통합 쉬움, 압축 지원 | 별도 설정 필요 | 파일 기반 앱 로그 |
+   
+   journald 용량 제한 설정 (`/etc/systemd/journald.conf`):
+   ```ini
+   SystemMaxUse=500M       # 전체 로그 최대 500MB
+   SystemMaxFileSize=50M   # 개별 파일 최대 50MB
+   MaxRetentionSec=7d      # 7일 이상 로그 자동 삭제
+   ```
+   Freqtrade 권장: `--logfile journald` 옵션으로 journald에 직접 전송, `journalctl -f -u tradingbot.service`로 실시간 확인.
+
+3. **프로세스 모니터링: supervisor vs systemd vs pm2 비교**:
+   
+   | 도구 | 자동 재시작 | 로그 관리 | 의존성 관리 | HTTP 대시보드 | 권장 환경 |
+   |------|------------|---------|------------|------------|---------|
+   | **systemd** | O (Restart=always) | journald 통합 | O (After=) | X | Linux 서버/VPS (권장) |
+   | **supervisor** | O | 자체 logrotate | 제한적 | O (9001포트) | 개발/스테이징 |
+   | **pm2** | O | pm2 logs | X | O (pm2 monit) | Node.js 친화적 |
+   | **Docker** | O (--restart=always) | json-file/journald | O (compose) | O (portainer) | 클라우드 배포 |
+   
+   **순수 Python 봇 Linux VPS → systemd 단독 권장**: 추가 데몬 없이 OS 수준 안정성 확보.
+
+4. **장기 운영 시 발생하는 문제들 (6개월+ 실사례)**:
+   - **메모리 리크**: DataFrame 누적 (미정리 히스토리 캐시), ccxt 미닫힌 연결 → 1~2개월 후 OOM 킬. 해결: 주기적 `gc.collect()`, DataFrame slice 대신 새 할당
+   - **디스크 풀**: 로그 파일 무한 증가 (journald 제한 미설정 시 수 GB), SQLite DB 비대화 (거래 기록 1년+) → systemd 강제 종료. 해결: journald `SystemMaxUse=500M` + DB 아카이브 스크립트
+   - **시계 오차(Clock Drift)**: VPS에서 NTP 비동기화 발생 시 HMAC 서명 실패 → API 거부. 해결: `chronyc tracking` 정기 확인, systemd-timesyncd 활성화
+   - **ccxt 세션 만료**: exchange 객체를 24시간+ 유지 시 세션 쿠키/토큰 만료 → 인증 에러. 해결: `exchange.reload_markets()` 24시간 주기 호출
+   - **WebSocket 좀비**: 비정상 종료 후 재시작 시 이전 WS 연결이 살아있어 이중 메시지 수신 → 중복 신호. 해결: 시작 시 기존 WS 연결 명시적 종료
+
+5. **Freqtrade의 실전 검증된 systemd 설정** — 공식 문서 기준:
+   - `internals.sd_notify: true` → WatchdogSec과 연동하여 봇 상태(Running/Paused/Stopped) systemd에 통보
+   - 봇 내부에서 `import systemd.daemon; systemd.daemon.notify("WATCHDOG=1")` 주기적 호출 필요 (Python `systemd` 패키지)
+   - 재시작 루프 방지: `StartLimitBurst=5` + `StartLimitIntervalSec=120` → 2분 내 5회 재시작 실패 시 중단 + 수동 개입 요구
+   - journald 로그 필터: `journalctl -f -u tradingbot.service --since "1 hour ago"`
+
+---
+
+### 이 프로젝트 적용 권장사항
+
+1. **재시작 동기화 루틴 추가** — `live_paper_trader` 또는 `orchestrator` 시작 시: `fetch_positions()` + `fetch_open_orders()` 호출 → 내부 상태(DB 또는 메모리)와 대조 → 불일치 시 Telegram 경고 + trading_disabled 플래그. 강제 청산 금지, hold 동기화 원칙 적용.
+
+2. **systemd unit 파일 준비** — VPS 배포 대비 unit 파일 작성: `Restart=always`, `RestartSec=10s`, `StartLimitBurst=5`, `WatchdogSec=60s`. journald 로그: `StandardOutput=journal` + `SystemMaxUse=500M` journald 설정. 메모리 제한 `MemoryMax=512M` 추가.
+
+3. **장기 운영 방어 로직** — (a) 24시간 주기 `exchange.reload_markets()` 스케줄러, (b) 시작 시 NTP 동기화 확인 1회, (c) DataFrame 히스토리 길이 상한(예: 최근 500봉만 유지) 설정, (d) journald `SystemMaxUse=500M` + DB 30일 이상 거래 기록 아카이브.
+
+4. **자본 규모 맞춤 포지션 사이징** — $1K 규모: 포지션당 최대 $100~$200, 스윙 전략만, 시장가 주문 금지(taker fee 과다). $10K+: 포지션당 최대 $1,000~$2,000. Kelly criterion 또는 고정 1~2% 리스크 적용.
+
+---
+
+### 핵심 발견 요약 (Cycle 180)
+
+1. **Paper 성과는 구조적으로 15~30% 과대평가** — 슬리피지 미반영 + 시장 충격 무시 + 실행 지연. 우리 BacktestEngine의 taker fee 0.055% 반영은 일부 보완하지만, 변동성 레짐별 가변 슬리피지(0.05%~0.5%) 적용이 추가로 필요.
+
+2. **봇 재시작 시 포지션 동기화는 반드시 거래소 실제 상태 대조** — 내부 상태만 믿으면 Freqtrade Issue #10436처럼 포지션 불일치 발생. `fetch_positions()` + `fetch_open_orders()` 순차 호출 후 비교가 필수.
+
+3. **강제 청산보다 hold 동기화가 안전** — 불일치 포지션 발견 시 Telegram 알림 + trading_disabled 플래그 → 수동 확인이 자동 강제 청산보다 손실 위험이 낮음.
+
+4. **systemd WatchdogSec이 stuck 프로세스 감지의 핵심** — `Restart=always`는 크래시만 감지. 봇이 무한루프 또는 hang 상태일 때는 WatchdogSec + `sd_notify("WATCHDOG=1")` 조합만이 자동 재시작 트리거.
+
+5. **장기 운영(6개월+) 3대 위험** — 메모리 리크(DataFrame 누적), 디스크 풀(journald 무제한), 세션 만료(ccxt 객체 24h+). 각각 방어 로직이 없으면 조용히 봇이 중단됨.
+
+---
+
+### 출처
+
+- [2026 Crypto Trading: Flow, Liquidity, and the Bot's Role in Noisy Markets](https://www.ainvest.com/news/2026-crypto-trading-flow-liquidity-bot-role-noisy-markets-2604/)
+- [AI Trading Bots Lost $441K in One Error (Medium, Apr 2026)](https://pumpparade.medium.com/ai-trading-bots-lost-441k-in-one-error-heres-what-actually-works-and-what-doesn-t-4f04f890c189)
+- [Paper vs Live Bots: Execution Differences Exposed - PickMyTrade](https://blog.pickmytrade.trade/paper-vs-live-bots-execution-differences/)
+- [Paper Trading vs. Live Trading: A Data-Backed Guide — Alpaca Markets](https://alpaca.markets/learn/paper-trading-vs-live-trading-a-data-backed-guide-on-when-to-start-trading-real-money)
+- [From Slippage to Overfitting: Common Pitfalls in Crypto Bot Trading — Bitunix (2025)](https://blog.bitunix.com/en/2025/06/02/common-pitfalls-crypto-trading-bots/)
+- [Wrong position state when rebooting with open entry order — Freqtrade Issue #10436](https://github.com/freqtrade/freqtrade/issues/10436)
+- [Freqtrade Advanced Setup (systemd, journald, WatchdogSec)](https://www.freqtrade.io/en/stable/advanced-setup/)
+- [How to Configure systemd RestartSec and WatchdogSec on Ubuntu (2026)](https://oneuptime.com/blog/post/2026-03-02-configure-systemd-restartsec-watchdogsec-ubuntu/view)
+- [CCXT fetch-open-orders Python example](https://github.com/ccxt/ccxt/blob/master/examples/py/fetch-open-orders.py)
+- [Trading Bot Risk Management: Stop-Loss & Position Sizing — Nadcab](https://www.nadcab.com/blog/trading-bot-risk-management-stop-loss-position-sizing-drawdown-control)
+- [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [Are Crypto Trading Bots Worth It in 2025? — CoinCub](https://coincub.com/are-crypto-trading-bots-worth-it-2025/)
+
+---

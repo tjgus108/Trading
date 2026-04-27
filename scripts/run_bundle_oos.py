@@ -45,10 +45,34 @@ BUNDLE_STRATEGIES = [
 ]
 
 
+def generate_synthetic_data(limit: int) -> pd.DataFrame:
+    """ccxt 없이 테스트용 합성 OHLCV 데이터 생성."""
+    import numpy as np
+
+    np.random.seed(42)
+    n = limit
+    closes = 30000.0 * np.cumprod(1 + np.random.randn(n) * 0.003)
+    highs = closes * (1 + np.abs(np.random.randn(n)) * 0.002)
+    lows = closes * (1 - np.abs(np.random.randn(n)) * 0.002)
+    opens = closes * (1 + np.random.randn(n) * 0.001)
+    volumes = np.random.lognormal(mean=10, sigma=1.5, size=n)
+
+    start_ts = pd.Timestamp("2022-01-01", tz="UTC")
+    timestamps = pd.date_range(start=start_ts, periods=n, freq="4h")
+
+    df = pd.DataFrame({
+        "open": opens, "high": highs, "low": lows,
+        "close": closes, "volume": volumes,
+    }, index=timestamps)
+    df.index.name = "timestamp"
+    logger.info("Generated %d synthetic candles", len(df))
+    return df
+
+
 def fetch_bybit_data(
-    symbol: str, timeframe: str, limit: int
+    symbol: str, timeframe: str, limit: int, max_retries: int = 3,
 ) -> pd.DataFrame:
-    """Bybit에서 OHLCV 데이터 수집 (페이지네이션 포함)."""
+    """Bybit에서 OHLCV 데이터 수집 (페이지네이션 + 재시도 포함)."""
     import ccxt
 
     tf_ms = {"1h": 3_600_000, "4h": 14_400_000}
@@ -62,7 +86,17 @@ def fetch_bybit_data(
     all_ohlcv: list = []
     stall = 0
     while len(all_ohlcv) < limit and since < now_ms:
-        batch = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=1000)
+        for attempt in range(1, max_retries + 1):
+            try:
+                batch = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=1000)
+                break
+            except (ccxt.NetworkError, ccxt.ExchangeNotAvailable) as e:
+                if attempt == max_retries:
+                    logger.error("Network error after %d retries: %s", max_retries, e)
+                    raise
+                wait = 2 ** attempt
+                logger.warning("Retry %d/%d after %ds: %s", attempt, max_retries, wait, e)
+                time.sleep(wait)
         if not batch:
             stall += 1
             if stall >= 3:
@@ -197,13 +231,18 @@ def run_bundle_oos(
     symbol: str = "BTC/USDT",
     timeframe: str = "4h",
     limit: int = 4320,
+    dry_run: bool = False,
 ) -> list[tuple[str, BundleOOSResult]]:
     """5-Bundle 전략에 대해 Rolling OOS 검증 실행."""
-    logger.info("=== 5-Bundle Rolling OOS Validation ===")
+    mode = "DRY-RUN (synthetic)" if dry_run else "LIVE"
+    logger.info("=== 5-Bundle Rolling OOS Validation [%s] ===", mode)
     logger.info("Symbol: %s | Timeframe: %s | Candles: %d", symbol, timeframe, limit)
 
     # 데이터 수집
-    df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
+    if dry_run:
+        df = enrich_indicators(generate_synthetic_data(limit))
+    else:
+        df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])
 
     # 검증기 초기화 (4h봉 기준: 6개월 ≈ 1080봉, 2개월 ≈ 360봉)
@@ -277,12 +316,17 @@ def main():
     parser.add_argument("--symbol", default="BTC/USDT", help="심볼 (기본: BTC/USDT)")
     parser.add_argument("--timeframe", default="4h", help="타임프레임 (기본: 4h)")
     parser.add_argument("--limit", type=int, default=4320, help="캔들 수 (기본: 4320)")
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="합성 데이터로 검증 (ccxt 불필요)",
+    )
     args = parser.parse_args()
 
     results = run_bundle_oos(
         symbol=args.symbol,
         timeframe=args.timeframe,
         limit=args.limit,
+        dry_run=args.dry_run,
     )
 
     # 콘솔 요약 출력
