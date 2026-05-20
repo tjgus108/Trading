@@ -1,52 +1,52 @@
 ======================================================================
-🔄 CYCLE 183 — 2026-05-20
+🔄 CYCLE 184 — 2026-05-20
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (183 mod 5 = 3)
-- C(데이터): 데이터 기간 확대 + 성능 최적화
-- B(리스크): 과적합 대응 + 버그 수정
-- F(리서치): 과적합 해결 기법 리서치
+## 이번 사이클 배정 카테고리 (184 mod 5 = 4)
+- D(ML): WalkForward factory 버그 수정 + OOS std 필터
+- E(실행): 거래 0건 전략 파라미터 완화
+- F(리서치): IS Sharpe 기준 재검토
 
 ======================================================================
 ## 완료된 작업
 ======================================================================
 
-### C(데이터) — Data & Infrastructure
-- paper_simulation.py: 6개월(4320봉) → 12개월(8640봉) 데이터 확대
-- Walk-Forward 윈도우: 2→8개 (통계 검증력 4배)
-- MIN_WINDOWS: 2→3
-- enrich_indicators(): Supertrend 미리 계산 (O(n²)→O(n) 개선)
-- SupertrendMultiStrategy: numpy + 미리 계산된 컬럼 사용
-- 거래 0건 전략 분석: volume_breakout/dema_cross/price_cluster 원인 파악
+### D(ML) — Walk-Forward factory 버그 수정
+- EmaCrossStrategy: __init__(fast_span=20, slow_span=50) + _get_ema_values() 동적 계산
+  - 기본값 + 컬럼 존재 시 pre-computed 사용 (완전 하위 호환)
+  - 다른 params 시 close 가격에서 EWM 동적 계산
+- DonchianBreakoutStrategy: __init__(channel_period=20) + _get_channel_values() 동적 계산
+  - 기본값 + 컬럼 존재 시 pre-computed, 아닐 시 rolling(period).max/min
+- optimize_ema_cross(): factory(params) → EmaCrossStrategy(fast_span, slow_span)
+- optimize_donchian(): factory(params) → DonchianBreakoutStrategy(channel_period)
+- IS 그리드 서치가 실제로 다른 파라미터 조합을 테스트하게 됨 ✅
 
-### B(리스크) — Risk Management
-- WalkForwardValidator.validate() IS/OOS 데이터 누수 버그 수정
-- KellySizer.adjust_for_regime() 불필요한 클리핑 제거
-- manager.CircuitBreaker: flash_crash 음수 전용으로 수정
-- check_parameter_ratio() 유틸 함수 추가
+### D(ML) — OOS Sharpe std 필터 (RollingOOSValidator)
+- BundleOOSResult.oos_sharpe_std 필드 추가 (field 기본값 0.0)
+- RollingOOSValidator.OOS_SHARPE_STD_MAX = 1.5
+- validate() 끝에서 std > 1.5이면 all_passed=False + fail_reason 추가
+- bundle_oos summary에 oos_sharpe_std 표시
 
-### 기존 실패 테스트 6종 수정
-- features.py 빈 DataFrame 방어
-- PageHinkleyDriftDetector, CUSUM 파라미터명 수정
-- KellySizer 레짐 테스트 파라미터 조정
-- CircuitBreaker 연속손실 테스트 수정
-- pytest.warns(None) deprecated 구문 제거
+### E(실행) — 파라미터 완화
+- volume_breakout: _ATR_LOW 0.3→0.1, _ATR_HIGH 5.0→10.0
+- dema_cross: 거리 필터 1.0%→0.5%
+- price_cluster: _BOUNCE_THRESHOLD 0.002→0.005
+- tests/test_volume_breakout.py: 경계값 테스트 업데이트
 
-### F(리서치) — Research
-- WalkForwardOptimizer factory 함수 버그가 핵심 과적합 원인으로 확인
-- Deflated Sharpe Ratio: IS Sharpe >= 2.5 기준 상향 권고
-- OOS std > 1.5 필터 필요성 확인
+### 테스트
+- 7582 passed, 17 skipped (all passing)
 
 ======================================================================
 ## 시뮬레이션 결과 (Synthetic data — Bybit SSL 차단)
 ======================================================================
 
-paper_simulation (1h, BTC, 8 windows): 0/22 PASS
-bundle_oos (4h, 9 folds, dry-run): 0/5 PASS
+paper_simulation (1h, BTC, 22 strategies, 8 windows): 0/22 PASS
+bundle_oos (4h, 5 strategies, 9 folds, dry-run): 0/5 PASS
+  - OOS Sharpe std 필터 동작 확인: 5/5 전략 std 3.16~6.15 > 1.5
 ⚠️ 합성 데이터 결과. 실제 Bybit 데이터로 재검증 필요.
 
 ======================================================================
-## 다음 사이클 (184)
+## 다음 사이클 (185)
 ======================================================================
-184 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
-최우선: factory(params) 버그 수정 → IS 최적화 실제 동작
+185 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)
+최우선: IS Sharpe >= 2.5 subset 재검증 + 합성 데이터 현실성 개선

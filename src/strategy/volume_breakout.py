@@ -13,8 +13,8 @@ _MIN_ROWS = 50  # EMA50 필요
 _VOL_LOOKBACK = 20
 _SPIKE_MULT = 1.5  # 1.8 → 1.5 (더 공격적)
 _HIGH_CONF_MULT = 2.2  # 2.5 → 2.2
-_ATR_LOW = 0.3  # ATR 최소 (극단적으로 낮은 경우만)
-_ATR_HIGH = 5.0  # ATR 최대 (극단적으로 높은 경우만)
+_ATR_LOW = 0.1  # ATR 최소 (0.3→0.1: 거래 빈도 증가)
+_ATR_HIGH = 10.0  # ATR 최대 (5.0→10.0: 고변동성 구간 포함)
 
 
 class VolumeBreakoutStrategy(BaseStrategy):

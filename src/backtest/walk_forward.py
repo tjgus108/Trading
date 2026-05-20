@@ -314,9 +314,10 @@ def optimize_ema_cross(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResul
     from src.strategy.ema_cross import EmaCrossStrategy
 
     def factory(params: dict) -> BaseStrategy:
-        # EmaCrossStrategy는 파라미터를 df에서 계산하므로 전략 자체는 변경 없음
-        # 실제로는 span을 DataFeed에서 계산하므로 현재는 동일 전략 반환
-        return EmaCrossStrategy()
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
 
     opt = WalkForwardOptimizer(
         strategy_name="ema_cross",
@@ -332,7 +333,9 @@ def optimize_donchian(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult
     from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 
     def factory(params: dict) -> BaseStrategy:
-        return DonchianBreakoutStrategy()
+        return DonchianBreakoutStrategy(
+            channel_period=params.get("channel_period", 20),
+        )
 
     opt = WalkForwardOptimizer(
         strategy_name="donchian_breakout",
@@ -392,6 +395,7 @@ class BundleOOSResult:
     avg_oos_pf: float
     all_passed: bool
     fail_reasons: List[str]
+    oos_sharpe_std: float = 0.0
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -401,6 +405,7 @@ class BundleOOSResult:
             f"  avg_wfe: {self.avg_wfe:.3f}",
             f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
+            f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
@@ -414,6 +419,8 @@ class RollingOOSValidator:
     Cycle 178 A: 6개월 IS / 2개월 OOS, 2개월씩 슬라이드.
     WFE ≥ 0.50, OOS Sharpe ≥ IS Sharpe × 0.60, OOS MDD ≤ IS MDD × 2.0.
     """
+
+    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 한계
 
     def __init__(
         self,
@@ -449,6 +456,7 @@ class RollingOOSValidator:
                 avg_wfe=0.0,
                 avg_oos_sharpe=0.0,
                 avg_oos_pf=0.0,
+                oos_sharpe_std=0.0,
                 all_passed=False,
                 fail_reasons=[f"데이터 부족: {len(df)} < {min_required}"],
             )
@@ -519,19 +527,28 @@ class RollingOOSValidator:
                 avg_wfe=0.0,
                 avg_oos_sharpe=0.0,
                 avg_oos_pf=0.0,
+                oos_sharpe_std=0.0,
                 all_passed=False,
                 fail_reasons=["유효 fold 없음"],
             )
 
+        import statistics as _stats
         avg_wfe = sum(f.wfe for f in folds) / len(folds)
         avg_sharpe = sum(f.oos_sharpe for f in folds) / len(folds)
         avg_pf = sum(f.oos_pf for f in folds) / len(folds)
+        oos_sharpes = [f.oos_sharpe for f in folds]
+        oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in folds)
 
         bundle_fails = []
         if not all_passed:
             failed_ids = [f.fold_id for f in folds if not f.passed]
             bundle_fails.append(f"Failed folds: {failed_ids}")
+        if oos_std > self.OOS_SHARPE_STD_MAX:
+            bundle_fails.append(
+                f"OOS Sharpe std {oos_std:.3f} > {self.OOS_SHARPE_STD_MAX} (불안정)"
+            )
+            all_passed = False
 
         result = BundleOOSResult(
             strategy_name=strategy.name,
@@ -539,6 +556,7 @@ class RollingOOSValidator:
             avg_wfe=round(avg_wfe, 4),
             avg_oos_sharpe=round(avg_sharpe, 3),
             avg_oos_pf=round(avg_pf, 3),
+            oos_sharpe_std=round(oos_std, 3),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
         )

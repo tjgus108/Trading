@@ -39,6 +39,26 @@ def _calc_adx(df: pd.DataFrame, idx: int) -> float:
 class DonchianBreakoutStrategy(BaseStrategy):
     name = "donchian_breakout"
 
+    def __init__(self, channel_period: int = 20) -> None:
+        self.channel_period = channel_period
+
+    def _get_channel_values(self, df: pd.DataFrame):
+        """Return (high_now, high_prev, low_now, low_prev).
+        Uses pre-computed columns when period == 20 and columns exist;
+        otherwise computes dynamically.
+        """
+        use_precomputed = (
+            self.channel_period == 20
+            and "donchian_high" in df.columns and "donchian_low" in df.columns
+        )
+        if use_precomputed:
+            last = df.iloc[-2]
+            prev = df.iloc[-3]
+            return float(last["donchian_high"]), float(prev["donchian_high"]), float(last["donchian_low"]), float(prev["donchian_low"])
+        high_series = df["high"].rolling(self.channel_period).max()
+        low_series = df["low"].rolling(self.channel_period).min()
+        return float(high_series.iloc[-2]), float(high_series.iloc[-3]), float(low_series.iloc[-2]), float(low_series.iloc[-3])
+
     def generate(self, df: pd.DataFrame) -> Signal:
         prev = df.iloc[-3]
         last = self._last(df)
@@ -50,10 +70,12 @@ class DonchianBreakoutStrategy(BaseStrategy):
         rsi = last["rsi14"]
         atr = last["atr14"]
 
+        d_high, d_high_prev, d_low, d_low_prev = self._get_channel_values(df)
+
         # ADX 필터: 횡보 구간 필터링
         if adx_val < 15:
             bull_case = (
-                f"Donchian high ({last['donchian_high']:.2f}) / low ({last['donchian_low']:.2f}), "
+                f"Donchian high ({d_high:.2f}) / low ({d_low:.2f}), "
                 f"ADX={adx_val:.1f}"
             )
             return Signal(
@@ -67,8 +89,8 @@ class DonchianBreakoutStrategy(BaseStrategy):
                 bear_case=bull_case,
             )
 
-        broke_high = prev["close"] <= prev["donchian_high"] and last["close"] > last["donchian_high"]
-        broke_low = prev["close"] >= prev["donchian_low"] and last["close"] < last["donchian_low"]
+        broke_high = float(prev["close"]) <= d_high_prev and float(last["close"]) > d_high
+        broke_low = float(prev["close"]) >= d_low_prev and float(last["close"]) < d_low
 
         # --- 변동성 필터: 최근 5봉 중 4봉 이상 같은 방향 연속 움직임 ---
         recent_moves = df["close"].diff().iloc[-6:-1]  # 최근 5봉의 방향
@@ -83,8 +105,8 @@ class DonchianBreakoutStrategy(BaseStrategy):
         vol_surge = avg_vol > 0 and last["volume"] >= avg_vol * 1.5
 
         # --- ATR 이격 필터 ---
-        atr_breakout_high = last["close"] - last["donchian_high"] >= atr * 0.5
-        atr_breakout_low = last["donchian_low"] - last["close"] >= atr * 0.5
+        atr_breakout_high = float(last["close"]) - d_high >= atr * 0.5
+        atr_breakout_low = d_low - float(last["close"]) >= atr * 0.5
 
         # --- EMA50 추세 필터 ---
         ema50 = last.get("ema50", entry)
@@ -92,12 +114,12 @@ class DonchianBreakoutStrategy(BaseStrategy):
         trend_bear = entry < ema50
 
         bull_case = (
-            f"Price ({entry:.2f}) broke above 20-bar high ({last['donchian_high']:.2f}). "
+            f"Price ({entry:.2f}) broke above {self.channel_period}-bar high ({d_high:.2f}). "
             f"ATR={atr:.2f}, RSI={rsi:.1f}, ADX={adx_val:.1f}, "
             f"VolSurge={vol_surge}, ATRBreak={atr_breakout_high}, Momentum={momentum_bull}"
         )
         bear_case = (
-            f"Price ({entry:.2f}) broke below 20-bar low ({last['donchian_low']:.2f}). "
+            f"Price ({entry:.2f}) broke below {self.channel_period}-bar low ({d_low:.2f}). "
             f"ATR={atr:.2f}, RSI={rsi:.1f}, ADX={adx_val:.1f}, "
             f"VolSurge={vol_surge}, ATRBreak={atr_breakout_low}, Momentum={momentum_bear}"
         )
@@ -115,11 +137,11 @@ class DonchianBreakoutStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Breakout above Donchian high {last['donchian_high']:.2f}. RSI={rsi:.1f}. "
+                    f"Breakout above Donchian high {d_high:.2f}. RSI={rsi:.1f}. "
                     f"ADX={adx_val:.1f}, VolSurge={vol_surge}, ATRBreak={atr_breakout_high}, "
                     f"Momentum={momentum_bull}, EMA50Trend={trend_bull}."
                 ),
-                invalidation=f"Close back below Donchian high ({last['donchian_high']:.2f})",
+                invalidation=f"Close back below Donchian high ({d_high:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
@@ -137,11 +159,11 @@ class DonchianBreakoutStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=entry,
                 reasoning=(
-                    f"Breakdown below Donchian low {last['donchian_low']:.2f}. RSI={rsi:.1f}. "
+                    f"Breakdown below Donchian low {d_low:.2f}. RSI={rsi:.1f}. "
                     f"ADX={adx_val:.1f}, VolSurge={vol_surge}, ATRBreak={atr_breakout_low}, "
                     f"Momentum={momentum_bear}, EMA50Trend={trend_bear}."
                 ),
-                invalidation=f"Close back above Donchian low ({last['donchian_low']:.2f})",
+                invalidation=f"Close back above Donchian low ({d_low:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )

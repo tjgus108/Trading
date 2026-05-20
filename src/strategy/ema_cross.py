@@ -40,6 +40,27 @@ def _calc_adx(df: pd.DataFrame, idx: int) -> float:
 class EmaCrossStrategy(BaseStrategy):
     name = "ema_cross"
 
+    def __init__(self, fast_span: int = 20, slow_span: int = 50) -> None:
+        self.fast_span = fast_span
+        self.slow_span = slow_span
+
+    def _get_ema_values(self, df: pd.DataFrame):
+        """Return (fast_last, fast_prev, slow_last, slow_prev).
+        Uses pre-computed columns when spans match defaults and columns exist;
+        otherwise computes dynamically from close prices.
+        """
+        use_precomputed = (
+            self.fast_span == 20 and self.slow_span == 50
+            and "ema20" in df.columns and "ema50" in df.columns
+        )
+        if use_precomputed:
+            last = df.iloc[-2]
+            prev = df.iloc[-3]
+            return float(last["ema20"]), float(prev["ema20"]), float(last["ema50"]), float(prev["ema50"])
+        ema_fast = df["close"].ewm(span=self.fast_span, adjust=False).mean()
+        ema_slow = df["close"].ewm(span=self.slow_span, adjust=False).mean()
+        return float(ema_fast.iloc[-2]), float(ema_fast.iloc[-3]), float(ema_slow.iloc[-2]), float(ema_slow.iloc[-3])
+
     def generate(self, df: pd.DataFrame) -> Signal:
         prev = df.iloc[-3]
         last = self._last(df)
@@ -52,10 +73,12 @@ class EmaCrossStrategy(BaseStrategy):
         atr = last["atr14"]
         vwap = last["vwap"]
 
+        ema_fast_now, ema_fast_prev, ema_slow_now, ema_slow_prev = self._get_ema_values(df)
+
         # ADX 필터: 횡보 구간 필터링
         if adx_val < 20:
             bull_case = (
-                f"EMA20 ({last['ema20']:.2f}) vs EMA50 ({last['ema50']:.2f}), "
+                f"EMA{self.fast_span} ({ema_fast_now:.2f}) vs EMA{self.slow_span} ({ema_slow_now:.2f}), "
                 f"ADX={adx_val:.1f}"
             )
             return Signal(
@@ -69,8 +92,8 @@ class EmaCrossStrategy(BaseStrategy):
                 bear_case=bull_case,
             )
 
-        ema20_crossed_up = prev["ema20"] <= prev["ema50"] and last["ema20"] > last["ema50"]
-        ema20_crossed_down = prev["ema20"] >= prev["ema50"] and last["ema20"] < last["ema50"]
+        ema20_crossed_up = ema_fast_prev <= ema_slow_prev and ema_fast_now > ema_slow_now
+        ema20_crossed_down = ema_fast_prev >= ema_slow_prev and ema_fast_now < ema_slow_now
 
         # ATR 필터: 최근 20봉(또는 가용 봉) 평균의 0.8배 이상이어야 진입
         lookback = min(20, len(df) - 1)
@@ -110,11 +133,11 @@ class EmaCrossStrategy(BaseStrategy):
             )
 
         bull_case = (
-            f"EMA20 ({last['ema20']:.2f}) > EMA50 ({last['ema50']:.2f}), "
+            f"EMA{self.fast_span} ({ema_fast_now:.2f}) > EMA{self.slow_span} ({ema_slow_now:.2f}), "
             f"RSI={rsi:.1f}, ATR={atr:.2f}, VWAP={vwap:.2f}{enhanced_info}"
         )
         bear_case = (
-            f"EMA20 ({last['ema20']:.2f}) < EMA50 ({last['ema50']:.2f}), "
+            f"EMA{self.fast_span} ({ema_fast_now:.2f}) < EMA{self.slow_span} ({ema_slow_now:.2f}), "
             f"RSI={rsi:.1f}, ATR={atr:.2f}, VWAP={vwap:.2f}{enhanced_info}"
         )
 
@@ -134,7 +157,7 @@ class EmaCrossStrategy(BaseStrategy):
                     f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close above VWAP. ADX={adx_val:.1f}."
                     + (f" EMA9/21 cross_up confirmed, vol & EMA50 ok." if has_ema9_21 else "")
                 ),
-                invalidation=f"Close below EMA50 ({last['ema50']:.2f})",
+                invalidation=f"Close below EMA{self.slow_span} ({ema_slow_now:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
@@ -155,7 +178,7 @@ class EmaCrossStrategy(BaseStrategy):
                     f"ATR={atr:.2f} >= {avg_atr * 0.8:.2f}. Close below VWAP. ADX={adx_val:.1f}."
                     + (f" EMA9/21 cross_down confirmed, vol & EMA50 ok." if has_ema9_21 else "")
                 ),
-                invalidation=f"Close above EMA50 ({last['ema50']:.2f})",
+                invalidation=f"Close above EMA{self.slow_span} ({ema_slow_now:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )

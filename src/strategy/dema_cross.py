@@ -70,15 +70,15 @@ class DEMACrossStrategy(BaseStrategy):
             if rsi_val != rsi_val:  # NaN check
                 rsi_val = 50.0
         
-        # ✅ NEW: 거리 필터 강화 (1% 이상 거리 필요)
-        if dist_pct < 0.01:
+        # 거리 필터 (1%→0.5%: 거래 빈도 증가)
+        if dist_pct < 0.005:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.MEDIUM,
                 strategy=self.name,
                 entry_price=close_price,
                 reasoning=(
-                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < 1.0% "
+                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < 0.5% "
                     f"(FAST={df_now:.4f}, SLOW={ds_now:.4f})"
                 ),
                 invalidation="",
