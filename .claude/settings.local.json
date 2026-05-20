@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
     "allow": [
       "WebSearch",
       "WebFetch(domain:tradingagents-ai.github.io)",
@@ -83,7 +82,9 @@
       "Bash(xargs -I{} basename {} .py)",
       "Read(//tmp/**)",
       "Bash(python -m pytest tests/ -q --tb=short --timeout=60)",
-      "Bash(python3.9 -m pytest tests/ -q --tb=short)"
-    ]
+      "Bash(python3.9 -m pytest tests/ -q --tb=short)",
+      "Bash(/usr/local/bin/python3.11 -c \"import ccxt; import pandas; import numpy; print\\('deps ok'\\)\")"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

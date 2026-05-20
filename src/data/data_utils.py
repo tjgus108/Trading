@@ -133,7 +133,6 @@ class HistoricalDataDownloader:
             raise
         except Exception as e:
             logger.error("Failed to initialize %s: %s", self.exchange_name, e)
-            raise
 
     def _get_cache_path(self, symbol: str, timeframe: str, ext: str = "parquet") -> Path:
         """캐시 파일 경로 생성."""

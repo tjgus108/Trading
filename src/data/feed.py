@@ -539,18 +539,61 @@ class DataFeed:
         return len(expected) - len(df)
 
     def _detect_anomalies(self, df: pd.DataFrame) -> List[str]:
+        """
+        Detect data anomalies including NaN/null, negative values, and OHLC inconsistencies.
+        
+        Checks:
+        1. NaN/null values in OHLCV columns
+        2. Negative prices (OHLC must be >= 0)
+        3. Negative volume (impossible in real data)
+        4. OHLC relationship validation
+        5. Price gaps and spikes
+        6. Zero volume candles (stale feed indicator)
+        7. Duplicate close prices (feed frozen)
+        8. Timestamp gaps (missing candles)
+        
+        Returns:
+            List of anomaly strings (empty if no issues found)
+        """
         anomalies = []
-        # OHLC 관계 검증
+        ohlcv_cols = ["open", "high", "low", "close", "volume"]
+        
+        # 1. NaN/Null detection in OHLCV columns (data feed corruption)
+        nan_mask = df[ohlcv_cols].isna()
+        nan_count = nan_mask.sum()
+        if nan_count.any():
+            nan_cols = nan_count[nan_count > 0]
+            for col in nan_cols.index:
+                anomalies.append(
+                    f"NaN values in {col}: {nan_count[col]} ({nan_count[col]/len(df)*100:.1f}%)"
+                )
+        
+        # 2. Negative price values (OHLC must be non-negative)
+        for col in ["open", "high", "low", "close"]:
+            neg_count = (df[col] < 0).sum()
+            if neg_count > 0:
+                neg_idx = df[df[col] < 0].index[0]
+                anomalies.append(f"negative {col}: {neg_count} candles, first at {neg_idx}")
+        
+        # 3. Negative volume (physically impossible)
+        if (df["volume"] < 0).any():
+            neg_vol_idx = df[df["volume"] < 0].index[0]
+            anomalies.append(f"negative volume at {neg_vol_idx}")
+        
+        # 4. OHLC 관계 검증
         anomalies.extend(self._validate_ohlc_relationships(df))
-        # 종가 0 이하
+        
+        # 5. 종가 0 이하 (명시적 체크)
         if (df["close"] <= 0).any():
             anomalies.append("close <= 0 detected")
-        # 극단적 가격 점프 (단일 캔들 10% 이상)
+        
+        # 6. 극단적 가격 점프 (단일 캔들 10% 이상)
         pct_change = df["close"].pct_change().abs()
         spikes = pct_change[pct_change > 0.10]
         if not spikes.empty:
             anomalies.append(f"price spike >10% at {spikes.index[0]}")
-        # 볼륨 0 캔들 (피드 동결/합성 데이터 의심)
+        
+        # 7. 볼륨 0 캔들 (피드 동결/합성 데이터 의심)
         zero_vol = (df["volume"] == 0).sum()
         if zero_vol > 0:
             zero_vol_pct = zero_vol / len(df) * 100
@@ -558,7 +601,8 @@ class DataFeed:
                 anomalies.append(f"zero volume candles: {zero_vol} ({zero_vol_pct:.1f}%)")
             else:
                 logger.debug("Minor zero-volume candles: %d (%.1f%%)", zero_vol, zero_vol_pct)
-        # 연속 중복 종가 감지 (스테일 피드 / 거래소 장애 의심)
+        
+        # 8. 연속 중복 종가 감지 (스테일 피드 / 거래소 장애 의심)
         if len(df) >= 5:
             dup_mask = df["close"].diff().abs() < 1e-10
             consecutive_dups = 0
@@ -568,7 +612,8 @@ class DataFeed:
                 max_consecutive = max(max_consecutive, consecutive_dups)
             if max_consecutive >= 5:
                 anomalies.append(f"stale feed: {max_consecutive} consecutive identical closes")
-        # 타임스탬프 갭 감지 (연속된 캔들 사이 예상 간격의 3배 초과)
+        
+        # 9. 타임스탬프 갭 감지 (연속된 캔들 사이 예상 간격의 3배 초과)
         if len(df) >= 2:
             time_diffs = df.index.to_series().diff().dropna()
             if not time_diffs.empty:
@@ -583,8 +628,8 @@ class DataFeed:
                             f"timestamp gaps: {gap_count} gaps detected, "
                             f"largest={max_gap} at {max_gap_at}"
                         )
+        
         return anomalies
-
     def _validate_ohlc_relationships(self, df: pd.DataFrame) -> List[str]:
         """
         OHLC 관계 검증: high >= max(open,close), low <= min(open,close)

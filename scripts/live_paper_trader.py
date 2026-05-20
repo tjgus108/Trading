@@ -1168,6 +1168,110 @@ class LivePaperTrader:
         summary_text = "\n".join(lines)
         logger.info(summary_text)
 
+    def _compute_go_nogo_judgment(self) -> dict:
+        """
+        Go/No-Go auto-judgment 로직: 주요 성과 지표를 평가하여
+        전략이 실전 배포(GO) 또는 보류(NO-GO)할 기준을 판정.
+
+        판정 기준:
+        - Profit Factor (PF) >= 1.4
+        - Max Drawdown (MDD) <= 15%
+        - Weekly Win Rate >= 45%
+        - Minimum Trades >= 20
+
+        Returns dict with verdict, pf, mdd, win_rate_weekly, trades_count, avg_trade_pnl, fail_reasons
+        """
+        result = {
+            "verdict": "INSUFFICIENT_DATA",
+            "pf": 0.0,
+            "mdd": 0.0,
+            "win_rate_weekly": 0.0,
+            "trades_count": 0,
+            "avg_trade_pnl": 0.0,
+            "fail_reasons": [],
+        }
+
+        trades = self.state.trade_log
+        if not trades or len(trades) < 20:
+            result["fail_reasons"].append(f"Insufficient trades: {len(trades)} < 20")
+            return result
+
+        # Profit Factor
+        wins_pnl = sum(t.get("pnl", 0.0) for t in trades if t.get("pnl", 0.0) > 0)
+        losses_pnl = abs(sum(t.get("pnl", 0.0) for t in trades if t.get("pnl", 0.0) <= 0))
+        pf = wins_pnl / losses_pnl if losses_pnl > 0 else (999.0 if wins_pnl > 0 else 0.0)
+        result["pf"] = round(pf, 2)
+
+        # Max Drawdown
+        if self.state.portfolio_peak > 0:
+            mdd = (self.state.portfolio_peak - self.state.portfolio_balance) / self.state.portfolio_peak * 100
+        else:
+            mdd = 0.0
+        result["mdd"] = round(mdd, 2)
+
+        # Weekly Win Rate
+        weekly_trades = trades[-min(50, len(trades)):]
+        weekly_wins = sum(1 for t in weekly_trades if t.get("pnl", 0.0) > 0)
+        win_rate_weekly = weekly_wins / len(weekly_trades) if weekly_trades else 0.0
+        result["win_rate_weekly"] = round(win_rate_weekly * 100, 1)
+
+        result["trades_count"] = len(trades)
+        total_pnl = sum(t.get("pnl", 0.0) for t in trades)
+        result["avg_trade_pnl"] = round(total_pnl / len(trades) if trades else 0.0, 2)
+
+        # Determine verdict
+        fail_reasons = []
+        if result["pf"] < 1.4:
+            fail_reasons.append(f'PF {result["pf"]:.2f} < 1.4')
+        if result["mdd"] > 15.0:
+            fail_reasons.append(f'MDD {result["mdd"]:.1f}% > 15%')
+        if result["win_rate_weekly"] < 45.0:
+            fail_reasons.append(f'Weekly WR {result["win_rate_weekly"]:.1f}% < 45%')
+        if len(trades) < 20:
+            fail_reasons.append(f'Trades {len(trades)} < 20')
+
+        result["fail_reasons"] = fail_reasons
+        result["verdict"] = "GO" if not fail_reasons else "NO-GO"
+        return result
+
+    def _print_go_nogo_summary(self, judgment: dict) -> None:
+        """Go/No-Go 판정 결과를 테이블로 출력."""
+        lines = []
+        lines.append("")
+        lines.append("=" * 70)
+        lines.append("GO/NO-GO AUTO-JUDGMENT")
+        lines.append("=" * 70)
+        lines.append(f'Verdict: {judgment["verdict"]}')
+        lines.append("")
+        lines.append("| Criterion | Value | Threshold | Status |")
+        lines.append("|-----------|-------|-----------|--------|")
+
+        pf_status = "PASS" if judgment["pf"] >= 1.4 else "FAIL"
+        lines.append(f'| Profit Factor | {judgment["pf"]:.2f}x | >= 1.4 | {pf_status} |')
+
+        mdd_status = "PASS" if judgment["mdd"] <= 15.0 else "FAIL"
+        lines.append(f'| Max Drawdown | {judgment["mdd"]:.1f}% | <= 15% | {mdd_status} |')
+
+        wr_status = "PASS" if judgment["win_rate_weekly"] >= 45.0 else "FAIL"
+        lines.append(f'| Weekly Win Rate | {judgment["win_rate_weekly"]:.1f}% | >= 45% | {wr_status} |')
+
+        trades_status = "PASS" if judgment["trades_count"] >= 20 else "FAIL"
+        lines.append(f'| Total Trades | {judgment["trades_count"]} | >= 20 | {trades_status} |')
+
+        lines.append("")
+        lines.append(f'Avg Trade PnL: ${judgment["avg_trade_pnl"]:.2f}')
+
+        if judgment["fail_reasons"]:
+            lines.append("")
+            lines.append("Fail Reasons:")
+            for reason in judgment["fail_reasons"]:
+                lines.append(f"  - {reason}")
+
+        lines.append("=" * 70)
+        summary_text = "\n".join(lines)
+        logger.info(summary_text)
+
+
     def _generate_report(self):
         """24시간마다 성과 리포트 생성."""
         lines = []
@@ -1287,6 +1391,8 @@ class LivePaperTrader:
         logger.info("Shutting down...")
         self._print_session_summary()
         self._generate_report()
+        judgment = self._compute_go_nogo_judgment()
+        self._print_go_nogo_summary(judgment)
         self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
         self.state.save()
         ret = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100
