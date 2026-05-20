@@ -1,3 +1,26 @@
+## Cycle 182 Research Notes — 2025-2026 봇 실패/성공 사례 + 시장 구조 변화
+
+### 핵심 발견
+
+1. **73% 자동화 계좌 6개월 내 손실, 95% AI 봇 90일 내 손실**
+2. **실행 품질 > 신호 품질**: 73% 손실 주원인 = 주문 실행/타이밍 실패
+3. **Production 실패 패턴 15가지**: 수수료 오류 계산(문서 0.04% vs 실제 6-12%), 수량 반올림, 상태 파일 원자성 부재, 유령 포지션, 타임아웃 미설정
+4. **AI는 부조종사**: AI+인간 34% ROI > 완전자동 29% > 수동 19%
+5. **ETF 효과**: 패닉 변동성↓, 유동성 변동성↑, Put IV > Call IV
+6. **DCA 봇**: 2024-2026 체계적 누적이 일시불보다 65% 케이스에서 우세
+
+### 우리 봇 적용 제안
+- 포지션 동기화 + atomic write 상태 저장 강화
+- 실제 수수료/슬리피지 시뮬레이션 필수
+- Fed 금리/ETF 유입 이벤트 달력 통합 검토
+
+### 출처
+- crypto.news/leading-ai-day-trading-bots-in-2026
+- florinelchis.medium.com/production-trading-bots-15-failure-patterns
+- blackrock.com/us/financial-professionals/insights/exploring-crypto-volatility
+
+---
+
 ## Cycle 165 Research Notes — 라이브 트레이딩봇 운영 자동화 및 모니터링 Best Practice
 
 ### 주제 1: 크립토 봇 자동 모니터링/알림 시스템
@@ -701,5 +724,78 @@
 - [Trading Bot Risk Management: Stop-Loss & Position Sizing — Nadcab](https://www.nadcab.com/blog/trading-bot-risk-management-stop-loss-position-sizing-drawdown-control)
 - [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
 - [Are Crypto Trading Bots Worth It in 2025? — CoinCub](https://coincub.com/are-crypto-trading-bots-worth-it-2025/)
+
+---
+
+## Cycle 181 — Research Findings (2026-04-27)
+
+### 봇 실패/성공 사례
+
+#### 실패 사례
+
+1. **AI 봇 $441K 손실 (2026-02-22) — 소수점 파싱 에러** — OpenAI 출신 개발자 Nik Pash가 만든 "Lobstar Wilde" AI 에이전트가 Solana 네트워크에서 소수점 해석 오류로 $50K 트레저리 목표 봇이 52.4M 토큰($441K)을 타인에게 전송. 봇은 고변동성 윈도우에서 트랜잭션 파라미터를 오해석. 개발자는 "AI 에이전트가 재무를 완전 자율 관리할 때 human-in-the-loop 검증이 필수"라고 공언. 핵심 교훈: 완전 자율 봇 + 대규모 트레저리 = 최고 위험 조합. 소수점 파싱과 단위 변환은 반드시 독립 검증 레이어 필요.
+
+2. **2025년 5월 플래시 크래시 — AI 봇 3분 내 $20억 매도** — 경제 지표 발표 직후 레짐 감지 없는 AI 봇들이 동일 방향으로 매도 신호 발생. 3분 만에 $20억 매도로 유동성 소진 → 슬리피지 폭발. 봇들이 유동성 공급자에서 소비자로 순간 전환되는 레짐 변화를 인식 못함. 이미 Cycle 179/180에서 기록됐으나 Cycle 181에서도 핵심 사례로 재확인.
+
+3. **2025년 10월 청산 폭풍 — API rate limit이 정보 차단** — 10월 10~11일 지정학적 발표 후 6시간 내 $60억 청산, 1.6M 계좌에서 $193억 레버리지 증발. 거래소가 청산 알림을 초당 1건으로 제한하는 동안 실제는 초당 수천 건 처리. 이 정보 불투명이 연쇄 청산을 가속화. API rate limit이 평상시 보호 장치에서 위기 시 정보 차단 도구로 변함.
+
+4. **73% 실패율 — 6개월 내** (재확인) — 자동화 크립토 트레이딩 계좌 73%가 6개월 내 실패. AI 봇의 95%가 90일 내 손실. 공통 원인: 수수료 과소추정, 레짐 비적응, 과적합.
+
+5. **2025년 11월 Binance 해킹 — 제3자 봇 권한 부여** — Binance는 2025년 11월 한 달에만 12개 계좌가 제3자 봇에 권한 부여로 18,000 USDT 이상 피해. 봇 API 키에 출금 권한 부여는 절대 금지.
+
+#### 성공 사례
+
+1. **레짐 인식 전략 전환이 핵심** — 성공한 봇들의 공통 패턴: 횡보 구간에서는 평균회귀/그리드 전략, 추세 구간에서는 추세추종, 고변동성 구간에서는 포지션 축소 또는 HOLD. Cryptohopper Algorithm Intelligence는 실시간으로 전략을 순위 매기고 레짐에 따라 자동 전환.
+
+2. **10-signal 복합 레짐 분류기 (getregime.com)** — SMA cross, 펀딩 레이트, fear/greed 지수, BTC 도미넌스, 거래량, 스테이블코인 유입, DXY, 집계 펀딩, 청산 데이터, 예측 시장 등 10개 시그널을 결합한 복합 레짐 분류기가 실전에서 단일 지표보다 훨씬 안정적.
+
+3. **AI-assisted vs 완전자동 vs 수동 (2025년 7월 기준)** — Crypto Quant Strategy Index: AI-assisted 6개월 ROI 34%, 완전자동 29%, 수동 19%. 단, 레짐 안정 구간 기준이며 레짐 전환 시 모두 급락 가능.
+
+---
+
+### 최신 퀀트 기법
+
+1. **LOB 마이크로구조 예측 — CatBoost + 1초 주파수 (arXiv:2602.00776, Jan 2026)** — BTC/LTC/ETC/ENJ/ROSE 5개 자산의 Binance Futures LOB 데이터(2022~2025, 1초 주기)를 CatBoost + time-series cross validation으로 분석. 핵심 발견: 피처 중요도 순위가 자산 간 안정적 — 마켓캡과 유동성이 다른 자산에도 동일한 마이크로구조 패턴 존재. 매도/매수 보수적 백테스트로 거래 가능성 검증. 우리 프로젝트(4h 봉 기반)와는 타임프레임이 다르지만, 피처 안정성 원칙은 적용 가능.
+
+2. **GMM + Regime-specific VAR (DSFE 2025)** — 크립토 가격 동학을 레짐별로 분리한 VAR 분석. GMM으로 변동성 레짐 분류 후 레짐 내부에서 별도 VAR 모델 적합. Markovian 제약 없는 GMM이 급변 구간에서 HMM보다 유연. 리스크 모델링과 전략 개발 모두에서 레짐별 접근이 단일 모델보다 강건.
+
+3. **ML 기반 이더리움 멀티팩터 모델 (ACM 2025)** — 온라인 학습으로 팩터 동적 업데이트해 시장 비정상성 대응. 2021Q4~2024Q3 백테스트 연환산 97% 수익, 2024Q4 시뮬레이션 33% 분기 수익. 그러나 2025Q1 -10% 분기 손실 — 레짐 전환 시 급락 패턴 재확인.
+
+4. **walk-forward + QuantTorch 검증 프레임워크 (2025~2026)** — QuantTorch.com이 크립토 특화 walk-forward 검증을 상업화. 주요 개선: 크립토 비정상성을 반영한 가변 윈도우 크기, 레짐 라벨 일관성 검증, LOB 마이크로구조 피처 통합. 핵심: 고정 윈도우 WFO보다 레짐 인식 가변 윈도우가 PBO를 낮춤.
+
+5. **레짐 전환 신호 4가지 (실전 검증)** — 약세→강세 전환 신호: (1) ETF 유입 순매수 전환, (2) 신규 수요 성장 지표, (3) 펀딩 레이트 양전환 (롱 보유 의지), (4) 가격이 365일 이동평균 회복. 이 4개 조건이 동시 충족 시 레짐 전환 확률 높음 — 단일 지표보다 복합 판단이 신뢰성 높음.
+
+---
+
+### 프로젝트 적용 제안 (구현 금지, 방향 제안만)
+
+1. **10-signal 복합 레짐 분류기로 기존 RegimeDetector 강화** — 현재 변동성 기반 단일 지표 레짐 분류에 펀딩 레이트, BTC 도미넌스, 스테이블코인 유입 등 외부 시장 신호를 추가하는 방향. 4h 봉 전략에는 일간 집계값으로 변환해 사용 가능. 단, 외부 데이터 피드 추가는 새로운 장애 포인트가 되므로 신호 없으면 폴백하는 설계 필요.
+
+2. **API 에러 시 소수점/단위 파싱 독립 검증 레이어** — Lobstar Wilde 사례($441K 손실)의 직접적 교훈. 주문 수량 계산 결과를 실제 제출 전 독립 함수로 한 번 더 검증하는 패턴 도입 검토. 특히 ccxt에서 base currency vs quote currency 단위 혼용 버그는 실전에서 빈번.
+
+3. **레짐 전환 4신호 기반 포지션 축소 로직** — 현재 레짐 탐지가 변동성 기반이라면, ETF 유입/펀딩 레이트/365MA 회복 같은 온체인+시장 복합 신호를 포지션 사이징 승수(multiplier)로 활용. 레짐 불확실 구간에서는 포지션을 절반으로 자동 축소하는 규칙 추가가 MDD 개선에 효과적.
+
+4. **human-in-the-loop 검증 게이트 유지** — 완전 자율 봇의 실패 사례(AI 에이전트 $441K)가 반복 확인. 현재 프로젝트의 Telegram 알림 + 수동 승인 재전환 원칙은 올바른 방향. 특히 대형 주문(포지션의 20% 이상) 전후 Telegram 알림 강제는 유지 필요.
+
+5. **변동성 레짐별 가변 슬리피지 적용** — Cycle 180에서도 제안됐으나 미구현. BacktestEngine에 ATR 기반 가변 슬리피지(low_vol: 0.05%, high_vol: 0.3~0.5%)를 적용하면 실전 성과와 백테스트 간 갭을 좁힐 수 있음. 현재 고정 수수료만 반영 → 변동성 구간 과대평가 위험 지속.
+
+---
+
+### 출처
+
+- [AI Trading Bots Lost $441K in One Error — Medium/Pump Parade (Apr 2026)](https://pumpparade.medium.com/ai-trading-bots-lost-441k-in-one-error-heres-what-actually-works-and-what-doesn-t-4f04f890c189)
+- [AI Crypto Trading Bot Sends $441K by Mistake — ETHNews](https://www.ethnews.com/ai-crypto-trading-bot-sends-441k-by-mistake-then-token-surges-190/)
+- [From Liquidation Storms to Cloud Outages: A Crisis Moment for Crypto Infrastructure — Bitget News](https://www.bitget.com/news/detail/12560605025625)
+- [Automation Risks: Slippage, Latency, and Overfitting in Bot Trading — BloFin](https://blofin.com/en/academy/education/automation-risk-in-crypto-bot)
+- [Why Most Trading Bots Lose Money — ForTraders](https://www.fortraders.com/blog/trading-bots-lose-money)
+- [Crypto Trading Bot Pitfalls, Risks & Mistakes to Avoid in 2025 — Gate News](https://www.gate.com/news/detail/13225882)
+- [Common Pitfalls When Building Your First Crypto Trading Bot — Coin Bureau](https://coinbureau.com/guides/crypto-trading-bot-mistakes-to-avoid)
+- [Explainable Patterns in Cryptocurrency Microstructure — arXiv:2602.00776 (Jan 2026)](https://arxiv.org/abs/2602.00776)
+- [Microstructure and Market Dynamics in Crypto Markets — ScienceDirect (2026)](https://www.sciencedirect.com/science/article/abs/pii/S1386418126000261)
+- [Machine Learning-Driven Multi-Factor Quantitative Model for Ethereum — ACM 2025](https://dl.acm.org/doi/10.1145/3766918.3766922)
+- [Regime — Real-Time Crypto Market Regime Detection API](https://getregime.com/)
+- [Crypto Regime Detection with Local AI Agent — DEV Community](https://dev.to/paarthurnax_3f967358857ce/crypto-regime-detection-with-a-local-ai-agent-bull-vs-bear-vs-sideways-27gc)
+- [AI Risk Management in Crypto Trading — Blockchain Council (2026)](https://www.blockchain-council.org/cryptocurrency/risk-management-with-ai-in-crypto-trading-volatility-forecasting-position-sizing-stop-loss-automation/)
+- [QuantTorch — Quant Development & Validation for Crypto Markets](https://quanttorch.com/)
 
 ---

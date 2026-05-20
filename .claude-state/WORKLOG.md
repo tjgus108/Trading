@@ -1,5 +1,40 @@
 # Work Log
 
+## [2026-05-20] Cycle 182 — B (리스크) + D (ML) + F (리서치) + SIM
+
+**[B] Risk Management 검증:**
+- CircuitBreaker: 플래시크래시 트리거 후 `reset_daily()` 리셋 불가 버그 수정 (line 263에 "플래시" 키워드 추가)
+- KellySizer: win_rate=1 시 inf 우려는 오탐 확인 (kelly_f=1.0으로 정상)
+- DrawdownMonitor: loss_pct 계산 기준 확인 — 근사치 수준 허용 범위
+- PerformanceMonitor: check_all() rolling PF/MDD/Sharpe 계산 정상
+- PortfolioOptimizer: VaR/CVaR + Risk Parity 정상
+
+**[D] ML & Signals 검증:**
+- RegimeDetector: TREND(ADX>25)/RANGE(ATR<MA+ADX<20)/CRISIS(ATR>2xMA) 정상, 2봉 연속 확인 구현됨
+- RegimeStrategyRouter: 전략-레짐 매핑 정확, CRISIS 0.5x 적용 정상
+- DriftDetector(ADWIN): 이중 게이트 + PSI 0.2 기준 정상, Hoeffding 경계 정확
+- ML 모듈 전체 프로덕션 레벨 양호
+
+**[F] 리서치: 2025-2026 트레이딩봇 실패/성공 + 시장 구조:**
+- 73% 자동화 계좌 6개월 내 손실, 95% AI 봇 90일 내 손실
+- 실행 품질이 신호보다 중요 (73% 손실 주원인 = 주문 실행/타이밍 실패)
+- Production 실패 패턴 15가지: 수수료 오류, 수량 반올림, 상태 파일 원자성, 유령 포지션 등
+- AI는 "부조종사" 역할 최적 (AI+인간 34% ROI vs 완전자동 29%)
+- ETF 효과로 BTC 변동성 구조 변화: 패닉 변동성↓, 유동성 변동성↑
+- Put IV > Call IV 신호 → 헤징 비용 상향 권고
+
+**[SIM] 시뮬레이션 결과 — ⚠️ 전략 전부 FAIL:**
+- paper_simulation.py (1h, 3심볼): BTC 0/22, ETH 0/22, SOL 0/22 PASS
+- run_bundle_oos.py (4h, 5전략): 5전략 전부 FAIL (OOS Sharpe 붕괴, WFE < 0.50)
+- 핵심: OOS에서 IS 대비 Sharpe 대폭 하락 → 과적합 의심
+- 평균 수익률 -8.4% (BTC 1h), elder_impulse OOS Sharpe -1.921
+
+**[인프라] /schedule 설정:**
+- 5시간마다 자동 사이클 원격 에이전트 등록 완료
+- 루틴 ID: trig_0145pyi9PxaqL9fbfd25nzEL
+
+**테스트: 2079 passed, 1 failed (기존 test_empty_dataframe 무관), 6 skipped**
+
 ## [2026-04-22] Cycle 179 — D (ML) + E (실행) + F (리서치)
 
 **[D] RegimeDetector → paper_trader 통합:**
@@ -13776,3 +13811,9 @@ Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-21 18:57 UTC] Cycle 178 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-27 11:19 UTC] Cycle 180 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-04-27 11:20 UTC] Cycle 181 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

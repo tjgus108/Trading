@@ -260,7 +260,7 @@ class CircuitBreaker:
         """매일 자정 리셋 — 일일 트리거만 해제, 전체 낙폭 트리거는 수동 해제 필요."""
         self._daily_start_balance = daily_start_balance
         self._daily_trade_count = 0
-        if self._triggered and ("일일" in self._reason or "거래 횟수" in self._reason):
+        if self._triggered and ("일일" in self._reason or "거래 횟수" in self._reason or "플래시" in self._reason):
             self._triggered = False
             self._reason = ""
             logger.info("CircuitBreaker: 일일 리셋 완료 (start_balance=%.2f)", daily_start_balance)
