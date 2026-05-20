@@ -5,7 +5,7 @@ Paper Trading 시뮬레이션 — 실제 Bybit 데이터로 전략들을 Walk-Fo
     python3 scripts/paper_simulation.py
 
 동작:
-1. Bybit public API로 BTC/USDT 1h 캔들 6개월치 페이지네이션 수집
+1. Bybit public API로 BTC/USDT 1h 캔들 12개월치 페이지네이션 수집
 2. QUALITY_AUDIT.csv에서 PASS 전략 목록 로드
 3. Walk-Forward 방식: 훈련 4개월 → 테스트 1개월, 1개월씩 롤링 (최소 3윈도우)
 4. 복수 윈도우에서 일관되게 실패해야 FAIL (단일 실패로 제거하지 않음)
@@ -45,7 +45,7 @@ CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 TRAIN_HOURS = 24 * 120   # 훈련: 4개월 (120일)
 TEST_HOURS = 24 * 30     # 테스트: 1개월 (30일)
 STEP_HOURS = 24 * 30     # 롤링 간격: 1개월
-MIN_WINDOWS = 2          # 최소 테스트 윈도우 수
+MIN_WINDOWS = 3          # 최소 테스트 윈도우 수
 
 # 전략 통과 기준: 테스트 윈도우 중 과반수에서 통과해야 PASS
 PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
@@ -62,7 +62,7 @@ TIMEFRAME_MS = {
 def fetch_real_data_paginated(
     symbol: str = "BTC/USDT",
     timeframe: str = "1h",
-    total_candles: int = 4320,  # 6개월 (180일 * 24h)
+    total_candles: int = 8640,  # 12개월 (360일 * 24h)
     batch_size: int = 1000,
 ) -> Optional[pd.DataFrame]:
     """Bybit에서 페이지네이션으로 장기 OHLCV 데이터 수집. 실패 시 None."""
@@ -175,6 +175,29 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Volume SMA
     df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
     df["return_5"] = close.pct_change(5)
+
+    # Supertrend (3 configs) — precomputed to avoid O(n²) in strategy generate()
+    for atr_period, mult in [(10, 1.5), (14, 2.0), (20, 3.0)]:
+        prev_close = close.shift(1)
+        _tr = pd.concat(
+            [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+        ).max(axis=1)
+        _atr = _tr.ewm(alpha=1.0 / atr_period, adjust=False).mean()
+        _hl2 = (high + low) / 2.0
+        _bu = (_hl2 + mult * _atr).to_numpy(dtype=float)
+        _bl = (_hl2 - mult * _atr).to_numpy(dtype=float)
+        _c = close.to_numpy(dtype=float)
+        n_ = len(_c)
+        _fu = _bu.copy(); _fl = _bl.copy()
+        _trend = np.ones(n_, dtype=np.int8)
+        for _i in range(1, n_):
+            _cp = _c[_i - 1]
+            _fu[_i] = _bu[_i] if (_bu[_i] < _fu[_i - 1] or _cp < _fu[_i - 1]) else _fu[_i - 1]
+            _fl[_i] = _bl[_i] if (_bl[_i] > _fl[_i - 1] or _cp > _fl[_i - 1]) else _fl[_i - 1]
+            _ci = _c[_i]
+            _trend[_i] = 1 if _ci > _fu[_i - 1] else (-1 if _ci < _fl[_i - 1] else _trend[_i - 1])
+        col = f"st_trend_{atr_period}_{str(mult).replace('.', '_')}"
+        df[col] = _trend
 
     return df
 
@@ -459,14 +482,14 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
-    df = fetch_real_data_paginated(symbol, "1h", total_candles=4320)
+    df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
     data_source = f"Bybit {symbol} 1h (paginated)"
 
     if df is None:
         print(f"[{symbol}][FALLBACK] Using synthetic data (Bybit API inaccessible)")
         from scripts.quality_audit import make_synthetic_data
-        df = make_synthetic_data(4320)
-        data_source = f"Synthetic GBM x4320 ({symbol}-like)"
+        df = make_synthetic_data(8640)
+        data_source = f"Synthetic GBM x8640 ({symbol}-like)"
         # 합성 데이터에도 enrich_indicators 적용 — make_synthetic_data에 없는
         # ema20, donchian_high/low, vwap, vwap20 등의 지표를 추가
         df = enrich_indicators(df)

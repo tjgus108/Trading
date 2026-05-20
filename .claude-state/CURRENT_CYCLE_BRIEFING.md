@@ -1,38 +1,52 @@
 ======================================================================
-🔄 CYCLE 182 — 2026-05-20
+🔄 CYCLE 183 — 2026-05-20
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (병렬 4개)
+## 이번 사이클 배정 카테고리 (183 mod 5 = 3)
+- C(데이터): 데이터 기간 확대 + 성능 최적화
+- B(리스크): 과적합 대응 + 버그 수정
+- F(리서치): 과적합 해결 기법 리서치
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: CircuitBreaker/DrawdownMonitor 로직 검증, Kelly Sizer 튜닝, VaR/CVaR 정확도
+======================================================================
+## 완료된 작업
+======================================================================
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: ML 모델 피처 중요도 분석, 앙상블 가중치 최적화, RegimeDetector 정확도 검증
+### C(데이터) — Data & Infrastructure
+- paper_simulation.py: 6개월(4320봉) → 12개월(8640봉) 데이터 확대
+- Walk-Forward 윈도우: 2→8개 (통계 검증력 4배)
+- MIN_WINDOWS: 2→3
+- enrich_indicators(): Supertrend 미리 계산 (O(n²)→O(n) 개선)
+- SupertrendMultiStrategy: numpy + 미리 계산된 컬럼 사용
+- 거래 0건 전략 분석: volume_breakout/dema_cross/price_cluster 원인 파악
 
-### [SIM] Paper Simulation & Auto-improve
-- **Agent**: backtest-agent
-- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
+### B(리스크) — Risk Management
+- WalkForwardValidator.validate() IS/OOS 데이터 누수 버그 수정
+- KellySizer.adjust_for_regime() 불필요한 클리핑 제거
+- manager.CircuitBreaker: flash_crash 음수 전용으로 수정
+- check_parameter_ratio() 유틸 함수 추가
 
-### [F] Research
-- **Agent**: strategy-researcher-agent
-- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 2026 최신 크립토 퀀트 논문 조사
+### 기존 실패 테스트 6종 수정
+- features.py 빈 DataFrame 방어
+- PageHinkleyDriftDetector, CUSUM 파라미터명 수정
+- KellySizer 레짐 테스트 파라미터 조정
+- CircuitBreaker 연속손실 테스트 수정
+- pytest.warns(None) deprecated 구문 제거
 
-## 이전 사이클 현황
-**Cycle 179 COMPLETED — D + E + F** (2026-04-22)
-  **[D]** RegimeDetector→paper_trader 통합, 23개 테스트 PASS
-  **[E]** 5-Bundle OOS 인프라 + PerformanceMonitor 연결, 11개 테스트 PASS
-  **[F]** Paper Trading 자동화 + 봇 실패/성공 리서치 완료
+### F(리서치) — Research
+- WalkForwardOptimizer factory 함수 버그가 핵심 과적합 원인으로 확인
+- Deflated Sharpe Ratio: IS Sharpe >= 2.5 기준 상향 권고
+- OOS std > 1.5 필터 필요성 확인
 
-## ⛔ 금지 사항
-- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
-- 한 카테고리에 2 사이클 연속 집중 금지
-- 실패 사례 리서치 없이 코드만 작성 금지
+======================================================================
+## 시뮬레이션 결과 (Synthetic data — Bybit SSL 차단)
+======================================================================
 
-## 📋 사이클 종료 시 필수 수행
-1. .claude-state/WORKLOG.md 업데이트
-2. .claude-state/NEXT_STEPS.md 업데이트
-3. git add -A && git commit && git push
-4. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
+paper_simulation (1h, BTC, 8 windows): 0/22 PASS
+bundle_oos (4h, 9 folds, dry-run): 0/5 PASS
+⚠️ 합성 데이터 결과. 실제 Bybit 데이터로 재검증 필요.
+
+======================================================================
+## 다음 사이클 (184)
+======================================================================
+184 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
+최우선: factory(params) 버그 수정 → IS 최적화 실제 동작

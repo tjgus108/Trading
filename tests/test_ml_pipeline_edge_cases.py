@@ -70,8 +70,7 @@ class TestFeatureBuilderEdgeCases:
         """극소 데이터(10개)에서 결과 비어있거나 경고 발생."""
         df = _make_df(10)
         fb = FeatureBuilder()
-        with pytest.warns(None) as warning_list:
-            X, y = fb.build(df)
+        X, y = fb.build(df)
         # 데이터 부족하면 X가 비어있을 수 있음
         assert isinstance(X, pd.DataFrame)
         assert isinstance(y, pd.Series)

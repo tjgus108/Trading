@@ -634,9 +634,13 @@ class WalkForwardValidator:
             if test_end > len(df):
                 break
 
-            # train + test 구간 전체를 엔진에 전달 (지표 warmup 포함)
-            window_df = df.iloc[start:test_end].reset_index(drop=True)
-            result = engine.run(strategy, window_df)
+            # [BUG FIX] IS/OOS 완전 분리: OOS 구간만 별도 실행해야 누수 없음.
+            # 이전 코드는 train+test 전체를 엔진에 전달해 IS 성과가 결과에 혼입됨.
+            is_df = df.iloc[start:test_start].reset_index(drop=True)
+            oos_df = df.iloc[test_start:test_end].reset_index(drop=True)
+            # IS 결과는 wfe 계산용, OOS 결과만 window_results에 기록
+            is_result = engine.run(strategy, is_df)
+            oos_result = engine.run(strategy, oos_df)
 
             window_results.append({
                 "window_index": len(window_results),
@@ -646,12 +650,16 @@ class WalkForwardValidator:
                 "train_end": test_start - 1,
                 "test_start": test_start,
                 "test_end": test_end - 1,
-                "total_return": result.total_return,
-                "sharpe_ratio": result.sharpe_ratio,
-                "max_drawdown": result.max_drawdown,
-                "total_trades": result.total_trades,
-                "win_rate": result.win_rate,
-                "passed": result.passed,
+                "total_return": oos_result.total_return,
+                "sharpe_ratio": oos_result.sharpe_ratio,
+                "max_drawdown": oos_result.max_drawdown,
+                "total_trades": oos_result.total_trades,
+                "win_rate": oos_result.win_rate,
+                "passed": oos_result.passed,
+                "is_sharpe": is_result.sharpe_ratio,
+                "wfe": round(oos_result.sharpe_ratio / is_result.sharpe_ratio, 4)
+                       if is_result.sharpe_ratio > 0 else
+                       (1.0 if oos_result.sharpe_ratio > 0 else 0.0),
             })
 
             start += self.step_size

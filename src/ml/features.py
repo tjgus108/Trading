@@ -87,6 +87,8 @@ class FeatureBuilder:
             X (pd.DataFrame): 피처 행렬 (NaN 행 제거됨)
             y (pd.Series): 레이블 {-1: SELL, 0: HOLD, 1: BUY}
         """
+        if df.empty or "close" not in df.columns:
+            return pd.DataFrame(), pd.Series(dtype=float)
         feat = self._compute_features(df)
         labels = self._compute_labels(df)
 
@@ -98,6 +100,8 @@ class FeatureBuilder:
 
     def build_features_only(self, df: pd.DataFrame) -> pd.DataFrame:
         """레이블 없이 피처만 반환 (추론용)."""
+        if df.empty or "close" not in df.columns:
+            return pd.DataFrame()
         return self._compute_features(df).dropna()
 
     # ------------------------------------------------------------------

@@ -49,21 +49,21 @@ class TestCircuitBreakerEdgeCases:
             max_drawdown=0.20,
             max_consecutive_losses=3
         )
-        
-        # 손실 1
-        cb.check(current_balance=9900, last_candle_pct_change=-0.01)
+        initial_balance = 10000.0
+
+        # record_trade_result()로 손실 누적 (check()는 읽기 전용)
+        cb.record_trade_result(pnl=-100, account_balance=initial_balance)
         assert cb._consecutive_losses == 1
-        
-        # 손실 2
-        cb.check(current_balance=9800, last_candle_pct_change=-0.01)
+
+        cb.record_trade_result(pnl=-100, account_balance=initial_balance)
         assert cb._consecutive_losses == 2
-        
-        # 손실 3 → 임계값 도달
+
+        cb.record_trade_result(pnl=-100, account_balance=initial_balance)
+        assert cb._consecutive_losses == 3
+
+        # 3연패 후 check → 서킷 오픈
         result = cb.check(current_balance=9700, last_candle_pct_change=-0.01)
-        
-        # 3연패가 되면 서킷이 열려야 함
-        if result is not None:
-            assert "consecutive" in result.lower()
+        assert result is not None and "consecutive" in result.lower()
 
     def test_zero_peak_balance_initialization(self):
         """초기 상태: peak_balance = 0 → 첫 check에서 설정."""

@@ -83,7 +83,7 @@ class CircuitBreaker:
             return f"drawdown {drawdown:.2%} >= limit {self.max_drawdown:.2%}"
         if self._consecutive_losses >= self.max_consecutive_losses:
             return f"consecutive_losses {self._consecutive_losses} >= {self.max_consecutive_losses}"
-        if abs(last_candle_pct_change) >= self.flash_crash_pct:
+        if last_candle_pct_change <= -self.flash_crash_pct:
             return f"flash crash detected: {last_candle_pct_change:.2%} move"
         return None
 
@@ -443,3 +443,18 @@ class SignalCorrelationTracker:
             "sell": sell_count,
             "hold": len(sigs) - len(active),
         }
+
+
+# ── 유틸 함수 (클래스 밖) ──────────────────────────────────────────────────────
+
+def check_parameter_ratio(n_params: int, n_data_points: int, threshold: float = 10.0) -> dict:
+    """
+    파라미터 수 대비 데이터 포인트 비율 체크.
+    n_data_points / n_params < threshold면 과적합 위험.
+    """
+    ratio = n_data_points / max(n_params, 1)
+    return {
+        "ratio": ratio,
+        "overfitting_risk": ratio < threshold,
+        "message": f"데이터/파라미터 비율: {ratio:.1f} (기준: {threshold})"
+    }

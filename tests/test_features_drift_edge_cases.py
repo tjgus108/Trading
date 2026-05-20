@@ -147,14 +147,14 @@ class TestDriftDetectorEdgeCases:
 
     def test_page_hinkley_single_value(self):
         """단일 값만 업데이트 → 아직 drift 감지 안 함."""
-        detector = PageHinkleyDriftDetector(lambda_val=5, alpha=0.005)
+        detector = PageHinkleyDriftDetector(lambda_=5, delta=0.005)
         result = detector.update(0.8)
         
         assert result is False, "Single value should not trigger drift"
 
     def test_page_hinkley_all_zeros(self):
         """모든 값이 0 → 안정적 → drift 미감지."""
-        detector = PageHinkleyDriftDetector(lambda_val=5, alpha=0.005)
+        detector = PageHinkleyDriftDetector(lambda_=5, delta=0.005)
         
         for _ in range(50):
             detector.update(0.0)
@@ -164,7 +164,7 @@ class TestDriftDetectorEdgeCases:
 
     def test_page_hinkley_extreme_swing(self):
         """극단 스윙: 0.9 → 0.1 → 0.9 → drift 감지 가능성."""
-        detector = PageHinkleyDriftDetector(lambda_val=2, alpha=0.005)
+        detector = PageHinkleyDriftDetector(lambda_=2, delta=0.005)
         
         results = []
         for _ in range(30):
@@ -179,14 +179,14 @@ class TestDriftDetectorEdgeCases:
 
     def test_cusum_initialization(self):
         """CUSUM 초기화 상태."""
-        detector = CUSUMDriftDetector(h=4, delta=0.5)
+        detector = CUSUMDriftDetector(h=4, k=0.5)
         
         result = detector.update(0.8)
         assert result is False, "Initial state should not detect drift immediately"
 
     def test_cusum_sustained_degradation(self):
         """CUSUM: 지속적 악화 → drift 감지."""
-        detector = CUSUMDriftDetector(h=4, delta=0.5)
+        detector = CUSUMDriftDetector(h=4, k=0.5)
         
         # 안정적인 시작
         for _ in range(20):
@@ -206,7 +206,7 @@ class TestDriftDetectorEdgeCases:
 
     def test_drift_detector_reset(self):
         """Drift detector 초기화 후 상태 리셋."""
-        detector = PageHinkleyDriftDetector(lambda_val=5, alpha=0.005)
+        detector = PageHinkleyDriftDetector(lambda_=5, delta=0.005)
         
         for _ in range(20):
             detector.update(0.8)

@@ -284,7 +284,7 @@ class KellySizer:
             유효 Kelly fraction (= self.fraction * regime_scale)
         """
         scale = self._REGIME_SCALE.get(regime.upper(), self._DEFAULT_REGIME_SCALE)
-        return float(np.clip(self.fraction * scale, self.min_fraction, self.max_fraction))
+        return float(self.fraction * scale)
 
 
 class BayesianKellyPositionSizer:

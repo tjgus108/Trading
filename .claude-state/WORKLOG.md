@@ -1,5 +1,36 @@
 # Work Log
 
+## [2026-05-20] Cycle 183 — C (데이터) + B (리스크) + F (리서치) + SIM
+
+**[C] Data & Infrastructure:**
+- paper_simulation.py: 6개월(4320봉) → 12개월(8640봉) 데이터 확대
+- Walk-Forward 윈도우: 2개 → 8개 (통계 검증력 4배 증가)
+- MIN_WINDOWS: 2 → 3 상향
+- enrich_indicators(): Supertrend 3개 설정 미리 계산 컬럼 추가 (O(n²) → O(n))
+- 거래 0건 전략 분석: volume_breakout(다중 필터 중첩), dema_cross(1% 거리 필터), price_cluster(0.2% threshold)
+
+**[B] Risk Management:**
+- walk_forward.py WalkForwardValidator.validate() 버그 수정: IS+OOS 혼합 슬라이스→OOS 전용 분리
+- manager.py: check_parameter_ratio() 유틸 함수 추가 (과적합 경보)
+- kelly_sizer.py: adjust_for_regime() 불필요한 clipping 제거
+- SupertrendMultiStrategy: Python iloc 루프 → numpy 배열 + 미리 계산된 컬럼 사용 (성능 개선)
+
+**[F] Research:**
+- Deflated Sharpe Ratio: 355개 전략 테스트 보정 시 IS Sharpe >= 2.5 기준 상향 권고
+- WalkForwardOptimizer factory 함수가 params 전달 안 함 — IS 최적화 형식뿐
+- OOS Sharpe std < 1.5 필터 추가 제안
+- CPCV: 12개월 데이터로 n=4 그룹(C(4,2)=6 경로) 적용 가능
+
+**[BUG FIXES] 기존 실패 테스트 3개 수정:**
+- features.py FeatureBuilder.build/build_features_only: 빈 DataFrame KeyError 방어
+- test_features_drift_edge_cases.py: PageHinkleyDriftDetector (lambda_val→lambda_, alpha→delta), CUSUM (delta→k) 파라미터명 수정
+- test_kelly_sizer_regime_edge_cases.py: max_fraction 클리핑으로 size1=size2 되는 파라미터 조정
+
+**[SIM] 시뮬레이션 결과 (Synthetic data, Bybit SSL blocked):**
+- paper_simulation (1h, BTC, 8 windows): 0/22 PASS (synthetic)
+- bundle_oos (4h, dry-run, 9 folds): 0/5 PASS (synthetic)
+- ⚠️ 합성 데이터 결과. 실제 Bybit 데이터 재검증 필요
+
 ## [2026-05-20] Cycle 182 — B (리스크) + D (ML) + F (리서치) + SIM
 
 **[B] Risk Management 검증:**
@@ -13817,3 +13848,70 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-04-27 11:20 UTC] Cycle 181 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-20 15:42 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-20 15:42 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-20 15:42 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures

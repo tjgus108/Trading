@@ -31,6 +31,10 @@ class SupertrendMultiStrategy(BaseStrategy):
     MIN_ROWS = 25
     ATR_THRESHOLD = 0.9  # ATR이 평균의 90% 이상이어야 신호 생성
 
+    def __init__(self) -> None:
+        # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
+        self._trend_cache: dict = {}
+
     def _compute_atr(self, df: pd.DataFrame, period: int) -> pd.Series:
         """True Range 기반 ATR 계산."""
         high = df["high"]
@@ -45,7 +49,7 @@ class SupertrendMultiStrategy(BaseStrategy):
         return atr
 
     def _compute_supertrend_trend(
-        self, df: pd.DataFrame, atr_period: int, mult: float
+        self, df: pd.DataFrame, atr_period: int, mult: float, _cache_key: tuple = ()
     ) -> pd.Series:
         """
         trend 시리즈 반환: 1 = bullish, -1 = bearish.
@@ -55,55 +59,33 @@ class SupertrendMultiStrategy(BaseStrategy):
           basic_lower = (high+low)/2 - mult * atr
           final_upper/lower 추적 후 trend 결정.
         """
+        import numpy as np
+
         hl2 = (df["high"] + df["low"]) / 2.0
         atr = self._compute_atr(df, atr_period)
 
-        basic_upper = hl2 + mult * atr
-        basic_lower = hl2 - mult * atr
+        bu_arr = (hl2 + mult * atr).to_numpy(dtype=float)
+        bl_arr = (hl2 - mult * atr).to_numpy(dtype=float)
+        close_arr = df["close"].to_numpy(dtype=float)
+        n = len(close_arr)
 
-        n = len(df)
-        final_upper = basic_upper.copy()
-        final_lower = basic_lower.copy()
-        trend = pd.Series(1, index=df.index, dtype=int)
-
-        close = df["close"]
+        fu = bu_arr.copy()
+        fl = bl_arr.copy()
+        trend = np.ones(n, dtype=np.int8)
 
         for i in range(1, n):
-            # final_upper: 현재 basic_upper가 이전 final_upper보다 작거나
-            # 이전 close가 이전 final_upper보다 작으면 갱신
-            bu = float(basic_upper.iloc[i])
-            fu_prev = float(final_upper.iloc[i - 1])
-            c_prev = float(close.iloc[i - 1])
-
-            if bu < fu_prev or c_prev < fu_prev:
-                final_upper.iloc[i] = bu
+            c_prev = close_arr[i - 1]
+            fu[i] = bu_arr[i] if (bu_arr[i] < fu[i - 1] or c_prev < fu[i - 1]) else fu[i - 1]
+            fl[i] = bl_arr[i] if (bl_arr[i] > fl[i - 1] or c_prev > fl[i - 1]) else fl[i - 1]
+            c = close_arr[i]
+            if c > fu[i - 1]:
+                trend[i] = 1
+            elif c < fl[i - 1]:
+                trend[i] = -1
             else:
-                final_upper.iloc[i] = fu_prev
+                trend[i] = trend[i - 1]
 
-            # final_lower: 현재 basic_lower가 이전 final_lower보다 크거나
-            # 이전 close가 이전 final_lower보다 크면 갱신
-            bl = float(basic_lower.iloc[i])
-            fl_prev = float(final_lower.iloc[i - 1])
-
-            if bl > fl_prev or c_prev > fl_prev:
-                final_lower.iloc[i] = bl
-            else:
-                final_lower.iloc[i] = fl_prev
-
-            # trend 결정: close vs final_upper_prev / final_lower_prev
-            c = float(close.iloc[i])
-            fu_prev_val = float(final_upper.iloc[i - 1])
-            fl_prev_val = float(final_lower.iloc[i - 1])
-            prev_trend = int(trend.iloc[i - 1])
-
-            if c > fu_prev_val:
-                trend.iloc[i] = 1
-            elif c < fl_prev_val:
-                trend.iloc[i] = -1
-            else:
-                trend.iloc[i] = prev_trend
-
-        return trend
+        return pd.Series(trend, index=df.index, dtype=int)
 
     def _atr_filter_pass(self, df: pd.DataFrame) -> bool:
         """
@@ -152,10 +134,14 @@ class SupertrendMultiStrategy(BaseStrategy):
             return self._hold(df, "ATR 필터 미충족: 변동성 부족")
 
         # 각 Supertrend의 마지막 완성봉(-2) trend 값 계산
+        # 미리 계산된 컬럼이 있으면 사용 (O(n²) 방지), 없으면 직접 계산
         trends_series: List[pd.Series] = []
         for atr_period, mult in self.CONFIGS:
-            t = self._compute_supertrend_trend(df, atr_period, mult)
-            trends_series.append(t)
+            col = f"st_trend_{atr_period}_{str(mult).replace('.', '_')}"
+            if col in df.columns:
+                trends_series.append(df[col])
+            else:
+                trends_series.append(self._compute_supertrend_trend(df, atr_period, mult))
 
         # 마지막 완성봉 기준으로 추세 확인
         last_trends = [int(t.iloc[-2]) for t in trends_series]

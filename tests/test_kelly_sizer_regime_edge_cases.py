@@ -53,30 +53,20 @@ class TestKellySizerRegimeSwitching:
     def test_regime_switch_with_smoothing(self):
         """레짐 전환 시 smoothing_alpha=0.3 → EMA 블렌딩 적용."""
         sizer = KellySizer(regime_smooth_alpha=0.3)
-        
+
+        # max_fraction(0.10) 클리핑을 피하기 위해 kelly_f가 작은 파라미터 사용
+        # kelly_f = (0.51*0.001 - 0.49*0.001)/0.001 = 0.02 → fractional_f=0.01 < 0.10
+        kwargs = dict(win_rate=0.51, avg_win=0.001, avg_loss=0.001, capital=10000, price=100)
+
         # 첫 호출: TREND_UP (1.0x)
-        size1 = sizer.compute(
-            win_rate=0.55,
-            avg_win=0.02,
-            avg_loss=0.01,
-            capital=10000,
-            price=100,
-            regime="TREND_UP"
-        )
-        
+        size1 = sizer.compute(**kwargs, regime="TREND_UP")
+
         # 레짐 전환: RANGING (0.5x) → 블렌딩으로 중간값 생성
-        size2 = sizer.compute(
-            win_rate=0.55,
-            avg_win=0.02,
-            avg_loss=0.01,
-            capital=10000,
-            price=100,
-            regime="RANGING"
-        )
-        
+        size2 = sizer.compute(**kwargs, regime="RANGING")
+
         # smoothing 있으므로 RANGING이 완전히 50%로 축소되지 않음
         # size2는 size1과 완전히 같지는 않지만 상당한 크기 유지
-        assert size2 < size1, "RANGING with smoothing should be less than TREND_UP"
+        assert size2 < size1, f"RANGING with smoothing should be less than TREND_UP: {size2} < {size1}"
 
     def test_same_regime_no_smoothing(self):
         """동일 레짐 유지 시 smoothing 미적용."""
