@@ -1,18 +1,29 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 187 B+D+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 188 E+A+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 187 완료
-- 187 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
-- 다음 Cycle 188: **188 mod 5 = 3 → E(실행) + A(품질) + F(리서치)**
+### 로테이션: Cycle 188 완료
+- 188 mod 5 = 3 → **E(실행) + A(품질) + F(리서치)** 패턴 ✅
+- 다음 Cycle 189: **189 mod 5 = 4 → C(데이터) + B(리스크) + F(리서치)**
 
-### 🔥 돌파구: Binance/OKX 실데이터 fetch 성공
-- Bybit SSL 차단이지만 Binance(2.36s), OKX(5.48s)로 1년치 OHLCV fetch 확인
-- DataFeed에 fallback 거래소 구현이 최우선 — 합성 데이터 한계 해소
+### 🔥 DataFeed Binance fallback 구현 완료 → 실데이터 OOS 재검증 가능
+- connector.py: fallback_exchanges=['binance','okx'] + fetch_ohlcv since + lazy init
+- feed.py: fetch_paginated() 대량 데이터 수집
+- **Binance 실데이터 EMA Cross 테스트**: IS Sharpe -0.44, OOS -0.25 (기본값, FAIL)
+- 합성 데이터 대비 거래 수 6배↑, Sharpe 덜 나쁨 → 실데이터가 더 유의미
+- **⚠️ 기본값 전략 FAIL → WF 파라미터 최적화 + 실데이터 조합으로 재검증 필수**
+
+### 📋 실데이터 전환 체크리스트 (Cycle 188 F 리서치)
+- [ ] 볼륨 단위 확인: Binance base vs Bybit quote 차이 (ccxt #25399)
+- [ ] 갭 탐지: df.index.diff() 확인
+- [ ] UTC 정규화: pd.to_datetime(..., utc=True)
+- [ ] 데이터 연속성: 12개월 = 8760행 검증
+- [ ] cross-exchange slippage: 0.05~0.1% 추가 패널티
+- [ ] 파라미터 재최적화: 소스 변경 시 WF 재실행 필수
 
 ### ✅ Cycle 186 A(품질) 완료 사항
 
@@ -138,8 +149,21 @@ _Last updated: 2026-05-21 (Cycle 187 B+D+F+SIM 완료)_
 
 ---
 
-**상태**: Cycle 187 완료 → Cycle 188 E(DataFeed fallback 구현) + A(실데이터 OOS 재검증) + F(리서치)
-**최우선 과제**: DataFeed에 Binance fallback 구현 → 실데이터 OOS 재검증 → PASS 전략 발굴
+**상태**: Cycle 188 완료 → Cycle 189 C(볼륨단위정규화) + B(실데이터 리스크 검증) + F(리서치)
+**최우선 과제**: Binance fallback으로 실데이터 확보 → WF 파라미터 최적화 → OOS PASS 전략 발굴
+
+### ✅ Cycle 188 E(실행) 완료 사항
+
+#### DataFeed fallback 거래소 구현 ✅ COMPLETE
+- **ExchangeConnector**: `fallback_exchanges` 파라미터 추가 (기본값: ['binance', 'okx'])
+- **ExchangeConnector.fetch_ohlcv**: `since` 파라미터 추가 + 기본 거래소 실패 시 fallback 자동 시도
+- **ExchangeConnector._get_fallback_exchange**: lazy init으로 public API 전용 인스턴스 생성 (API 키 불필요)
+- **ExchangeConnector.EXCHANGE_MAX_LIMIT**: 거래소별 최대 limit (binance:1000, okx:300, bybit:200)
+- **DataFeed.fetch_paginated**: 1년치(8760봉) 등 대량 데이터를 paginated loop로 수집
+  - 거래소별 batch limit 자동 적용, 중복 제거, rate limit 보호
+- **MockExchangeConnector**: `since`, `get_ohlcv_limit`, `exchange_name`, `_active_data_exchange` 호환 인터페이스 추가
+- **호환성**: 기존 코드 동작 변경 없음 (bybit 작동 시 bybit 사용, 실패 시에만 fallback)
+- **테스트**: 기존 125+ 테스트 전체 통과
 
 ### ✅ Cycle 187 완료 사항
 

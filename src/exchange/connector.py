@@ -23,7 +23,15 @@ API_CALL_TIMEOUT = 30
 
 
 class ExchangeConnector:
-    def __init__(self, exchange_name: str, sandbox: bool = True, timeout_ms: int = 15000):
+    # 거래소별 fetch_ohlcv 최대 limit
+    EXCHANGE_MAX_LIMIT = {
+        "binance": 1000,
+        "okx": 300,
+        "bybit": 200,
+    }
+
+    def __init__(self, exchange_name: str, sandbox: bool = True, timeout_ms: int = 15000,
+                 fallback_exchanges: Optional[List[str]] = None):
         self.exchange_name = exchange_name
         self.sandbox = sandbox
         self._timeout_ms = timeout_ms
@@ -31,6 +39,10 @@ class ExchangeConnector:
         self._last_balance: Optional[dict] = None
         self._consecutive_failures: int = 0
         self._max_consecutive_failures: int = 5  # 연속 실패 시 halt
+        # Fallback 거래소 (데이터 fetch 전용, 주문/잔고는 기본 거래소만 사용)
+        self._fallback_exchanges: List[str] = fallback_exchanges if fallback_exchanges is not None else ["binance", "okx"]
+        self._fallback_instances: dict = {}  # name -> ccxt.Exchange (lazy init)
+        self._active_data_exchange: Optional[str] = None  # 현재 데이터 fetch에 사용 중인 거래소
 
     def connect(self) -> None:
         exchange_class = getattr(ccxt, self.exchange_name)
@@ -250,12 +262,88 @@ class ExchangeConnector:
                     time.sleep(backoff)
         raise last_exc
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500) -> list:
-        data = self._retry(self.exchange.fetch_ohlcv, symbol, timeframe, limit=limit)
-        if not data:
-            raise ValueError(f"No OHLCV data returned for {symbol} {timeframe}")
-        logger.debug("Fetched %d candles for %s %s", len(data), symbol, timeframe)
-        return data
+    def _get_fallback_exchange(self, name: str) -> "ccxt.Exchange":
+        """Fallback 거래소 인스턴스를 lazy 초기화하여 반환 (public API 전용, 키 불필요)."""
+        if name in self._fallback_instances:
+            return self._fallback_instances[name]
+        if ccxt is None:
+            raise RuntimeError("ccxt not installed")
+        exchange_class = getattr(ccxt, name, None)
+        if exchange_class is None:
+            raise ValueError(f"Unknown exchange: {name}")
+        instance = exchange_class({
+            "enableRateLimit": True,
+            "timeout": self._timeout_ms,
+        })
+        instance.load_markets()
+        self._fallback_instances[name] = instance
+        logger.info("Fallback exchange initialized: %s (public API only)", name)
+        return instance
+
+    def get_ohlcv_limit(self, exchange_name: Optional[str] = None) -> int:
+        """거래소별 최대 OHLCV fetch limit 반환."""
+        name = exchange_name or self.exchange_name
+        return self.EXCHANGE_MAX_LIMIT.get(name, 500)
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500,
+                    since: Optional[int] = None) -> list:
+        """OHLCV 데이터 fetch. 기본 거래소 실패 시 fallback 거래소 자동 시도.
+
+        Args:
+            symbol: 거래 심볼 (예: "BTC/USDT")
+            timeframe: 타임프레임 (예: "1h")
+            limit: 캔들 개수
+            since: 시작 timestamp (ms). None이면 최근 데이터.
+
+        Returns:
+            OHLCV 리스트 [[timestamp, open, high, low, close, volume], ...]
+        """
+        fallback_list = getattr(self, '_fallback_exchanges', [])
+
+        # 1. 기본 거래소로 시도
+        primary_err = None
+        try:
+            kwargs = {"limit": limit}
+            if since is not None:
+                kwargs["since"] = since
+            data = self._retry(self.exchange.fetch_ohlcv, symbol, timeframe, **kwargs)
+            if data:
+                if hasattr(self, '_active_data_exchange'):
+                    self._active_data_exchange = self.exchange_name
+                logger.debug("Fetched %d candles for %s %s via %s",
+                             len(data), symbol, timeframe, self.exchange_name)
+                return data
+        except Exception as err:
+            primary_err = err
+            logger.warning("Primary exchange (%s) fetch_ohlcv failed: %s",
+                           self.exchange_name, str(err)[:200])
+
+        # 2. Fallback 거래소 순회
+        for fb_name in fallback_list:
+            if fb_name == self.exchange_name:
+                continue
+            try:
+                fb_exchange = self._get_fallback_exchange(fb_name)
+                kwargs = {"limit": min(limit, self.get_ohlcv_limit(fb_name))}
+                if since is not None:
+                    kwargs["since"] = since
+                data = fb_exchange.fetch_ohlcv(symbol, timeframe, **kwargs)
+                if data:
+                    if hasattr(self, '_active_data_exchange'):
+                        self._active_data_exchange = fb_name
+                    logger.info("Fetched %d candles for %s %s via FALLBACK %s",
+                                len(data), symbol, timeframe, fb_name)
+                    return data
+            except Exception as fb_err:
+                logger.warning("Fallback %s fetch_ohlcv failed: %s",
+                               fb_name, str(fb_err)[:200])
+                continue
+
+        # primary 에러가 있으면 그것을 re-raise
+        if primary_err is not None:
+            raise primary_err
+        raise ValueError(f"No OHLCV data returned for {symbol} {timeframe} "
+                         f"(tried {self.exchange_name} + fallbacks {fallback_list})")
 
     def fetch_funding_rate(self, symbol: str) -> dict:
         """현재 funding rate 조회 (ccxt fetchFundingRate).

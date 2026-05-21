@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-05-21 (Cycle 187)_
+_Last updated: 2026-05-21 (Cycle 188)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -17,16 +17,16 @@ _Last updated: 2026-05-21 (Cycle 187)_
 - **라이브**: live_paper_trader **100% 준비**
 - **OOS 인프라**: `scripts/run_bundle_oos.py` — 5-Bundle Rolling OOS 자동 실행 + 리포트 생성
 
-## 최근 작업 (Cycle 187)
+## 최근 작업 (Cycle 188)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
-| B (리스크) | ✅ | CircuitBreaker 급속 하락 감지 추가 (5%/5캔들/30분 쿨다운) |
-| D (ML) | ✅ | param stability CV 측정 + Sharpe-λ*CV penalty 목적함수 |
-| F (리서치) | ✅ | Binance/OKX 대안 데이터 fetch 확인 + 합성데이터 한계 분석 |
-| SIM | ✅ | Binance 8760봉(2.36s), OKX 8760봉(5.48s) fetch 성공 |
+| E (실행) | ✅ | DataFeed Binance fallback 구현 (connector+feed+mock 완료) |
+| A (품질) | ✅ | 7,605 테스트 전부 pass + 2건 수정 |
+| F (리서치) | ✅ | 실데이터 전환 체크리스트 + 볼륨 단위 차이 확인 |
+| SIM | ✅ | Binance 실데이터 EMA Cross: IS -0.44, OOS -0.25 (기본값 FAIL) |
 
 ## 주요 리스크/이슈
-- ⚠️ 실데이터 PASS 전략 0개 — 합성 데이터 IS Sharpe 음수
-- ✅ Binance/OKX fetch 성공 확인 — DataFeed fallback 구현으로 해소 가능
-- 다음 우선: DataFeed에 Binance fallback 추가 → 실데이터 OOS 재검증
-- 다음 우선: factory 수정된 상태로 OOS 재실행, fold별 param stability 측정
+- ⚠️ 실데이터 PASS 전략 0개 — 기본값 전략 실데이터에서도 FAIL
+- ✅ DataFeed Binance fallback 구현 완료 — 실데이터 확보 병목 해소
+- ⚠️ 볼륨 단위 불일치 주의: Binance(base) vs Bybit(quote) (ccxt #25399)
+- 다음 우선: Binance 실데이터 + WF 파라미터 최적화 → OOS 재검증

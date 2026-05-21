@@ -15,13 +15,18 @@ class MockExchangeConnector:
 
     def __init__(self, symbol: str = "BTC/USDT", base_price: float = 65000.0):
         self.symbol = symbol
+        self.exchange_name = "mock"
         self.base_price = base_price
         self._balance = {"total": {"USDT": 10000.0, "BTC": 0.0}}
+        self._active_data_exchange = "mock"
 
     def connect(self) -> None:
         logger.info("MockConnector: connected (no real exchange)")
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500) -> list:
+    def get_ohlcv_limit(self, exchange_name=None) -> int:
+        return 500
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500, since: int = None) -> list:
         now = int(time.time() * 1000)
         interval_map = {
             "1m": 60_000, "5m": 300_000, "15m": 900_000,
@@ -29,10 +34,15 @@ class MockExchangeConnector:
         }
         interval = interval_map.get(timeframe, 3_600_000)
 
+        # since가 주어지면 해당 시점부터 생성
+        start_ts = since if since is not None else (now - limit * interval)
+
         price = self.base_price
         candles = []
         for i in range(limit):
-            ts = now - (limit - i) * interval
+            ts = start_ts + i * interval
+            if ts > now:
+                break
             # 약한 상승 트렌드 + 랜덤 노이즈
             price = price * (1 + random.gauss(0.0002, 0.008))
             high = price * (1 + abs(random.gauss(0, 0.003)))
@@ -40,7 +50,7 @@ class MockExchangeConnector:
             vol  = random.uniform(5, 30)
             candles.append([ts, price, high, low, price, vol])
 
-        logger.debug("MockConnector: generated %d candles for %s %s", limit, symbol, timeframe)
+        logger.debug("MockConnector: generated %d candles for %s %s", len(candles), symbol, timeframe)
         return candles
 
     def fetch_balance(self) -> dict:

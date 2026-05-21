@@ -474,6 +474,122 @@ class DataFeed:
             'recovery_timeout_remaining': remaining,
         }
 
+    # 타임프레임 → 밀리초 매핑
+    _TF_MS = {
+        "1m": 60_000, "5m": 300_000, "15m": 900_000,
+        "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+    }
+
+    def fetch_paginated(self, symbol: str, timeframe: str, total_candles: int) -> DataSummary:
+        """Paginated OHLCV fetch: 거래소 limit 제한을 우회하여 대량 데이터 수집.
+
+        1년치(8760봉 @1h) 등 대량 데이터를 자동으로 페이지네이션하여 가져온다.
+        거래소별 최대 limit를 자동 적용하며, fallback 거래소도 지원.
+
+        Args:
+            symbol: 거래 심볼 (예: "BTC/USDT")
+            timeframe: 타임프레임 (예: "1h")
+            total_candles: 가져올 총 캔들 수 (예: 8760 = 1년 @1h)
+
+        Returns:
+            DataSummary: 수집된 OHLCV + 지표 포함 데이터 요약
+        """
+        tf_ms = self._TF_MS.get(timeframe)
+        if tf_ms is None:
+            raise ValueError(f"Unsupported timeframe for pagination: {timeframe}")
+
+        batch_limit = self.connector.get_ohlcv_limit()
+        now_ms = int(time.time() * 1000)
+        since = now_ms - (total_candles * tf_ms)
+
+        all_data: list = []
+        seen_ts: set = set()
+        stall_count = 0
+        max_stalls = 5
+
+        logger.info(
+            "fetch_paginated: %s %s, target=%d candles, batch=%d, exchange=%s",
+            symbol, timeframe, total_candles, batch_limit,
+            self.connector.exchange_name,
+        )
+
+        while len(all_data) < total_candles and since < now_ms:
+            try:
+                batch = self.connector.fetch_ohlcv(
+                    symbol, timeframe, limit=batch_limit, since=since,
+                )
+            except Exception as e:
+                logger.warning("fetch_paginated batch error: %s", e)
+                stall_count += 1
+                if stall_count >= max_stalls:
+                    logger.error("fetch_paginated: too many stalls, stopping")
+                    break
+                since += batch_limit * tf_ms
+                time.sleep(1)
+                continue
+
+            if not batch:
+                stall_count += 1
+                if stall_count >= max_stalls:
+                    break
+                since += batch_limit * tf_ms
+                time.sleep(0.5)
+                continue
+
+            stall_count = 0
+            new_count = 0
+            for row in batch:
+                ts = row[0]
+                if ts not in seen_ts:
+                    seen_ts.add(ts)
+                    all_data.append(row)
+                    new_count += 1
+
+            if new_count == 0:
+                stall_count += 1
+                if stall_count >= max_stalls:
+                    break
+
+            # 다음 페이지
+            since = batch[-1][0] + tf_ms
+            time.sleep(0.3)  # rate limit 보호
+
+        # 정렬 및 잘라내기
+        all_data.sort(key=lambda x: x[0])
+        all_data = all_data[:total_candles]
+
+        if not all_data:
+            raise ValueError(
+                f"fetch_paginated: no data collected for {symbol} {timeframe}"
+            )
+
+        used_exchange = getattr(self.connector, '_active_data_exchange', None) or self.connector.exchange_name
+        logger.info(
+            "fetch_paginated complete: %s %s, %d/%d candles via %s",
+            symbol, timeframe, len(all_data), total_candles, used_exchange,
+        )
+
+        df = self._to_dataframe(all_data)
+        if df.empty:
+            raise ValueError(f"Empty DataFrame after pagination for {symbol} {timeframe}")
+
+        missing = self._count_missing(df, timeframe)
+        anomalies = self._detect_anomalies(df)
+        df = self._add_indicators(df)
+        indicators = [c for c in df.columns if c not in {"open", "high", "low", "close", "volume"}]
+
+        return DataSummary(
+            symbol=symbol,
+            timeframe=timeframe,
+            candles=len(df),
+            start=str(df.index[0]),
+            end=str(df.index[-1]),
+            missing=missing,
+            indicators=indicators,
+            anomalies=anomalies,
+            df=df,
+        )
+
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
         raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
         df = self._to_dataframe(raw)
