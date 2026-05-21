@@ -95,7 +95,19 @@ def fetch_bybit_data(
             logger.warning("거래소 %s 연결 실패: %s", eid, str(e)[:80])
             continue
     if ex is None:
-        raise RuntimeError("모든 거래소 연결 실패 (bybit/binance/okx)")
+        # SSL 우회 재시도
+        for eid in exchange_ids:
+            try:
+                candidate = getattr(ccxt, eid)({"timeout": 30000, "enableRateLimit": True, "verify": False})
+                test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
+                if test_data:
+                    ex = candidate
+                    logger.warning("%s SSL skip 연결", eid)
+                    break
+            except Exception:
+                continue
+    if ex is None:
+        raise RuntimeError("모든 거래소 연결 실패 (bybit/binance/okx, SSL skip 포함)")
 
     ex.timeout = 30000
     now_ms = int(time.time() * 1000)

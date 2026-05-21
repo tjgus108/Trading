@@ -68,8 +68,34 @@ def fetch_real_data_paginated(
     """Bybit에서 페이지네이션으로 장기 OHLCV 데이터 수집. 실패 시 None."""
     try:
         import ccxt
-        ex = ccxt.bybit()
-        ex.timeout = 20000
+        # 거래소 우선순위: bybit → binance → okx (SSL 차단 시 fallback)
+        exchange_ids = ["bybit", "binance", "okx"]
+        ex = None
+        for eid in exchange_ids:
+            try:
+                candidate = getattr(ccxt, eid)({"timeout": 20000, "enableRateLimit": True})
+                test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
+                if test_data:
+                    ex = candidate
+                    if eid != "bybit":
+                        print(f"[DATA] Bybit 차단, {eid}로 fallback", flush=True)
+                    break
+            except Exception:
+                continue
+        if ex is None:
+            for eid in exchange_ids:
+                try:
+                    candidate = getattr(ccxt, eid)({"timeout": 20000, "enableRateLimit": True, "verify": False})
+                    test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
+                    if test_data:
+                        ex = candidate
+                        print(f"[DATA] {eid} SSL skip 연결", flush=True)
+                        break
+                except Exception:
+                    continue
+        if ex is None:
+            print("[ERROR] 모든 거래소 연결 실패", flush=True)
+            return None
         tf_ms = TIMEFRAME_MS.get(timeframe, 3_600_000)
 
         all_data = []
