@@ -839,8 +839,10 @@ class RollingOOSValidator:
         avg_wfe = sum(f.wfe for f in folds) / len(folds)
         avg_sharpe = sum(f.oos_sharpe for f in folds) / len(folds)
         avg_pf = sum(f.oos_pf for f in folds) / len(folds)
+        # 거래 0건 폴드는 Sharpe=0으로 std를 부풀림 → 최소 1건 이상인 폴드만 std 계산
+        traded_sharpes = [f.oos_sharpe for f in folds if f.oos_trades >= 1]
         oos_sharpes = [f.oos_sharpe for f in folds]
-        oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
+        oos_std = _stats.stdev(traded_sharpes) if len(traded_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in folds)
 
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL

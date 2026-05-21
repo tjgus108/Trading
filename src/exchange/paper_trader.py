@@ -66,6 +66,7 @@ class PaperTrader:
         regime_router=None,           # src.strategy.regime_router.RegimeStrategyRouter (선택)
         performance_monitor=None,     # src.risk.performance_tracker.PerformanceMonitor (선택)
         vol_targeting=None,           # src.risk.vol_targeting.VolTargeting (선택)
+        kelly_sizer=None,             # src.risk.kelly_sizer.KellySizer (선택)
     ):
         self.account = PaperAccount(
             initial_balance=initial_balance,
@@ -85,6 +86,10 @@ class PaperTrader:
         # ── VolTargeting integration ────────────────────────────────────────
         self._vol_targeting = vol_targeting
         self._vol_targeting_adjustments: int = 0
+
+        # ── KellySizer integration ──────────────────────────────────────────
+        self._kelly_sizer = kelly_sizer
+        self._kelly_sizer_adjustments: int = 0
 
     # ── Regime interface ────────────────────────────────────────────────────
 
@@ -199,6 +204,22 @@ class PaperTrader:
             except Exception as exc:
                 logger.warning("vol_targeting.adjust failed: %s", exc)
 
+        # KellySizer-based position sizing (BUY만 적용)
+        # rolling 기록이 충분하면 compute_dynamic()으로 수량을 결정
+        if action == "BUY" and self._kelly_sizer is not None:
+            try:
+                kelly_qty = self._kelly_sizer.compute_dynamic(
+                    capital=self.account.balance, price=price
+                )
+                if kelly_qty > 0 and kelly_qty != quantity:
+                    logger.debug(
+                        "KellySizer: quantity %.6f → %.6f", quantity, kelly_qty
+                    )
+                    self._kelly_sizer_adjustments += 1
+                    quantity = kelly_qty
+            except Exception as exc:
+                logger.warning("kelly_sizer.compute_dynamic failed: %s", exc)
+
         # Input validation
         if quantity <= 0:
             return {"status": "rejected", "reason": "quantity must be positive"}
@@ -276,6 +297,10 @@ class PaperTrader:
             trade.pnl = pnl
             self.account.balance += proceeds
             self.account.total_pnl += pnl
+            # KellySizer에 거래 결과 기록 (percentage return 사용)
+            if self._kelly_sizer is not None and avg > 0:
+                pnl_pct = (actual_price - avg) / avg
+                self._kelly_sizer.record_trade(pnl_pct)
             new_qty = held - sell_qty
             if new_qty < 1e-9:  # float precision guard
                 self.account.positions.pop(symbol, None)
@@ -342,6 +367,8 @@ class PaperTrader:
             ),
             "vol_targeting_active": self._vol_targeting is not None,
             "vol_targeting_adjustments": self._vol_targeting_adjustments,
+            "kelly_sizer_active": self._kelly_sizer is not None,
+            "kelly_sizer_adjustments": self._kelly_sizer_adjustments,
         }
 
     def _calculate_max_drawdown(self) -> float:

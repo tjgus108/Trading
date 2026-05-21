@@ -228,6 +228,66 @@ class TestTripleBarrierLabels:
         assert len(X_tight) >= len(X_wide)
 
 
+# ── Cycle 194: 온체인 피처 ─────────────────────────────────────────────────────
+
+
+class TestOnchainFeatures:
+    """exchange_netflow, sopr 온체인 피처 통합 테스트 (Cycle 194)."""
+
+    def _make_ohlcv_with_onchain(self, n: int = 200) -> pd.DataFrame:
+        rng = np.random.default_rng(77)
+        close = 50000 + np.cumsum(rng.standard_normal(n) * 300)
+        close = np.abs(close)
+        df = pd.DataFrame({
+            "open": close,
+            "high": close + 100,
+            "low": close - 100,
+            "close": close,
+            "volume": 10.0 + np.abs(rng.standard_normal(n)),
+            "exchange_netflow": rng.standard_normal(n) * 1000,
+            "sopr": 1.0 + rng.standard_normal(n) * 0.05,
+        })
+        return df
+
+    def test_netflow_zscore_feature_added(self):
+        """exchange_netflow 컬럼 있으면 netflow_zscore 피처 생성."""
+        df = self._make_ohlcv_with_onchain()
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "netflow_zscore" in X.columns
+
+    def test_netflow_zscore_no_inf(self):
+        """netflow_zscore에 inf/-inf 없음."""
+        df = self._make_ohlcv_with_onchain()
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert not np.isinf(X["netflow_zscore"].dropna()).any()
+
+    def test_sopr_delta_feature_added(self):
+        """sopr 컬럼 있으면 sopr_delta 피처 생성."""
+        df = self._make_ohlcv_with_onchain()
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "sopr_delta" in X.columns
+
+    def test_no_onchain_columns_no_feature(self):
+        """onchain 컬럼 없으면 netflow_zscore/sopr_delta 피처 생성 안 됨."""
+        df = _make_ohlcv(200)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "netflow_zscore" not in X.columns
+        assert "sopr_delta" not in X.columns
+
+    def test_onchain_features_survive_build(self):
+        """build()에서 NaN 제거 후에도 피처 컬럼 유지."""
+        df = self._make_ohlcv_with_onchain()
+        fb = FeatureBuilder()
+        X, y = fb.build(df)
+        assert "netflow_zscore" in X.columns
+        assert "sopr_delta" in X.columns
+        assert len(X) > 0
+
+
 # ── 선택적 피처: BTC lag ──────────────────────────────────────────────────────
 
 
