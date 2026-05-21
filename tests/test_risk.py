@@ -188,6 +188,35 @@ def test_kelly_regime_none_unchanged():
     assert size_none == size_default
 
 
+def test_kelly_regime_detect_regime_aliases():
+    """detect_regime() 반환값("bull","bear","crisis")이 올바른 스케일로 매핑된다.
+
+    bull → 1.0 (TREND_UP), bear → 0.6 (TREND_DOWN), crisis → 0.3 (HIGH_VOL).
+    """
+    sizer = KellySizer(fraction=0.5, max_fraction=0.50)
+    kwargs = dict(win_rate=0.6, avg_win=0.02, avg_loss=0.01, capital=10000, price=50000)
+
+    size_bull = sizer.compute(**kwargs, regime="bull")
+    size_bear = sizer.compute(**kwargs, regime="bear")
+    size_crisis = sizer.compute(**kwargs, regime="crisis")
+    size_trend_up = sizer.compute(**kwargs, regime="TREND_UP")
+    size_trend_down = sizer.compute(**kwargs, regime="TREND_DOWN")
+    size_high_vol = sizer.compute(**kwargs, regime="HIGH_VOL")
+
+    # bull == TREND_UP
+    assert abs(size_bull - size_trend_up) < 1e-10, (
+        f"bull={size_bull} should equal TREND_UP={size_trend_up}"
+    )
+    # bear == TREND_DOWN
+    assert abs(size_bear - size_trend_down) < 1e-10, (
+        f"bear={size_bear} should equal TREND_DOWN={size_trend_down}"
+    )
+    # crisis == HIGH_VOL
+    assert abs(size_crisis - size_high_vol) < 1e-10, (
+        f"crisis={size_crisis} should equal HIGH_VOL={size_high_vol}"
+    )
+
+
 def test_kelly_from_trade_history_regime():
     """from_trade_history에 regime 전달 시 TREND_UP > TREND_DOWN 성립.
 
@@ -1384,3 +1413,37 @@ def test_cb_rapid_decline_reset_all_clears_state():
     cb.reset_all()
     assert cb.rapid_decline_cooldown == 0
     assert cb.is_triggered is False
+
+
+# ── DrawdownMonitor detect_regime() 별칭 테스트 ─────────────────────────────
+
+
+def test_drawdown_monitor_crisis_alias_tightens_daily_limit():
+    """set_regime('crisis') 시 HIGH_VOL과 동일하게 일일 DD 한도가 강화된다."""
+    dm_crisis = DrawdownMonitor(daily_limit=0.03)
+    dm_crisis.set_regime("crisis")
+    dm_high_vol = DrawdownMonitor(daily_limit=0.03)
+    dm_high_vol.set_regime("HIGH_VOL")
+    assert dm_crisis._effective_daily_limit() == dm_high_vol._effective_daily_limit()
+    assert dm_crisis._effective_daily_limit() == dm_crisis._high_vol_daily_limit
+
+
+def test_drawdown_monitor_bear_alias_cooldown_multiplier():
+    """set_regime('bear') 시 TREND_DOWN(1.5x)과 동일한 cooldown 배수."""
+    dm = DrawdownMonitor()
+    dm.set_regime("bear")
+    assert dm._regime_cooldown_multiplier() == 1.5
+
+
+def test_drawdown_monitor_bull_alias_cooldown_multiplier():
+    """set_regime('bull') 시 TREND_UP(0.5x)과 동일한 cooldown 배수."""
+    dm = DrawdownMonitor()
+    dm.set_regime("bull")
+    assert dm._regime_cooldown_multiplier() == 0.5
+
+
+def test_drawdown_monitor_crisis_alias_cooldown_multiplier():
+    """set_regime('crisis') 시 HIGH_VOL(2.0x)과 동일한 cooldown 배수."""
+    dm = DrawdownMonitor()
+    dm.set_regime("crisis")
+    assert dm._regime_cooldown_multiplier() == 2.0

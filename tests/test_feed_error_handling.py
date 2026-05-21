@@ -187,13 +187,114 @@ class TestRetryLogic:
         """Fatal errors are not retried."""
         connector = MagicMock()
         connector.fetch_ohlcv.side_effect = ValueError("bad symbol")
-        
+
         feed = DataFeed(connector, max_retries=3)
-        
+
         with pytest.raises(ValueError):
             feed.fetch("BXX/USDT", "1h")
-        
+
         assert connector.fetch_ohlcv.call_count == 1
+
+
+class TestExchangeFallback:
+    """DataFeed public exchange fallback tests."""
+
+    _CANDLE = [[1704067200000, 42000, 42500, 41800, 42300, 100]]
+
+    def _make_feed(self, fallback_ids=None):
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        return DataFeed(connector, max_retries=1, fallback_exchange_ids=fallback_ids or [])
+
+    def test_fallback_succeeds_when_primary_fails(self):
+        """Primary connector timeout → fallback exchange fetch succeeds."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=["binance"])
+
+        with patch.object(feed, "_fetch_public_ohlcv", return_value=self._CANDLE) as mock_pub:
+            result = feed.fetch("BTC/USDT", "1h")
+
+        assert result.symbol == "BTC/USDT"
+        mock_pub.assert_called_once_with("binance", "BTC/USDT", "1h", 500)
+        assert feed._exchange_fallback_count == 1
+
+    def test_fallback_tries_multiple_exchanges(self):
+        """First fallback exchange fails → second succeeds."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=["binance", "okx"])
+
+        call_results = [ValueError("binance error"), self._CANDLE]
+
+        def side_effect(exchange_id, *args, **kwargs):
+            res = call_results.pop(0)
+            if isinstance(res, Exception):
+                raise res
+            return res
+
+        with patch.object(feed, "_fetch_public_ohlcv", side_effect=side_effect):
+            result = feed.fetch("BTC/USDT", "1h")
+
+        assert result.symbol == "BTC/USDT"
+        assert feed._exchange_fallback_count == 1
+
+    def test_fallback_raises_when_all_exchanges_fail(self):
+        """All fallback exchanges fail → last exception raised."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=["binance", "okx"])
+
+        with patch.object(feed, "_fetch_public_ohlcv", side_effect=ValueError("all failed")):
+            with pytest.raises(Exception):
+                feed.fetch("BTC/USDT", "1h")
+
+    def test_no_fallback_when_list_empty(self):
+        """Empty fallback list → original error propagates."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=[])
+
+        with pytest.raises(TimeoutError):
+            feed.fetch("BTC/USDT", "1h")
+
+    def test_fatal_error_does_not_trigger_fallback(self):
+        """Fatal errors (ValueError) skip fallback even if configured."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = ValueError("bad symbol")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=["binance"])
+
+        with patch.object(feed, "_fetch_public_ohlcv") as mock_pub:
+            with pytest.raises(ValueError):
+                feed.fetch("BAD/SYM", "1h")
+
+        mock_pub.assert_not_called()
+
+    def test_exchange_fallback_count_in_cache_stats(self):
+        """exchange_fallback_count는 cache_stats()에 포함된다."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL timeout")
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=["binance"])
+
+        with patch.object(feed, "_fetch_public_ohlcv", return_value=self._CANDLE):
+            feed.fetch("BTC/USDT", "1h")
+
+        stats = feed.cache_stats()
+        assert "exchange_fallback_count" in stats
+        assert stats["exchange_fallback_count"] == 1
+
+    def test_default_fallback_exchanges_list(self):
+        """기본값(fallback_exchange_ids 미지정)은 빈 목록."""
+        connector = MagicMock()
+        feed = DataFeed(connector)
+        assert feed._fallback_exchange_ids == []
+
+    def test_explicit_fallback_exchanges_list(self):
+        """명시적으로 전달한 fallback 목록이 사용된다."""
+        connector = MagicMock()
+        feed = DataFeed(connector, fallback_exchange_ids=DataFeed.DEFAULT_FALLBACK_EXCHANGES)
+        assert "binance" in feed._fallback_exchange_ids
+        assert "okx" in feed._fallback_exchange_ids
 
 
 if __name__ == "__main__":

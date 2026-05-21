@@ -185,7 +185,17 @@ class DataFeed:
         "trending": 0.5,           # half TTL in trending regimes
     }
 
-    def __init__(self, connector: ExchangeConnector, cache_ttl: int = 60, max_retries: int = 3, max_cache_size: int = 128):
+    # 공개 API fallback 거래소 목록 (인증 불필요, OHLCV 공개 지원)
+    DEFAULT_FALLBACK_EXCHANGES: List[str] = ["binance", "okx", "bitget"]
+
+    def __init__(
+        self,
+        connector: ExchangeConnector,
+        cache_ttl: int = 60,
+        max_retries: int = 3,
+        max_cache_size: int = 128,
+        fallback_exchange_ids: Optional[List[str]] = None,
+    ):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._cache_ttl = cache_ttl  # 초 (base TTL)
@@ -199,6 +209,9 @@ class DataFeed:
         self._stale_cache: dict = {}  # (symbol, timeframe, limit) → (DataSummary, timestamp)
         self._fallback_count = 0       # 캐시 폴백 사용 횟수
         self._last_error_time: Optional[float] = None  # 마지막 에러 발생 시간
+        # ─ 공개 API 거래소 fallback (Bybit SSL 차단 대응, 명시적 설정 필요)
+        self._fallback_exchange_ids: List[str] = fallback_exchange_ids or []
+        self._exchange_fallback_count = 0  # 공개 API fallback 사용 횟수
 
     def _effective_ttl(self, symbol: str) -> float:
         """레짐 기반 캐시 TTL 계산. 고변동성이면 짧게, 저변동성이면 길게."""
@@ -444,6 +457,7 @@ class DataFeed:
             'regime_cache_size': len(self._regime_cache),
             'fallback_count': self._fallback_count,
             'stale_cache_size': len(self._stale_cache),
+            'exchange_fallback_count': self._exchange_fallback_count,
         }
 
 
@@ -481,19 +495,7 @@ class DataFeed:
     }
 
     def fetch_paginated(self, symbol: str, timeframe: str, total_candles: int) -> DataSummary:
-        """Paginated OHLCV fetch: 거래소 limit 제한을 우회하여 대량 데이터 수집.
-
-        1년치(8760봉 @1h) 등 대량 데이터를 자동으로 페이지네이션하여 가져온다.
-        거래소별 최대 limit를 자동 적용하며, fallback 거래소도 지원.
-
-        Args:
-            symbol: 거래 심볼 (예: "BTC/USDT")
-            timeframe: 타임프레임 (예: "1h")
-            total_candles: 가져올 총 캔들 수 (예: 8760 = 1년 @1h)
-
-        Returns:
-            DataSummary: 수집된 OHLCV + 지표 포함 데이터 요약
-        """
+        """Paginated OHLCV fetch: 거래소 limit 제한을 우회하여 대량 데이터 수집."""
         tf_ms = self._TF_MS.get(timeframe)
         if tf_ms is None:
             raise ValueError(f"Unsupported timeframe for pagination: {timeframe}")
@@ -550,11 +552,9 @@ class DataFeed:
                 if stall_count >= max_stalls:
                     break
 
-            # 다음 페이지
             since = batch[-1][0] + tf_ms
-            time.sleep(0.3)  # rate limit 보호
+            time.sleep(0.3)
 
-        # 정렬 및 잘라내기
         all_data.sort(key=lambda x: x[0])
         all_data = all_data[:total_candles]
 
@@ -590,8 +590,75 @@ class DataFeed:
             df=df,
         )
 
+    def _fetch_public_ohlcv(
+        self, exchange_id: str, symbol: str, timeframe: str, limit: int
+    ) -> list:
+        """공개 API로 OHLCV 조회 (인증 불필요). 실패 시 예외 발생."""
+        if ccxt is None:
+            raise RuntimeError("ccxt not available for public fallback")
+        exchange_class = getattr(ccxt, exchange_id, None)
+        if exchange_class is None:
+            raise ValueError(f"Unknown exchange: {exchange_id}")
+        ex = exchange_class({"enableRateLimit": True, "timeout": 15000})
+        raw = ex.fetch_ohlcv(symbol, timeframe, limit=limit)
+        if not raw:
+            raise ValueError(f"No OHLCV data from {exchange_id} for {symbol}")
+        return raw
+
+    def _fetch_fresh_with_exchange_fallback(
+        self, symbol: str, timeframe: str, limit: int
+    ) -> DataSummary:
+        """primary connector 실패 시 공개 API fallback 거래소 순서대로 시도."""
+        last_exc: Exception = RuntimeError("no fallback exchanges configured")
+        for exchange_id in self._fallback_exchange_ids:
+            try:
+                logger.info(
+                    "DataFeed: trying public fallback exchange=%s for %s %s",
+                    exchange_id, symbol, timeframe,
+                )
+                raw = self._fetch_public_ohlcv(exchange_id, symbol, timeframe, limit)
+                df = self._to_dataframe(raw)
+                if df.empty:
+                    raise ValueError(f"Empty OHLCV from {exchange_id}")
+                missing = self._count_missing(df, timeframe)
+                anomalies = self._detect_anomalies(df)
+                df = self._add_indicators(df)
+                indicators = [c for c in df.columns if c not in {"open", "high", "low", "close", "volume"}]
+                self._exchange_fallback_count += 1
+                logger.info(
+                    "DataFeed: public fallback SUCCESS via %s — %d candles for %s %s",
+                    exchange_id, len(df), symbol, timeframe,
+                )
+                return DataSummary(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    candles=len(df),
+                    start=str(df.index[0]),
+                    end=str(df.index[-1]),
+                    missing=missing,
+                    indicators=indicators,
+                    anomalies=anomalies,
+                    df=df,
+                )
+            except Exception as e:
+                logger.warning(
+                    "DataFeed: fallback exchange=%s failed for %s: %s",
+                    exchange_id, symbol, e,
+                )
+                last_exc = e
+        raise last_exc
+
     def _fetch_fresh(self, symbol: str, timeframe: str, limit: int) -> DataSummary:
-        raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
+        try:
+            raw = self.connector.fetch_ohlcv(symbol, timeframe, limit=limit)
+        except Exception as primary_exc:
+            if _is_transient_error(primary_exc) and self._fallback_exchange_ids:
+                logger.warning(
+                    "DataFeed: primary connector failed (%s), trying exchange fallback",
+                    type(primary_exc).__name__,
+                )
+                return self._fetch_fresh_with_exchange_fallback(symbol, timeframe, limit)
+            raise
         df = self._to_dataframe(raw)
         
         # 경계: 빈 DataFrame 처리

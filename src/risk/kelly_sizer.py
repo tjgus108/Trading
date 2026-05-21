@@ -257,11 +257,16 @@ class KellySizer:
         )
 
     # 레짐 → Kelly fraction 스케일 팩터
+    # detect_regime() 반환값("bull","bear","crisis") 별칭도 포함
     _REGIME_SCALE: dict = {
         "TREND_UP":   1.0,   # 상승장: 풀 Kelly
         "TREND_DOWN": 0.6,   # 하락장: 40% 축소 (손실 확률 상승)
         "RANGING":    0.5,   # 레인지장: 절반으로 축소
         "HIGH_VOL":   0.3,   # 고변동성: 크게 축소
+        # detect_regime() 별칭
+        "BULL":       1.0,
+        "BEAR":       0.6,
+        "CRISIS":     0.3,
     }
     _DEFAULT_REGIME_SCALE: float = 0.5  # 알 수 없는 레짐 보수적 처리
 

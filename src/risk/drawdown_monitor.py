@@ -97,11 +97,16 @@ class DrawdownMonitor:
     """
 
     # 레짐별 cooldown 배수 (기본 cooldown_seconds * 배수)
+    # detect_regime() 반환값("bull","bear","crisis") 별칭 포함
     REGIME_COOLDOWN_MULTIPLIERS: dict = {
         'TREND_UP': 0.5,     # 상승 추세: 짧은 cooldown
         'TREND_DOWN': 1.5,   # 하락 추세: 긴 cooldown
         'RANGING': 1.0,      # 횡보: 기본 cooldown
         'HIGH_VOL': 2.0,     # 고변동성: 가장 긴 cooldown
+        # detect_regime() 별칭
+        'BULL': 0.5,
+        'BEAR': 1.5,
+        'CRISIS': 2.0,
     }
 
     def __init__(
@@ -194,17 +199,17 @@ class DrawdownMonitor:
             regime: 레짐 문자열 — 'TREND_UP', 'TREND_DOWN', 'RANGING', 'HIGH_VOL'
         """
         self._current_regime = regime.upper() if regime else ''
-        if self._current_regime == 'HIGH_VOL':
+        if self._current_regime in ('HIGH_VOL', 'CRISIS'):
             logger.info(
-                'DrawdownMonitor: HIGH_VOL 레짐 — 일일 DD 한도 %.1f%% → %.1f%% 강화',
-                self.daily_limit * 100, self._high_vol_daily_limit * 100,
+                'DrawdownMonitor: %s 레짐 — 일일 DD 한도 %.1f%% → %.1f%% 강화',
+                self._current_regime, self.daily_limit * 100, self._high_vol_daily_limit * 100,
             )
         else:
             logger.debug('DrawdownMonitor: regime=%s (일일 한도=%.1f%%)', self._current_regime, self.daily_limit * 100)
 
     def _effective_daily_limit(self) -> float:
         """현재 레짐에 따른 실효 일일 DD 한도 반환."""
-        if self._current_regime == 'HIGH_VOL':
+        if self._current_regime in ('HIGH_VOL', 'CRISIS'):
             return self._high_vol_daily_limit
         return self.daily_limit
 

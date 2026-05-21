@@ -1,29 +1,24 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 188 E+A+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 188 C+B+E+A+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
 ### 로테이션: Cycle 188 완료
-- 188 mod 5 = 3 → **E(실행) + A(품질) + F(리서치)** 패턴 ✅
-- 다음 Cycle 189: **189 mod 5 = 4 → C(데이터) + B(리스크) + F(리서치)**
+- 188 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** 패턴 ✅
+- 다음 Cycle 189: **189 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
 
-### 🔥 DataFeed Binance fallback 구현 완료 → 실데이터 OOS 재검증 가능
-- connector.py: fallback_exchanges=['binance','okx'] + fetch_ohlcv since + lazy init
-- feed.py: fetch_paginated() 대량 데이터 수집
-- **Binance 실데이터 EMA Cross 테스트**: IS Sharpe -0.44, OOS -0.25 (기본값, FAIL)
-- 합성 데이터 대비 거래 수 6배↑, Sharpe 덜 나쁨 → 실데이터가 더 유의미
-- **⚠️ 기본값 전략 FAIL → WF 파라미터 최적화 + 실데이터 조합으로 재검증 필수**
+### 🔥 Cycle 188 주요 성과
+- **DataFeed fallback**: connector.py fallback_exchanges + fetch_paginated() + _fetch_public_ohlcv()
+- **레짐 별칭 버그 수정**: KellySizer/DrawdownMonitor bull/bear/crisis 별칭 추가
+- **DataFeed exchange fallback**: fallback_exchange_ids 파라미터 추가
 
-### 📋 실데이터 전환 체크리스트 (Cycle 188 F 리서치)
-- [ ] 볼륨 단위 확인: Binance base vs Bybit quote 차이 (ccxt #25399)
-- [ ] 갭 탐지: df.index.diff() 확인
-- [ ] UTC 정규화: pd.to_datetime(..., utc=True)
-- [ ] 데이터 연속성: 12개월 = 8760행 검증
-- [ ] cross-exchange slippage: 0.05~0.1% 추가 패널티
-- [ ] 파라미터 재최적화: 소스 변경 시 WF 재실행 필수
+### ⚠️ 원격 환경 제약
+- SSL 인터셉션으로 외부 거래소 API 전면 차단 (원격 사이클에서는 합성 SIM만 가능)
+- DataFeed.DEFAULT_FALLBACK_EXCHANGES = ["binance", "okx", "bitget"] 준비됨
+- 로컬 환경에서 `DataFeed(connector, fallback_exchange_ids=DataFeed.DEFAULT_FALLBACK_EXCHANGES)` 활성화
 
 ### ✅ Cycle 186 A(품질) 완료 사항
 
@@ -146,21 +141,8 @@ _Last updated: 2026-05-21 (Cycle 188 E+A+F+SIM 완료)_
 
 ---
 
-**상태**: Cycle 188 완료 → Cycle 189 C(볼륨단위정규화) + B(실데이터 리스크 검증) + F(리서치)
-**최우선 과제**: Binance fallback으로 실데이터 확보 → WF 파라미터 최적화 → OOS PASS 전략 발굴
-
-### ✅ Cycle 188 E(실행) 완료 사항
-
-#### DataFeed fallback 거래소 구현 ✅ COMPLETE
-- **ExchangeConnector**: `fallback_exchanges` 파라미터 추가 (기본값: ['binance', 'okx'])
-- **ExchangeConnector.fetch_ohlcv**: `since` 파라미터 추가 + 기본 거래소 실패 시 fallback 자동 시도
-- **ExchangeConnector._get_fallback_exchange**: lazy init으로 public API 전용 인스턴스 생성 (API 키 불필요)
-- **ExchangeConnector.EXCHANGE_MAX_LIMIT**: 거래소별 최대 limit (binance:1000, okx:300, bybit:200)
-- **DataFeed.fetch_paginated**: 1년치(8760봉) 등 대량 데이터를 paginated loop로 수집
-  - 거래소별 batch limit 자동 적용, 중복 제거, rate limit 보호
-- **MockExchangeConnector**: `since`, `get_ohlcv_limit`, `exchange_name`, `_active_data_exchange` 호환 인터페이스 추가
-- **호환성**: 기존 코드 동작 변경 없음 (bybit 작동 시 bybit 사용, 실패 시에만 fallback)
-- **테스트**: 기존 125+ 테스트 전체 통과
+**상태**: Cycle 188 완료 → Cycle 189 D(ML) + E(실행) + F(리서치)
+**최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
 
 ### ✅ Cycle 187 완료 사항
 

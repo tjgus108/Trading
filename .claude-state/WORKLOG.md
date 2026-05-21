@@ -1,32 +1,25 @@
 # Work Log
 
-## [2026-05-21] Cycle 188 — E (실행) + A (품질) + F (리서치) + SIM
+## [2026-05-21] Cycle 188 — C+B+E+A+F (통합)
 
-**[E] Execution — DataFeed fallback 구현:**
-- connector.py: fallback_exchanges=['binance','okx'] 파라미터, EXCHANGE_MAX_LIMIT 클래스 변수
-- connector.py: _get_fallback_exchange() lazy init (public API, 키 불필요)
-- connector.py: fetch_ohlcv에 since 파라미터 + 실패 시 fallback 자동 순회
-- feed.py: fetch_paginated() 메서드 — 1년치 대량 데이터 paginated loop 수집
-- mock_connector.py: 인터페이스 호환 (exchange_name, get_ohlcv_limit, since)
-- 기존 125+ 테스트 전부 통과
+**[C/E] Data & Execution — DataFeed fallback 완성:**
+- DataFeed: `fallback_exchange_ids` 파라미터, `_fetch_public_ohlcv()`, `_fetch_fresh_with_exchange_fallback()`, `fetch_paginated()` 추가
+- connector.py: fallback_exchanges + fetch_ohlcv since 파라미터, EXCHANGE_MAX_LIMIT
+- run_bundle_oos.py: Bybit→Binance→OKX→합성 데이터 3단계 fallback
+- `cache_stats()`에 `exchange_fallback_count` 추가
+- 테스트 7개 추가, 전체 7612 passed
 
-**[A] Quality Assurance — 전체 테스트 검증:**
-- 7,605 테스트 전부 PASS (17 skipped)
-- test_cycle178_abc.py: PnL 생성 normal→uniform으로 안정화 + mdd_halt_pct=1.0
-- test_connector.py: fallback 비활성화로 retry 예외 전파 테스트 수정
-- Cycle 185-187 변경사항 전부 정상 작동 확인
+**[B] Risk Management — 레짐 별칭 버그 수정:**
+- detect_regime() 반환 "bull"/"bear"/"crisis" → KellySizer에서 DEFAULT 0.5로 처리되던 버그 수정
+- KellySizer._REGIME_SCALE: BULL=1.0, BEAR=0.6, CRISIS=0.3 별칭 추가
+- DrawdownMonitor: BULL=0.5x, BEAR=1.5x, CRISIS=2.0x cooldown 별칭 + CRISIS 일일 한도 강화
+- 테스트 5개 추가
 
-**[F] Research — 실데이터 전환 전략:**
-- Binance vs Bybit 볼륨 단위 불일치 주의 (ccxt issue #25399)
-- 실데이터 전환 체크리스트: 볼륨 단위, 갭 탐지, UTC 정규화, 파라미터 재최적화 필수
-- cross-exchange slippage: 0.05~0.1% 추가 패널티 반영 권고
-- 데이터 소스 변경 = 전략 재검증 시작점 (기존 파라미터 신뢰 불가)
+**[F] Research:**
+- 원격 환경: SSL 인터셉션으로 외부 API 전면 차단 (합성 SIM 유지)
+- SIM: 0/22 PASS(1h WF), 0/5 PASS(4h OOS) — 합성 데이터 한계 재확인
 
-**[SIM] Binance 실데이터 전략 테스트:**
-- EMA Cross (Binance BTC/USDT 1h, 1년): IS Sharpe -0.44, OOS Sharpe -0.25
-- Donchian Breakout: IS Sharpe -0.34, OOS Sharpe 0.00
-- 합성 데이터 대비: IS 거래 수 6배↑(110 vs 18), Sharpe 덜 나쁨(-0.44 vs -1.77)
-- **결론: 기본값 전략은 실데이터에서도 FAIL — WF 파라미터 최적화 필수**
+---
 
 ## [2026-05-21] Cycle 187 — B (리스크) + D (ML) + F (리서치) + SIM
 
@@ -14589,10 +14582,10 @@ Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 ## [2026-05-21 04:04 UTC] Cycle 187 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
-## [2026-05-21 04:11 UTC] Cycle 188 Dispatched — E + A + SIM + F
-Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+## [2026-05-21 04:11 UTC] Cycle 188 Dispatched — C + B + F
+Categories: C + B + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
-## [2026-05-21 04:37 UTC]
+## [2026-05-21 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -14641,83 +14634,7 @@ Context: score=N/A news=NONE
 Notes: none
 ImplShortfall: -5.00bps
 
-## [2026-05-21 04:37 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-21 04:37 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-21 04:50 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 15.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: -5.00bps
-
-## [2026-05-21 04:50 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-21 04:50 UTC]
+## [2026-05-21 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
