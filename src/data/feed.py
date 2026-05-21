@@ -253,7 +253,9 @@ class DataFeed:
                 f"Will retry after {self._circuit_breaker.recovery_timeout}s"
             )
 
-        key = (symbol, timeframe, limit)
+        # 캐시 키 정규화: 심볼을 대문자로 통일해 hit율 향상
+        symbol_normalized = symbol.upper()
+        key = (symbol_normalized, timeframe, limit)
         now = time.time()
         effective_ttl = self._effective_ttl(symbol)
         if key in self._cache:
@@ -401,7 +403,9 @@ class DataFeed:
             if regime_cache_too:
                 self._regime_cache.clear()
         else:
-            keys_to_del = [k for k in self._cache if k[0] == symbol or k[1] == timeframe]
+            # 심볼 정규화: 캐시 키와 일치시키기 위해 대문자로 변환
+            symbol_normalized = symbol.upper() if symbol else None
+            keys_to_del = [k for k in self._cache if (symbol_normalized and k[0] == symbol_normalized) or (timeframe and k[1] == timeframe)]
             for k in keys_to_del:
                 del self._cache[k]
             if regime_cache_too and symbol:

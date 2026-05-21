@@ -34,15 +34,18 @@ class ExchangeConnector:
 
     def connect(self) -> None:
         exchange_class = getattr(ccxt, self.exchange_name)
-        self._exchange = exchange_class(
-            {
-                "apiKey": os.environ["EXCHANGE_API_KEY"],
-                "secret": os.environ["EXCHANGE_API_SECRET"],
-                "enableRateLimit": True,
-                "timeout": self._timeout_ms,
-                "options": {"fetchCurrencies": False},
-            }
-        )
+        config = {
+            "apiKey": os.environ["EXCHANGE_API_KEY"],
+            "secret": os.environ["EXCHANGE_API_SECRET"],
+            "enableRateLimit": True,
+            "timeout": self._timeout_ms,
+            "verify": True,  # SSL 인증서 검증 활성화 (기본값, False로 설정 시 검증 비활성화)
+            "options": {
+                "fetchCurrencies": False,
+                "aiohttp_trust_env": True,  # 프록시 환경 변수 지원 (HTTP_PROXY, HTTPS_PROXY)
+            },
+        }
+        self._exchange = exchange_class(config)
         if self.sandbox:
             self._exchange.set_sandbox_mode(True)
         # load_markets도 hang 가능 → 스레드 타임아웃으로 보호
