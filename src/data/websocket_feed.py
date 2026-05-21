@@ -75,6 +75,48 @@ class ConnectionMetrics:
     consecutive_failures: int = 0
 
 
+class ConnectionHealthMonitor:
+    """연결 상태 장기 추적 모니터."""
+
+    _MAX_HISTORY = 10
+
+    def __init__(self) -> None:
+        self._start_time: float = time.time()
+        self._last_candle_time: Optional[float] = None
+        self._reconnection_history: list = []  # [{timestamp, reason}]
+
+    def record_reconnection(self, reason: str) -> None:
+        """재연결 이벤트 기록."""
+        self._reconnection_history.append({"timestamp": time.time(), "reason": reason})
+        # 최근 10개만 유지
+        if len(self._reconnection_history) > self._MAX_HISTORY:
+            self._reconnection_history = self._reconnection_history[-self._MAX_HISTORY:]
+
+    def record_candle(self) -> None:
+        """캔들 수신 시 마지막 수신 시간 갱신."""
+        self._last_candle_time = time.time()
+
+    def is_stale(self, timeout_seconds: float = 300.0) -> bool:
+        """마지막 캔들 수신 후 timeout_seconds 초 이상 경과하면 True.
+        캔들을 한 번도 수신하지 않은 경우 False 반환 (아직 초기화 중).
+        """
+        if self._last_candle_time is None:
+            return False
+        return (time.time() - self._last_candle_time) >= timeout_seconds
+
+    def get_health_summary(self) -> dict:
+        """연결 상태 요약 딕셔너리 반환."""
+        now = time.time()
+        last_candle_age = (now - self._last_candle_time) if self._last_candle_time is not None else None
+        return {
+            "uptime_seconds": now - self._start_time,
+            "total_reconnections": len(self._reconnection_history),
+            "last_candle_age_seconds": last_candle_age,
+            "is_healthy": not self.is_stale(),
+            "reconnection_history": list(self._reconnection_history),
+        }
+
+
 class BinanceWebSocketFeed:
     """
     Binance WebSocket 기반 실시간 캔들 피드.
@@ -88,9 +130,10 @@ class BinanceWebSocketFeed:
     - max_retry: 5회 (약 62초 누적)
     """
 
-    def __init__(self, symbol: str = "btcusdt", interval: str = "1h"):
+    def __init__(self, symbol: str = "btcusdt", interval: str = "1h", stale_timeout: float = 300.0):
         self.symbol = symbol.lower().replace("/", "")
         self.interval = interval
+        self._stale_timeout = stale_timeout
         self._candles: Deque[CandleBar] = deque(maxlen=MAX_CANDLES)
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -99,7 +142,10 @@ class BinanceWebSocketFeed:
         self._connected = False
         self._last_obi: Optional[OrderBookImbalance] = None
         self._retry_count = 0
-        
+
+        # Health monitor
+        self._health_monitor = ConnectionHealthMonitor()
+
         # Metrics tracking
         self._start_time: Optional[float] = None
         self._last_candle_ts: Optional[float] = None
@@ -187,6 +233,10 @@ class BinanceWebSocketFeed:
     def candle_count(self) -> int:
         return len(self._candles)
 
+    def get_health_summary(self) -> dict:
+        """연결 상태 장기 요약 반환 (ConnectionHealthMonitor 위임)."""
+        return self._health_monitor.get_health_summary()
+
     def get_connection_metrics(self) -> ConnectionMetrics:
         """
         현재 연결 상태 및 성능 메트릭 반환.
@@ -246,7 +296,8 @@ class BinanceWebSocketFeed:
                 self._connected = False
                 self._retry_count += 1
                 self._consecutive_failures += 1
-                
+                self._health_monitor.record_reconnection(reason=str(e))
+
                 wait = self._calculate_backoff_with_jitter(self._retry_count)
                 logger.warning(
                     "WebSocket disconnected (retry %d/%d in %.2fs): %s",
@@ -270,6 +321,7 @@ class BinanceWebSocketFeed:
             async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
                 self._connected = True
                 self._reconnection_count += 1
+                self._health_monitor.record_reconnection(reason="connect")
                 logger.info("WebSocket connected: %s (reconnection #%d)", url, self._reconnection_count)
 
                 async for msg in ws:
@@ -304,6 +356,7 @@ class BinanceWebSocketFeed:
             self._candles.append(bar)
             self._last_candle_ts = time.time()
             self._total_candles_received += 1
+        self._health_monitor.record_candle()
 
         logger.debug(
             "New candle: %s O=%.2f H=%.2f L=%.2f C=%.2f V=%.2f",

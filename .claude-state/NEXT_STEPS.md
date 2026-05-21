@@ -1,36 +1,45 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 192 E+A+F 완료)_
+_Last updated: 2026-05-22 (Cycle 193 C+B+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 192 완료
-- 192 mod 5 = 2 → **E(실행) + A(품질) + F(리서치)** 패턴 ✅
-- 다음 Cycle 193: **193 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)**
+### 로테이션: Cycle 193 완료
+- 193 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** 패턴 ✅
+- 다음 Cycle 194: **194 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
+
+### 🔥 Cycle 193 주요 성과
+- **WebSocket ConnectionHealthMonitor**: stale 감지, 재연결 이력, health summary
+- **KellySizer rolling win_rate**: record_trade() + compute_dynamic() — 실전 데이터 기반 자동 포지션 사이징
+- **온체인 리서치**: Exchange Inflow 2σ→1주 하락 72%, 최우선 신호 3개 도출
+
+### 🎯 Cycle 194 권장 작업 (194 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+
+#### D(ML): 온체인 피처 통합 + 모델 개선
+- FeatureBuilder에 온체인 피처 인터페이스 추가 (exchange_netflow, sopr_delta)
+- Walk-Forward fold_decay 효과 검증 (합성 데이터에서도 가중치 차이 확인)
+- ML 모델 추론 속도 벤치마크
+
+#### E(실행): Paper Trading 실전 시뮬레이션
+- PaperTrader + VolTargeting(EWMA) + KellySizer(rolling) 통합 테스트
+- Telegram 알림 dry-run 검증
+- TWAP slippage 시뮬레이션 vs 리서치 수치 비교
+
+#### F(리서치): ML 모델 실전 배포 사례
+- ML 기반 트레이딩 시스템의 프로덕션 배포 아키텍처
+- 모델 재학습 주기 최적화 리서치
 
 ### 🔥 Cycle 192 주요 성과
 - **PaperTrader VolTargeting 연동**: 변동성 높을 때 자동 사이즈 축소
 - **TWAP 엣지 케이스 30개 테스트**: single-slice, 극단 가격, timeout, 대형 주문
 - **CircuitBreaker 직렬화 5개 테스트**: to_dict/from_dict 라운드트립 검증
-- **실행 품질 리서치**: EWMA λ=0.94 기관 표준, Paper→Live 갭 분석
 
-### 🎯 Cycle 193 권장 작업 (193 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
-
-#### C(데이터): DataFeed 실데이터 파이프라인 강화
-- Binance fetch_paginated() 안정성 테스트 (네트워크 끊김 대응)
-- 볼륨 정규화 자동 감지: ccxt exchange 속성으로 base/quote 자동 판별
-- WebSocket reconnect 지수 백오프 테스트
-
-#### B(리스크): VaR/CVaR 정확도 검증
-- Cornish-Fisher VaR: 합성 데이터로 confidence level별 커버리지 검증
-- KellySizer: win_rate 동적 추정 (rolling window 기반)
-- DrawdownMonitor: 레짐별 block 한도 시뮬레이션 테스트
-
-#### F(리서치): 대안 데이터 + 온체인 신호
-- on-chain whale tracking 실전 효과 리서치
-- DEX vs CEX 유동성 차이와 실행 전략
+### ✅ Cycle 193 완료 사항
+- WebSocket ConnectionHealthMonitor ✅
+- KellySizer rolling win_rate ✅
+- 온체인 데이터 + DEX/CEX 리서치 ✅
 
 ### 🔥 Cycle 191 주요 성과
 - **VolTargeting EWMA**: vol_method="ewma" 옵션으로 레짐 전환에 빠른 반응
@@ -164,7 +173,7 @@ _Last updated: 2026-05-22 (Cycle 192 E+A+F 완료)_
 
 ---
 
-**상태**: Cycle 192 완료 → Cycle 193 C(데이터) + B(리스크) + F(리서치)
+**상태**: Cycle 193 완료 → Cycle 194 D(ML) + E(실행) + F(리서치)
 **최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
 
 ### ✅ Cycle 187 완료 사항

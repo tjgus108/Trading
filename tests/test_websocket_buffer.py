@@ -363,3 +363,101 @@ class TestWebSocketBackoffJitter:
             ratio = base_delays[i] / base_delays[i-1]
             # jitter 때문에 정확히 2배는 아니지만 1.8~2.2 범위
             assert 1.8 <= ratio <= 2.2, f"Step {i}: expected ~2x, got {ratio:.2f}x"
+
+
+class TestConnectionHealthMonitor:
+    """ConnectionHealthMonitor 단위 테스트."""
+
+    def _make_monitor(self):
+        from src.data.websocket_feed import ConnectionHealthMonitor
+        return ConnectionHealthMonitor()
+
+    def test_record_candle_clears_stale(self):
+        """record_candle 후 is_stale(very_large_timeout)은 False."""
+        m = self._make_monitor()
+        m.record_candle()
+        assert m.is_stale(timeout_seconds=9999) is False
+
+    def test_is_stale_no_candle_returns_false(self):
+        """캔들을 한 번도 수신하지 않으면 is_stale은 False (초기화 중 간주)."""
+        m = self._make_monitor()
+        assert m.is_stale(timeout_seconds=0) is False
+
+    def test_is_stale_after_timeout(self):
+        """마지막 캔들 수신 후 timeout 초 경과 시 True."""
+        m = self._make_monitor()
+        m._last_candle_time = time.time() - 400  # 400초 전 수신
+        assert m.is_stale(timeout_seconds=300) is True
+
+    def test_record_reconnection_increments_count(self):
+        """record_reconnection 호출 횟수가 history에 반영."""
+        m = self._make_monitor()
+        m.record_reconnection("test error 1")
+        m.record_reconnection("test error 2")
+        m.record_reconnection("test error 3")
+        summary = m.get_health_summary()
+        assert summary["total_reconnections"] == 3
+
+    def test_reconnection_history_capped_at_10(self):
+        """재연결 이력은 최근 10개만 유지."""
+        m = self._make_monitor()
+        for i in range(15):
+            m.record_reconnection(f"error {i}")
+        summary = m.get_health_summary()
+        assert len(summary["reconnection_history"]) == 10
+        # 최신 10개: error 5 ~ error 14
+        assert summary["reconnection_history"][-1]["reason"] == "error 14"
+
+    def test_get_health_summary_required_keys(self):
+        """get_health_summary 반환 딕셔너리에 필수 키 존재."""
+        m = self._make_monitor()
+        summary = m.get_health_summary()
+        for key in ("uptime_seconds", "total_reconnections", "last_candle_age_seconds",
+                    "is_healthy", "reconnection_history"):
+            assert key in summary, f"Missing key: {key}"
+
+    def test_get_health_summary_is_healthy_no_candle(self):
+        """캔들 미수신 상태에서 is_healthy는 True (is_stale=False)."""
+        m = self._make_monitor()
+        summary = m.get_health_summary()
+        assert summary["is_healthy"] is True
+
+    def test_get_health_summary_is_healthy_stale(self):
+        """stale 상태에서 is_healthy는 False."""
+        m = self._make_monitor()
+        m._last_candle_time = time.time() - 400
+        # is_stale 기본값 300초 기준
+        summary = m.get_health_summary()
+        assert summary["is_healthy"] is False
+
+    def test_get_health_summary_last_candle_age(self):
+        """last_candle_age_seconds: 캔들 없으면 None, 있으면 경과 초."""
+        m = self._make_monitor()
+        assert m.get_health_summary()["last_candle_age_seconds"] is None
+
+        m.record_candle()
+        age = m.get_health_summary()["last_candle_age_seconds"]
+        assert age is not None
+        assert age < 1.0  # 방금 호출했으므로 1초 미만
+
+    def test_feed_has_health_monitor(self):
+        """BinanceWebSocketFeed에 _health_monitor 속성 존재."""
+        from src.data.websocket_feed import BinanceWebSocketFeed, ConnectionHealthMonitor
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        assert hasattr(feed, "_health_monitor")
+        assert isinstance(feed._health_monitor, ConnectionHealthMonitor)
+
+    def test_feed_get_health_summary(self):
+        """BinanceWebSocketFeed.get_health_summary() 필수 키 반환."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+        summary = feed.get_health_summary()
+        for key in ("uptime_seconds", "total_reconnections", "last_candle_age_seconds",
+                    "is_healthy", "reconnection_history"):
+            assert key in summary
+
+    def test_feed_stale_timeout_param(self):
+        """stale_timeout=0 파라미터 수용."""
+        from src.data.websocket_feed import BinanceWebSocketFeed
+        feed = BinanceWebSocketFeed("btcusdt", "1h", stale_timeout=0)
+        assert feed._stale_timeout == 0

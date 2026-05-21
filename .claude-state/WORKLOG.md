@@ -1,5 +1,31 @@
 # Work Log
 
+## [2026-05-22] Cycle 193 — C(데이터) + B(리스크) + F(리서치)
+
+**[C] Data — WebSocket ConnectionHealthMonitor:**
+- `ConnectionHealthMonitor` 내부 클래스 추가: 재연결 이력, 캔들 수신 추적, stale 감지
+- `record_candle()`, `record_reconnection(reason)`, `is_stale(timeout)`, `get_health_summary()` 메서드
+- BinanceWebSocketFeed에 `stale_timeout` 파라미터 + `get_health_summary()` 공개 메서드
+- 캔들 수신/재연결 시점에 health monitor 호출 연동
+- 테스트 12개 추가
+
+**[B] Risk — KellySizer rolling win_rate 동적 추정:**
+- `record_trade(pnl)`: 거래 결과 기록 (deque maxlen=rolling_window)
+- `estimate_from_history()`: rolling win_rate, avg_win, avg_loss 자동 계산
+- `compute_dynamic(capital)`: history 기반 자동 포지션 사이징 (부족 시 min_fraction 반환)
+- `rolling_window=50`, `min_trades=10` 기본값
+- 테스트 8개 추가
+
+**[F] Research — 온체인 데이터 + DEX/CEX 분석:**
+- 온체인 고래 추적: 단기 신뢰도 낮음, Exchange Inflow 2σ→1주 하락 72% 정확도
+- MVRV/SOPR: 중장기 필터용, ETF 시대 이후 NVT 왜곡
+- DEX/CEX 차익거래: MEV가 일반 봇 수익 0.5-2% 잠식
+- 최우선 적용 3개: Exchange Netflow, DeFiLlama TVL, SOPR 28일 delta
+
+**테스트:** 154 passed (risk + websocket, pre-existing reconnect 실패 제외)
+
+---
+
 ## [2026-05-22] Cycle 192 — E(실행) + A(품질) + F(리서치)
 
 **[E] Execution — PaperTrader VolTargeting 연동:**
@@ -14884,3 +14910,6 @@ Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-21 18:22 UTC] Cycle 192 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 18:29 UTC] Cycle 193 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

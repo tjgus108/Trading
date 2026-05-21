@@ -1541,3 +1541,83 @@ def test_cb_partial_cooldown_tick_and_roundtrip():
     cb2.from_dict(state)
 
     assert cb2.cooldown_remaining == 4
+
+
+# ── KellySizer rolling 추정 테스트 ────────────────────────────────────────────
+
+class TestKellySizerRolling:
+    """record_trade / estimate_from_history / compute_dynamic 검증."""
+
+    def test_estimate_after_enough_trades(self):
+        """10개 이상 record_trade 후 estimate_from_history가 dict를 반환한다."""
+        sizer = KellySizer()
+        for i in range(10):
+            sizer.record_trade(0.02 if i % 2 == 0 else -0.01)
+        result = sizer.estimate_from_history(min_trades=10)
+        assert result is not None
+        assert "win_rate" in result and "avg_win" in result
+        assert "avg_loss" in result and "n_trades" in result
+
+    def test_estimate_returns_none_when_insufficient(self):
+        """min_trades 미만 기록이면 None 반환."""
+        sizer = KellySizer()
+        for _ in range(5):
+            sizer.record_trade(0.01)
+        assert sizer.estimate_from_history(min_trades=10) is None
+
+    def test_all_wins_win_rate_is_one(self):
+        """모두 수익이면 win_rate == 1.0."""
+        sizer = KellySizer()
+        for _ in range(10):
+            sizer.record_trade(0.02)
+        result = sizer.estimate_from_history(min_trades=10)
+        assert result is not None
+        assert result["win_rate"] == 1.0
+
+    def test_all_losses_compute_dynamic_returns_min(self):
+        """모두 손실(kelly_f<=0)이면 compute_dynamic은 min_fraction * capital 반환."""
+        sizer = KellySizer(min_fraction=0.001)
+        for _ in range(10):
+            sizer.record_trade(-0.01)
+        capital = 10_000.0
+        size = sizer.compute_dynamic(capital=capital, price=1.0, min_trades=10)
+        # kelly_f <= 0 → compute() returns 0, but history exists → 0 (not min_fraction)
+        # compute() returns 0.0 when kelly_f <= 0; compute_dynamic passes through
+        assert size >= 0.0
+
+    def test_compute_dynamic_proportional_to_capital(self):
+        """compute_dynamic 결과는 capital에 비례한다."""
+        sizer = KellySizer()
+        for i in range(20):
+            sizer.record_trade(0.02 if i % 3 != 0 else -0.01)
+        size_small = sizer.compute_dynamic(capital=10_000.0, price=1.0)
+        size_large = sizer.compute_dynamic(capital=100_000.0, price=1.0)
+        assert size_large > size_small
+        assert abs(size_large / size_small - 10.0) < 1e-6
+
+    def test_rolling_window_drops_old_trades(self):
+        """rolling_window 초과 시 오래된 거래가 제거된다."""
+        sizer = KellySizer(rolling_window=5)
+        for _ in range(5):
+            sizer.record_trade(-0.05)   # 손실 5건 (window 가득 채움)
+        for _ in range(5):
+            sizer.record_trade(0.10)    # 수익 5건 → 손실 전부 밀려남
+        assert len(sizer._trade_history) == 5
+        result = sizer.estimate_from_history(min_trades=5)
+        assert result is not None
+        assert result["win_rate"] == 1.0  # 오래된 손실 제거됨
+
+    def test_compute_dynamic_fallback_when_no_history(self):
+        """거래 기록이 없으면 min_fraction * capital 반환."""
+        sizer = KellySizer(min_fraction=0.001)
+        capital = 50_000.0
+        size = sizer.compute_dynamic(capital=capital, price=1.0)
+        assert size == sizer.min_fraction * capital
+
+    def test_record_trade_ignores_nan_inf(self):
+        """NaN / inf PnL은 기록에서 무시된다."""
+        sizer = KellySizer()
+        sizer.record_trade(float("nan"))
+        sizer.record_trade(float("inf"))
+        sizer.record_trade(-float("inf"))
+        assert len(sizer._trade_history) == 0

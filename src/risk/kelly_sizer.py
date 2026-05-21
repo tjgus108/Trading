@@ -17,7 +17,8 @@ Risk-Constrained Kelly (max_drawdown 제약):
 from __future__ import annotations
 
 import numpy as np
-from typing import Optional, List
+from collections import deque
+from typing import Deque, Optional, List
 
 
 class KellySizer:
@@ -36,6 +37,7 @@ class KellySizer:
         leverage: float = 1.0,
         kelly_cap: float = 0.25,
         regime_smooth_alpha: float = 0.0,
+        rolling_window: int = 50,
     ) -> None:
         """
         Args:
@@ -51,6 +53,7 @@ class KellySizer:
                        0.0 = 스무딩 없음(즉시 전환, 기본값), 1 = 이전 스케일 유지.
                        0.3 권장: 새 레짐 70% + 이전 스케일 30% 블렌딩.
                        레짐이 실제로 바뀔 때만 적용 (동일 레짐 반복 시 그대로).
+            rolling_window: rolling 추정에 사용할 최근 거래 수 (기본 50).
         """
         self.fraction = fraction
         self.max_fraction = max_fraction
@@ -59,9 +62,12 @@ class KellySizer:
         self.leverage = leverage
         self.kelly_cap = kelly_cap
         self.regime_smooth_alpha = float(np.clip(regime_smooth_alpha, 0.0, 1.0))
+        self.rolling_window = int(rolling_window)
         # 레짐 스무딩 상태: 이전 레짐명과 실효 스케일 추적
         self._prev_regime: Optional[str] = None
         self._prev_regime_scale: Optional[float] = None
+        # Rolling 거래 기록 (maxlen = rolling_window)
+        self._trade_history: Deque[float] = deque(maxlen=self.rolling_window)
 
     def compute(
         self,
@@ -165,6 +171,70 @@ class KellySizer:
         position_capital = capital * fractional_f * atr_factor * mdd_factor
         qty = position_capital / price
         return qty
+
+    def record_trade(self, pnl: float) -> None:
+        """거래 결과(PnL)를 내부 rolling 기록에 추가.
+
+        Args:
+            pnl: 거래 손익 (양수=수익, 음수=손실). NaN/inf는 무시.
+        """
+        if not np.isfinite(pnl):
+            return
+        self._trade_history.append(float(pnl))
+
+    def estimate_from_history(self, min_trades: int = 10) -> Optional[dict]:
+        """Rolling 거래 기록에서 win_rate / avg_win / avg_loss 추정.
+
+        Args:
+            min_trades: 유효한 추정을 위한 최소 거래 수 (기본 10).
+
+        Returns:
+            {"win_rate": float, "avg_win": float, "avg_loss": float, "n_trades": int}
+            거래 기록이 min_trades 미만이면 None 반환.
+        """
+        if len(self._trade_history) < min_trades:
+            return None
+
+        arr = np.array(self._trade_history, dtype=float)
+        wins = arr[arr > 0]
+        losses = arr[arr < 0]
+        n = len(arr)
+
+        win_rate = float(len(wins) / n)
+        avg_win = float(wins.mean()) if len(wins) > 0 else 0.0
+        avg_loss = float(abs(losses.mean())) if len(losses) > 0 else 0.0
+
+        return {
+            "win_rate": win_rate,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "n_trades": n,
+        }
+
+    def compute_dynamic(self, capital: float, price: float = 1.0, min_trades: int = 10) -> float:
+        """Rolling 거래 기록으로 자동 포지션 사이즈 계산.
+
+        estimate_from_history()가 None이면 (기록 부족) min_fraction * capital 반환.
+
+        Args:
+            capital: 총 자본 (통화)
+            price: 현재 가격 (기본 1.0, 수량 대신 자본 금액이 필요할 때 1.0 사용)
+            min_trades: estimate_from_history에 전달할 최소 거래 수 (기본 10)
+
+        Returns:
+            포지션 사이즈 (수량). 기록 부족 시 min_fraction * capital.
+        """
+        stats = self.estimate_from_history(min_trades=min_trades)
+        if stats is None:
+            return self.min_fraction * capital
+
+        return self.compute(
+            win_rate=stats["win_rate"],
+            avg_win=stats["avg_win"],
+            avg_loss=stats["avg_loss"],
+            capital=capital,
+            price=price,
+        )
 
     # 최소 거래 수: 이보다 적으면 Kelly 추정이 통계적으로 불안정
     MIN_TRADES_FOR_KELLY: int = 10
