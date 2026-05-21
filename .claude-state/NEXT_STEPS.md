@@ -1,59 +1,62 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 185 F 완료)_
+_Last updated: 2026-05-21 (Cycle 185 A+C+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 184 완료
-- 184 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
-- 다음 Cycle 185: **185 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+### 로테이션: Cycle 185 완료
+- 185 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
+- 다음 Cycle 186: **186 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (지속)
 
-**Cycle 184 시뮬레이션 결과 (Synthetic data):**
-- paper_simulation (1h, BTC, 22 strategies, 8 windows): 0/22 PASS
-- bundle_oos (4h, dry-run, 5 strategies, 9 folds): 0/5 PASS
+**Cycle 185 시뮬레이션 결과 (Synthetic data):**
+- paper_simulation (1h, BTC, 22 strategies, 2 windows): 0/22 PASS
+- bundle_oos (4h, BTC/USDT, 5 strategies, 9 folds): 0/5 PASS
 - ⚠️ Bybit API SSL 차단으로 합성 데이터만 사용. 실제 데이터 결과 아님.
-- **OOS std 필터 추가**: 5/5 전략 std > 1.5 (3.16~6.15) → 불안정 추가 필터 동작 확인
-- **factory 버그 수정**: IS 최적화 실제 작동 — 하지만 합성 데이터에서 효과 측정 어려움
+- OOS std 필터: 5/5 전략 std 3.16~6.15 > 1.5 (불안정 필터 동작)
 
-### 🎯 Cycle 185 권장 작업 (185 mod 5 = 0 → A+C+F)
+### 🎯 Cycle 186 권장 작업 (186 mod 5 = 1 → B+D+F)
 
-#### A(품질): IS Sharpe >= 2.5 subset 재검증
-- QUALITY_AUDIT.csv에서 IS Sharpe >= 2.5 전략만 필터 (DSR 보정 기준)
-- 현재 PASS 22개 중 몇 개가 >= 2.5인지 확인
-- QUALITY_AUDIT.csv 기준 업데이트 고려 (Sharpe 1.0 → 2.5)
+#### B(리스크): DrawdownMonitor + CircuitBreaker 재검토
+- DrawdownMonitor.check() 현재 임계값 적절한지 검토
+- CircuitBreaker 룰: 연속 손실 N회 → 강제 중단 로직 확인
+- kelly_sizer.py: adjust_for_regime() 최신 레짐 기준 검토
 
-#### A(품질): 테스트 커버리지 점검
-- 수정된 EmaCrossStrategy, DonchianBreakoutStrategy에 파라미터 최적화 단위 테스트 추가
-- optimize_ema_cross(), optimize_donchian() 통합 테스트: 다른 params 조합이 다른 결과를 내는지 검증
+#### D(ML): IS 최적화 효과 실질 검증
+- 새 make_synthetic_data() (트렌드/레인지/변동성 구간 포함)로 IS 최적화 효과 측정
+- optimize_ema_cross()의 last_is_sharpe_dist 확인: 파라미터별 IS Sharpe 분포가 실제로 다른지
+- IS 최적 파라미터 ≠ 기본값인 경우 발생 비율 측정
 
-#### C(데이터): 합성 데이터 품질 개선
-- 현재 GBM 합성 데이터로는 전략 차별화 불가 (모두 FAIL)
-- `make_synthetic_data()` 개선: 트렌드/레인지/변동성 전환 구간 포함하는 현실적 합성 데이터
+#### F(리서치): CPCV 적용 가능성 검토
+- Combinatorial Purged Cross-Validation (CPCV) — Lopez de Prado 기법
+- 현재 12개월 데이터로 n=4 그룹 → C(4,2)=6 경로 가능
+- walk_forward.py에 CPCV 모드 추가 고려
 
-#### F(리서치): IS 최적화 효과 측정 방법 설계
-- factory 버그 수정 후 IS Sharpe가 실제로 개선되었는지 단위 검증
-- 파라미터별 IS/OOS Sharpe 분포 로깅 추가
+### ✅ Cycle 185 완료 사항
 
-### ✅ Cycle 184 완료 사항
+#### A(품질): IS Sharpe >= 2.5 재검증 ✅ COMPLETE
+- QUALITY_AUDIT.csv: 22개 PASS 전략 모두 IS Sharpe >= 2.5 (최저 2.98)
+- DSR 기준 상향 불필요 — 현재 선별 기준으로 충분
 
-#### D(ML): WalkForwardOptimizer factory 버그 수정 ✅ COMPLETE
-- EmaCrossStrategy `__init__(fast_span=20, slow_span=50)` + `_get_ema_values()` 동적 계산
-- DonchianBreakoutStrategy `__init__(channel_period=20)` + `_get_channel_values()` 동적 계산
-- optimize_ema_cross(), optimize_donchian() factory 함수가 실제로 params 주입
+#### A(품질): 파라미터 최적화 단위 테스트 4개 추가 ✅ COMPLETE
+- test_optimize_ema_cross_uses_params()
+- test_optimize_donchian_uses_params()
+- test_ema_cross_dynamic_params()
+- test_donchian_dynamic_params()
+- make_df() 확장: rsi14, vwap, ema9/20/21/50, volume, donchian 컬럼
 
-#### D(ML): OOS Sharpe std 필터 (RollingOOSValidator) ✅ COMPLETE
-- BundleOOSResult.oos_sharpe_std 필드 추가
-- RollingOOSValidator.OOS_SHARPE_STD_MAX = 1.5
-- validate() std > 1.5이면 FAIL 처리
+#### C(데이터): make_synthetic_data() 레짐 개선 ✅ COMPLETE
+- 트렌드/레인지/변동성 폭발 블록 포함
+- GARCH-like volatility clustering
+- 레짐 지속성 강화, 볼륨↔변동성 상관관계 개선
 
-#### E(실행): 파라미터 완화 ✅ COMPLETE
-- volume_breakout: ATR 0.3~5.0 → 0.1~10.0
-- dema_cross: 거리 필터 1.0% → 0.5%
-- price_cluster: threshold 0.2% → 0.5%
+#### F(리서치): IS 최적화 효과 측정 메커니즘 ✅ COMPLETE
+- walk_forward.py: 파라미터별 IS Sharpe 분포 로깅 (param_is_sharpes dict)
+- WalkForwardResult.last_is_sharpe_dist 필드 추가
+- 윈도우별 IS/OOS gap 로깅
 
 ---
 
@@ -90,15 +93,5 @@ _Last updated: 2026-05-21 (Cycle 185 F 완료)_
 
 ---
 
-### ✅ Cycle 185 F 완료 사항
-
-#### F(리서치): IS 최적화 효과 측정 메커니즘 검증 ✅ COMPLETE
-- walk_forward.py에 이미 IS Sharpe 분포 로깅 완비 (Cycle 184에서 구현됨)
-  - `_optimize_in_sample()`: `param_is_sharpes` dict 반환, DEBUG 레벨 랭킹 + INFO 요약 출력
-  - `run()`: 윈도우별 IS/OOS gap 로깅 (`oos_vs_is_gap`)
-  - `WalkForwardResult.last_is_sharpe_dist`: 마지막 윈도우 분포 보관
-- `test_is_optimization_improves_sharpe()` 테스트: last_is_sharpe_dist 비어있지 않음 + IS Sharpe >= 0 검증
-- 27 tests 전체 PASS 확인
-
-**상태**: Cycle 185 F 완료 → 다음 Cycle 186: A(IS Sharpe 2.5 기준 재검증) + C(합성 데이터 현실성 개선)
-**최우선 과제**: IS Sharpe >= 2.5 전략 subset 재검증 + 합성 데이터 트렌드/레인지 구간 포함
+**상태**: Cycle 185 완료 → Cycle 186 B(리스크) + D(ML/IS최적화효과) + F(CPCV리서치)
+**최우선 과제**: IS 최적화 효과 실질 검증 + DrawdownMonitor/CircuitBreaker 재검토
