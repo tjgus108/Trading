@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-05-20 (Cycle 184 D+E+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 185 F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -90,5 +90,15 @@ _Last updated: 2026-05-20 (Cycle 184 D+E+F+SIM 완료)_
 
 ---
 
-**상태**: Cycle 184 완료 → Cycle 185 A(품질/IS Sharpe 2.5 기준) + C(합성 데이터 개선) + F(IS 최적화 효과 측정)
-**최우선 과제**: IS Sharpe >= 2.5 전략 subset 재검증 + 합성 데이터 현실성 개선
+### ✅ Cycle 185 F 완료 사항
+
+#### F(리서치): IS 최적화 효과 측정 메커니즘 검증 ✅ COMPLETE
+- walk_forward.py에 이미 IS Sharpe 분포 로깅 완비 (Cycle 184에서 구현됨)
+  - `_optimize_in_sample()`: `param_is_sharpes` dict 반환, DEBUG 레벨 랭킹 + INFO 요약 출력
+  - `run()`: 윈도우별 IS/OOS gap 로깅 (`oos_vs_is_gap`)
+  - `WalkForwardResult.last_is_sharpe_dist`: 마지막 윈도우 분포 보관
+- `test_is_optimization_improves_sharpe()` 테스트: last_is_sharpe_dist 비어있지 않음 + IS Sharpe >= 0 검증
+- 27 tests 전체 PASS 확인
+
+**상태**: Cycle 185 F 완료 → 다음 Cycle 186: A(IS Sharpe 2.5 기준 재검증) + C(합성 데이터 현실성 개선)
+**최우선 과제**: IS Sharpe >= 2.5 전략 subset 재검증 + 합성 데이터 트렌드/레인지 구간 포함

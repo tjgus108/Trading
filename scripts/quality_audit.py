@@ -32,119 +32,165 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
     현실적인 합성 OHLCV 데이터 생성 (트렌드/레인지/변동성 폭발 레짐 포함).
     
     Regime structure:
-    - Trend blocks (100~150 candles): mu=±0.003, sigma=0.015
-    - Range blocks (80~120 candles): mu=0, sigma=0.008
-    - Volatility spike blocks (40~60 candles): mu=0.0001, sigma=0.04~0.05
+    - Trend blocks (120~180 candles): mu=±0.002~0.004, sigma=0.012~0.018
+    - Range blocks (100~150 candles): mu=0, sigma=0.006~0.010
+    - Volatility spike blocks (50~80 candles): mu=±0.001, sigma=0.035~0.055
+    - Regime persistence: 각 레짐은 여러 블록 반복 후 전환
+    
+    개선사항:
+    1. GARCH-like volatility clustering
+    2. 더 현실적인 High/Low 생성
+    3. Regime 지속성 강화 (같은 레짐 반복)
+    4. 볼륨과 변동성 상관관계 개선
     """
     np.random.seed(seed)
     
-    # 레짐 블록 생성
+    # 레짐 블록 생성 (longer persistence for strategy differentiation)
     regime_blocks = []
     idx = 0
     
-    # Regime sequence for realism
-    regime_sequence = ["trend_up", "range", "trend_down", "range", "vol_spike", "range", "trend_up"]
-    regime_idx = 0
+    # 레짐 시퀀스: 더 긴 블록 + 레짐 지속성
+    regime_patterns = [
+        ("trend_up", 2, 120, 150),      # trend_up 2회 반복, 120-150 캔들
+        ("range", 1, 100, 150),         # range 1회, 100-150 캔들
+        ("trend_down", 2, 120, 150),    # trend_down 2회 반복
+        ("range", 1, 100, 150),
+        ("vol_spike", 1, 50, 80),       # vol_spike 1회, 50-80 캔들
+        ("range", 1, 100, 150),
+        ("trend_up", 2, 120, 150),
+    ]
     
+    pattern_idx = 0
     while idx < n:
-        regime = regime_sequence[regime_idx % len(regime_sequence)]
+        regime, repeat_count, min_size, max_size = regime_patterns[pattern_idx % len(regime_patterns)]
         
-        # Block size and parameters by regime
-        if regime == "trend_up":
-            size = np.random.randint(100, 151)
-            mu = 0.003  # strong uptrend
-            sigma = 0.015
-        elif regime == "trend_down":
-            size = np.random.randint(100, 151)
-            mu = -0.003  # strong downtrend
-            sigma = 0.015
-        elif regime == "range":
-            size = np.random.randint(80, 121)
-            mu = 0.0  # sideways
-            sigma = 0.008
-        elif regime == "vol_spike":
-            size = np.random.randint(40, 61)
-            mu = 0.0001  # slight drift
-            sigma = 0.04 + np.random.uniform(0, 0.01)  # 4~5% volatility
+        for _ in range(repeat_count):
+            if idx >= n:
+                break
+            size = np.random.randint(min_size, max_size + 1)
+            size = min(size, n - idx)
+            
+            # Regime별 파라미터
+            if regime == "trend_up":
+                mu = np.random.uniform(0.0020, 0.0040)  # stronger uptrend
+                sigma = np.random.uniform(0.012, 0.018)
+            elif regime == "trend_down":
+                mu = np.random.uniform(-0.0040, -0.0020)  # stronger downtrend
+                sigma = np.random.uniform(0.012, 0.018)
+            elif regime == "range":
+                mu = np.random.uniform(-0.0002, 0.0002)  # near zero drift
+                sigma = np.random.uniform(0.006, 0.010)  # lower volatility
+            elif regime == "vol_spike":
+                mu = np.random.uniform(-0.0005, 0.0005)  # slight drift
+                sigma = np.random.uniform(0.035, 0.055)  # high volatility
+            
+            regime_blocks.append({
+                "regime": regime,
+                "start": idx,
+                "size": size,
+                "mu": mu,
+                "sigma": sigma
+            })
+            idx += size
         
-        regime_blocks.append({
-            "regime": regime,
-            "start": idx,
-            "size": min(size, n - idx),
-            "mu": mu,
-            "sigma": sigma
-        })
-        
-        idx += min(size, n - idx)
-        regime_idx += 1
+        pattern_idx += 1
     
-    # Returns 생성: regime별 파라미터 사용
+    # Returns 생성: 개선된 변동성 클러스터링
     returns = np.zeros(n)
-    volumes_base = np.zeros(n)
+    volatility_state = np.zeros(n)  # GARCH-like state
     
     for block in regime_blocks:
         start = block["start"]
         size = block["size"]
-        end = start + size
         
-        # Generate returns for this block
-        block_returns = np.random.normal(block["mu"], block["sigma"], size)
-        returns[start:end] = block_returns
-        
-        # Volume: volatility spike 구간에서 더 높음
-        if block["regime"] == "vol_spike":
-            volumes_base[start:end] = np.random.lognormal(10.5, 0.8, size)
-        else:
-            volumes_base[start:end] = np.random.lognormal(10, 0.8, size)
+        # Block returns with volatility clustering
+        for i in range(size):
+            idx_in_block = start + i
+            
+            # GARCH: volatility persistence
+            if idx_in_block == 0:
+                volatility_state[idx_in_block] = block["sigma"]
+            else:
+                prev_vol = volatility_state[idx_in_block - 1]
+                prev_ret = returns[idx_in_block - 1]
+                # Simple GARCH(1,1) evolution
+                volatility_state[idx_in_block] = np.sqrt(
+                    0.02 * (block["sigma"] ** 2) +
+                    0.08 * (prev_ret ** 2) +
+                    0.90 * (prev_vol ** 2)
+                )
+            
+            # Generate return
+            Z = np.random.normal(0, 1)
+            returns[idx_in_block] = block["mu"] + volatility_state[idx_in_block] * Z
     
-    # 변동성 클러스터링 (추가 realism)
-    for i in range(1, n):
-        if abs(returns[i - 1]) > 0.02:
-            returns[i] *= 1.3
-    
-    # 가격 계산
+    # 가격 계산 (log-normal)
     close = 50000 * np.exp(np.cumsum(returns))
     
-    # OHLC 생성
-    high = close * (1 + np.abs(np.random.normal(0, 0.008, n)))
-    low = close * (1 - np.abs(np.random.normal(0, 0.008, n)))
-    open_ = close * (1 + np.random.normal(0, 0.003, n))
-    volume = volumes_base
+    # OHLC 생성 (개선: High/Low는 volatility state와 연관)
+    high_wicks = np.abs(np.random.normal(0, 1, n)) * volatility_state
+    low_wicks = np.abs(np.random.normal(0, 1, n)) * volatility_state
+    
+    high = close * (1 + high_wicks * 0.010)
+    low = close * (1 - low_wicks * 0.010)
+    
+    # Open: 이전 Close와 현재 Close 사이, 약간의 갭 가능성
+    open_ = np.zeros(n)
+    open_[0] = close[0]
+    for i in range(1, n):
+        # 이전 종가에서 시작하되 현재 종가를 향해 이동 + 작은 갭
+        gap_prob = 0.15 * (1 + volatility_state[i])
+        if np.random.random() < min(gap_prob, 0.4):
+            # 갭 발생
+            gap_direction = np.sign(close[i] - close[i-1])
+            gap_size = np.random.uniform(0, 0.003) * volatility_state[i]
+            open_[i] = close[i-1] * (1 + gap_direction * gap_size)
+        else:
+            # 갭 없음: 이전 종가와 현재 종가 사이
+            open_[i] = close[i-1] + (close[i] - close[i-1]) * np.random.uniform(-0.3, 0.7)
+    
+    # Volume: 변동성 상태에 강하게 연관
+    volume_base = 10 ** np.random.normal(10, 1.2, n)
+    volume = volume_base * (1 + 0.5 * volatility_state)
     
     df = pd.DataFrame({
         "open": open_,
-        "high": high,
-        "low": low,
+        "high": np.maximum(high, np.maximum(open_, close)),
+        "low": np.minimum(low, np.minimum(open_, close)),
         "close": close,
         "volume": volume,
     })
     
     # 지표 사전 계산
     df["atr14"] = _atr(df, 14)
-    df["ema50"] = df["close"].ewm(span=50).mean()
+    df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
     df["rsi14"] = _rsi(df["close"], 14)
-    df["sma20"] = df["close"].rolling(20).mean()
-    df["sma50"] = df["close"].rolling(50).mean()
-    df["bb_upper"] = df["sma20"] + 2 * df["close"].rolling(20).std()
-    df["bb_lower"] = df["sma20"] - 2 * df["close"].rolling(20).std()
-    df["macd"] = df["close"].ewm(span=12).mean() - df["close"].ewm(span=26).mean()
-    df["macd_signal"] = df["macd"].ewm(span=9).mean()
-    df["volume_sma20"] = df["volume"].rolling(20).mean()
+    df["sma20"] = df["close"].rolling(20, min_periods=1).mean()
+    df["sma50"] = df["close"].rolling(50, min_periods=1).mean()
+    df["bb_upper"] = df["sma20"] + 2 * df["close"].rolling(20, min_periods=1).std()
+    df["bb_lower"] = df["sma20"] - 2 * df["close"].rolling(20, min_periods=1).std()
+    df["macd"] = df["close"].ewm(span=12, adjust=False).mean() - df["close"].ewm(span=26, adjust=False).mean()
+    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+    df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
     df["return_5"] = df["close"].pct_change(5)
     
     # 추가 지표
-    df["ema20"] = df["close"].ewm(span=20).mean()
-    df["donchian_high"] = df["high"].rolling(20).max()
-    df["donchian_low"] = df["low"].rolling(20).min()
+    df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+    df["donchian_high"] = df["high"].rolling(20, min_periods=1).max()
+    df["donchian_low"] = df["low"].rolling(20, min_periods=1).min()
     
     # VWAP
     typical_price = (df["high"] + df["low"] + df["close"]) / 3
     cum_vol = df["volume"].cumsum()
     cum_tp_vol = (typical_price * df["volume"]).cumsum()
     df["vwap"] = cum_tp_vol / cum_vol.replace(0, np.nan)
-    df["vwap20"] = (typical_price * df["volume"]).rolling(20).sum() / df["volume"].rolling(20).sum()
+    df["vwap20"] = (
+        (typical_price * df["volume"]).rolling(20, min_periods=1).sum() / 
+        df["volume"].rolling(20, min_periods=1).sum()
+    )
 
     return df
+
 
 def _atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     hl = df["high"] - df["low"]
