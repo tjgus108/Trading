@@ -1,14 +1,22 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 189 D+E+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 190 A+C+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 189 완료
-- 189 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
-- 다음 Cycle 190: **190 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+### 로테이션: Cycle 190 완료
+- 190 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
+- 다음 Cycle 191: **191 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
+
+### 🔥 Cycle 190 주요 성과
+- **팩토리 함수 버그 수정**: optimize_* 8개 함수 → plateau_pct kwarg 추가 (누락 버그 수정)
+- **볼륨 단위 정규화**: DataFeed에 volume_unit="base"/"quote" 파라미터 + volume_quote 컬럼
+- **MDD 경계 케이스**: 단일 거래, 단조 하락, 회복 후 재하락 테스트 3개 추가
+- **plateau 효과 테스트**: 2개 추가 (그리드 내 선택 검증)
+- **paper_simulation.py 버그 수정**: .days AttributeError (RangeIndex vs DatetimeIndex)
+- **신규 테스트 10개** (7621 → 7631)
 
 ### 🔥 Cycle 189 주요 성과
 - **플래토 룰**: WalkForwardOptimizer에 plateau_pct=0.9 추가 — IS 최고 Sharpe 90% 이상 파라미터 중 중간값 선택
@@ -55,21 +63,21 @@ _Last updated: 2026-05-21 (Cycle 189 D+E+F+SIM 완료)_
 - 테스트: 캐시 hit율 향상 확인 (3개 신규 테스트 통과, 기존 23개 테스트 모두 통과)
 - 실무 환경에서 hit율 10~20% 향상 예상
 
-### 🎯 Cycle 190 권장 작업 (190 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 191 권장 작업 (191 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): 테스트 커버리지 향상
-- WalkForwardOptimizer plateau_pct 효과 검증 테스트 추가 (plateau 실제 선택 효과)
-- MDD 계산 경계 케이스 추가 (단일 거래, 모두 손실, 회복 후 재하락)
+#### B(리스크): KellySizer + DrawdownMonitor 개선
+- KellySizer: win_rate 동적 추정 (고정값 0.5 대신 rolling window 기반)
+- DrawdownMonitor: regime별 block 한도 시뮬레이션 검증 테스트 추가
+- VaR/CVaR 계산 정확도 검증 (합성 데이터로 confidence level별 검증)
 
-#### C(데이터): 볼륨 단위 정규화 + 실데이터 파이프라인 검증 (최우선)
-- Binance fetch_paginated()로 BTC/USDT 1h 12개월 데이터 수집
-- 볼륨 단위 확인/정규화 (base vs quote, ccxt #25399)
-- 데이터 갭 탐지, UTC 정규화, 연속성 검증
+#### D(ML): donchian_breakout 파라미터 그리드 확장
+- DEFAULT_GRIDS["donchian_breakout"]: 현재 단일 파라미터 3개 → atr_mult 등 추가로 6개+
+- plateau_pct 효과 검증: 확장 그리드에서 median 선택이 실제로 동작하는지 테스트
+- WalkForwardResult.fold_params_history 추가 — 각 fold에서 어떤 파라미터가 선택됐는지 기록
 
-#### F(리서치): Binance 실데이터 WF 최적화 전략 리서치
-- 7개 factory + 실데이터 WF 최적화 → 어떤 전략이 유망한지 사전 분석
-- plateau_pct 효과 실데이터 검증 — 중간값 선택이 실제로 OOS를 개선하는지 확인
-- cross-exchange slippage 실측 데이터 수집
+#### F(리서치): 실데이터 OOS PASS 전략 발굴 (로컬 환경)
+- 로컬 환경에서 DataFeed fallback 활성화 → Binance 실데이터 WF 최적화
+- volume_quote_sma20 신호 활용 전략 탐색 (볼륨 단위 정규화 효과 측정)
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
 

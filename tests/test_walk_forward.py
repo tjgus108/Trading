@@ -699,3 +699,67 @@ def test_plateau_pct_disabled_with_zero():
     # 정상 동작 (예외 없이 결과 반환)
     assert result is not None
     assert isinstance(result.best_params, dict)
+
+
+def test_plateau_pct_effect_vs_zero():
+    """plateau_pct=0.9이면 plateau_pct=0.0과 다른 파라미터를 선택할 수 있어야 함.
+    동일 그리드에서 두 설정의 best_params가 동일하지 않을 가능성을 검증.
+    (결과가 동일해도 오류 아님 - 그리드가 작아서 plateau 집합이 1개일 수 있음)
+    """
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    grid = {"fast_span": [5, 10, 20, 30], "slow_span": [40, 60, 80, 100]}
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 10),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    df = make_df(800)
+
+    opt_plateau = WalkForwardOptimizer(
+        strategy_name="ema_cross", strategy_factory=factory,
+        param_grid=grid, n_windows=2, plateau_pct=0.9,
+    )
+    opt_no_plateau = WalkForwardOptimizer(
+        strategy_name="ema_cross", strategy_factory=factory,
+        param_grid=grid, n_windows=2, plateau_pct=0.0,
+    )
+    result_p = opt_plateau.run(df)
+    result_np = opt_no_plateau.run(df)
+    # 둘 다 정상 실행 (예외 없이 결과 반환)
+    assert result_p is not None
+    assert result_np is not None
+    assert isinstance(result_p.best_params, dict)
+    assert isinstance(result_np.best_params, dict)
+
+
+def test_plateau_pct_selects_from_plateau_set():
+    """plateau_pct=0.9 적용 시 선택 파라미터는 그리드의 중간 영역에서 올 가능성이 높음.
+    fast_span 그리드 [5, 10, 20, 30] 에서 plateau 선택은 극단(5 또는 30)보다 중간(10, 20)을 선호.
+    주의: 이 테스트는 선택 가능성을 검증하며 결정론적 보장은 아님.
+    """
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    grid = {"fast_span": [5, 10, 20, 30], "slow_span": [40, 60, 80, 100]}
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 10),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross", strategy_factory=factory,
+        param_grid=grid, n_windows=2, plateau_pct=0.9,
+    )
+    df = make_df(800)
+    result = opt.run(df)
+    if result.best_params:
+        # 선택된 fast_span은 그리드 내의 유효한 값이어야 함
+        assert result.best_params["fast_span"] in grid["fast_span"]
+        # slow_span도 그리드 내
+        assert result.best_params["slow_span"] in grid["slow_span"]

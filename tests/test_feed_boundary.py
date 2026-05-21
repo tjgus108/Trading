@@ -207,3 +207,70 @@ class TestTimestampGapDetection:
         feed = DataFeed(connector)
         result = feed.fetch("BTC/USDT", "1h")
         assert not any("timestamp gaps" in a for a in result.anomalies)
+
+
+# ── 볼륨 단위 정규화 테스트 ──────────────────────────────────────
+
+class TestVolumeNormalization:
+    """볼륨 단위 정규화 테스트."""
+
+    def _make_raw(self, n=50, close=50000.0, base_vol=2.0):
+        """base volume 기준 raw OHLCV 생성."""
+        import time
+        ts = int(time.time() * 1000) - n * 3600000
+        return [
+            [ts + i * 3600000, close * 0.99, close * 1.01, close * 0.98, close, base_vol]
+            for i in range(n)
+        ]
+
+    def test_volume_unit_base_default(self):
+        """기본 volume_unit='base'이면 volume 변환 없음."""
+        connector = MagicMock()
+        raw = self._make_raw(close=50000.0, base_vol=2.0)
+        connector.fetch_ohlcv.return_value = raw
+        feed = DataFeed(connector, volume_unit="base")
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        # base volume 유지 (2.0)
+        assert abs(result.df["volume"].iloc[-1] - 2.0) < 0.01
+
+    def test_volume_unit_quote_converts_to_base(self):
+        """volume_unit='quote'이면 volume/close → base volume으로 변환."""
+        connector = MagicMock()
+        close = 50000.0
+        quote_vol = 100000.0  # 100000 USDT = 2 BTC at 50000
+        raw = self._make_raw(close=close, base_vol=quote_vol)
+        connector.fetch_ohlcv.return_value = raw
+        feed = DataFeed(connector, volume_unit="quote")
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        # quote 변환: 100000 / 50000 = 2.0 BTC
+        assert abs(result.df["volume"].iloc[-1] - 2.0) < 0.01
+
+    def test_volume_quote_column_always_present(self):
+        """volume_quote 컬럼은 항상 추가되어야 함."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw()
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        assert "volume_quote" in result.df.columns
+
+    def test_volume_quote_equals_volume_times_close(self):
+        """volume_quote = volume * close 검증."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(close=50000.0, base_vol=2.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        expected = df["volume"] * df["close"]
+        pd.testing.assert_series_equal(
+            df["volume_quote"].iloc[-10:],
+            expected.iloc[-10:],
+            check_names=False,
+        )
+
+    def test_volume_quote_sma20_present(self):
+        """volume_quote_sma20 컬럼이 추가되어야 함."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=50)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        assert "volume_quote_sma20" in result.df.columns

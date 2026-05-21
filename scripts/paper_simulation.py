@@ -347,7 +347,9 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     lines.append(f"_Generated: {datetime.utcnow().isoformat()}Z_")
     lines.append(f"_Symbol: {symbol}_")
     lines.append(f"_Data Source: {data_source}_")
-    lines.append(f"_Data Range: {df.index[0]} ~ {df.index[-1]} ({(df.index[-1] - df.index[0]).days}일)_")
+    _idx_diff = df.index[-1] - df.index[0]
+    _days_str = f"{_idx_diff.days}일" if hasattr(_idx_diff, 'days') else f"{len(df)}봉"
+    lines.append(f"_Data Range: {df.index[0]} ~ {df.index[-1]} ({_days_str})_")
     lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={TRAIN_HOURS}h, test={TEST_HOURS}h)_")
     lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.1% | Slippage: 0.05%_")
     lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_\n")

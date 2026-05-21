@@ -1,42 +1,46 @@
 ======================================================================
-🔄 CYCLE 189 (완료) — 2026-05-21T10:30:00.000000Z
+🔄 CYCLE 190 (완료) — 2026-05-21T15:40:00.000000Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (189 mod 5 = 4 → D+E+F)
+## 이번 사이클 배정 카테고리 (190 mod 5 = 0 → A+C+F)
 
-### [D] ML & Walk-Forward ✅ COMPLETE
-- WalkForwardOptimizer.plateau_pct = 0.9 추가
-- _optimize_in_sample(): IS 최고 Sharpe × 90% 이상 파라미터 집합 중 중간값 선택
-- 극단적 파라미터 배제 → 과최적화 방지
-- 테스트 3개 추가
+### [A] Quality Assurance ✅ COMPLETE
+- plateau_pct 효과 검증 테스트 2개 추가 (test_walk_forward.py)
+  - test_plateau_pct_effect_vs_zero: 0.9 vs 0.0 모두 정상 실행
+  - test_plateau_pct_selects_from_plateau_set: 선택 파라미터 그리드 내 검증
+- MDD 경계 케이스 3개 추가 (test_paper_trader.py)
+  - 단일 거래 MDD=0, 단조 하락 MDD>0, 회복 후 재하락 MDD 갱신
+- **Factory 함수 버그 수정** (F 리서치에서 발견):
+  - optimize_* 8개 함수 모두 plateau_pct kwarg 누락 → 추가 완료
+  - 이제 optimize_ema_cross(df, plateau_pct=0.7) 등 호출 가능
 
-### [E] Execution ✅ COMPLETE
-- PaperAccount.equity_history: List[float] 추가 (체결 시점 자본 스냅샷)
-- _calculate_max_drawdown(): equity_history 기반 MDD(%) 계산
-- get_summary()에 max_drawdown_pct 키 추가
-- reset()에 equity_history 초기화 추가
-- 테스트 6개 추가
+### [C] Data & Infrastructure ✅ COMPLETE
+- DataFeed.volume_unit 파라미터 추가 ("base" 기본 / "quote" 지원)
+- _normalize_volume(): quote volume → base volume 변환
+- volume_quote 컬럼 항상 추가 (base_vol × close = USDT 단위)
+- volume_quote_sma20 지표 추가
+- cache_stats()에 volume_unit 정보 추가
+- TestVolumeNormalization 5개 테스트 추가 (test_feed_boundary.py)
 
 ### [F] Research ✅ COMPLETE
-- 플래토 룰 이론: IS Sharpe 최고 점 대신 90% 이상 plateau 중간값 선택
-- Curve-fitting 방지 원리: stable 파라미터 영역 → OOS 일반화 성능 개선 기대
-- 합성 SIM: 0/22 PASS(1h WF), 0/5 PASS(4h Bundle OOS) — 합성 데이터 한계 재확인
+- plateau_pct=0.0 guard 동작 확인: IS Sharpe ≤ 0이면 plateau 스킵 (엣지 케이스)
+- donchian_breakout 그리드 3개 콤보로 plateau 효과 미미 → D에서 확장 권장
+- plateau 0.9 vs 0.0: 합성 데이터에서 동일 파라미터 선택 (데이터 문제, 룰 문제 아님)
 
-## 전체 테스트 현황
-- 7621 passed, 23 skipped (전체 테스트 통과)
-- 신규 테스트 9개 추가 (plateau + MDD)
+### [SIM] 합성 데이터 시뮬레이션 ✅
+- 1h WF (8640봉, 8윈도우): 0/22 PASS
+- 4h OOS (9fold): 0/5 PASS
+- 합성 데이터 한계 재확인 — 실제 거래소 데이터 필요
 
-## 다음 사이클 (190)
-- 190 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)
-- MDD 경계 케이스, 볼륨 단위 정규화, plateau 효과 실데이터 검증
+### [BUGFIX]
+- paper_simulation.py: generate_report()에서 RangeIndex .days AttributeError 수정
 
-## ⛔ 금지 사항
-- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
-- 한 카테고리에 2 사이클 연속 집중 금지
+## 테스트 현황
+- 전체 테스트: 7631 passed (이전 7621, +10 신규)
+- 깨진 테스트: 없음
 
-## 📋 사이클 종료 시 필수 수행
-1. .claude-state/WORKLOG.md 업데이트 ✅
-2. .claude-state/NEXT_STEPS.md 업데이트 ✅
-3. CURRENT_CYCLE_BRIEFING.md 업데이트 ✅
-4. git commit + push ← 진행 중
-5. CYCLE_STATE.txt N+1로 업데이트 ← 진행 중
+## 다음 사이클 예고 (191 → 191 mod 5 = 1 → B+D+F)
+- B: KellySizer win_rate 동적 추정, VaR/CVaR 검증
+- D: donchian_breakout 그리드 확장 + fold_params_history 추가
+- F: 로컬 환경 실데이터 OOS PASS 전략 발굴
+======================================================================

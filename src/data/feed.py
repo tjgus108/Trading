@@ -195,6 +195,7 @@ class DataFeed:
         max_retries: int = 3,
         max_cache_size: int = 128,
         fallback_exchange_ids: Optional[List[str]] = None,
+        volume_unit: str = "base",  # "base" (BTC) or "quote" (USDT)
     ):
         self.connector = connector
         self._cache: dict = {}       # (symbol, timeframe, limit) → (DataSummary, timestamp)
@@ -213,6 +214,8 @@ class DataFeed:
         self._fallback_exchange_ids: List[str] = fallback_exchange_ids or []
         self._exchange_fallback_count = 0  # 공개 API fallback 사용 횟수
 
+        # ─ 볼륨 단위 정규화
+        self._volume_unit = volume_unit  # "base" (BTC) 또는 "quote" (USDT)
     def _effective_ttl(self, symbol: str) -> float:
         """레짐 기반 캐시 TTL 계산. 고변동성이면 짧게, 저변동성이면 길게."""
         regime = self.get_cached_regime(symbol)
@@ -458,6 +461,7 @@ class DataFeed:
             'fallback_count': self._fallback_count,
             'stale_cache_size': len(self._stale_cache),
             'exchange_fallback_count': self._exchange_fallback_count,
+            'volume_unit': self._volume_unit,
         }
 
 
@@ -575,6 +579,7 @@ class DataFeed:
 
         missing = self._count_missing(df, timeframe)
         anomalies = self._detect_anomalies(df)
+        df = self._normalize_volume(df)
         df = self._add_indicators(df)
         indicators = [c for c in df.columns if c not in {"open", "high", "low", "close", "volume"}]
 
@@ -622,6 +627,7 @@ class DataFeed:
                     raise ValueError(f"Empty OHLCV from {exchange_id}")
                 missing = self._count_missing(df, timeframe)
                 anomalies = self._detect_anomalies(df)
+                df = self._normalize_volume(df)
                 df = self._add_indicators(df)
                 indicators = [c for c in df.columns if c not in {"open", "high", "low", "close", "volume"}]
                 self._exchange_fallback_count += 1
@@ -667,6 +673,7 @@ class DataFeed:
         
         missing = self._count_missing(df, timeframe)
         anomalies = self._detect_anomalies(df)
+        df = self._normalize_volume(df)
         df = self._add_indicators(df)
         indicators = [c for c in df.columns if c not in {"open", "high", "low", "close", "volume"}]
 
@@ -715,6 +722,23 @@ class DataFeed:
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
         df.set_index("timestamp", inplace=True)
         df = df.astype(float)
+        return df
+
+
+    def _normalize_volume(self, df: pd.DataFrame) -> pd.DataFrame:
+        """볼륨 단위 정규화.
+        
+        ccxt는 거래소마다 base(BTC) 또는 quote(USDT) 단위로 volume을 반환.
+        volume_unit="quote"이면 close로 나눠 base 단위로 변환.
+        항상 volume_quote (USDT 단위) 컬럼도 추가.
+        """
+        if self._volume_unit == "quote":
+            # quote volume → base volume 변환 (예: USDT → BTC)
+            close_safe = df["close"].replace(0, np.nan)
+            df["volume"] = df["volume"] / close_safe
+            df["volume"] = df["volume"].fillna(0.0)
+        # volume_quote: 항상 USDT 단위 (base volume * close)
+        df["volume_quote"] = df["volume"] * df["close"]
         return df
 
     def _count_missing(self, df: pd.DataFrame, timeframe: str) -> int:
@@ -891,6 +915,11 @@ class DataFeed:
 
         # Volume SMA
         df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
+        # Volume Quote (USDT 단위, volume_quote가 없을 경우 대비)
+        if "volume_quote" not in df.columns:
+            df["volume_quote"] = df["volume"] * df["close"]
+        df["volume_quote_sma20"] = df["volume_quote"].rolling(20, min_periods=1).mean()
+
 
         # Momentum
         df["return_5"] = close.pct_change(5)

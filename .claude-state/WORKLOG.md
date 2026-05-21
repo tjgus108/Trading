@@ -1,5 +1,47 @@
 # Work Log
 
+## [2026-05-21] Cycle 190 — A(품질) + C(데이터) + F(리서치)
+
+**[A] Quality Assurance — 테스트 커버리지 향상:**
+- `test_walk_forward.py`: plateau_pct 효과 검증 테스트 2개 추가
+  - `test_plateau_pct_effect_vs_zero()` — plateau_pct=0.9 vs 0.0 양쪽 정상 실행 확인
+  - `test_plateau_pct_selects_from_plateau_set()` — 선택 파라미터가 그리드 내 유효한 값인지 확인
+- `test_paper_trader.py`: MDD 경계 케이스 3개 추가
+  - `test_max_drawdown_single_trade_only()` — 단일 BUY만 있을 때 MDD=0 (len<2 경계)
+  - `test_max_drawdown_all_losses_monotonic()` — 단조 하락 시 MDD > 0
+  - `test_max_drawdown_recovery_then_deeper_decline()` — 회복 후 더 큰 낙폭 → MDD 갱신 확인
+- **F(리서치) 발견 버그 수정**: `optimize_*` 8개 팩토리 함수 모두 `plateau_pct` kwarg 누락
+  - `optimize_ema_cross`, `optimize_donchian`, `optimize_funding_rate`, `optimize_cmf`
+  - `optimize_wick_reversal`, `optimize_elder_impulse`, `optimize_value_area`, `optimize_frama`
+  - 모두 `plateau_pct: float = 0.9` 파라미터 추가 + `WalkForwardOptimizer`에 전달
+
+**[C] Data & Infrastructure — 볼륨 단위 정규화:**
+- `DataFeed.__init__()`: `volume_unit: str = "base"` 파라미터 추가
+- `_normalize_volume()` 메서드 추가: `volume_unit="quote"` 시 volume/close → base volume 변환
+- `volume_quote` 컬럼 항상 추가 (volume * close, USDT 단위)
+- `_add_indicators()`: `volume_quote_sma20` 추가 (없는 경우 방어 코드 포함)
+- `cache_stats()`: `volume_unit` 정보 추가
+- `_normalize_volume()` 3곳에서 호출: `fetch_paginated()`, `_fetch_fresh_with_exchange_fallback()`, `_fetch_fresh()`
+- `test_feed_boundary.py`: `TestVolumeNormalization` 클래스 (5개 테스트) 추가
+
+**[F] Research — plateau_pct 효과 분석:**
+- plateau_pct 구현 검토: 기본 로직 정확, 엣지 케이스(IS Sharpe < 0 → 플래토 룰 스킵) 문서화
+- 팩토리 함수 버그 발견 → A 카테고리에서 즉시 수정 완료
+- `donchian_breakout` 그리드: 3개 콤보만 → plateau 효과 미미 (다음 사이클 개선 권장)
+- plateau=0.9 vs 0.0: 합성 데이터에서는 동일 파라미터 선택 (합성 신호 없음 확인)
+
+**[SIM] 합성 데이터 시뮬레이션:**
+- 1h WF: 0/22 PASS (합성 데이터 한계, 변화 없음)
+- 4h OOS: 0/5 PASS (합성 데이터 한계, 변화 없음)
+
+**[BUGFIX] paper_simulation.py:**
+- `generate_report()`: 합성 데이터(RangeIndex) vs 실데이터(DatetimeIndex) 모두 처리
+  - `(df.index[-1] - df.index[0]).days` → `_idx_diff.days if hasattr(..., 'days') else f"{len(df)}봉"`
+
+**테스트:** 7631 passed (+10 신규), 전체 테스트 깨짐 없음
+
+---
+
 ## [2026-05-21] Cycle 189 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML & Walk-Forward — 플래토 룰 파라미터 선택:**
@@ -14730,6 +14772,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-21 10:15 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 15:38 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-21 15:38 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 15:38 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -478,7 +478,8 @@ class WalkForwardOptimizer:
 # 편의 팩토리 함수들
 # ------------------------------------------------------------------
 
-def optimize_ema_cross(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_ema_cross(df: pd.DataFrame, n_windows: int = 3,
+                       plateau_pct: float = 0.9) -> WalkForwardResult:
     """EMA Cross 전략 파라미터 최적화."""
     from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -493,11 +494,13 @@ def optimize_ema_cross(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResul
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["ema_cross"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_donchian(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_donchian(df: pd.DataFrame, n_windows: int = 3,
+                      plateau_pct: float = 0.9) -> WalkForwardResult:
     """Donchian Breakout 전략 파라미터 최적화."""
     from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 
@@ -511,11 +514,13 @@ def optimize_donchian(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["donchian_breakout"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3,
+                          plateau_pct: float = 0.9) -> WalkForwardResult:
     """FundingRate 전략 파라미터 최적화."""
     from src.strategy.funding_rate import FundingRateStrategy
 
@@ -530,10 +535,12 @@ def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardRe
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["funding_rate"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
-def optimize_cmf(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_cmf(df: pd.DataFrame, n_windows: int = 3,
+                 plateau_pct: float = 0.9) -> WalkForwardResult:
     """CMF 전략 파라미터 최적화."""
     from src.strategy.cmf import CMFStrategy
 
@@ -549,11 +556,13 @@ def optimize_cmf(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["cmf"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
+                           plateau_pct: float = 0.9) -> WalkForwardResult:
     """Wick Reversal 전략 파라미터 최적화."""
     from src.strategy.wick_reversal import WickReversalStrategy
 
@@ -568,11 +577,13 @@ def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardR
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["wick_reversal"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_elder_impulse(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_elder_impulse(df: pd.DataFrame, n_windows: int = 3,
+                           plateau_pct: float = 0.9) -> WalkForwardResult:
     """Elder Impulse 전략 파라미터 최적화."""
     from src.strategy.elder_impulse import ElderImpulseStrategy
 
@@ -587,11 +598,13 @@ def optimize_elder_impulse(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardR
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["elder_impulse"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_value_area(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_value_area(df: pd.DataFrame, n_windows: int = 3,
+                        plateau_pct: float = 0.9) -> WalkForwardResult:
     """Value Area 전략 파라미터 최적화."""
     from src.strategy.value_area import ValueAreaStrategy
 
@@ -606,11 +619,13 @@ def optimize_value_area(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResu
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["value_area"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 
 
-def optimize_frama(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
+                   plateau_pct: float = 0.9) -> WalkForwardResult:
     """FRAMA 전략 파라미터 최적화."""
     from src.strategy.frama import FRAMAStrategy
 
@@ -625,6 +640,7 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["frama"],
         n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 

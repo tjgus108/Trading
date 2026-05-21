@@ -978,3 +978,46 @@ def test_equity_history_cleared_on_reset():
     assert len(pt.account.equity_history) > 0
     pt.reset()
     assert len(pt.account.equity_history) == 0
+
+
+def test_max_drawdown_single_trade_only():
+    """단일 BUY 거래만 있을 경우(SELL 없음) equity_history에 1개 스냅샷 → MDD=0."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    # equity_history에 1개만 → _calculate_max_drawdown에서 len<2 → 0.0
+    assert pt._calculate_max_drawdown() == 0.0
+
+
+def test_max_drawdown_all_losses_monotonic():
+    """연속 손실 거래 (단조 하락) - MDD가 전체 낙폭에 해당하는지 확인."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    # 세 번 연속 손실
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=900.0, quantity=2.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "BUY", price=900.0, quantity=2.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=800.0, quantity=2.0, strategy="s", confidence="H")
+    summary = pt.get_summary()
+    # 10000 → ~9800 → ~9600 → 최소 MDD 양수
+    assert summary["max_drawdown_pct"] > 0.0
+
+
+def test_max_drawdown_recovery_then_deeper_decline():
+    """회복 후 더 큰 낙폭 발생 시 MDD는 두 번째(더 큰) 낙폭을 반영해야 함."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    # T1: 손실 (소폭)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=950.0, quantity=1.0, strategy="s", confidence="H")
+    mdd_after_t1 = pt._calculate_max_drawdown()
+    # T2: 회복 (수익)
+    pt.execute_signal("BTC/USDT", "BUY", price=950.0, quantity=1.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=1000.0, quantity=1.0, strategy="s", confidence="H")
+    # T3: 더 큰 손실
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=5.0, strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=700.0, quantity=5.0, strategy="s", confidence="H")
+    mdd_final = pt._calculate_max_drawdown()
+    # 최종 MDD가 T1 이후 MDD보다 커야 함
+    assert mdd_final > mdd_after_t1
