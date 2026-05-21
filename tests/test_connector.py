@@ -235,6 +235,7 @@ def test_fetch_ohlcv_retries_on_network_error():
 def test_fetch_ohlcv_raises_after_retries():
     """fetch_ohlcv: 모든 재시도 실패 → 예외 전파."""
     conn = _make_connector()
+    conn._fallback_exchanges = []  # Disable fallback exchanges
     conn._exchange.fetch_ohlcv.side_effect = ccxt.NetworkError("persistent")
 
     import unittest.mock as _mock

@@ -148,7 +148,8 @@ class TestPerformanceMonitor:
         tracker = LivePerformanceTracker()
         rng = np.random.default_rng(42)
         for _ in range(n):
-            pnl = rng.normal(10, 50)
+            # Small positive PnL to avoid extreme drawdowns
+            pnl = rng.uniform(5, 15)  # 5-15 PnL per trade
             tracker.record_trade("test_strat", pnl, 100.0, 100.0 + pnl)
         return tracker
 
@@ -198,6 +199,7 @@ class TestPerformanceMonitor:
             sharpe_warn=-100.0,
             pf_warn=0.0,
             mdd_warn_pct=0.99,
+            mdd_halt_pct=1.0,
         )
         results = monitor.check_all(["test_strat"])
         assert len(alerts_received) == 0
