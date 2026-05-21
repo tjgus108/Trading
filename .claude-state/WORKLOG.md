@@ -1,44 +1,46 @@
 # Work Log
 
+## [2026-05-22] Cycle 191 — B(리스크) + D(ML) + F(리서치)
+
+**[B] Risk — VolTargeting EWMA + PerformanceTracker 타임스탬프:**
+- `VolTargeting.__init__`에 `vol_method` 파라미터 추가 ("simple" / "ewma")
+- `ewma_span=20` 파라미터로 EWMA 감쇠율 조절
+- EWMA 변동성: `pd.Series(log_returns).ewm(span).std() * sqrt(annualization)` — 레짐 전환에 빠른 반응
+- `LivePerformanceTracker.record_trade()`에 `timestamp` 파라미터 추가 (None이면 time.time())
+- `get_hourly_pnl(strategy, hours=24)` 메서드 추가 — 시간별 PnL 버킷
+- 테스트: EWMA/simple 양수 반환, 변동성 민감도, 타임스탬프 확인
+
+**[D] ML — Walk-Forward fold 시간가중치(time-decay):**
+- `WalkForwardOptimizer.__init__`에 `fold_decay: float = 0.0` 파라미터 추가
+- 가중치: `w_i = exp(fold_decay * i)` 정규화 (i 클수록 최근 fold)
+- `WalkForwardResult.weighted_oos_sharpe` 필드 추가
+- `fold_decay=0`이면 weighted == avg (하위 호환)
+- PASS/FAIL 판단은 기존 avg_oos_sharpe 유지 (weighted는 정보 제공용)
+- 테스트 3개 추가 (동일가중, 최근 fold 우세, 초기 fold 우세)
+
+**[F] Research — 트레이딩봇 실패/성공 사례:**
+- Kronos $25M API 해킹(2023.11), dogwifhat $5.7M 슬리피지(2024.01), AI봇 플래시크래시 증폭(2025.05)
+- 90%+ 학술 전략이 실전 FAIL — OOS FAIL은 정상 패턴, 실데이터 확보가 유일한 탈출구
+- 최신 연구: Autoencoder+DualTransformer+RL 레짐 적응, XGBoost BTC 분류 55.9%
+- AlgoXpert IS→WFA→OOS 3단계 프로토콜이 우리 WalkForwardOptimizer 방향과 일치
+
+**테스트:** 247 passed, 0 failed (risk + walk_forward)
+
+---
+
 ## [2026-05-21] Cycle 190 — A(품질) + C(데이터) + F(리서치)
 
 **[A] Quality Assurance — 테스트 커버리지 향상:**
-- `test_walk_forward.py`: plateau_pct 효과 검증 테스트 2개 추가
-  - `test_plateau_pct_effect_vs_zero()` — plateau_pct=0.9 vs 0.0 양쪽 정상 실행 확인
-  - `test_plateau_pct_selects_from_plateau_set()` — 선택 파라미터가 그리드 내 유효한 값인지 확인
-- `test_paper_trader.py`: MDD 경계 케이스 3개 추가
-  - `test_max_drawdown_single_trade_only()` — 단일 BUY만 있을 때 MDD=0 (len<2 경계)
-  - `test_max_drawdown_all_losses_monotonic()` — 단조 하락 시 MDD > 0
-  - `test_max_drawdown_recovery_then_deeper_decline()` — 회복 후 더 큰 낙폭 → MDD 갱신 확인
-- **F(리서치) 발견 버그 수정**: `optimize_*` 8개 팩토리 함수 모두 `plateau_pct` kwarg 누락
-  - `optimize_ema_cross`, `optimize_donchian`, `optimize_funding_rate`, `optimize_cmf`
-  - `optimize_wick_reversal`, `optimize_elder_impulse`, `optimize_value_area`, `optimize_frama`
-  - 모두 `plateau_pct: float = 0.9` 파라미터 추가 + `WalkForwardOptimizer`에 전달
+- plateau_pct 효과 검증 테스트 2개 + MDD 경계 케이스 3개 추가
+- `optimize_*` 8개 팩토리 함수 `plateau_pct` kwarg 누락 버그 수정
 
 **[C] Data & Infrastructure — 볼륨 단위 정규화:**
-- `DataFeed.__init__()`: `volume_unit: str = "base"` 파라미터 추가
-- `_normalize_volume()` 메서드 추가: `volume_unit="quote"` 시 volume/close → base volume 변환
-- `volume_quote` 컬럼 항상 추가 (volume * close, USDT 단위)
-- `_add_indicators()`: `volume_quote_sma20` 추가 (없는 경우 방어 코드 포함)
-- `cache_stats()`: `volume_unit` 정보 추가
-- `_normalize_volume()` 3곳에서 호출: `fetch_paginated()`, `_fetch_fresh_with_exchange_fallback()`, `_fetch_fresh()`
-- `test_feed_boundary.py`: `TestVolumeNormalization` 클래스 (5개 테스트) 추가
+- `DataFeed`: `volume_unit` 파라미터, `_normalize_volume()`, `volume_quote` 컬럼 추가
 
 **[F] Research — plateau_pct 효과 분석:**
-- plateau_pct 구현 검토: 기본 로직 정확, 엣지 케이스(IS Sharpe < 0 → 플래토 룰 스킵) 문서화
-- 팩토리 함수 버그 발견 → A 카테고리에서 즉시 수정 완료
-- `donchian_breakout` 그리드: 3개 콤보만 → plateau 효과 미미 (다음 사이클 개선 권장)
-- plateau=0.9 vs 0.0: 합성 데이터에서는 동일 파라미터 선택 (합성 신호 없음 확인)
+- 합성 데이터에서는 동일 파라미터 선택 (합성 신호 없음 확인)
 
-**[SIM] 합성 데이터 시뮬레이션:**
-- 1h WF: 0/22 PASS (합성 데이터 한계, 변화 없음)
-- 4h OOS: 0/5 PASS (합성 데이터 한계, 변화 없음)
-
-**[BUGFIX] paper_simulation.py:**
-- `generate_report()`: 합성 데이터(RangeIndex) vs 실데이터(DatetimeIndex) 모두 처리
-  - `(df.index[-1] - df.index[0]).days` → `_idx_diff.days if hasattr(..., 'days') else f"{len(df)}봉"`
-
-**테스트:** 7631 passed (+10 신규), 전체 테스트 깨짐 없음
+**테스트:** 7631 passed (+10 신규)
 
 ---
 
@@ -14780,6 +14782,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
+<<<<<<< HEAD
 ## [2026-05-21 15:38 UTC]
 Pipeline: preflight
 Status: ERROR
@@ -14846,3 +14849,10 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+=======
+## [2026-05-21 11:04 UTC] Cycle 190 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 18:09 UTC] Cycle 191 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+>>>>>>> d606fc9 ([Cycle 191] B(Risk EWMA VolTargeting) + D(ML fold time-decay) + F(Research))

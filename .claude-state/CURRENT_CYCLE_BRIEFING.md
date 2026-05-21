@@ -1,46 +1,51 @@
 ======================================================================
-🔄 CYCLE 190 (완료) — 2026-05-21T15:40:00.000000Z
+🔄 CYCLE 191 — 2026-05-21T18:09:55.985753Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (190 mod 5 = 0 → A+C+F)
+## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [A] Quality Assurance ✅ COMPLETE
-- plateau_pct 효과 검증 테스트 2개 추가 (test_walk_forward.py)
-  - test_plateau_pct_effect_vs_zero: 0.9 vs 0.0 모두 정상 실행
-  - test_plateau_pct_selects_from_plateau_set: 선택 파라미터 그리드 내 검증
-- MDD 경계 케이스 3개 추가 (test_paper_trader.py)
-  - 단일 거래 MDD=0, 단조 하락 MDD>0, 회복 후 재하락 MDD 갱신
-- **Factory 함수 버그 수정** (F 리서치에서 발견):
-  - optimize_* 8개 함수 모두 plateau_pct kwarg 누락 → 추가 완료
-  - 이제 optimize_ema_cross(df, plateau_pct=0.7) 등 호출 가능
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### [C] Data & Infrastructure ✅ COMPLETE
-- DataFeed.volume_unit 파라미터 추가 ("base" 기본 / "quote" 지원)
-- _normalize_volume(): quote volume → base volume 변환
-- volume_quote 컬럼 항상 추가 (base_vol × close = USDT 단위)
-- volume_quote_sma20 지표 추가
-- cache_stats()에 volume_unit 정보 추가
-- TestVolumeNormalization 5개 테스트 추가 (test_feed_boundary.py)
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [F] Research ✅ COMPLETE
-- plateau_pct=0.0 guard 동작 확인: IS Sharpe ≤ 0이면 plateau 스킵 (엣지 케이스)
-- donchian_breakout 그리드 3개 콤보로 plateau 효과 미미 → D에서 확장 권장
-- plateau 0.9 vs 0.0: 합성 데이터에서 동일 파라미터 선택 (데이터 문제, 룰 문제 아님)
+### [SIM] Paper Simulation & Auto-improve
+- **Agent**: backtest-agent
+- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
 
-### [SIM] 합성 데이터 시뮬레이션 ✅
-- 1h WF (8640봉, 8윈도우): 0/22 PASS
-- 4h OOS (9fold): 0/5 PASS
-- 합성 데이터 한계 재확인 — 실제 거래소 데이터 필요
+### [F] Research
+- **Agent**: strategy-researcher-agent
+- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
-### [BUGFIX]
-- paper_simulation.py: generate_report()에서 RangeIndex .days AttributeError 수정
+## 이전 사이클 현황
+**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
+  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
+  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
+  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
+  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
 
-## 테스트 현황
-- 전체 테스트: 7631 passed (이전 7621, +10 신규)
-- 깨진 테스트: 없음
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
+  - ERROR 기록 존재
 
-## 다음 사이클 예고 (191 → 191 mod 5 = 1 → B+D+F)
-- B: KellySizer win_rate 동적 추정, VaR/CVaR 검증
-- D: donchian_breakout 그리드 확장 + fold_params_history 추가
-- F: 로컬 환경 실데이터 OOS PASS 전략 발굴
-======================================================================
+## ⛔ 금지 사항
+- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
+- 한 카테고리에 2 사이클 연속 집중 금지
+- 실패 사례 리서치 없이 코드만 작성 금지
+
+## 📋 사이클 종료 시 필수 수행
+1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
+2. STATUS.md 업데이트 (전체 현황)
+3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
+4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
+5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
+
+## 🚀 실행 지침 (Claude Code 세션용)
+이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
+1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
+2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
+3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
+4. 커밋 + push

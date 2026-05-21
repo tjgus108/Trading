@@ -159,3 +159,60 @@ def test_consecutive_losses_resets_on_win():
     assert summary["consecutive_losses"] == 0
     result = t.check_degradation("strat", backtest_sharpe=2.0)
     assert result != "연속 손실 5회"
+
+
+# --- timestamp 테스트 ---
+
+def test_record_trade_has_timestamp_auto():
+    """timestamp 미지정 시 자동으로 현재 시각 기록."""
+    import time
+    before = time.time()
+    t = make_tracker()
+    t.record_trade("strat", 10.0, 100.0, 110.0)
+    after = time.time()
+    ts = t._trades["strat"][0]["timestamp"]
+    assert before <= ts <= after, "auto timestamp should be current time"
+
+
+def test_record_trade_has_timestamp_explicit():
+    """명시적 timestamp가 그대로 저장되는지 확인."""
+    t = make_tracker()
+    t.record_trade("strat", 10.0, 100.0, 110.0, timestamp=1234567890.0)
+    ts = t._trades["strat"][0]["timestamp"]
+    assert ts == 1234567890.0
+
+
+# --- get_hourly_pnl 테스트 ---
+
+def test_get_hourly_pnl_returns_list_of_correct_length():
+    """get_hourly_pnl이 hours 길이의 리스트를 반환."""
+    t = make_tracker()
+    result = t.get_hourly_pnl("strat", hours=24)
+    assert isinstance(result, list)
+    assert len(result) == 24
+
+
+def test_get_hourly_pnl_empty_strategy():
+    """거래 없으면 모두 0.0."""
+    t = make_tracker()
+    result = t.get_hourly_pnl("no_strat", hours=12)
+    assert result == [0.0] * 12
+
+
+def test_get_hourly_pnl_recent_trade_in_last_bucket():
+    """방금 기록한 거래는 마지막 버킷(index -1)에 합산."""
+    import time
+    t = make_tracker()
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=time.time())
+    result = t.get_hourly_pnl("strat", hours=24)
+    assert result[-1] == pytest.approx(50.0), "recent trade pnl must be in last bucket"
+
+
+def test_get_hourly_pnl_old_trade_excluded():
+    """cutoff 이전 거래는 집계에서 제외."""
+    import time
+    t = make_tracker()
+    old_ts = time.time() - 25 * 3600  # 25시간 전
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=old_ts)
+    result = t.get_hourly_pnl("strat", hours=24)
+    assert sum(result) == pytest.approx(0.0), "trade older than cutoff must be excluded"

@@ -25,6 +25,7 @@ class LivePerformanceTracker:
         pnl: float,
         entry_price: float,
         exit_price: float,
+        timestamp: Optional[float] = None,
     ) -> None:
         """거래 결과 기록."""
         self._trades[strategy].append(
@@ -32,6 +33,7 @@ class LivePerformanceTracker:
                 "pnl": pnl,
                 "entry_price": entry_price,
                 "exit_price": exit_price,
+                "timestamp": timestamp if timestamp is not None else time.time(),
             }
         )
 
@@ -147,6 +149,28 @@ class LivePerformanceTracker:
             elif equity < 0:
                 max_dd = 1.0
         return max_dd
+
+    def get_hourly_pnl(self, strategy: str, hours: int = 24) -> list:
+        """최근 N시간 동안의 시간별 합산 PnL 리스트 반환.
+
+        Returns:
+            길이 hours인 list. index 0 = 가장 오래된 시간 버킷,
+            index -1 = 가장 최근 시간 버킷. 거래 없는 버킷은 0.0.
+        """
+        now = time.time()
+        cutoff = now - hours * 3600.0
+        buckets = [0.0] * hours
+
+        for t in self._trades[strategy]:
+            ts = t.get("timestamp", 0.0)
+            if ts < cutoff:
+                continue
+            age_seconds = now - ts
+            bucket_idx = hours - 1 - int(age_seconds // 3600)
+            if 0 <= bucket_idx < hours:
+                buckets[bucket_idx] += t["pnl"]
+
+        return buckets
 
     def get_summary(self, strategy: str) -> dict:
         """전략별 요약 반환."""

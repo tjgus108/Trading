@@ -99,6 +99,8 @@ class WalkForwardResult:
     last_is_sharpe_dist: Dict[str, float] = field(default_factory=dict)
     # 파라미터 안정성 CV: {param_name: cv} (fold 간 CV=std/mean)
     param_stability_cv: Dict[str, float] = field(default_factory=dict)
+    # time-decay 가중평균 OOS Sharpe (정보 제공용, PASS/FAIL 기준 아님)
+    weighted_oos_sharpe: Optional[float] = None
 
     def summary(self) -> str:
         verdict = "STABLE" if self.is_stable else "UNSTABLE"
@@ -111,6 +113,8 @@ class WalkForwardResult:
             f"  overfit_windows: {self.overfit_windows}/{len(self.windows)}",
             f"  verdict: {verdict}",
         ]
+        if self.weighted_oos_sharpe is not None:
+            lines.append(f"  weighted_oos_sharpe: {self.weighted_oos_sharpe:.3f}")
         if self.param_stability_cv:
             unstable = {k: v for k, v in self.param_stability_cv.items() if v > 0.5}
             lines.append(f"  param_cv: {self.param_stability_cv}")
@@ -141,6 +145,7 @@ class WalkForwardOptimizer:
         is_ratio: float = 0.6,    # in-sample 비율
         stability_lambda: float = 0.5,  # Sharpe - λ*CV penalty 계수
         plateau_pct: float = 0.9,  # 플래토 룰: IS 최고 Sharpe의 이 비율 이상인 파라미터 집합 중 중간값 선택
+        fold_decay: float = 0.0,  # time-decay: 0=동일가중, 양수=최근fold에 지수적 가중치
     ):
         """
         Args:
@@ -154,6 +159,9 @@ class WalkForwardOptimizer:
             plateau_pct: 플래토 룰 임계값 (기본 0.9 = 90%).
                          IS 최고 Sharpe × plateau_pct 이상인 파라미터들 중 중간값 선택.
                          과최적화 방지: 극단 파라미터 배제.
+            fold_decay: time-decay 계수. 0이면 동일 가중치(기존 동작).
+                        양수면 w_i = exp(fold_decay * i) (i가 클수록 최근 fold).
+                        weighted_oos_sharpe 계산에만 사용; PASS/FAIL은 avg_oos_sharpe 기준.
         """
         self.strategy_name = strategy_name
         self.strategy_factory = strategy_factory
@@ -161,6 +169,7 @@ class WalkForwardOptimizer:
         self.is_ratio = is_ratio
         self.stability_lambda = stability_lambda
         self.plateau_pct = plateau_pct
+        self.fold_decay = fold_decay
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -301,6 +310,18 @@ class WalkForwardOptimizer:
                 except (TypeError, ValueError):
                     pass  # 비수치 파라미터는 스킵
 
+        # time-decay 가중평균 OOS Sharpe 계산
+        import math
+        n_folds = len(oos_sharpes)
+        if n_folds > 0 and self.fold_decay != 0.0:
+            raw_weights = [math.exp(self.fold_decay * i) for i in range(n_folds)]
+            total_w = sum(raw_weights)
+            weights = [w / total_w for w in raw_weights]
+            weighted_oos_sharpe = sum(w * s for w, s in zip(weights, oos_sharpes))
+        else:
+            # fold_decay=0이면 동일 가중치 → weighted == avg
+            weighted_oos_sharpe = avg_oos
+
         fail_reasons = []
         is_stable = True
         if oos_std > OOS_STD_MAX:
@@ -321,6 +342,7 @@ class WalkForwardOptimizer:
             fail_reasons=fail_reasons,
             last_is_sharpe_dist=last_is_sharpe_dist,
             param_stability_cv=param_stability_cv,
+            weighted_oos_sharpe=round(weighted_oos_sharpe, 4),
         )
         logger.info(result.summary())
         return result

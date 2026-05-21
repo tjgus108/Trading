@@ -156,3 +156,66 @@ def test_nonpositive_target_vol_raises():
         VolTargeting(target_vol=0.0)
     with pytest.raises(ValueError, match="target_vol must be positive"):
         VolTargeting(target_vol=-0.5)
+
+
+# ── EWMA vol_method 테스트 ────────────────────────────────────────────────────
+
+def test_invalid_vol_method_raises():
+    """잘못된 vol_method이면 ValueError."""
+    with pytest.raises(ValueError, match="vol_method must be"):
+        VolTargeting(vol_method="invalid")
+
+
+def test_ewma_returns_positive_scalar():
+    """ewma 모드에서 realized_vol()이 양수 스칼라를 반환."""
+    vt = VolTargeting(vol_method="ewma", ewma_span=10)
+    rng = np.random.default_rng(0)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_df(closes)
+    rv = vt.realized_vol(df)
+    assert rv > 0.0, "EWMA realized_vol should be positive"
+    assert isinstance(rv, float)
+
+
+def test_simple_returns_positive_scalar():
+    """simple 모드(기본값)에서 realized_vol()이 양수 스칼라를 반환."""
+    vt = VolTargeting(vol_method="simple")
+    rng = np.random.default_rng(1)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_df(closes)
+    rv = vt.realized_vol(df)
+    assert rv > 0.0
+    assert isinstance(rv, float)
+
+
+def test_ewma_more_sensitive_to_recent_vol():
+    """EWMA가 최근 급등 변동성에 simple보다 더 민감하게 반응."""
+    rng = np.random.default_rng(42)
+    # 앞부분: 저변동성, 뒷부분: 고변동성
+    low_vol_rets = rng.normal(0, 0.002, 15)
+    high_vol_rets = rng.normal(0, 0.05, 10)
+    all_rets = np.concatenate([low_vol_rets, high_vol_rets])
+    closes = 100 * np.exp(np.cumsum(np.concatenate([[0], all_rets])))
+    df = _make_df(closes)
+
+    vt_simple = VolTargeting(vol_method="simple", annualization=1)
+    vt_ewma = VolTargeting(vol_method="ewma", ewma_span=5, annualization=1)
+
+    rv_simple = vt_simple.realized_vol(df)
+    rv_ewma = vt_ewma.realized_vol(df)
+
+    # EWMA는 최근 고변동성에 더 빠르게 반응 → simple보다 큰 값
+    assert rv_ewma > rv_simple, (
+        f"EWMA rv({rv_ewma:.4f}) should exceed simple rv({rv_simple:.4f}) "
+        "when recent volatility spikes"
+    )
+
+
+def test_ewma_adjust_returns_positive():
+    """EWMA 모드에서 adjust()가 양수를 반환."""
+    vt = VolTargeting(vol_method="ewma", ewma_span=10)
+    rng = np.random.default_rng(5)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_df(closes)
+    result = vt.adjust(base_size=0.01, df=df)
+    assert result > 0.0

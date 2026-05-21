@@ -34,14 +34,20 @@ class VolTargeting:
         annualization: int = 252 * 24,  # 1h 기준
         max_scalar: float = 2.0,        # 최대 스케일 배수 (레버리지 한계)
         min_scalar: float = 0.1,        # 최소 스케일 배수
+        vol_method: str = "simple",     # "simple" 또는 "ewma"
+        ewma_span: int = 20,            # EWMA span (vol_method="ewma" 시 사용)
     ) -> None:
         if target_vol <= 0:
             raise ValueError(f"target_vol must be positive, got {target_vol}")
+        if vol_method not in ("simple", "ewma"):
+            raise ValueError(f"vol_method must be 'simple' or 'ewma', got {vol_method!r}")
         self.target_vol = target_vol
         self.window = window
         self.annualization = annualization
         self.max_scalar = max_scalar
         self.min_scalar = min_scalar
+        self.vol_method = vol_method
+        self.ewma_span = ewma_span
 
     def realized_vol(self, df: pd.DataFrame) -> float:
         """최근 window 개 캔들의 연환산 실현 변동성."""
@@ -58,7 +64,14 @@ class VolTargeting:
             return self.target_vol
 
         log_returns = np.diff(np.log(closes))
-        std = float(np.std(log_returns, ddof=1))
+
+        if self.vol_method == "ewma":
+            std = float(
+                pd.Series(log_returns).ewm(span=self.ewma_span).std().iloc[-1]
+            )
+        else:
+            std = float(np.std(log_returns, ddof=1))
+
         return std * np.sqrt(self.annualization)
 
     def scalar(self, df: pd.DataFrame) -> float:

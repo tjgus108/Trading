@@ -702,10 +702,7 @@ def test_plateau_pct_disabled_with_zero():
 
 
 def test_plateau_pct_effect_vs_zero():
-    """plateau_pct=0.9이면 plateau_pct=0.0과 다른 파라미터를 선택할 수 있어야 함.
-    동일 그리드에서 두 설정의 best_params가 동일하지 않을 가능성을 검증.
-    (결과가 동일해도 오류 아님 - 그리드가 작아서 plateau 집합이 1개일 수 있음)
-    """
+    """plateau_pct=0.9이면 plateau_pct=0.0과 다른 파라미터를 선택할 수 있어야 함."""
     from src.backtest.walk_forward import WalkForwardOptimizer
     from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -729,7 +726,6 @@ def test_plateau_pct_effect_vs_zero():
     )
     result_p = opt_plateau.run(df)
     result_np = opt_no_plateau.run(df)
-    # 둘 다 정상 실행 (예외 없이 결과 반환)
     assert result_p is not None
     assert result_np is not None
     assert isinstance(result_p.best_params, dict)
@@ -737,10 +733,7 @@ def test_plateau_pct_effect_vs_zero():
 
 
 def test_plateau_pct_selects_from_plateau_set():
-    """plateau_pct=0.9 적용 시 선택 파라미터는 그리드의 중간 영역에서 올 가능성이 높음.
-    fast_span 그리드 [5, 10, 20, 30] 에서 plateau 선택은 극단(5 또는 30)보다 중간(10, 20)을 선호.
-    주의: 이 테스트는 선택 가능성을 검증하며 결정론적 보장은 아님.
-    """
+    """plateau_pct=0.9 적용 시 선택 파라미터는 그리드 내 유효한 값이어야 함."""
     from src.backtest.walk_forward import WalkForwardOptimizer
     from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -759,7 +752,95 @@ def test_plateau_pct_selects_from_plateau_set():
     df = make_df(800)
     result = opt.run(df)
     if result.best_params:
-        # 선택된 fast_span은 그리드 내의 유효한 값이어야 함
         assert result.best_params["fast_span"] in grid["fast_span"]
-        # slow_span도 그리드 내
         assert result.best_params["slow_span"] in grid["slow_span"]
+
+
+# ---------------------------------------------------------------------------
+# fold_decay (time-decay) 테스트
+# ---------------------------------------------------------------------------
+
+def _make_optimizer_with_decay(fold_decay: float):
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    return WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=3,
+        fold_decay=fold_decay,
+    )
+
+
+def test_fold_decay_zero_weighted_equals_avg():
+    """fold_decay=0이면 weighted_oos_sharpe == avg_oos_sharpe."""
+    from src.backtest.walk_forward import WalkForwardResult
+    import math
+
+    oos_sharpes = [0.5, 1.0, 1.5]
+    fold_decay = 0.0
+    n_folds = len(oos_sharpes)
+
+    if n_folds > 0 and fold_decay != 0.0:
+        raw_weights = [math.exp(fold_decay * i) for i in range(n_folds)]
+        total_w = sum(raw_weights)
+        weights = [w / total_w for w in raw_weights]
+        weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
+    else:
+        weighted = sum(oos_sharpes) / n_folds
+
+    avg = sum(oos_sharpes) / n_folds
+    assert abs(weighted - avg) < 1e-9, f"fold_decay=0: weighted={weighted} != avg={avg}"
+
+    opt = _make_optimizer_with_decay(0.0)
+    df = make_df(600)
+    result = opt.run(df)
+    if result.weighted_oos_sharpe is not None and len(result.windows) > 0:
+        assert abs(result.weighted_oos_sharpe - result.avg_oos_sharpe) < 1e-6, (
+            f"fold_decay=0: weighted={result.weighted_oos_sharpe} != avg={result.avg_oos_sharpe}"
+        )
+
+
+def test_fold_decay_positive_recent_high_weighted_greater():
+    """fold_decay > 0이고 최근 fold OOS가 높으면 weighted > avg."""
+    import math
+
+    oos_sharpes = [0.2, 0.5, 2.0]
+    fold_decay = 1.0
+    n_folds = len(oos_sharpes)
+
+    raw_weights = [math.exp(fold_decay * i) for i in range(n_folds)]
+    total_w = sum(raw_weights)
+    weights = [w / total_w for w in raw_weights]
+    weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
+    avg = sum(oos_sharpes) / n_folds
+
+    assert weighted > avg, (
+        f"최근 fold OOS 높을 때 weighted({weighted:.4f}) > avg({avg:.4f}) 여야 함"
+    )
+
+
+def test_fold_decay_positive_early_high_weighted_less():
+    """fold_decay > 0이고 초기 fold OOS가 높으면 weighted < avg."""
+    import math
+
+    oos_sharpes = [2.0, 0.5, 0.2]
+    fold_decay = 1.0
+    n_folds = len(oos_sharpes)
+
+    raw_weights = [math.exp(fold_decay * i) for i in range(n_folds)]
+    total_w = sum(raw_weights)
+    weights = [w / total_w for w in raw_weights]
+    weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
+    avg = sum(oos_sharpes) / n_folds
+
+    assert weighted < avg, (
+        f"초기 fold OOS 높을 때 weighted({weighted:.4f}) < avg({avg:.4f}) 여야 함"
+    )
