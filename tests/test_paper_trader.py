@@ -1021,3 +1021,126 @@ def test_max_drawdown_recovery_then_deeper_decline():
     mdd_final = pt._calculate_max_drawdown()
     # 최종 MDD가 T1 이후 MDD보다 커야 함
     assert mdd_final > mdd_after_t1
+
+
+# ── VolTargeting 연동 테스트 ───────────────────────────────────
+
+def _make_candle_df(n: int = 30, base_price: float = 100.0) -> "pd.DataFrame":
+    """테스트용 간단한 OHLCV DataFrame 생성."""
+    import pandas as pd
+    import numpy as np
+    prices = base_price + np.cumsum(np.random.randn(n) * 0.5)
+    prices = np.maximum(prices, 1.0)  # 비양수 방지
+    return pd.DataFrame({
+        "open":   prices,
+        "high":   prices * 1.005,
+        "low":    prices * 0.995,
+        "close":  prices,
+        "volume": np.ones(n) * 1000,
+    })
+
+
+def test_vol_targeting_none_no_adjustment():
+    """vol_targeting=None이면 기존 동작과 동일 — 수량 조절 없음."""
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, vol_targeting=None)
+    df = _make_candle_df()
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                               strategy="s", confidence="H", candle_df=df)
+    assert result["status"] == "filled"
+    assert result["requested_quantity"] == 5.0
+    assert pt.account.positions["BTC/USDT"] == 5.0
+
+
+def test_vol_targeting_adjusts_quantity():
+    """vol_targeting 설정 + candle_df 전달 시 수량이 조절됨."""
+    from src.risk.vol_targeting import VolTargeting
+    import pandas as pd
+    import numpy as np
+
+    # 높은 변동성 → scalar < 1 → quantity 감소
+    # 강제로 변동성이 높은 df 생성
+    n = 30
+    prices = 100.0 + np.cumsum(np.random.randn(n) * 5.0)  # 큰 변동
+    prices = np.maximum(prices, 1.0)
+    df = pd.DataFrame({
+        "open": prices, "high": prices * 1.01,
+        "low": prices * 0.99, "close": prices, "volume": np.ones(n),
+    })
+
+    # target_vol=0.01 (1%) — 실현 vol이 훨씬 높으면 사이즈 축소
+    vt = VolTargeting(target_vol=0.01, window=20, annualization=252 * 24,
+                      max_scalar=2.0, min_scalar=0.01)
+    pt = PaperTrader(initial_balance=500000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, vol_targeting=vt)
+
+    base_qty = 100.0
+    result = pt.execute_signal("BTC/USDT", "BUY", price=10.0, quantity=base_qty,
+                               strategy="s", confidence="H", candle_df=df)
+
+    assert result["status"] == "filled"
+    # 실현 변동성 >> target_vol이므로 actual_quantity < base_qty
+    assert result["actual_quantity"] < base_qty
+
+
+def test_vol_targeting_candle_df_none_ignored():
+    """candle_df=None이면 vol_targeting이 있어도 사이즈 조절 무시."""
+    from src.risk.vol_targeting import VolTargeting
+
+    vt = VolTargeting(target_vol=0.01)  # 매우 낮은 target → 정상이면 사이즈 축소
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, vol_targeting=vt)
+
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                               strategy="s", confidence="H", candle_df=None)
+    # candle_df=None → vol_targeting 무시 → quantity 그대로
+    assert result["status"] == "filled"
+    assert result["requested_quantity"] == 5.0
+    assert result["actual_quantity"] == 5.0
+
+
+def test_vol_targeting_summary_keys():
+    """get_summary()에 vol_targeting 관련 키가 존재."""
+    from src.risk.vol_targeting import VolTargeting
+
+    vt = VolTargeting()
+    pt_with = PaperTrader(vol_targeting=vt)
+    pt_without = PaperTrader()
+
+    summary_with = pt_with.get_summary()
+    summary_without = pt_without.get_summary()
+
+    assert "vol_targeting_active" in summary_with
+    assert "vol_targeting_adjustments" in summary_with
+    assert summary_with["vol_targeting_active"] is True
+    assert summary_without["vol_targeting_active"] is False
+    assert summary_with["vol_targeting_adjustments"] == 0
+    assert summary_without["vol_targeting_adjustments"] == 0
+
+
+def test_vol_targeting_adjustment_count():
+    """vol_targeting으로 사이즈가 실제 조절될 때 adjustments 카운터 증가."""
+    from src.risk.vol_targeting import VolTargeting
+    import pandas as pd
+    import numpy as np
+
+    # 변동성이 target_vol보다 훨씬 높도록 설정
+    n = 30
+    prices = 100.0 + np.cumsum(np.random.randn(n) * 10.0)
+    prices = np.maximum(prices, 1.0)
+    df = pd.DataFrame({
+        "open": prices, "high": prices * 1.01,
+        "low": prices * 0.99, "close": prices, "volume": np.ones(n),
+    })
+
+    vt = VolTargeting(target_vol=0.001, window=20, annualization=252 * 24,
+                      min_scalar=0.001)
+    pt = PaperTrader(initial_balance=500000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, vol_targeting=vt)
+
+    for _ in range(3):
+        pt.execute_signal("BTC/USDT", "BUY", price=1.0, quantity=10.0,
+                          strategy="s", confidence="H", candle_df=df)
+
+    summary = pt.get_summary()
+    assert summary["vol_targeting_adjustments"] == 3

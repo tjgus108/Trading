@@ -3,6 +3,7 @@ Paper Trading (모의거래) 모드.
 실제 API 호출 없이 신호를 기록하고 가상 P&L 추적.
 슬리피지, 부분체결, 타임아웃 시뮬레이션 포함.
 RegimeDetector 통합: 매 틱마다 레짐 감지 → 전략 라우팅 + CRISIS 포지션 스케일링.
+VolTargeting 통합: 변동성 기반 포지션 사이즈 자동 조절.
 """
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ from typing import Callable, Dict, List, Optional
 import time
 import random
 import logging
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,7 @@ class PaperTrader:
         regime_detector=None,         # src.ml.regime_detector.RegimeDetector (선택)
         regime_router=None,           # src.strategy.regime_router.RegimeStrategyRouter (선택)
         performance_monitor=None,     # src.risk.performance_tracker.PerformanceMonitor (선택)
+        vol_targeting=None,           # src.risk.vol_targeting.VolTargeting (선택)
     ):
         self.account = PaperAccount(
             initial_balance=initial_balance,
@@ -77,6 +81,10 @@ class PaperTrader:
         self._regime_router = regime_router
         self._performance_monitor = performance_monitor
         self._current_regime: str = "RANGE"  # 초기 기본값
+
+        # ── VolTargeting integration ────────────────────────────────────────
+        self._vol_targeting = vol_targeting
+        self._vol_targeting_adjustments: int = 0
 
     # ── Regime interface ────────────────────────────────────────────────────
 
@@ -146,6 +154,7 @@ class PaperTrader:
         quantity: float,
         strategy: str,
         confidence: str,
+        candle_df: Optional[pd.DataFrame] = None,
     ) -> dict:
         """신호를 모의 실행. 실제 API 없음.
 
@@ -176,6 +185,19 @@ class PaperTrader:
             scale = self.get_position_scale()
             if scale != 1.0:
                 quantity = quantity * scale
+
+        # VolTargeting-based position sizing (BUY만 적용)
+        if action == "BUY" and self._vol_targeting is not None and candle_df is not None:
+            try:
+                adjusted = self._vol_targeting.adjust(quantity, candle_df)
+                if adjusted != quantity:
+                    logger.debug(
+                        "VolTargeting: quantity %.6f → %.6f", quantity, adjusted
+                    )
+                    self._vol_targeting_adjustments += 1
+                quantity = adjusted
+            except Exception as exc:
+                logger.warning("vol_targeting.adjust failed: %s", exc)
 
         # Input validation
         if quantity <= 0:
@@ -318,6 +340,8 @@ class PaperTrader:
                     for sym in self.account.positions),
                 2
             ),
+            "vol_targeting_active": self._vol_targeting is not None,
+            "vol_targeting_adjustments": self._vol_targeting_adjustments,
         }
 
     def _calculate_max_drawdown(self) -> float:

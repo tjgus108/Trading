@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-05-22] Cycle 192 — E(실행) + A(품질) + F(리서치)
+
+**[E] Execution — PaperTrader VolTargeting 연동:**
+- `PaperTrader.__init__`에 `vol_targeting: Optional[VolTargeting] = None` 파라미터 추가
+- `execute_signal()`에 `candle_df: Optional[pd.DataFrame] = None` 파라미터 추가
+- BUY 경로: vol_targeting + candle_df 모두 있으면 `vol_targeting.adjust(quantity, candle_df)` 호출
+- `get_summary()`: `vol_targeting_active`, `vol_targeting_adjustments` 키 추가
+- 테스트 5개 추가 (None 무조절, 사이즈 조절, candle_df None 무시, summary 키, 조절 횟수)
+
+**[A] Quality — TWAP 엣지 케이스 + CircuitBreaker 직렬화 테스트:**
+- `tests/test_twap.py` 신규 생성: 30개 테스트
+  - single-slice, 극단적 가격 하락, timeout, 대형 주문, 입력 검증
+- `tests/test_risk.py`: CircuitBreaker to_dict/from_dict 라운드트립 5개 테스트 추가
+  - full roundtrip, rapid_decline 상태 보존, 초기 상태, 쿨다운 활성, 부분 소진
+
+**[F] Research — 실행 품질 리서치:**
+- TWAP vs VWAP: VWAP 유동성 안정 페어 유리, 딥러닝 VWAP 최적화 25% 손실 개선
+- EWMA λ=0.94 (RiskMetrics 표준) + Quarter Kelly 25% = 기관 표준
+- 73% 봇 6개월 내 실패: 슬리피지 미반영 + 과최적화 + 레짐 대응 부재
+- Paper→Live 갭: BTC 0.05%, 중형 0.2%, 소형 1.0% 슬리피지 반영 필수
+
+**테스트:** 218 passed (paper_trader + twap + risk)
+
+---
+
 ## [2026-05-22] Cycle 191 — B(리스크) + D(ML) + F(리서치)
 
 **[B] Risk — VolTargeting EWMA + PerformanceTracker 타임스탬프:**
@@ -14856,3 +14881,6 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 ## [2026-05-21 18:09 UTC] Cycle 191 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 >>>>>>> d606fc9 ([Cycle 191] B(Risk EWMA VolTargeting) + D(ML fold time-decay) + F(Research))
+
+## [2026-05-21 18:22 UTC] Cycle 192 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

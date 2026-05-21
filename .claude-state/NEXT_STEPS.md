@@ -1,14 +1,36 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 191 B+D+F 완료)_
+_Last updated: 2026-05-22 (Cycle 192 E+A+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 191 완료
-- 191 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
-- 다음 Cycle 192: **192 mod 5 = 2 → E(실행) + A(품질) + F(리서치)**
+### 로테이션: Cycle 192 완료
+- 192 mod 5 = 2 → **E(실행) + A(품질) + F(리서치)** 패턴 ✅
+- 다음 Cycle 193: **193 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)**
+
+### 🔥 Cycle 192 주요 성과
+- **PaperTrader VolTargeting 연동**: 변동성 높을 때 자동 사이즈 축소
+- **TWAP 엣지 케이스 30개 테스트**: single-slice, 극단 가격, timeout, 대형 주문
+- **CircuitBreaker 직렬화 5개 테스트**: to_dict/from_dict 라운드트립 검증
+- **실행 품질 리서치**: EWMA λ=0.94 기관 표준, Paper→Live 갭 분석
+
+### 🎯 Cycle 193 권장 작업 (193 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+
+#### C(데이터): DataFeed 실데이터 파이프라인 강화
+- Binance fetch_paginated() 안정성 테스트 (네트워크 끊김 대응)
+- 볼륨 정규화 자동 감지: ccxt exchange 속성으로 base/quote 자동 판별
+- WebSocket reconnect 지수 백오프 테스트
+
+#### B(리스크): VaR/CVaR 정확도 검증
+- Cornish-Fisher VaR: 합성 데이터로 confidence level별 커버리지 검증
+- KellySizer: win_rate 동적 추정 (rolling window 기반)
+- DrawdownMonitor: 레짐별 block 한도 시뮬레이션 테스트
+
+#### F(리서치): 대안 데이터 + 온체인 신호
+- on-chain whale tracking 실전 효과 리서치
+- DEX vs CEX 유동성 차이와 실행 전략
 
 ### 🔥 Cycle 191 주요 성과
 - **VolTargeting EWMA**: vol_method="ewma" 옵션으로 레짐 전환에 빠른 반응
@@ -60,21 +82,11 @@ _Last updated: 2026-05-22 (Cycle 191 B+D+F 완료)_
 - 테스트: 캐시 hit율 향상 확인 (3개 신규 테스트 통과, 기존 23개 테스트 모두 통과)
 - 실무 환경에서 hit율 10~20% 향상 예상
 
-### 🎯 Cycle 192 권장 작업 (192 mod 5 = 2 → E(실행) + A(품질) + F(리서치))
-
-#### E(실행): Paper Trading 검증 + TWAP 개선
-- PaperTrader에 VolTargeting(EWMA) 통합 테스트
-- fold_decay 적용한 WF 결과로 paper trading 전략 선택
-- TWAP 실행기 슬리피지 모델 검증
-
-#### A(품질): 테스트 커버리지 향상
-- VolTargeting EWMA + PerformanceTracker 통합 테스트
-- WalkForward fold_decay + plateau_pct 복합 효과 검증
-- MDD 계산 경계 케이스 추가
-
-#### F(리서치): 실데이터 WF 최적화 전략 리서치
-- fold_decay 효과 실데이터 검증 — 최근 fold 가중치가 OOS 개선하는지 확인
-- EWMA vol vs simple vol 실데이터 비교
+### ✅ Cycle 192 완료 사항
+- PaperTrader VolTargeting 연동 ✅
+- TWAP 엣지 케이스 30개 테스트 ✅
+- CircuitBreaker 직렬화 라운드트립 5개 테스트 ✅
+- 실행 품질 리서치 ✅
 - AlgoXpert IS→WFA→OOS 프로토콜 상세 분석
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
@@ -152,7 +164,7 @@ _Last updated: 2026-05-22 (Cycle 191 B+D+F 완료)_
 
 ---
 
-**상태**: Cycle 191 완료 → Cycle 192 E(실행) + A(품질) + F(리서치)
+**상태**: Cycle 192 완료 → Cycle 193 C(데이터) + B(리스크) + F(리서치)
 **최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
 
 ### ✅ Cycle 187 완료 사항

@@ -1447,3 +1447,97 @@ def test_drawdown_monitor_crisis_alias_cooldown_multiplier():
     dm = DrawdownMonitor()
     dm.set_regime("crisis")
     assert dm._regime_cooldown_multiplier() == 2.0
+
+
+# ── CircuitBreaker to_dict/from_dict 라운드트립 심화 테스트 ──────────────────
+
+def test_cb_full_roundtrip_all_fields():
+    """완전 라운드트립: 상태 변경 후 to_dict → from_dict → 모든 필드 일치."""
+    cb = _make_cb(max_consecutive_losses=5, cooldown_periods=4, max_daily_trades=20)
+    # 상태 변경
+    for _ in range(4):
+        cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=False)  # 한 번 이기면 streak 초기화
+    for _ in range(5):
+        cb.record_trade_result(is_loss=True)  # 쿨다운 진입
+    cb.check(current_balance=9900, peak_balance=10000, daily_start_balance=10000)
+
+    state = cb.to_dict()
+    cb2 = _make_cb(max_consecutive_losses=5, cooldown_periods=4, max_daily_trades=20)
+    cb2.from_dict(state)
+
+    assert cb2.is_triggered == cb.is_triggered
+    assert cb2.consecutive_losses == cb.consecutive_losses
+    assert cb2.cooldown_remaining == cb.cooldown_remaining
+    assert cb2.daily_trade_count == cb.daily_trade_count
+    assert cb2.rapid_decline_cooldown == cb.rapid_decline_cooldown
+    assert cb2._reason == cb._reason
+
+
+def test_cb_rapid_decline_cooldown_preserved_on_roundtrip():
+    """rapid_decline 쿨다운 중 직렬화 → 복원 후 쿨다운 유지."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=15)
+    # 급속 하락 유발
+    for price in [100.0, 97.0, 93.0]:
+        cb.record_price(price)
+    cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 15
+
+    # 직렬화/복원
+    state = cb.to_dict()
+    cb2 = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=15)
+    cb2.from_dict(state)
+
+    assert cb2.rapid_decline_cooldown == 15
+    # 복원된 인스턴스도 check() 시 triggered=True
+    result = cb2.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "급속" in result["reason"]
+
+
+def test_cb_initial_state_roundtrip():
+    """초기 상태 to_dict → from_dict → 초기 상태와 동일."""
+    cb = _make_cb()
+    state = cb.to_dict()
+
+    cb2 = _make_cb()
+    cb2.from_dict(state)
+
+    assert cb2.is_triggered is False
+    assert cb2.consecutive_losses == 0
+    assert cb2.cooldown_remaining == 0
+    assert cb2.daily_trade_count == 0
+    assert cb2.rapid_decline_cooldown == 0
+    assert cb2._reason == ""
+
+
+def test_cb_cooldown_active_state_roundtrip():
+    """쿨다운 활성 상태 직렬화 → 복원 후 check() 가 triggered=True."""
+    cb = _make_cb(max_consecutive_losses=3, cooldown_periods=5)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 5
+
+    state = cb.to_dict()
+    cb2 = _make_cb(max_consecutive_losses=3, cooldown_periods=5)
+    cb2.from_dict(state)
+
+    result = cb2.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+    assert cb2.cooldown_remaining == 5
+
+
+def test_cb_partial_cooldown_tick_and_roundtrip():
+    """쿨다운 일부 소진 후 직렬화 → 복원 후 잔여 쿨다운 정확히 일치."""
+    cb = _make_cb(max_consecutive_losses=3, cooldown_periods=6)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    cb.tick_cooldown()
+    cb.tick_cooldown()  # 2번 소진 → 잔여 4
+
+    state = cb.to_dict()
+    cb2 = _make_cb(max_consecutive_losses=3, cooldown_periods=6)
+    cb2.from_dict(state)
+
+    assert cb2.cooldown_remaining == 4
