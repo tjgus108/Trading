@@ -41,6 +41,11 @@ class EmaCrossStrategy(BaseStrategy):
     name = "ema_cross"
 
     def __init__(self, fast_span: int = 20, slow_span: int = 50) -> None:
+        """
+        Args:
+            fast_span: 빠른 EMA 기간 (기본 20)
+            slow_span: 느린 EMA 기간 (기본 50)
+        """
         self.fast_span = fast_span
         self.slow_span = slow_span
 
@@ -62,6 +67,20 @@ class EmaCrossStrategy(BaseStrategy):
         return float(ema_fast.iloc[-2]), float(ema_fast.iloc[-3]), float(ema_slow.iloc[-2]), float(ema_slow.iloc[-3])
 
     def generate(self, df: pd.DataFrame) -> Signal:
+        # 파라미터 기반으로 EMA 컬럼을 동적 재계산 (walk-forward 최적화 지원)
+        fast_col = f"ema{self.fast_span}"
+        slow_col = f"ema{self.slow_span}"
+        if fast_col not in df.columns or slow_col not in df.columns:
+            df = df.copy()
+            df[fast_col] = df["close"].ewm(span=self.fast_span, adjust=False).mean()
+            df[slow_col] = df["close"].ewm(span=self.slow_span, adjust=False).mean()
+
+        # 표준 컬럼명으로 alias (generate 내부에서 ema20/ema50 참조하는 코드와 호환)
+        if fast_col != "ema20" or slow_col != "ema50":
+            df = df.copy()
+            df["ema20"] = df[fast_col]
+            df["ema50"] = df[slow_col]
+
         prev = df.iloc[-3]
         last = self._last(df)
 
@@ -69,9 +88,9 @@ class EmaCrossStrategy(BaseStrategy):
         adx_val = _calc_adx(df, idx)
 
         entry = last["close"]
-        rsi = last["rsi14"]
-        atr = last["atr14"]
-        vwap = last["vwap"]
+        rsi = last.get("rsi14", 50.0)
+        atr = last.get("atr14", 1.0)
+        vwap = last.get("vwap", entry)
 
         ema_fast_now, ema_fast_prev, ema_slow_now, ema_slow_prev = self._get_ema_values(df)
 

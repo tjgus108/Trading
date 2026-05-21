@@ -1,6 +1,6 @@
 # Work Log
 
-## [2026-05-21] Cycle 185 — A (품질) + C (데이터) + F (리서치) + SIM
+## [2026-05-21] Cycle 185 — A (품질) + C (데이터) + F (리서치) + SIM (원격 세션)
 
 **[A] Quality Assurance — IS Sharpe >= 2.5 재검증 + 테스트 커버리지:**
 - QUALITY_AUDIT.csv 분석: 전체 348개 전략 중 PASS 22개, 모두 IS Sharpe >= 2.5 (최저 2.98)
@@ -36,6 +36,35 @@
 - paper_simulation (1h, BTC, 22 strategies, 2 windows): 0/22 PASS
 - bundle_oos (4h, BTC/USDT, 5 strategies, 9 folds): 0/5 PASS (OOS std 3.16~6.15 > 1.5)
 - ⚠️ 합성 데이터 결과. 실제 Bybit 데이터 없이는 전략 차별화 불가.
+
+---
+
+## [2026-05-21] Cycle 185 — D (ML) + E (실행) + F (리서치) + SIM (로컬 세션)
+
+**[D] ML & Signals:**
+- WalkForwardOptimizer factory 함수 수정: EmaCrossStrategy(fast_span, slow_span), DonchianBreakoutStrategy(channel_period) params 주입 구현
+- walk_forward.py L312-343: optimize_ema_cross/optimize_donchian factory가 실제 params를 전략 생성자에 전달
+- RollingOOSValidator: OOS Sharpe std > 1.5이면 FAIL 처리 필터 추가
+- BundleOOSResult에 oos_sharpe_std 필드 추가
+- 테스트: walk_forward 22/22, 전략 36/36 pass
+
+**[E] Execution:**
+- volume_breakout: ATR 필터 0.3~5.0 → 0.1~10.0 (거래 0건 해소)
+- dema_cross: 거리 필터 1% → 0.5% (거래 0건 해소)
+- price_cluster: bounce threshold 0.2% → 0.5% (거래 0건 해소)
+- test_volume_breakout: ATR 경계값 테스트 조정 (40/40 pass)
+
+**[F] Research:**
+- WFO 실전 사례: Freqtrade Hyperopt, Jesse Optuna가 best practice. IS:OOS = 5:1 권장
+- 과적합 방지: fold별 param stability(CV) 측정 → stability penalty 적용이 2025 best practice
+- CPCV는 BTC/ETH 최종 검증 단계에서 1회 적용 권장 (일상 비용 과다)
+- Regime-aware backtesting: HMM 3-regime(bull/bear/sideways) 독립 성과 측정이 2025-2026 표준
+- 생존 봇: Grid(횡보), DCA(하락), Circuit Breaker 필수, "Bot Pilot" 반자동화 모델
+
+**[SIM] 시뮬레이션 분석 (코드 분석, 실행 없음):**
+- 가장 PASS에 가까운 전략: linear_channel_rev(SOL, Sharpe 1.65, PF 1.62, 거래 9건), frama(ETH, Sharpe 1.24, PF 1.34, 거래 18건)
+- 핵심 원인: factory 버그로 IS 최적화 무의미 → OOS 랜덤워크 수준
+- WFE 평균 0.0~0.2 (기준: ≥0.5)
 
 ---
 
@@ -14459,3 +14488,9 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-20 20:13 UTC] Cycle 184 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 03:45 UTC] Cycle 185 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

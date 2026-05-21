@@ -40,6 +40,10 @@ class DonchianBreakoutStrategy(BaseStrategy):
     name = "donchian_breakout"
 
     def __init__(self, channel_period: int = 20) -> None:
+        """
+        Args:
+            channel_period: Donchian 채널 기간 (기본 20)
+        """
         self.channel_period = channel_period
 
     def _get_channel_values(self, df: pd.DataFrame):
@@ -60,6 +64,18 @@ class DonchianBreakoutStrategy(BaseStrategy):
         return float(high_series.iloc[-2]), float(high_series.iloc[-3]), float(low_series.iloc[-2]), float(low_series.iloc[-3])
 
     def generate(self, df: pd.DataFrame) -> Signal:
+        # 파라미터 기반으로 Donchian 채널 동적 재계산 (walk-forward 최적화 지원)
+        p = self.channel_period
+        if "donchian_high" not in df.columns or "donchian_low" not in df.columns:
+            df = df.copy()
+            df["donchian_high"] = df["high"].rolling(p).max()
+            df["donchian_low"] = df["low"].rolling(p).min()
+        elif p != 20:
+            # 기간이 기본값(20)과 다르면 재계산
+            df = df.copy()
+            df["donchian_high"] = df["high"].rolling(p).max()
+            df["donchian_low"] = df["low"].rolling(p).min()
+
         prev = df.iloc[-3]
         last = self._last(df)
 
@@ -67,8 +83,8 @@ class DonchianBreakoutStrategy(BaseStrategy):
         adx_val = _calc_adx(df, idx)
 
         entry = last["close"]
-        rsi = last["rsi14"]
-        atr = last["atr14"]
+        rsi = last.get("rsi14", 50.0)
+        atr = last.get("atr14", 1.0)
 
         d_high, d_high_prev, d_low, d_low_prev = self._get_channel_values(df)
 

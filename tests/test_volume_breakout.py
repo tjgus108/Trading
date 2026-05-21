@@ -91,7 +91,7 @@ class TestVolumeBreakoutStrategy:
         sig = self.strategy.generate(df)
         assert sig.action == Action.HOLD
 
-    # 7. HOLD: ATR 필터 실패 (너무 낮음, < 0.3)
+    # 7. HOLD: ATR 필터 실패 (너무 낮음, < 0.1)
     def test_hold_atr_too_low(self):
         # _ATR_LOW = 0.1 이므로 0.05는 필터 범위 밖 → HOLD
         df = _make_df(close=105.0, open_=99.0, volume=900.0, avg_volume=500.0,
