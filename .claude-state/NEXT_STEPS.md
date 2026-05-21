@@ -55,23 +55,20 @@ _Last updated: 2026-05-21 (Cycle 188 E+A+F+SIM 완료)_
 - 테스트: 캐시 hit율 향상 확인 (3개 신규 테스트 통과, 기존 23개 테스트 모두 통과)
 - 실무 환경에서 hit율 10~20% 향상 예상
 
-### 🎯 Cycle 187 권장 작업 (187 mod 5 = 2 → B+D+F)
+### 🎯 Cycle 189 권장 작업 (189 mod 5 = 4 → C+B+F)
 
-#### B(리스크): DrawdownMonitor + CircuitBreaker 재검토
-- DrawdownMonitor.check() 현재 임계값 적절한지 검토
-- CircuitBreaker 룰: AI 봇 군집매도 패턴 대응 (2026 리서치 결과)
-- 플래시크래시 감지: 5분 내 5% 이상 하락 시 신규 진입 중단 로직
+#### C(데이터): 볼륨 단위 정규화 + 실데이터 파이프라인 검증 (최우선)
+- Binance fetch_paginated()로 BTC/USDT 1h 12개월 데이터 수집
+- 볼륨 단위 확인/정규화 (base vs quote, ccxt #25399)
+- 데이터 갭 탐지, UTC 정규화, 연속성 검증
 
-#### D(ML): ✅ Cycle 187 완료
-- `WalkForwardResult.param_stability_cv` 필드 추가 (fold 간 파라미터 CV = std/|mean|)
-- CV > 0.5인 파라미터에 WARNING 로그 출력
-- IS 목적함수: `Score = Sharpe - λ * CV` (λ=0.5 기본값, `stability_lambda` 설정 가능)
-- 테스트 27/27 통과
-- 실데이터 확보 후 7개 factory OOS 재검증 (다음 우선)
+#### B(리스크): 실데이터 기반 리스크 파라미터 검증
+- 실데이터에서 DrawdownMonitor/CircuitBreaker 임계값 적정성 재검토
+- 실데이터 변동성 분포에 맞는 kelly_sizer 파라미터 조정
 
-#### F(리서치): param stability 구현 검증 + CPCV 실용성
-- CV = std(params) / mean(params), 임계값: < 0.3 안정, > 0.6 불안정
-- Sharpe - λ*CV (λ=0.5~1.0) penalty 목적함수 통합 방법
+#### F(리서치): Binance 실데이터 WF 최적화 전략 리서치
+- 7개 factory + 실데이터 WF 최적화 → 어떤 전략이 유망한지 사전 분석
+- cross-exchange slippage 실측 데이터 수집
 - 90% plateau rule: IS 최고 Sharpe의 90% 이상 파라미터 범위 중간값 선택
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
