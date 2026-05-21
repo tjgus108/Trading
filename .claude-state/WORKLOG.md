@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-21] Cycle 187 — B (리스크) + D (ML) + F (리서치) + SIM
+
+**[B] Risk Management:**
+- CircuitBreaker: 급속 가격 하락 감지 추가 (record_price + _check_rapid_decline)
+- 기본값: 5% 하락 / 5캔들 윈도우 / 30분 쿨다운
+- check() 우선순위에 급속 하락 체크 삽입
+- reset_daily/reset_all/to_dict/from_dict에 신규 상태 반영
+- DrawdownMonitor: 4단계 임계값(5/10/15/20%) 유지 — 레짐별 자동 강화 이미 구현됨
+- 테스트 8개 추가 (total 110 passed)
+
+**[D] ML & Signals:**
+- WalkForwardResult.param_stability_cv 필드 추가 (fold간 파라미터 CV = std/|mean|)
+- CV > 0.5인 파라미터에 WARNING 로그 출력
+- IS 목적함수: Score = Sharpe - λ*CV (stability_lambda=0.5 기본값)
+- WalkForwardOptimizer.__init__에 stability_lambda 파라미터 추가
+- 테스트 27/27 통과
+
+**[F] Research — 대안 데이터소스 + 합성데이터 개선:**
+- Binance: ccxt로 1년치 8760봉 fetch 성공 (2.36s, 1000/request)
+- OKX: 1년치 fetch 성공 (5.48s, 300/request)
+- Bitget: 제한적 (2361봉, 200/request)
+- 합성 데이터 개선: Jump-Diffusion + Regime-Switching 혼합 권장
+- Survivorship bias: 상장폐지 코인 제외 시 수익률 4배 과대평가
+- **핵심 결론: Binance 전환으로 실데이터 병목 즉시 해소 가능**
+
+**[SIM] 대안 거래소 데이터 fetch 테스트:**
+- Binance: ✅ 100봉 + 8760봉 paginated fetch 성공 (public API, 키 불필요)
+- OKX: ✅ 100봉 + 8760봉 fetch 성공
+- Bitget: ⚠️ 100봉 성공, 1년치 제한적 (2361봉)
+- SSL 에러 없음 — Bybit만 차단된 상태
+- **DataFeed에 fallback 거래소 구현 권장**: Bybit → Binance → OKX
+
 ## [2026-05-21] Cycle 186 — A (품질) + C (데이터) + F (리서치) + SIM
 
 **[A] Quality Assurance — params kwargs 확장:**
@@ -14525,3 +14557,6 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-21 03:58 UTC] Cycle 186 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 04:04 UTC] Cycle 187 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

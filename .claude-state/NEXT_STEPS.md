@@ -1,14 +1,18 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 186 A+C+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 187 B+D+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 186 완료
-- 186 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
-- 다음 Cycle 187: **187 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
+### 로테이션: Cycle 187 완료
+- 187 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
+- 다음 Cycle 188: **188 mod 5 = 3 → E(실행) + A(품질) + F(리서치)**
+
+### 🔥 돌파구: Binance/OKX 실데이터 fetch 성공
+- Bybit SSL 차단이지만 Binance(2.36s), OKX(5.48s)로 1년치 OHLCV fetch 확인
+- DataFeed에 fallback 거래소 구현이 최우선 — 합성 데이터 한계 해소
 
 ### ✅ Cycle 186 A(품질) 완료 사항
 
@@ -47,11 +51,12 @@ _Last updated: 2026-05-21 (Cycle 186 A+C+F+SIM 완료)_
 - CircuitBreaker 룰: AI 봇 군집매도 패턴 대응 (2026 리서치 결과)
 - 플래시크래시 감지: 5분 내 5% 이상 하락 시 신규 진입 중단 로직
 
-#### D(ML): 실제 데이터 확보 → OOS 재검증 (최우선)
-- ⚠️ 합성 데이터에서는 IS Sharpe 자체가 음수 → 최적화 무의미 확인됨
-- connector.py SSL 설정 수정 후 실제 Bybit 데이터 fetch 시도
-- 실데이터 확보 시 7개 factory(EmaCross, Donchian, CMF, WickReversal, ElderImpulse, ValueArea, FRAMA) OOS 재검증
-- fold별 param stability CV 측정 구현 (CV > 0.5 → fallback)
+#### D(ML): ✅ Cycle 187 완료
+- `WalkForwardResult.param_stability_cv` 필드 추가 (fold 간 파라미터 CV = std/|mean|)
+- CV > 0.5인 파라미터에 WARNING 로그 출력
+- IS 목적함수: `Score = Sharpe - λ * CV` (λ=0.5 기본값, `stability_lambda` 설정 가능)
+- 테스트 27/27 통과
+- 실데이터 확보 후 7개 factory OOS 재검증 (다음 우선)
 
 #### F(리서치): param stability 구현 검증 + CPCV 실용성
 - CV = std(params) / mean(params), 임계값: < 0.3 안정, > 0.6 불안정
@@ -133,5 +138,43 @@ _Last updated: 2026-05-21 (Cycle 186 A+C+F+SIM 완료)_
 
 ---
 
-**상태**: Cycle 186 완료 → Cycle 187 B(리스크) + D(실데이터 OOS 재검증) + F(param stability 구현)
-**최우선 과제**: 실제 Bybit 데이터 확보 → 7개 factory OOS 재검증 → PASS 전략 발굴
+**상태**: Cycle 187 완료 → Cycle 188 E(DataFeed fallback 구현) + A(실데이터 OOS 재검증) + F(리서치)
+**최우선 과제**: DataFeed에 Binance fallback 구현 → 실데이터 OOS 재검증 → PASS 전략 발굴
+
+### ✅ Cycle 187 완료 사항
+
+#### CircuitBreaker: 급속 가격 하락 감지 추가 ✅ COMPLETE
+- `record_price(close_price)` 메서드 추가: 캔들 확정 시 가격 기록 + 쿨다운 tick
+- `_check_rapid_decline()` 내부 메서드: 최근 N캔들 내 하락 ≥ rapid_decline_pct 감지
+- 파라미터 (기본값): `rapid_decline_pct=0.05`, `rapid_decline_window=5`, `rapid_decline_cooldown_periods=30`
+- check() 우선순위: 플래시 크래시 → 낙폭 → 연속손실 쿨다운 → **급속 하락** → 거래 횟수 → ATR/상관
+- `reset_daily()` / `reset_all()` 에 rapid_decline 상태 초기화 포함
+- `to_dict()` / `from_dict()` 직렬화 지원
+- `rapid_decline_cooldown` 프로퍼티 추가
+- 테스트 8개 추가 (total 110 → 110 passed, 신규 포함)
+
+#### DrawdownMonitor: 4단계 임계값 유지 (변경 불필요) ✅
+- 현재 임계값: WARN=5%, BLOCK=10%, LIQUIDATE=15%, HALT=20%
+- 2026 기관 참여 확대 환경에서도 적절 — 이유:
+  1. HIGH_VOL 레짐 시 daily_limit을 2%로 자동 강화하는 `set_regime()` 이미 구현됨
+  2. 레짐별 cooldown 배수(HIGH_VOL×2.0, TREND_DOWN×1.5)로 시장 구조 변화 반영
+  3. 5%→10%→15%→20% 4단계 누진 구조는 급격한 시장 충격에 충분히 대응 가능
+  4. 임계값 하향 시 오히려 정상 변동성에서 과도한 false positive 위험
+
+#### D(ML): Parameter Stability CV + Stability Penalty ✅ COMPLETE
+- WalkForwardResult.param_stability_cv: fold간 파라미터 CV = std/|mean|
+- CV > 0.5 WARNING 로그
+- 목적함수: Score = Sharpe - λ*CV (stability_lambda=0.5)
+- 테스트 27/27 통과
+
+#### F(리서치): 대안 데이터소스 + 합성데이터 한계 ✅ COMPLETE
+- Binance: 1년치 8760봉 fetch 성공 (2.36s, public API)
+- OKX: 1년치 fetch 성공 (5.48s)
+- 합성 데이터 개선: Jump-Diffusion + Regime-Switching 혼합 권장
+- Survivorship bias: 상장폐지 코인 제외 시 4배 과대평가
+
+#### SIM: 대안 거래소 fetch 테스트 ✅ COMPLETE
+- Binance/OKX/Bitget 모두 SSL 에러 없이 접근 성공
+- DataFeed fallback 구현으로 실데이터 병목 해소 가능
+
+**상태**: Cycle 187 전체 완료

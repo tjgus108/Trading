@@ -1263,3 +1263,124 @@ def test_cb_daily_trade_limit_reset_clears_trigger():
     # reset_daily로 해제
     cb.reset_daily(daily_start_balance=10000)
     assert cb.daily_trade_count == 0
+
+
+# ── CircuitBreaker 급속 가격 하락 감지 테스트 ─────────────────────────────────
+
+def _make_cb_rapid(**kwargs) -> FullCircuitBreaker:
+    """급속 하락 감지 테스트용 헬퍼."""
+    defaults = dict(
+        daily_drawdown_limit=0.03,
+        total_drawdown_limit=0.15,
+        flash_crash_pct=0.10,
+        max_consecutive_losses=5,
+        cooldown_periods=3,
+        max_daily_trades=0,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=5,
+        rapid_decline_cooldown_periods=30,
+    )
+    defaults.update(kwargs)
+    return FullCircuitBreaker(**defaults)
+
+
+def test_cb_rapid_decline_triggers_when_exceeded():
+    """5캔들 내 5% 이상 하락 시 check()가 triggered=True."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=5, rapid_decline_cooldown_periods=30)
+    # 100 → 94: 6% 하락 (window=5 이상 데이터 필요)
+    for price in [100.0, 99.0, 98.0, 96.0, 94.0]:
+        cb.record_price(price)
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "급속" in result["reason"]
+    assert result["size_multiplier"] == 0.0
+
+
+def test_cb_rapid_decline_not_triggered_below_threshold():
+    """하락이 threshold 미만이면 triggered=False."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=5)
+    # 100 → 96.5: 3.5% 하락 → 미감지
+    for price in [100.0, 99.5, 98.5, 97.5, 96.5]:
+        cb.record_price(price)
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_rapid_decline_cooldown_blocks_entry():
+    """급속 하락 감지 후 쿨다운 기간 동안 check()가 계속 triggered=True."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=5)
+    for price in [100.0, 97.0, 94.0]:
+        cb.record_price(price)
+    # 첫 check → 감지 + 쿨다운 시작
+    result1 = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result1["triggered"] is True
+    assert cb.rapid_decline_cooldown == 5
+    # 두 번째 check (쿨다운 중) → 여전히 차단
+    result2 = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result2["triggered"] is True
+    assert "급속" in result2["reason"]
+
+
+def test_cb_rapid_decline_cooldown_expires_after_record_price():
+    """record_price() N회 호출 후 쿨다운이 만료되면 check() triggered=False."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=3)
+    # 감지 유발
+    for price in [100.0, 97.0, 94.0]:
+        cb.record_price(price)
+    cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 3
+    # 3번 tick (record_price) → 쿨다운 만료
+    cb.record_price(94.0)
+    cb.record_price(94.0)
+    cb.record_price(94.0)
+    assert cb.rapid_decline_cooldown == 0
+    # 가격도 회복됐다고 가정 (history 전부 동일 가격 → 하락 없음)
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_rapid_decline_insufficient_data_no_trigger():
+    """가격 데이터가 2개 미만이면 감지 안 함."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=5)
+    cb.record_price(100.0)  # 1개만
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_rapid_decline_reset_daily_clears_state():
+    """reset_daily() 호출 시 급속 하락 쿨다운 및 가격 히스토리 초기화."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=10)
+    for price in [100.0, 97.0, 93.0]:
+        cb.record_price(price)
+    cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown > 0
+    cb.reset_daily(daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 0
+    # 리셋 후 같은 조건으로 check → triggered=False (히스토리 비어있음)
+    result = cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is False
+
+
+def test_cb_rapid_decline_serialization():
+    """to_dict/from_dict이 rapid_decline_cooldown을 올바르게 직렬화/복원."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=10)
+    for price in [100.0, 97.0, 93.0]:
+        cb.record_price(price)
+    cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    state = cb.to_dict()
+    assert state["rapid_decline_cooldown"] == 10
+
+    cb2 = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=10)
+    cb2.from_dict(state)
+    assert cb2.rapid_decline_cooldown == 10
+
+
+def test_cb_rapid_decline_reset_all_clears_state():
+    """reset_all() 후 급속 하락 쿨다운 0으로 초기화."""
+    cb = _make_cb_rapid(rapid_decline_pct=0.05, rapid_decline_window=3, rapid_decline_cooldown_periods=10)
+    for price in [100.0, 97.0, 93.0]:
+        cb.record_price(price)
+    cb.check(current_balance=10000, peak_balance=10000, daily_start_balance=10000)
+    cb.reset_all()
+    assert cb.rapid_decline_cooldown == 0
+    assert cb.is_triggered is False

@@ -18,6 +18,7 @@ D3. WalkForwardOptimizer: 전략 파라미터 자동 최적화.
 
 import itertools
 import logging
+import statistics as _statistics
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 
@@ -96,6 +97,8 @@ class WalkForwardResult:
     # IS 최적화 효과 측정용: 마지막 윈도우의 파라미터별 IS Sharpe 분포
     # {str(sorted(params.items())): is_sharpe} 형태
     last_is_sharpe_dist: Dict[str, float] = field(default_factory=dict)
+    # 파라미터 안정성 CV: {param_name: cv} (fold 간 CV=std/mean)
+    param_stability_cv: Dict[str, float] = field(default_factory=dict)
 
     def summary(self) -> str:
         verdict = "STABLE" if self.is_stable else "UNSTABLE"
@@ -108,6 +111,11 @@ class WalkForwardResult:
             f"  overfit_windows: {self.overfit_windows}/{len(self.windows)}",
             f"  verdict: {verdict}",
         ]
+        if self.param_stability_cv:
+            unstable = {k: v for k, v in self.param_stability_cv.items() if v > 0.5}
+            lines.append(f"  param_cv: {self.param_stability_cv}")
+            if unstable:
+                lines.append(f"  [WARN] unstable params (CV>0.5): {unstable}")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         return "\n".join(lines)
@@ -131,6 +139,7 @@ class WalkForwardOptimizer:
         param_grid: Optional[dict] = None,
         n_windows: int = 3,
         is_ratio: float = 0.6,    # in-sample 비율
+        stability_lambda: float = 0.5,  # Sharpe - λ*CV penalty 계수
     ):
         """
         Args:
@@ -139,11 +148,14 @@ class WalkForwardOptimizer:
             param_grid: {"param": [values]} 딕셔너리
             n_windows: walk-forward 윈도우 수
             is_ratio: in-sample 데이터 비율 (0.6 = 60%)
+            stability_lambda: IS 목적함수 stability penalty 계수.
+                              Score = Sharpe - λ * CV (λ=0 이면 순수 Sharpe 최적화)
         """
         self.strategy_name = strategy_name
         self.strategy_factory = strategy_factory
         self.n_windows = n_windows
         self.is_ratio = is_ratio
+        self.stability_lambda = stability_lambda
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -198,10 +210,14 @@ class WalkForwardOptimizer:
         window_results: List[WindowResult] = []
         param_oos_map: Dict[str, List[float]] = {}
         last_is_sharpe_dist: Dict[str, float] = {}
+        # fold별 최적 파라미터 수집 (파라미터 안정성 CV 계산용)
+        fold_params_history: List[dict] = []
 
         for i, (is_df, oos_df) in enumerate(windows):
-            # IS 최적화
-            best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(is_df, all_combinations)
+            # IS 최적화 (Sharpe - λ*CV 목적함수 적용)
+            best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(
+                is_df, all_combinations, stability_lambda=self.stability_lambda
+            )
 
             # OOS 검증
             oos_strategy = self.strategy_factory(best_params)
@@ -220,6 +236,7 @@ class WalkForwardOptimizer:
                 is_oos_ratio=ratio,
             )
             window_results.append(wr)
+            fold_params_history.append(best_params)
 
             # 파라미터별 OOS 성과 집계
             key = str(sorted(best_params.items()))
@@ -255,6 +272,28 @@ class WalkForwardOptimizer:
         oos_std = statistics.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         overfit_count = sum(1 for wr in window_results if wr.is_overfit())
 
+        # 파라미터 안정성 CV 계산 (fold 간 파라미터 CV = std / |mean|)
+        param_stability_cv: Dict[str, float] = {}
+        if len(fold_params_history) > 1:
+            all_param_keys = set(k for p in fold_params_history for k in p)
+            for pname in sorted(all_param_keys):
+                values = [p[pname] for p in fold_params_history if pname in p]
+                if len(values) < 2:
+                    continue
+                try:
+                    vals_float = [float(v) for v in values]
+                    mean_abs = abs(sum(vals_float) / len(vals_float))
+                    std_val = _statistics.stdev(vals_float)
+                    cv = (std_val / mean_abs) if mean_abs > 1e-9 else 0.0
+                    param_stability_cv[pname] = round(cv, 4)
+                    if cv > 0.5:
+                        logger.warning(
+                            "ParamStability [%s] param=%s CV=%.3f > 0.5 (불안정)",
+                            self.strategy_name, pname, cv,
+                        )
+                except (TypeError, ValueError):
+                    pass  # 비수치 파라미터는 스킵
+
         fail_reasons = []
         is_stable = True
         if oos_std > OOS_STD_MAX:
@@ -274,6 +313,7 @@ class WalkForwardOptimizer:
             overfit_windows=overfit_count,
             fail_reasons=fail_reasons,
             last_is_sharpe_dist=last_is_sharpe_dist,
+            param_stability_cv=param_stability_cv,
         )
         logger.info(result.summary())
         return result
@@ -304,15 +344,20 @@ class WalkForwardOptimizer:
         return windows
 
     def _optimize_in_sample(
-        self, is_df: pd.DataFrame, combinations: List[dict]
+        self, is_df: pd.DataFrame, combinations: List[dict],
+        stability_lambda: float = 0.5,
     ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색.
 
+        목적함수: Score = Sharpe - λ * CV (파라미터 내 변동성 패널티)
+        λ=0이면 순수 Sharpe 최대화.
         파라미터별 IS Sharpe를 DEBUG 레벨로 로깅하여 IS 최적화 분포 추적 가능.
         """
         best_params = combinations[0]
-        best_sharpe = -999.0
+        best_score = -999.0
         param_is_sharpes: Dict[str, float] = {}
+        # 그리드 탐색 중 파라미터값 누적 (CV 계산용)
+        param_value_lists: Dict[str, list] = {}
 
         for params in combinations:
             try:
@@ -321,11 +366,36 @@ class WalkForwardOptimizer:
                 sharpe = result.sharpe_ratio
                 param_key = str(sorted(params.items()))
                 param_is_sharpes[param_key] = round(sharpe, 4)
-                if sharpe > best_sharpe:
-                    best_sharpe = sharpe
-                    best_params = params
+                # 파라미터별 값 수집 (CV 계산용)
+                for k, v in params.items():
+                    param_value_lists.setdefault(k, []).append(float(v))
             except Exception as e:
                 logger.debug("IS backtest failed for %s: %s", params, e)
+
+        # 파라미터 그리드 전체 CV 계산 (그리드 내 분산 측도)
+        grid_cv: Dict[str, float] = {}
+        for pname, vals in param_value_lists.items():
+            if len(vals) < 2:
+                grid_cv[pname] = 0.0
+                continue
+            mean_abs = abs(sum(vals) / len(vals))
+            std_val = _statistics.stdev(vals)
+            grid_cv[pname] = (std_val / mean_abs) if mean_abs > 1e-9 else 0.0
+
+        # Score = Sharpe - λ * avg_CV 로 최적 파라미터 선택
+        avg_grid_cv = sum(grid_cv.values()) / len(grid_cv) if grid_cv else 0.0
+
+        for params in combinations:
+            param_key = str(sorted(params.items()))
+            if param_key not in param_is_sharpes:
+                continue
+            sharpe = param_is_sharpes[param_key]
+            score = sharpe - stability_lambda * avg_grid_cv
+            if score > best_score:
+                best_score = score
+                best_params = params
+
+        best_sharpe = param_is_sharpes.get(str(sorted(best_params.items())), 0.0)
 
         # 파라미터별 IS Sharpe 분포 로깅 (IS 최적화 효과 측정용)
         if logger.isEnabledFor(logging.DEBUG):
