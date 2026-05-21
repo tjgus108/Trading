@@ -140,6 +140,7 @@ class WalkForwardOptimizer:
         n_windows: int = 3,
         is_ratio: float = 0.6,    # in-sample 비율
         stability_lambda: float = 0.5,  # Sharpe - λ*CV penalty 계수
+        plateau_pct: float = 0.9,  # 플래토 룰: IS 최고 Sharpe의 이 비율 이상인 파라미터 집합 중 중간값 선택
     ):
         """
         Args:
@@ -150,12 +151,16 @@ class WalkForwardOptimizer:
             is_ratio: in-sample 데이터 비율 (0.6 = 60%)
             stability_lambda: IS 목적함수 stability penalty 계수.
                               Score = Sharpe - λ * CV (λ=0 이면 순수 Sharpe 최적화)
+            plateau_pct: 플래토 룰 임계값 (기본 0.9 = 90%).
+                         IS 최고 Sharpe × plateau_pct 이상인 파라미터들 중 중간값 선택.
+                         과최적화 방지: 극단 파라미터 배제.
         """
         self.strategy_name = strategy_name
         self.strategy_factory = strategy_factory
         self.n_windows = n_windows
         self.is_ratio = is_ratio
         self.stability_lambda = stability_lambda
+        self.plateau_pct = plateau_pct
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -214,9 +219,11 @@ class WalkForwardOptimizer:
         fold_params_history: List[dict] = []
 
         for i, (is_df, oos_df) in enumerate(windows):
-            # IS 최적화 (Sharpe - λ*CV 목적함수 적용)
+            # IS 최적화 (Sharpe - λ*CV 목적함수 + 플래토 룰 적용)
             best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(
-                is_df, all_combinations, stability_lambda=self.stability_lambda
+                is_df, all_combinations,
+                stability_lambda=self.stability_lambda,
+                plateau_pct=self.plateau_pct,
             )
 
             # OOS 검증
@@ -346,12 +353,18 @@ class WalkForwardOptimizer:
     def _optimize_in_sample(
         self, is_df: pd.DataFrame, combinations: List[dict],
         stability_lambda: float = 0.5,
+        plateau_pct: float = 0.9,
     ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색.
 
         목적함수: Score = Sharpe - λ * CV (파라미터 내 변동성 패널티)
         λ=0이면 순수 Sharpe 최대화.
-        파라미터별 IS Sharpe를 DEBUG 레벨로 로깅하여 IS 최적화 분포 추적 가능.
+
+        플래토 룰 (plateau_pct):
+          1. 모든 파라미터의 IS Sharpe 계산
+          2. 최고 IS Sharpe * plateau_pct 이상인 파라미터들을 "플래토 집합"으로 정의
+          3. 플래토 집합 내에서 각 파라미터의 중간값(median)에 가장 가까운 조합 선택
+          → 극단적 파라미터 배제 → 과최적화 방지
         """
         best_params = combinations[0]
         best_score = -999.0
@@ -382,7 +395,7 @@ class WalkForwardOptimizer:
             std_val = _statistics.stdev(vals)
             grid_cv[pname] = (std_val / mean_abs) if mean_abs > 1e-9 else 0.0
 
-        # Score = Sharpe - λ * avg_CV 로 최적 파라미터 선택
+        # Score = Sharpe - λ * avg_CV 로 최적 파라미터 선택 (플래토 룰 적용 전)
         avg_grid_cv = sum(grid_cv.values()) / len(grid_cv) if grid_cv else 0.0
 
         for params in combinations:
@@ -396,6 +409,38 @@ class WalkForwardOptimizer:
                 best_params = params
 
         best_sharpe = param_is_sharpes.get(str(sorted(best_params.items())), 0.0)
+
+        # 플래토 룰: IS 최고 Sharpe * plateau_pct 이상인 파라미터들 중 중간값 선택
+        if param_is_sharpes and plateau_pct > 0.0 and best_sharpe > 0:
+            max_is_sharpe = max(param_is_sharpes.values())
+            plateau_threshold = max_is_sharpe * plateau_pct
+            plateau_candidates = [
+                params for params in combinations
+                if param_is_sharpes.get(str(sorted(params.items())), -999.0) >= plateau_threshold
+            ]
+            if len(plateau_candidates) > 1:
+                # 각 파라미터의 중간값 계산
+                param_medians: Dict[str, float] = {}
+                all_param_keys = set(k for p in plateau_candidates for k in p)
+                for pname in all_param_keys:
+                    vals = sorted([float(p[pname]) for p in plateau_candidates if pname in p])
+                    mid = len(vals) // 2
+                    param_medians[pname] = vals[mid]
+                # 플래토 집합 중 중간값에 가장 가까운 파라미터 조합 선택
+                def median_distance(params: dict) -> float:
+                    return sum(
+                        abs(float(params.get(k, 0)) - param_medians.get(k, 0))
+                        / (abs(param_medians.get(k, 1)) + 1e-9)
+                        for k in param_medians
+                    )
+                plateau_best = min(plateau_candidates, key=median_distance)
+                plateau_sharpe = param_is_sharpes.get(str(sorted(plateau_best.items())), best_sharpe)
+                logger.info(
+                    "Plateau rule: threshold=%.4f plateau_size=%d → %s (sharpe=%.4f vs best=%.4f)",
+                    plateau_threshold, len(plateau_candidates), plateau_best, plateau_sharpe, best_sharpe,
+                )
+                best_params = plateau_best
+                best_sharpe = plateau_sharpe
 
         # 파라미터별 IS Sharpe 분포 로깅 (IS 최적화 효과 측정용)
         if logger.isEnabledFor(logging.DEBUG):

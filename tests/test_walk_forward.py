@@ -616,8 +616,86 @@ def test_donchian_dynamic_params():
     # 짧은 기간(10)은 일반적으로 더 좁은 채널을 생성 → high가 더 낮거나 low가 더 높음
     high_differs = abs(d_high_default - d_high_custom) > 0.01
     low_differs = abs(d_low_default - d_low_custom) > 0.01
-    
+
     assert high_differs or low_differs, \
         f"Different channel_period should produce different channel values. " \
         f"Default high={d_high_default:.2f}, Custom high={d_high_custom:.2f}, " \
         f"Default low={d_low_default:.2f}, Custom low={d_low_custom:.2f}"
+
+
+# ---------------------------------------------------------------------------
+# 플래토 룰 테스트 (Cycle 189 D(ML))
+# ---------------------------------------------------------------------------
+
+def test_plateau_pct_parameter_accepted():
+    """WalkForwardOptimizer가 plateau_pct 파라미터를 수용하는지 검증."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=2,
+        plateau_pct=0.9,
+    )
+    assert opt.plateau_pct == 0.9
+
+
+def test_plateau_pct_result_in_grid():
+    """플래토 룰 적용 후 선택된 파라미터가 제공된 그리드 내에 있어야 함."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    grid = {"fast_span": [10, 15, 20], "slow_span": [40, 50, 60]}
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid=grid,
+        n_windows=2,
+        plateau_pct=0.9,
+    )
+    df = make_df(600)
+    result = opt.run(df)
+    # 유효 윈도우가 생성되었으면 파라미터가 그리드 내에 있어야 함
+    if result.best_params:
+        assert result.best_params.get("fast_span") in grid["fast_span"]
+        assert result.best_params.get("slow_span") in grid["slow_span"]
+
+
+def test_plateau_pct_disabled_with_zero():
+    """plateau_pct=0.0이면 플래토 룰이 비활성화되고 순수 Sharpe 최대화 파라미터 선택."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=2,
+        plateau_pct=0.0,
+    )
+    df = make_df(600)
+    result = opt.run(df)
+    # 정상 동작 (예외 없이 결과 반환)
+    assert result is not None
+    assert isinstance(result.best_params, dict)

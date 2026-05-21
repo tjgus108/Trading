@@ -38,6 +38,7 @@ class PaperAccount:
     avg_entry: Dict[str, float] = field(default_factory=dict)   # symbol → avg price
     trades: List[PaperTrade] = field(default_factory=list)
     total_pnl: float = 0.0
+    equity_history: List[float] = field(default_factory=list)   # 체결 시점 자본 스냅샷 (MDD 계산용)
 
 
 class PaperTrader:
@@ -261,7 +262,13 @@ class PaperTrader:
                 self.account.positions[symbol] = new_qty
 
         self.account.trades.append(trade)
-        
+        # 자본 스냅샷 기록 (포지션 평가금 포함)
+        open_value = sum(
+            self.account.positions.get(sym, 0) * self.account.avg_entry.get(sym, 0)
+            for sym in self.account.positions
+        )
+        self.account.equity_history.append(self.account.balance + open_value)
+
         fill_status = "partial" if is_partial else "filled"
         return {
             "status": fill_status,
@@ -280,7 +287,7 @@ class PaperTrader:
         }
 
     def get_summary(self) -> dict:
-        """모의거래 요약: total_return%, trade_count, win_rate. slippage in basis points."""
+        """모의거래 요약: total_return%, trade_count, win_rate, max_drawdown_pct. slippage in basis points."""
         trades = self.account.trades
         sell_trades = [t for t in trades if t.action == "SELL"]
         win_count = sum(1 for t in sell_trades if t.pnl > 0)
@@ -290,29 +297,48 @@ class PaperTrader:
             (self.account.balance - self.account.initial_balance)
             / self.account.initial_balance
         )
-        # 체결된 거래만 통계 (부분체결 포함). slippage는 basis points.
         total_slippage_bps = sum(t.slippage_pct for t in trades) if trades else 0.0
-        
+
+        # 최대 낙폭(MDD) 계산: equity_history 기반
+        max_drawdown_pct = self._calculate_max_drawdown()
+
         return {
             "initial_balance": self.account.initial_balance,
             "current_balance": round(self.account.balance, 2),
             "total_pnl": round(self.account.total_pnl, 2),
             "total_return_pct": round(total_return * 100, 4),
+            "max_drawdown_pct": round(max_drawdown_pct, 4),
             "trade_count": trade_count,
             "sell_count": len(sell_trades),
             "win_rate": round(win_rate, 4),
             "avg_slippage_bps": round(total_slippage_bps / len(trades), 2) if trades else 0.0,
             "open_positions": dict(self.account.positions),
             "open_position_value": round(
-                sum(self.account.positions.get(sym, 0) * self.account.avg_entry.get(sym, 0) 
+                sum(self.account.positions.get(sym, 0) * self.account.avg_entry.get(sym, 0)
                     for sym in self.account.positions),
                 2
             ),
         }
+
+    def _calculate_max_drawdown(self) -> float:
+        """equity_history로부터 최대 낙폭(%) 계산. 기록 없으면 0.0 반환."""
+        equity = self.account.equity_history
+        if len(equity) < 2:
+            return 0.0
+        peak = equity[0]
+        max_dd = 0.0
+        for e in equity:
+            if e > peak:
+                peak = e
+            dd = (peak - e) / peak if peak > 0 else 0.0
+            if dd > max_dd:
+                max_dd = dd
+        return max_dd * 100.0  # 퍼센트 반환
 
     def reset(self) -> None:
         """계좌 초기화 (테스트용)"""
         self.account = PaperAccount(
             initial_balance=self.account.initial_balance,
             balance=self.account.initial_balance,
+            equity_history=[],
         )

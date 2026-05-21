@@ -1,14 +1,19 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 188 C+B+E+A+F+SIM 완료)_
+_Last updated: 2026-05-21 (Cycle 189 D+E+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 188 완료
-- 188 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** 패턴 ✅
-- 다음 Cycle 189: **189 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
+### 로테이션: Cycle 189 완료
+- 189 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
+- 다음 Cycle 190: **190 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+
+### 🔥 Cycle 189 주요 성과
+- **플래토 룰**: WalkForwardOptimizer에 plateau_pct=0.9 추가 — IS 최고 Sharpe 90% 이상 파라미터 중 중간값 선택
+- **PaperTrader MDD**: equity_history + _calculate_max_drawdown() + get_summary()에 max_drawdown_pct 추가
+- **신규 테스트 9개**: plateau_pct 파라미터 수용, MDD 계산 검증
 
 ### 🔥 Cycle 188 주요 성과
 - **DataFeed fallback**: connector.py fallback_exchanges + fetch_paginated() + _fetch_public_ohlcv()
@@ -50,21 +55,21 @@ _Last updated: 2026-05-21 (Cycle 188 C+B+E+A+F+SIM 완료)_
 - 테스트: 캐시 hit율 향상 확인 (3개 신규 테스트 통과, 기존 23개 테스트 모두 통과)
 - 실무 환경에서 hit율 10~20% 향상 예상
 
-### 🎯 Cycle 189 권장 작업 (189 mod 5 = 4 → C+B+F)
+### 🎯 Cycle 190 권장 작업 (190 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+
+#### A(품질): 테스트 커버리지 향상
+- WalkForwardOptimizer plateau_pct 효과 검증 테스트 추가 (plateau 실제 선택 효과)
+- MDD 계산 경계 케이스 추가 (단일 거래, 모두 손실, 회복 후 재하락)
 
 #### C(데이터): 볼륨 단위 정규화 + 실데이터 파이프라인 검증 (최우선)
 - Binance fetch_paginated()로 BTC/USDT 1h 12개월 데이터 수집
 - 볼륨 단위 확인/정규화 (base vs quote, ccxt #25399)
 - 데이터 갭 탐지, UTC 정규화, 연속성 검증
 
-#### B(리스크): 실데이터 기반 리스크 파라미터 검증
-- 실데이터에서 DrawdownMonitor/CircuitBreaker 임계값 적정성 재검토
-- 실데이터 변동성 분포에 맞는 kelly_sizer 파라미터 조정
-
 #### F(리서치): Binance 실데이터 WF 최적화 전략 리서치
 - 7개 factory + 실데이터 WF 최적화 → 어떤 전략이 유망한지 사전 분석
+- plateau_pct 효과 실데이터 검증 — 중간값 선택이 실제로 OOS를 개선하는지 확인
 - cross-exchange slippage 실측 데이터 수집
-- 90% plateau rule: IS 최고 Sharpe의 90% 이상 파라미터 범위 중간값 선택
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
 
@@ -141,7 +146,7 @@ _Last updated: 2026-05-21 (Cycle 188 C+B+E+A+F+SIM 완료)_
 
 ---
 
-**상태**: Cycle 188 완료 → Cycle 189 D(ML) + E(실행) + F(리서치)
+**상태**: Cycle 189 완료 → Cycle 190 A(품질) + C(데이터) + F(리서치)
 **최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
 
 ### ✅ Cycle 187 완료 사항

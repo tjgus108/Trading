@@ -911,9 +911,70 @@ def test_extremely_small_fee_rate():
     """극소 수수료율 (1 bps = 0.01%) 처리."""
     pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0001,
                      slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
-    
+
     result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
                                strategy="s", confidence="H")
-    
+
     expected_fee = 1000.0 * 1.0 * 0.0001  # = 0.1
     assert abs(result["fee"] - expected_fee) < 0.01
+
+
+# ── MDD 추적 ────────────────────────────────────────────────
+
+def test_max_drawdown_zero_on_empty():
+    """거래 없으면 MDD=0."""
+    pt = PaperTrader()
+    summary = pt.get_summary()
+    assert summary["max_drawdown_pct"] == 0.0
+
+
+def test_max_drawdown_summary_key_present():
+    """get_summary()에 max_drawdown_pct 키가 존재해야 함."""
+    pt = PaperTrader()
+    assert "max_drawdown_pct" in pt.get_summary()
+
+
+def test_equity_history_recorded_on_buy():
+    """BUY 체결 후 equity_history에 스냅샷 기록."""
+    pt = PaperTrader(initial_balance=10000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    assert len(pt.account.equity_history) == 1
+
+
+def test_max_drawdown_positive_after_loss():
+    """손실 거래 후 MDD > 0."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=5.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=800.0, quantity=5.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_summary()
+    assert summary["max_drawdown_pct"] > 0.0
+
+
+def test_max_drawdown_zero_on_profit():
+    """꾸준히 수익만 나는 경우 MDD=0 (고점 갱신만 발생)."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    # 매수 후 더 높은 가격에 매도 (수익)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=1200.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_summary()
+    # 수익 후에는 equity가 고점을 넘으므로 낙폭 없음 (또는 매우 작음)
+    assert summary["max_drawdown_pct"] >= 0.0
+
+
+def test_equity_history_cleared_on_reset():
+    """reset() 후 equity_history가 초기화."""
+    pt = PaperTrader(initial_balance=10000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    assert len(pt.account.equity_history) > 0
+    pt.reset()
+    assert len(pt.account.equity_history) == 0

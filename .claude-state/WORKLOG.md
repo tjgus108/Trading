@@ -1,5 +1,33 @@
 # Work Log
 
+## [2026-05-21] Cycle 189 — D(ML) + E(실행) + F(리서치)
+
+**[D] ML & Walk-Forward — 플래토 룰 파라미터 선택:**
+- `WalkForwardOptimizer.__init__`에 `plateau_pct: float = 0.9` 파라미터 추가
+- `_optimize_in_sample()`: IS 최고 Sharpe × plateau_pct 이상인 파라미터 집합 필터링
+- 플래토 집합 내에서 각 파라미터의 중간값(median)에 가장 가까운 조합 선택 → 극단적 파라미터 배제
+- `plateau_pct=0.0`이면 기존 순수 Sharpe 최대화 동작 유지 (하위 호환)
+- 테스트 3개 추가 (plateau_pct 수용, 그리드 내 선택, 비활성화 동작)
+
+**[E] Execution — PaperTrader MDD 추적:**
+- `PaperAccount.equity_history: List[float]` 필드 추가 (체결 시점 자본 스냅샷)
+- `execute_signal()`: 체결 후 포지션 평가금 포함 자본 기록
+- `_calculate_max_drawdown()`: equity_history 기반 최대 낙폭(%) 계산
+- `get_summary()`: `max_drawdown_pct` 키 추가
+- `reset()`: equity_history 초기화 포함
+- 테스트 6개 추가 (빈 기록 0%, MDD 키 존재, 체결 후 기록, 손실 후 양수, 수익 후 음수 MDD 없음, reset 초기화)
+
+**[F] Research — 플래토 룰 효과 분석:**
+- 90% plateau rule: 파라미터 중간값 선택으로 over-optimization 방지
+- IS Sharpe 최고 파라미터(corner solution) 대신 stable 영역 중간값 선택
+- Walk-Forward Efficiency: OOS/IS 비율 유지하면서 파라미터 안정성 향상
+- 실전 효과: 파라미터 민감도 낮은 구간 선택 → OOS 일반화 성능 개선 기대
+- 합성 데이터 SIM: 0/22 PASS(1h WF), 0/5 PASS(4h OOS) — 변화 없음 (합성 데이터 한계)
+
+**테스트:** 7621 passed (전체), 신규 9개 추가
+
+---
+
 ## [2026-05-21] Cycle 188 — C+B+E+A+F (통합)
 
 **[C/E] Data & Execution — DataFeed fallback 완성:**
@@ -14635,6 +14663,73 @@ Notes: none
 ImplShortfall: -5.00bps
 
 ## [2026-05-21 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 10:15 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-21 10:15 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 10:15 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
