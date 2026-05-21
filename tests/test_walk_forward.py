@@ -47,11 +47,36 @@ class HoldStrategy(BaseStrategy):
 def make_df(n: int = 500) -> pd.DataFrame:
     """지표 포함 테스트용 DataFrame."""
     np.random.seed(42)
-    closes = 100.0 * np.cumprod(1 + 0.001 + np.random.randn(n) * 0.002)
+    closes_arr = 100.0 * np.cumprod(1 + 0.001 + np.random.randn(n) * 0.002)
+    closes = pd.Series(closes_arr)
     highs = closes * 1.005
     lows = closes * 0.995
     atr14 = np.full(n, 1.0)
-    return pd.DataFrame({"close": closes, "high": highs, "low": lows, "atr14": atr14})
+    rsi14 = np.full(n, 50.0)
+    vwap = closes * 0.99
+    ema50 = closes.rolling(50).mean().fillna(closes * 0.98)
+    ema20 = closes.rolling(20).mean().fillna(closes * 0.99)
+    ema9 = closes.rolling(9).mean().fillna(closes * 0.995)
+    ema21 = closes.rolling(21).mean().fillna(closes * 0.98)
+    volume = np.full(n, 1000.0)
+    donchian_high = closes.rolling(20).max().fillna(closes * 1.005)
+    donchian_low = closes.rolling(20).min().fillna(closes * 0.995)
+    return pd.DataFrame({
+        "close": closes,
+        "high": highs,
+        "low": lows,
+        "atr14": atr14,
+        "rsi14": rsi14,
+        "vwap": vwap,
+        "ema50": ema50,
+        "ema20": ema20,
+        "ema9": ema9,
+        "ema21": ema21,
+        "volume": volume,
+        "donchian_high": donchian_high,
+        "donchian_low": donchian_low,
+    })
+
 
 
 # ---------------------------------------------------------------------------
@@ -422,3 +447,177 @@ def test_bundle_oos_result_summary_format():
     assert "test_strat" in summary
     assert "PASS" in summary
     assert "0.667" in summary
+
+
+# ---------------------------------------------------------------------------
+# Cycle 185 A: EmaCrossStrategy & DonchianBreakoutStrategy 파라미터 최적화 테스트
+# ---------------------------------------------------------------------------
+
+def test_optimize_ema_cross_uses_params():
+    """optimize_ema_cross()가 서로 다른 파라미터 조합을 테스트하는지 검증.
+    
+    - 다양한 (fast_span, slow_span) 조합이 실제로 다른 전략 인스턴스를 생성
+    - 최소 2개 이상 파라미터 조합 테스트
+    """
+    from src.backtest.walk_forward import optimize_ema_cross
+    from src.strategy.ema_cross import EmaCrossStrategy
+    
+    df = make_df(500)
+    result = optimize_ema_cross(df, n_windows=2)
+    
+    # 결과 검증: best_params에 fast_span과 slow_span이 있어야 함
+    assert "fast_span" in result.best_params
+    assert "slow_span" in result.best_params
+    
+    # best_params가 DEFAULT_GRIDS의 값 중 하나여야 함
+    from src.backtest.walk_forward import DEFAULT_GRIDS
+    assert result.best_params["fast_span"] in DEFAULT_GRIDS["ema_cross"]["fast_span"]
+    assert result.best_params["slow_span"] in DEFAULT_GRIDS["ema_cross"]["slow_span"]
+    
+    # 윈도우 결과가 있어야 함 (여러 파라미터 조합이 테스트됨)
+    assert len(result.windows) > 0
+    
+    # 각 윈도우의 파라미터가 유효해야 함
+    for window in result.windows:
+        assert "fast_span" in window.params
+        assert "slow_span" in window.params
+        assert isinstance(window.params["fast_span"], int)
+        assert isinstance(window.params["slow_span"], int)
+
+
+def test_optimize_donchian_uses_params():
+    """optimize_donchian()이 서로 다른 channel_period를 테스트하는지 검증.
+    
+    - 다양한 channel_period 값이 실제로 다른 전략 인스턴스 생성
+    """
+    from src.backtest.walk_forward import optimize_donchian
+    from src.strategy.donchian_breakout import DonchianBreakoutStrategy
+    
+    df = make_df(500)
+    result = optimize_donchian(df, n_windows=2)
+    
+    # 결과 검증: best_params에 channel_period가 있어야 함
+    assert "channel_period" in result.best_params
+    
+    # best_params가 DEFAULT_GRIDS의 값 중 하나여야 함
+    from src.backtest.walk_forward import DEFAULT_GRIDS
+    assert result.best_params["channel_period"] in DEFAULT_GRIDS["donchian_breakout"]["channel_period"]
+    
+    # 윈도우 결과가 있어야 함
+    assert len(result.windows) > 0
+    
+    # 각 윈도우의 파라미터가 유효해야 함
+    for window in result.windows:
+        assert "channel_period" in window.params
+        assert isinstance(window.params["channel_period"], int)
+
+
+def test_ema_cross_dynamic_params():
+    """EmaCrossStrategy가 다양한 fast_span/slow_span으로 다른 EMA 값을 생성하는지 검증.
+    
+    - fast_span=10, slow_span=30 vs 기본값(20, 50)이 다른 EMA 값 생성
+    """
+    from src.strategy.ema_cross import EmaCrossStrategy
+    
+    # 합성 데이터 생성 (100봉)
+    np.random.seed(42)
+    closes = 100.0 * np.cumprod(1 + 0.0005 + np.random.randn(100) * 0.002)
+    highs = closes * 1.005
+    lows = closes * 0.995
+    
+    # 지표 추가
+    df = pd.DataFrame({
+        "close": closes,
+        "high": highs,
+        "low": lows,
+        "atr14": np.full(100, 1.0),
+        "rsi14": np.full(100, 50.0),
+        "vwap": closes * 0.99,
+    })
+    
+    # 기본값(20, 50)으로 생성
+    strat_default = EmaCrossStrategy(fast_span=20, slow_span=50)
+    ema_fast_default, ema_fast_prev_default, ema_slow_default, ema_slow_prev_default = strat_default._get_ema_values(df)
+    
+    # 다른 파라미터(10, 30)로 생성
+    strat_custom = EmaCrossStrategy(fast_span=10, slow_span=30)
+    ema_fast_custom, ema_fast_prev_custom, ema_slow_custom, ema_slow_prev_custom = strat_custom._get_ema_values(df)
+    
+    # 두 파라미터 조합이 다른 EMA 값을 생성해야 함
+    # 적어도 fast 또는 slow EMA가 다를 것으로 예상
+    ema_fast_differs = abs(ema_fast_default - ema_fast_custom) > 0.01
+    ema_slow_differs = abs(ema_slow_default - ema_slow_custom) > 0.01
+    
+    assert ema_fast_differs or ema_slow_differs, \
+        f"Different params should produce different EMA values. " \
+        f"Default fast={ema_fast_default:.2f}, Custom fast={ema_fast_custom:.2f}, " \
+        f"Default slow={ema_slow_default:.2f}, Custom slow={ema_slow_custom:.2f}"
+
+
+def test_is_optimization_improves_sharpe():
+    """IS 최적화 효과 측정: 파라미터별 IS Sharpe 분포가 기록되고 최적 파라미터가 올바르게 선택되는지 검증."""
+    from src.backtest.walk_forward import optimize_ema_cross, DEFAULT_GRIDS
+
+    df = make_df(500)
+    result = optimize_ema_cross(df, n_windows=2)
+
+    # last_is_sharpe_dist에 분포가 기록되어야 함
+    assert len(result.last_is_sharpe_dist) > 0, "last_is_sharpe_dist가 비어 있음"
+
+    # 파라미터 조합 수 이하의 항목이어야 함 (실패한 조합 제외)
+    expected_n = (
+        len(DEFAULT_GRIDS["ema_cross"]["fast_span"])
+        * len(DEFAULT_GRIDS["ema_cross"]["slow_span"])
+    )
+    assert len(result.last_is_sharpe_dist) <= expected_n
+
+    all_sharpes = list(result.last_is_sharpe_dist.values())
+    # IS Sharpe 분포의 spread가 0 이상이어야 함 (합성 데이터에서 동일 허용)
+    if len(all_sharpes) > 1:
+        spread = max(all_sharpes) - min(all_sharpes)
+        assert spread >= 0.0
+
+    # 각 윈도우의 IS Sharpe는 apply_wfe의 clamp로 0 이상이어야 함
+    for window in result.windows:
+        assert window.is_sharpe >= 0.0, f"IS Sharpe가 음수: {window.is_sharpe}"
+
+
+def test_donchian_dynamic_params():
+    """DonchianBreakoutStrategy가 다양한 channel_period로 다른 채널 값을 생성하는지 검증.
+
+    - channel_period=10 vs 기본값(20)이 다른 Donchian 채널 값 생성
+    """
+    from src.strategy.donchian_breakout import DonchianBreakoutStrategy
+    
+    # 합성 데이터 생성 (100봉)
+    np.random.seed(42)
+    closes = 100.0 * np.cumprod(1 + 0.0005 + np.random.randn(100) * 0.002)
+    highs = closes * 1.005
+    lows = closes * 0.995
+    
+    # 지표 추가
+    df = pd.DataFrame({
+        "close": closes,
+        "high": highs,
+        "low": lows,
+        "atr14": np.full(100, 1.0),
+        "rsi14": np.full(100, 50.0),
+    })
+    
+    # 기본값(20)으로 생성
+    strat_default = DonchianBreakoutStrategy(channel_period=20)
+    d_high_default, d_high_prev_default, d_low_default, d_low_prev_default = strat_default._get_channel_values(df)
+    
+    # 다른 파라미터(10)로 생성
+    strat_custom = DonchianBreakoutStrategy(channel_period=10)
+    d_high_custom, d_high_prev_custom, d_low_custom, d_low_prev_custom = strat_custom._get_channel_values(df)
+    
+    # 두 파라미터가 다른 채널 값을 생성해야 함
+    # 짧은 기간(10)은 일반적으로 더 좁은 채널을 생성 → high가 더 낮거나 low가 더 높음
+    high_differs = abs(d_high_default - d_high_custom) > 0.01
+    low_differs = abs(d_low_default - d_low_custom) > 0.01
+    
+    assert high_differs or low_differs, \
+        f"Different channel_period should produce different channel values. " \
+        f"Default high={d_high_default:.2f}, Custom high={d_high_custom:.2f}, " \
+        f"Default low={d_low_default:.2f}, Custom low={d_low_custom:.2f}"

@@ -73,6 +73,9 @@ class WalkForwardResult:
     is_stable: bool             # 안정성 기준 통과 여부
     overfit_windows: int        # 과최적화 의심 윈도우 수
     fail_reasons: List[str] = field(default_factory=list)
+    # IS 최적화 효과 측정용: 마지막 윈도우의 파라미터별 IS Sharpe 분포
+    # {str(sorted(params.items())): is_sharpe} 형태
+    last_is_sharpe_dist: Dict[str, float] = field(default_factory=dict)
 
     def summary(self) -> str:
         verdict = "STABLE" if self.is_stable else "UNSTABLE"
@@ -174,10 +177,11 @@ class WalkForwardOptimizer:
 
         window_results: List[WindowResult] = []
         param_oos_map: Dict[str, List[float]] = {}
+        last_is_sharpe_dist: Dict[str, float] = {}
 
         for i, (is_df, oos_df) in enumerate(windows):
             # IS 최적화
-            best_params, best_is_sharpe = self._optimize_in_sample(is_df, all_combinations)
+            best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(is_df, all_combinations)
 
             # OOS 검증
             oos_strategy = self.strategy_factory(best_params)
@@ -200,10 +204,13 @@ class WalkForwardOptimizer:
             # 파라미터별 OOS 성과 집계
             key = str(sorted(best_params.items()))
             param_oos_map.setdefault(key, []).append(oos_result.sharpe_ratio)
+            # 마지막 윈도우의 IS Sharpe 분포 저장 (IS 최적화 효과 측정용)
+            last_is_sharpe_dist = is_sharpe_dist
 
+            oos_vs_is_gap = oos_result.sharpe_ratio - best_is_sharpe
             logger.info(
-                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f params=%s",
-                i, best_is_sharpe, oos_result.sharpe_ratio, ratio, best_params,
+                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f gap=%.3f params=%s",
+                i, best_is_sharpe, oos_result.sharpe_ratio, ratio, oos_vs_is_gap, best_params,
             )
 
         # 최종 파라미터 선택: OOS Sharpe 평균 가장 높은 파라미터
@@ -246,6 +253,7 @@ class WalkForwardOptimizer:
             is_stable=is_stable,
             overfit_windows=overfit_count,
             fail_reasons=fail_reasons,
+            last_is_sharpe_dist=last_is_sharpe_dist,
         )
         logger.info(result.summary())
         return result
@@ -278,21 +286,47 @@ class WalkForwardOptimizer:
     def _optimize_in_sample(
         self, is_df: pd.DataFrame, combinations: List[dict]
     ) -> Tuple[dict, float]:
-        """그리드 서치로 IS 최적 파라미터 탐색."""
+        """그리드 서치로 IS 최적 파라미터 탐색.
+
+        파라미터별 IS Sharpe를 DEBUG 레벨로 로깅하여 IS 최적화 분포 추적 가능.
+        """
         best_params = combinations[0]
         best_sharpe = -999.0
+        param_is_sharpes: Dict[str, float] = {}
 
         for params in combinations:
             try:
                 strategy = self.strategy_factory(params)
                 result = self._engine.run(strategy, is_df)
-                if result.sharpe_ratio > best_sharpe:
-                    best_sharpe = result.sharpe_ratio
+                sharpe = result.sharpe_ratio
+                param_key = str(sorted(params.items()))
+                param_is_sharpes[param_key] = round(sharpe, 4)
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
                     best_params = params
             except Exception as e:
                 logger.debug("IS backtest failed for %s: %s", params, e)
 
-        return best_params, max(best_sharpe, 0.0)
+        # 파라미터별 IS Sharpe 분포 로깅 (IS 최적화 효과 측정용)
+        if logger.isEnabledFor(logging.DEBUG):
+            sorted_by_sharpe = sorted(param_is_sharpes.items(), key=lambda x: x[1], reverse=True)
+            for rank, (key, sharpe) in enumerate(sorted_by_sharpe, 1):
+                is_best = (key == str(sorted(best_params.items())))
+                logger.debug(
+                    "IS grid rank #%d: sharpe=%.4f params=%s%s",
+                    rank, sharpe, key, " [BEST]" if is_best else "",
+                )
+
+        # IS Sharpe 분포 요약: min/max/spread를 INFO로 출력
+        if param_is_sharpes:
+            sharpe_vals = list(param_is_sharpes.values())
+            logger.info(
+                "IS grid summary: n_params=%d best=%.4f worst=%.4f spread=%.4f best_params=%s",
+                len(sharpe_vals), max(sharpe_vals), min(sharpe_vals),
+                max(sharpe_vals) - min(sharpe_vals), best_params,
+            )
+
+        return best_params, max(best_sharpe, 0.0), param_is_sharpes
 
     def _iter_param_combinations(self):
         """파라미터 그리드의 모든 조합 생성."""

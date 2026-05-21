@@ -28,26 +28,89 @@ from typing import List, Tuple, Optional
 
 
 def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
-    """현실적인 합성 OHLCV 데이터 생성 (트렌드 + 노이즈 + 변동성 클러스터링)."""
+    """
+    현실적인 합성 OHLCV 데이터 생성 (트렌드/레인지/변동성 폭발 레짐 포함).
+    
+    Regime structure:
+    - Trend blocks (100~150 candles): mu=±0.003, sigma=0.015
+    - Range blocks (80~120 candles): mu=0, sigma=0.008
+    - Volatility spike blocks (40~60 candles): mu=0.0001, sigma=0.04~0.05
+    """
     np.random.seed(seed)
-
-    # 가격 생성: GBM with regime changes
-    returns = np.random.normal(0.0001, 0.015, n)
-    # 변동성 클러스터링
+    
+    # 레짐 블록 생성
+    regime_blocks = []
+    idx = 0
+    
+    # Regime sequence for realism
+    regime_sequence = ["trend_up", "range", "trend_down", "range", "vol_spike", "range", "trend_up"]
+    regime_idx = 0
+    
+    while idx < n:
+        regime = regime_sequence[regime_idx % len(regime_sequence)]
+        
+        # Block size and parameters by regime
+        if regime == "trend_up":
+            size = np.random.randint(100, 151)
+            mu = 0.003  # strong uptrend
+            sigma = 0.015
+        elif regime == "trend_down":
+            size = np.random.randint(100, 151)
+            mu = -0.003  # strong downtrend
+            sigma = 0.015
+        elif regime == "range":
+            size = np.random.randint(80, 121)
+            mu = 0.0  # sideways
+            sigma = 0.008
+        elif regime == "vol_spike":
+            size = np.random.randint(40, 61)
+            mu = 0.0001  # slight drift
+            sigma = 0.04 + np.random.uniform(0, 0.01)  # 4~5% volatility
+        
+        regime_blocks.append({
+            "regime": regime,
+            "start": idx,
+            "size": min(size, n - idx),
+            "mu": mu,
+            "sigma": sigma
+        })
+        
+        idx += min(size, n - idx)
+        regime_idx += 1
+    
+    # Returns 생성: regime별 파라미터 사용
+    returns = np.zeros(n)
+    volumes_base = np.zeros(n)
+    
+    for block in regime_blocks:
+        start = block["start"]
+        size = block["size"]
+        end = start + size
+        
+        # Generate returns for this block
+        block_returns = np.random.normal(block["mu"], block["sigma"], size)
+        returns[start:end] = block_returns
+        
+        # Volume: volatility spike 구간에서 더 높음
+        if block["regime"] == "vol_spike":
+            volumes_base[start:end] = np.random.lognormal(10.5, 0.8, size)
+        else:
+            volumes_base[start:end] = np.random.lognormal(10, 0.8, size)
+    
+    # 변동성 클러스터링 (추가 realism)
     for i in range(1, n):
         if abs(returns[i - 1]) > 0.02:
-            returns[i] *= 1.5
-    # 트렌드 구간 삽입
-    returns[100:200] += 0.002   # bull
-    returns[400:500] -= 0.002   # bear
-    returns[700:800] += 0.001   # mild bull
-
+            returns[i] *= 1.3
+    
+    # 가격 계산
     close = 50000 * np.exp(np.cumsum(returns))
+    
+    # OHLC 생성
     high = close * (1 + np.abs(np.random.normal(0, 0.008, n)))
     low = close * (1 - np.abs(np.random.normal(0, 0.008, n)))
     open_ = close * (1 + np.random.normal(0, 0.003, n))
-    volume = np.random.lognormal(10, 0.8, n)
-
+    volume = volumes_base
+    
     df = pd.DataFrame({
         "open": open_,
         "high": high,
@@ -55,8 +118,8 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
         "close": close,
         "volume": volume,
     })
-
-    # 흔히 사용되는 지표 사전 계산
+    
+    # 지표 사전 계산
     df["atr14"] = _atr(df, 14)
     df["ema50"] = df["close"].ewm(span=50).mean()
     df["rsi14"] = _rsi(df["close"], 14)
@@ -69,22 +132,19 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
     df["volume_sma20"] = df["volume"].rolling(20).mean()
     df["return_5"] = df["close"].pct_change(5)
     
-    # 추가 지표 (몇몇 전략에서 필요)
+    # 추가 지표
     df["ema20"] = df["close"].ewm(span=20).mean()
     df["donchian_high"] = df["high"].rolling(20).max()
     df["donchian_low"] = df["low"].rolling(20).min()
     
-    # VWAP 계산: (누적 전형 가격 * 거래량) / 누적 거래량
+    # VWAP
     typical_price = (df["high"] + df["low"] + df["close"]) / 3
     cum_vol = df["volume"].cumsum()
     cum_tp_vol = (typical_price * df["volume"]).cumsum()
     df["vwap"] = cum_tp_vol / cum_vol.replace(0, np.nan)
-    
-    # VWAP 20 period rolling (근사)
     df["vwap20"] = (typical_price * df["volume"]).rolling(20).sum() / df["volume"].rolling(20).sum()
 
     return df
-
 
 def _atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     hl = df["high"] - df["low"]
