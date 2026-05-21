@@ -26,22 +26,29 @@ _MIN_BREACH = 1.5  # 최소 breach width: std * 1.5
 class ValueAreaStrategy(BaseStrategy):
     name = "value_area"
 
+    def __init__(self, va_period: int = 20, va_mult: float = 0.7, ema_short: int = 20, ema_long: int = 50, min_breach: float = 1.5, **kwargs):
+        self.va_period = va_period
+        self.va_mult = va_mult
+        self.ema_short = ema_short
+        self.ema_long = ema_long
+        self.min_breach = min_breach
+
     def generate(self, df: pd.DataFrame) -> Signal:
-        if df is None or len(df) < _MIN_ROWS:
+        if df is None or len(df) < 55:
             return self._hold_safe(df, f"Insufficient data for ValueArea (need {_MIN_ROWS} rows)")
 
         close = df["close"]
         volume = df["volume"]
 
         # VWAP + Value Area
-        vwap = (close * volume).rolling(_VA_PERIOD).sum() / volume.rolling(_VA_PERIOD).sum()
-        std = close.rolling(_VA_PERIOD).std()
-        va_high = vwap + std * _VA_MULT
-        va_low = vwap - std * _VA_MULT
+        vwap = (close * volume).rolling(self.va_period).sum() / volume.rolling(self.va_period).sum()
+        std = close.rolling(self.va_period).std()
+        va_high = vwap + std * self.va_mult
+        va_low = vwap - std * self.va_mult
 
         # Trend filters: EMA20 vs EMA50
-        ema20 = close.ewm(span=_EMA_SHORT, adjust=False).mean()
-        ema50 = close.ewm(span=_EMA_LONG, adjust=False).mean()
+        ema20 = close.ewm(span=self.ema_short, adjust=False).mean()
+        ema50 = close.ewm(span=self.ema_long, adjust=False).mean()
 
         # Volume filter
         vol_ma = volume.rolling(20).mean()
@@ -95,7 +102,7 @@ class ValueAreaStrategy(BaseStrategy):
         if prev_close < prev_va_low and curr_close > curr_va_low and trend_up and volume_ok:
             # HIGH confidence: 큰 breach + close near VWAP + strong volume
             conf = Confidence.MEDIUM
-            if (buy_breach_gap > curr_std * _MIN_BREACH and 
+            if (buy_breach_gap > curr_std * self.min_breach and 
                 abs(curr_close - curr_vwap) < curr_std * _HIGH_CONF_MULT and
                 curr_vol > curr_vol_ma * 1.3):
                 conf = Confidence.HIGH
@@ -119,7 +126,7 @@ class ValueAreaStrategy(BaseStrategy):
         if prev_close > prev_va_high and curr_close < curr_va_high and trend_down and volume_ok:
             # HIGH confidence: 큰 breach + close near VWAP + strong volume
             conf = Confidence.MEDIUM
-            if (sell_breach_gap > curr_std * _MIN_BREACH and 
+            if (sell_breach_gap > curr_std * self.min_breach and 
                 abs(curr_close - curr_vwap) < curr_std * _HIGH_CONF_MULT and
                 curr_vol > curr_vol_ma * 1.3):
                 conf = Confidence.HIGH

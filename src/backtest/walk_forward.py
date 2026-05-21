@@ -41,6 +41,26 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "long_threshold": [0.0002, 0.0003, 0.0004],
         "short_threshold": [-0.0001, -0.0002],
     },
+    "cmf": {
+        "period": [15, 20, 25],
+        "buy_thresh": [0.06, 0.08, 0.10],
+    },
+    "wick_reversal": {
+        "min_wick_ratio": [0.60, 0.65, 0.70],
+        "vol_mult": [0.7, 0.8, 0.9],
+    },
+    "elder_impulse": {
+        "ema_span": [10, 13, 15],
+        "min_volatility": [0.001, 0.002, 0.003],
+    },
+    "value_area": {
+        "va_period": [15, 20, 25],
+        "va_mult": [0.6, 0.7, 0.8],
+    },
+    "frama": {
+        "period": [14, 16, 18],
+        "rsi_period": [12, 14, 16],
+    },
 }
 
 # 과최적화 판단 기준
@@ -394,6 +414,101 @@ def optimize_funding_rate(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardRe
         strategy_name="funding_rate",
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["funding_rate"],
+        n_windows=n_windows,
+    )
+    return opt.run(df)
+
+def optimize_cmf(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+    """CMF 전략 파라미터 최적화."""
+    from src.strategy.cmf import CMFStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return CMFStrategy(
+            period=params.get("period", 20),
+            buy_thresh=params.get("buy_thresh", 0.08),
+            sell_thresh=params.get("sell_thresh", -0.08),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="cmf",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["cmf"],
+        n_windows=n_windows,
+    )
+    return opt.run(df)
+
+
+def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+    """Wick Reversal 전략 파라미터 최적화."""
+    from src.strategy.wick_reversal import WickReversalStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return WickReversalStrategy(
+            min_wick_ratio=params.get("min_wick_ratio", 0.65),
+            vol_mult=params.get("vol_mult", 0.8),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="wick_reversal",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["wick_reversal"],
+        n_windows=n_windows,
+    )
+    return opt.run(df)
+
+
+def optimize_elder_impulse(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+    """Elder Impulse 전략 파라미터 최적화."""
+    from src.strategy.elder_impulse import ElderImpulseStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return ElderImpulseStrategy(
+            ema_span=params.get("ema_span", 13),
+            min_volatility=params.get("min_volatility", 0.002),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="elder_impulse",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["elder_impulse"],
+        n_windows=n_windows,
+    )
+    return opt.run(df)
+
+
+def optimize_value_area(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+    """Value Area 전략 파라미터 최적화."""
+    from src.strategy.value_area import ValueAreaStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return ValueAreaStrategy(
+            va_period=params.get("va_period", 20),
+            va_mult=params.get("va_mult", 0.7),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="value_area",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["value_area"],
+        n_windows=n_windows,
+    )
+    return opt.run(df)
+
+
+def optimize_frama(df: pd.DataFrame, n_windows: int = 3) -> WalkForwardResult:
+    """FRAMA 전략 파라미터 최적화."""
+    from src.strategy.frama import FRAMAStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return FRAMAStrategy(
+            period=params.get("period", 16),
+            rsi_period=params.get("rsi_period", 14),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="frama",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["frama"],
         n_windows=n_windows,
     )
     return opt.run(df)

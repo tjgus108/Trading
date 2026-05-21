@@ -21,6 +21,13 @@ _VOL_PERCENTILE = 0.85  # 상위 15% 볼륨 (강화)
 class CMFStrategy(BaseStrategy):
     name = "cmf"
 
+    def __init__(self, period: int = 20, buy_thresh: float = 0.08, sell_thresh: float = -0.08, high_conf: float = 0.15, vol_percentile: float = 0.85, **kwargs):
+        self.period = period
+        self.buy_thresh = buy_thresh
+        self.sell_thresh = sell_thresh
+        self.high_conf = high_conf
+        self.vol_percentile = vol_percentile
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
             return Signal(
@@ -36,10 +43,10 @@ class CMFStrategy(BaseStrategy):
 
         idx = len(df) - 2
 
-        h = df["high"].iloc[idx - _PERIOD + 1: idx + 1]
-        l = df["low"].iloc[idx - _PERIOD + 1: idx + 1]
-        c = df["close"].iloc[idx - _PERIOD + 1: idx + 1]
-        v = df["volume"].iloc[idx - _PERIOD + 1: idx + 1]
+        h = df["high"].iloc[idx - self.period + 1: idx + 1]
+        l = df["low"].iloc[idx - self.period + 1: idx + 1]
+        c = df["close"].iloc[idx - self.period + 1: idx + 1]
+        v = df["volume"].iloc[idx - self.period + 1: idx + 1]
 
         hl_range = h - l
         mfm = ((c - l) - (h - c)) / hl_range.where(hl_range != 0, 1.0)
@@ -55,10 +62,10 @@ class CMFStrategy(BaseStrategy):
         current_vol = float(df["volume"].iloc[idx])
         vol_ratio = current_vol / vol_median if vol_median > 0 else 1.0
 
-        conf = Confidence.HIGH if abs(cmf) > _HIGH_CONF else Confidence.MEDIUM
+        conf = Confidence.HIGH if abs(cmf) > self.high_conf else Confidence.MEDIUM
 
         # BUY: CMF > 0.08 AND close > ema50 AND ema20 > ema50 AND 볼륨 양호 AND RSI < 75
-        if cmf > _BUY_THRESH and close > ema50 and ema20 > ema50 and vol_ratio >= _VOL_PERCENTILE and rsi < 75:
+        if cmf > self.buy_thresh and close > ema50 and ema20 > ema50 and vol_ratio >= self.vol_percentile and rsi < 75:
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -71,7 +78,7 @@ class CMFStrategy(BaseStrategy):
             )
 
         # SELL: CMF < -0.08 AND close < ema50 AND ema20 < ema50 AND 볼륨 양호 AND RSI > 25
-        if cmf < _SELL_THRESH and close < ema50 and ema20 < ema50 and vol_ratio >= _VOL_PERCENTILE and rsi > 25:
+        if cmf < self.sell_thresh and close < ema50 and ema20 < ema50 and vol_ratio >= self.vol_percentile and rsi > 25:
             return Signal(
                 action=Action.SELL,
                 confidence=conf,

@@ -1,15 +1,14 @@
 # Next Steps
 
-_Last updated: 2026-05-21 (Cycle 186 C 데이터 작업 완료)_
+_Last updated: 2026-05-21 (Cycle 186 A+C+F+SIM 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 186 완료 (A + C 완료)
-- 186 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)**
-- A(품질): 5개 전략 kwargs 수용 + walk_forward factory ✅
-- C(데이터): Bybit API SSL 문제 대응 + 캐시 효율성 개선 ✅
+### 로테이션: Cycle 186 완료
+- 186 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
+- 다음 Cycle 187: **187 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
 
 ### ✅ Cycle 186 A(품질) 완료 사항
 
@@ -41,36 +40,30 @@ _Last updated: 2026-05-21 (Cycle 186 C 데이터 작업 완료)_
 - 테스트: 캐시 hit율 향상 확인 (3개 신규 테스트 통과, 기존 23개 테스트 모두 통과)
 - 실무 환경에서 hit율 10~20% 향상 예상
 
-### 🎯 Cycle 186 B+D+F 권장 작업
+### 🎯 Cycle 187 권장 작업 (187 mod 5 = 2 → B+D+F)
 
 #### B(리스크): DrawdownMonitor + CircuitBreaker 재검토
 - DrawdownMonitor.check() 현재 임계값 적절한지 검토
-- CircuitBreaker 룰: 연속 손실 N회 → 강제 중단 로직 확인
-- kelly_sizer.py: adjust_for_regime() 최신 레짐 기준 검토
+- CircuitBreaker 룰: AI 봇 군집매도 패턴 대응 (2026 리서치 결과)
+- 플래시크래시 감지: 5분 내 5% 이상 하락 시 신규 진입 중단 로직
 
-#### D(ML): IS 최적화 효과 실질 검증 + OOS 재검증
-- 새 make_synthetic_data() (트렌드/레인지/변동성 구간 포함)로 IS 최적화 효과 측정
-- **이제 5개 전략 factory 완성 → run_bundle_oos.py 재실행으로 OOS 재검증 가능**
-  - optimize_ema_cross(), optimize_donchian(), optimize_funding_rate() (기존)
-  - optimize_cmf(), optimize_wick_reversal(), optimize_elder_impulse(), optimize_value_area(), optimize_frama() (신규)
-- optimize_ema_cross()의 last_is_sharpe_dist 확인: 파라미터별 IS Sharpe 분포 검증
-- factory 수정 효과: 5개 전략 OOS Sharpe 개선율 측정
+#### D(ML): 실제 데이터 확보 → OOS 재검증 (최우선)
+- ⚠️ 합성 데이터에서는 IS Sharpe 자체가 음수 → 최적화 무의미 확인됨
+- connector.py SSL 설정 수정 후 실제 Bybit 데이터 fetch 시도
+- 실데이터 확보 시 7개 factory(EmaCross, Donchian, CMF, WickReversal, ElderImpulse, ValueArea, FRAMA) OOS 재검증
+- fold별 param stability CV 측정 구현 (CV > 0.5 → fallback)
 
-#### F(리서치): CPCV 적용 가능성 검토 + param stability
-- Combinatorial Purged Cross-Validation (CPCV) — Lopez de Prado 기법
-- 현재 12개월 데이터로 n=4 그룹 → C(4,2)=6 경로 가능
-- walk_forward.py에 CPCV 모드 추가 고려
-- fold별 param stability(CV) 측정 → stability penalty 적용 (Freqtrade Hyperopt 패턴 참고)
+#### F(리서치): param stability 구현 검증 + CPCV 실용성
+- CV = std(params) / mean(params), 임계값: < 0.3 안정, > 0.6 불안정
+- Sharpe - λ*CV (λ=0.5~1.0) penalty 목적함수 통합 방법
+- 90% plateau rule: IS 최고 Sharpe의 90% 이상 파라미터 범위 중간값 선택
 
-### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (Cycle 185 미해결)
+### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
 
-**Cycle 185 시뮬레이션 결과 (Synthetic data):**
-- paper_simulation (1h, BTC, 22 strategies, 2 windows): 0/22 PASS
-- bundle_oos (4h, BTC/USDT, 5 strategies, 9 folds): 0/5 PASS
-- ⚠️ Bybit API SSL 차단으로 합성 데이터만 사용. 실제 데이터 결과 아님.
-- OOS std 필터: 5/5 전략 std 3.16~6.15 > 1.5 (불안정 필터 동작)
-
-**이번 Cycle 186 D(ML)에서 5개 신규 factory 사용 OOS 재검증 추진.**
+**Cycle 186 SIM 결과:** factory 수정 후에도 0/5 PASS (변화 없음)
+- IS Sharpe 자체가 음수(-6.5~2.3) → 합성 데이터에서는 최적화 신호 없음
+- factory 수정은 올바르지만 합성 데이터 환경에서 효과 검증 불가
+- **결론: 실제 Bybit 데이터 확보가 최우선 병목**
 
 ---
 
@@ -140,5 +133,5 @@ _Last updated: 2026-05-21 (Cycle 186 C 데이터 작업 완료)_
 
 ---
 
-**상태**: Cycle 186 A(품질) 완료 → Cycle 186 B(리스크) + D(ML/OOS재검증) + F(CPCV리서치+param stability)
-**최우선 과제**: 5개 신규 factory 사용 OOS 재검증 + DrawdownMonitor/CircuitBreaker 재검토
+**상태**: Cycle 186 완료 → Cycle 187 B(리스크) + D(실데이터 OOS 재검증) + F(param stability 구현)
+**최우선 과제**: 실제 Bybit 데이터 확보 → 7개 factory OOS 재검증 → PASS 전략 발굴

@@ -1,5 +1,33 @@
 # Work Log
 
+## [2026-05-21] Cycle 186 — A (품질) + C (데이터) + F (리서치) + SIM
+
+**[A] Quality Assurance — params kwargs 확장:**
+- 5개 전략(cmf, wick_reversal, elder_impulse, value_area, frama) __init__에 파라미터 kwargs 수용 추가
+- walk_forward.py에 optimize_cmf/wick_reversal/elder_impulse/value_area/frama factory 함수 5개 추가
+- DEFAULT_GRIDS에 5개 전략 파라미터 그리드 추가
+- generate() 내 하드코딩 상수를 self.파라미터 참조로 변경
+- 81개 단위 테스트 전부 PASS
+
+**[C] Data & Infrastructure — SSL 대응 + 캐시 개선:**
+- connector.py: SSL verify 옵션 + aiohttp_trust_env=True (프록시 환경변수 지원)
+- feed.py: 캐시 키 정규화 (symbol.upper()) — 대소문자 혼합 캐시 미스 방지
+- invalidate_cache()에도 정규화 적용
+- 캐시 정규화 테스트 3개 추가 (26개 테스트 전부 pass)
+
+**[F] Research — param stability + 시장전망 + 실패패턴:**
+- Parameter Stability: CV < 0.3 안정, > 0.6 불안정. Sharpe - λ*CV (λ=0.5~1.0) penalty 적용 권장
+- 90% plateau rule: IS 최고 Sharpe의 90% 이상 달성하는 파라미터 범위 중간값 선택
+- 2026 Q2: BTC $110K+ 지지, 기관 참여 확대, 단순 momentum edge 감소
+- MiCA: 2026-07-01 EU 전환기간 종료, 비EU 운영자는 단기 영향 없음
+- 2026 플래시크래시: AI 봇 군집매도($20억/3분), BTC $77K crash($6.57억 청산)
+
+**[SIM] OOS 재검증 (factory 수정 후):**
+- run_bundle_oos.py 실행: 0/5 PASS (변화 없음)
+- 원인: 합성 데이터에서 IS Sharpe 자체가 음수 (-6.5~2.3) → 최적화 신호 없음
+- factory 수정은 올바르지만, 합성 데이터 환경에서는 효과 검증 불가
+- **결론: 실제 Bybit 데이터 확보가 최우선 과제**
+
 ## [2026-05-21] Cycle 185 — A (품질) + C (데이터) + F (리서치) + SIM (원격 세션)
 
 **[A] Quality Assurance — IS Sharpe >= 2.5 재검증 + 테스트 커버리지:**
@@ -14494,3 +14522,6 @@ Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-21 03:45 UTC] Cycle 185 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 03:58 UTC] Cycle 186 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

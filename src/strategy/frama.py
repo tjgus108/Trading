@@ -124,7 +124,7 @@ class FRAMAStrategy(BaseStrategy):
     """
     name = "frama"
 
-    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14) -> None:
+    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14, **kwargs) -> None:
         self.period = period
         self.rsi_period = rsi_period
         self.atr_period = atr_period

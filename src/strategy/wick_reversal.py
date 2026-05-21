@@ -1,8 +1,8 @@
 """
 WickReversalStrategy v2: 긴 꼬리(wick)를 이용한 반전 감지.
 개선 (Cycle 120): 선택적 강화 필터 (거래수 유지 + 품질 향상)
-- Hammer (lower_wick_ratio >= 0.65, close > SMA20*0.97, vol_ok OR rsi<=70) → BUY
-- Shooting Star (upper_wick_ratio >= 0.65, close < SMA20*1.03, vol_ok OR rsi>=30) → SELL
+- Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.97, vol_ok OR rsi<=70) → BUY
+- Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, vol_ok OR rsi>=30) → SELL
 - volume > avg_volume_10 * 1.0 (기존 유지)
 - wick_ratio > 0.7 → HIGH confidence
 - 추세 필터 유지 (trend_up/trend_down)
@@ -19,6 +19,12 @@ from .base import Action, BaseStrategy, Confidence, Signal
 class WickReversalStrategy(BaseStrategy):
     name = "wick_reversal"
 
+    def __init__(self, min_wick_ratio: float = 0.65, vol_mult: float = 0.8, sma_period: int = 20, trend_period: int = 14, **kwargs):
+        self.min_wick_ratio = min_wick_ratio
+        self.vol_mult = vol_mult
+        self.sma_period = sma_period
+        self.trend_period = trend_period
+
     MIN_ROWS = 25
 
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
@@ -33,7 +39,7 @@ class WickReversalStrategy(BaseStrategy):
             bear_case="",
         )
 
-        if df is None or len(df) < self.MIN_ROWS:
+        if df is None or len(df) < 25:
             hold.reasoning = "데이터 부족"
             return hold
 
@@ -59,16 +65,16 @@ class WickReversalStrategy(BaseStrategy):
         upper_wick_ratio = upper_wick / total_range
 
         # SMA20
-        lookback = min(20, len(df) - 1)
+        lookback = min(self.sma_period, len(df) - 1)
         sma20 = float(df["close"].iloc[-lookback - 1:-1].mean())
 
         # 볼륨: 기존 기준 유지 (0.8배)
         vol_lookback = min(10, len(df) - 1)
         avg_vol_10 = float(df["volume"].iloc[-vol_lookback - 1:-1].mean())
-        vol_ok = volume > avg_vol_10 * 0.8
+        vol_ok = volume > avg_vol_10 * self.vol_mult
 
         # 추세 필터: 14기간 최고가/최저가 대비
-        trend_lookback = min(14, len(df) - 1)
+        trend_lookback = min(self.trend_period, len(df) - 1)
         high_14 = float(df["high"].iloc[-trend_lookback - 1:-1].max())
         low_14 = float(df["low"].iloc[-trend_lookback - 1:-1].min())
         
@@ -90,10 +96,10 @@ class WickReversalStrategy(BaseStrategy):
         )
 
         # Hammer: BUY
-        # 기본: lower_wick_ratio >= 0.65 + trend_up + close > SMA20*0.97
+        # 기본: lower_wick_ratio >= self.min_wick_ratio + trend_up + close > SMA20*0.97
         # 강화: + (vol_ok OR rsi <= 70)
         hammer = (
-            lower_wick_ratio >= 0.65 and 
+            lower_wick_ratio >= self.min_wick_ratio and 
             close > sma20 * 0.97 and 
             trend_up and
             (vol_ok or rsi <= 70)
@@ -116,10 +122,10 @@ class WickReversalStrategy(BaseStrategy):
             )
 
         # Shooting Star: SELL
-        # 기본: upper_wick_ratio >= 0.65 + trend_down + close < SMA20*1.03
+        # 기본: upper_wick_ratio >= self.min_wick_ratio + trend_down + close < SMA20*1.03
         # 강화: + (vol_ok OR rsi >= 30)
         shooting_star = (
-            upper_wick_ratio >= 0.65 and 
+            upper_wick_ratio >= self.min_wick_ratio and 
             close < sma20 * 1.03 and 
             trend_down and
             (vol_ok or rsi >= 30)

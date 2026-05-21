@@ -1,71 +1,35 @@
 ======================================================================
-🔄 CYCLE 185 — 2026-05-21
+🔄 CYCLE 186 — 2026-05-21T03:58:30.183747Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (185 mod 5 = 0)
-- A(품질): IS Sharpe >= 2.5 재검증 + 테스트 커버리지 향상
-- C(데이터): make_synthetic_data() 레짐 구조 개선
-- F(리서치): IS 최적화 효과 측정 메커니즘
+## 이번 사이클 배정 카테고리 (병렬 3개)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### A(품질) — IS Sharpe >= 2.5 재검증
-- QUALITY_AUDIT.csv 분석: 348개 전략 중 PASS 22개 → **모두 IS Sharpe >= 2.5** (최저 2.98)
-- DSR 기준 상향(2.5) 필요 없음 — 이미 전략 선별이 충분히 엄격
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### A(품질) — 파라미터 최적화 단위 테스트 4개 추가
-- test_optimize_ema_cross_uses_params(): factory 다양한 파라미터 테스트 검증
-- test_optimize_donchian_uses_params(): channel_period 유효성 검증
-- test_ema_cross_dynamic_params(): 동적 EMA 계산 확인
-- test_donchian_dynamic_params(): 동적 채널 계산 확인
-- make_df() helper 컬럼 확장 (rsi14, vwap, ema, volume, donchian 추가)
+### [SIM] Paper Simulation & Auto-improve
+- **Agent**: backtest-agent
+- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
 
-### C(데이터) — 합성 데이터 레짐 개선
-- make_synthetic_data() 완전 재작성:
-  - 트렌드 업/다운 블록: mu=±0.002~0.004, sigma=0.012~0.018 (120~180봉)
-  - 레인지 블록: mu=0, sigma=0.006~0.010 (100~150봉)
-  - 변동성 폭발 블록: sigma=0.035~0.055 (50~80봉)
-  - GARCH-like volatility clustering
-  - 레짐 지속성 강화, 볼륨↔변동성 상관관계 개선
+### [F] Research
+- **Agent**: strategy-researcher-agent
+- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
-### F(리서치) — IS 최적화 효과 측정 메커니즘
-- walk_forward.py: 파라미터별 IS Sharpe 분포 로깅 (DEBUG/INFO 레벨)
-- WalkForwardResult.last_is_sharpe_dist 필드 추가
-- 윈도우별 IS/OOS gap 로깅
-- test_is_optimization_improves_sharpe() 추가
-
-### D(ML) — WFO factory params 주입 수정 + OOS Sharpe std 필터 (로컬 세션)
-- EmaCrossStrategy(fast_span, slow_span), DonchianBreakoutStrategy(channel_period) __init__ 추가
-- optimize_ema_cross, optimize_donchian factory가 params를 실제로 생성자에 전달
-- RollingOOSValidator: OOS Sharpe std > 1.5이면 FAIL 처리
-
-### E(실행) — 거래 0건 전략 3종 완화 (로컬 세션)
-- volume_breakout: ATR 필터 0.3~5.0 → 0.1~10.0
-- dema_cross: 거리 필터 1% → 0.5%
-- price_cluster: threshold 0.2% → 0.5%
-
-### 테스트
-- 7591 passed, 23 skipped ✅
-
-paper_simulation (1h, BTC, 22 strategies, 2 windows): 0/22 PASS
-bundle_oos (4h, BTC/USDT, 5 strategies, 9 folds): 0/5 PASS
-  - OOS Sharpe std 3.16~6.15 > 1.5 (불안정 필터 동작)
-⚠️ 합성 데이터 환경. 실제 Bybit 데이터 없이 전략 차별화 불가.
+## 이전 사이클 현황
+**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
+  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
+  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
+  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
+  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
 
 **[!] 감지된 이슈:**
   - CRITICAL 항목 감지
   - ERROR 기록 존재
-
-======================================================================
-## 다음 사이클 (186)
-======================================================================
-186 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)
-최우선:
-- B: DrawdownMonitor/CircuitBreaker 로직 재검토
-- D: WalkForward IS 최적화 효과 실질 검증 (새 합성 데이터로)
-- F: CPCV(Combinatorial Purged CV) 적용 가능성 검토
 
 ## ⛔ 금지 사항
 - 새 전략 파일 생성 금지 (현재 ~355개로 충분)

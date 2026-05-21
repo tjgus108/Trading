@@ -59,18 +59,25 @@ def _calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
 class ElderImpulseStrategy(BaseStrategy):
     name = "elder_impulse"
 
+    def __init__(self, ema_span: int = 13, macd_fast: int = 12, macd_slow: int = 26, macd_signal: int = 9, min_volatility: float = 0.002, **kwargs):
+        self.ema_span = ema_span
+        self.macd_fast = macd_fast
+        self.macd_slow = macd_slow
+        self.macd_signal = macd_signal
+        self.min_volatility = min_volatility
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < _MIN_ROWS:
             return self._hold(df, "Insufficient data for Elder Impulse (need 35 rows)")
 
         idx = len(df) - 2  # _last() = iloc[-2]
 
-        ema13 = df["close"].ewm(span=13, adjust=False).mean()
+        ema13 = df["close"].ewm(span=self.ema_span, adjust=False).mean()
         macd_line = (
-            df["close"].ewm(span=12, adjust=False).mean()
-            - df["close"].ewm(span=26, adjust=False).mean()
+            df["close"].ewm(span=self.macd_fast, adjust=False).mean()
+            - df["close"].ewm(span=self.macd_slow, adjust=False).mean()
         )
-        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        signal_line = macd_line.ewm(span=self.macd_signal, adjust=False).mean()
         macd_hist = macd_line - signal_line
 
         ema_now = float(ema13.iloc[idx])
@@ -92,7 +99,7 @@ class ElderImpulseStrategy(BaseStrategy):
         
         # 변동성 필터 (ATR 기반)
         volatility = _calculate_atr(df.iloc[:idx+1], period=14)
-        min_volatility = 0.002  # 최소 0.2% 변동성 필요
+        vol_threshold = self.min_volatility  # 최소 0.2% 변동성 필요
 
         context = (
             f"close={close:.4f} ema13={ema_now:.4f} "
@@ -102,7 +109,7 @@ class ElderImpulseStrategy(BaseStrategy):
         # BUY: RED → GREEN + 변동성 필터
         if color_prev == "RED" and color_now == "GREEN":
             # 변동성 검증 추가
-            if volatility < min_volatility:
+            if volatility < vol_threshold:
                 return self._hold(df, f"Insufficient volatility for BUY (vol={volatility:.4f})", context, context)
             
             confidence = (
@@ -127,7 +134,7 @@ class ElderImpulseStrategy(BaseStrategy):
         # SELL: GREEN → RED + 변동성 필터
         if color_prev == "GREEN" and color_now == "RED":
             # 변동성 검증 추가
-            if volatility < min_volatility:
+            if volatility < vol_threshold:
                 return self._hold(df, f"Insufficient volatility for SELL (vol={volatility:.4f})", context, context)
             
             confidence = (
