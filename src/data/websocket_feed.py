@@ -311,6 +311,27 @@ class BinanceWebSocketFeed:
             logger.error("WebSocket max retries exceeded — feed stopped")
             self._consecutive_failures = MAX_RETRY
 
+    async def _message_loop(self, ws) -> None:
+        """WebSocket 메시지 수신 루프."""
+        async for msg in ws:
+            if self._stop_event.is_set():
+                return
+            try:
+                self._process_message(json.loads(msg))
+            except Exception as e:
+                logger.debug("Message parse error: %s", e)
+
+    async def _stale_watchdog(self) -> None:
+        """캔들 stale 감지 → 예외 발생으로 재연결 트리거."""
+        while not self._stop_event.is_set():
+            await asyncio.sleep(30.0)
+            if self._health_monitor.is_stale(timeout_seconds=self._stale_timeout):
+                logger.warning(
+                    "Stale connection detected (no candle for >%.0fs) — forcing reconnect",
+                    self._stale_timeout,
+                )
+                raise ConnectionError(f"Stale: no candle for >{self._stale_timeout}s")
+
     async def _listen(self) -> None:
         import websockets
 
@@ -324,13 +345,24 @@ class BinanceWebSocketFeed:
                 self._health_monitor.record_reconnection(reason="connect")
                 logger.info("WebSocket connected: %s (reconnection #%d)", url, self._reconnection_count)
 
-                async for msg in ws:
-                    if self._stop_event.is_set():
-                        break
-                    try:
-                        self._process_message(json.loads(msg))
-                    except Exception as e:
-                        logger.debug("Message parse error: %s", e)
+                tasks = [
+                    asyncio.create_task(self._message_loop(ws)),
+                    asyncio.create_task(self._stale_watchdog()),
+                ]
+                try:
+                    done, pending = await asyncio.wait(
+                        tasks, return_when=asyncio.FIRST_EXCEPTION
+                    )
+                    for t in pending:
+                        t.cancel()
+                    for t in done:
+                        exc = t.exception()
+                        if exc:
+                            raise exc
+                except Exception:
+                    for t in tasks:
+                        t.cancel()
+                    raise
         finally:
             self._connected = False
 

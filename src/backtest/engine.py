@@ -348,7 +348,7 @@ class BacktestEngine:
         win_rate = len(wins) / len(trades)
         gross_profit = sum(wins) if wins else 0
         gross_loss = abs(sum(losses)) if losses else 1e-9
-        profit_factor = gross_profit / gross_loss
+        profit_factor = min(gross_profit / gross_loss, 999.99)  # cap: 손실 0건 시 무한대 방지
 
         eq = np.array(equity)
         returns = np.diff(eq) / eq[:-1]

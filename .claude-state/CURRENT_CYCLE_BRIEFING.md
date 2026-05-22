@@ -1,28 +1,25 @@
 ======================================================================
-🔄 CYCLE 194 COMPLETED — 2026-05-22
+🔄 CYCLE 195 COMPLETED — 2026-05-22
 ======================================================================
 
-## 완료된 사이클: 194 (D(ML) + E(실행) + F(리서치))
+## 완료된 사이클: 195 (A(품질) + C(데이터) + F(리서치))
 
-### [D] ML
-- FeatureBuilder: exchange_netflow_norm + sopr_delta 온체인 피처 추가
-- RollingOOSValidator: min_oos_trades=3 (저거래 fold 제외), summary 중복 버그 수정
-- 테스트 12개 추가
+### A(품질) — 6개 신규 테스트
+- RollingOOSValidator PASS 경로 (mock BacktestEngine → all_passed=True)
+- WalkForwardOptimizer fold_decay>0 E2E (weighted_oos_sharpe 반환 확인)
+- RegimeAwareFeatureBuilder.build_with_cached_regime() 4개 (정상/None/invalid/features_only)
 
-### [E] Execution  
-- KellySizer(rolling) + VolTargeting(EWMA) + PaperTrader 통합 테스트 5개
-- warmup/Kelly 경로 전환 E2E 검증
+### C(데이터) — WebSocket stale 자동 재연결
+- _stale_watchdog(): 30초마다 is_stale() 체크, stale 감지 시 ConnectionError
+- asyncio.wait(FIRST_EXCEPTION)으로 message_loop + watchdog 동시 실행
+- BacktestEngine PF cap 999.99 (합성데이터 0-loss fold 무한대 방지)
 
-### [F] Research
-- ML 트레이딩 프로덕션: PSI + Page-Hinkley drift 감지 + shadow→canary 배포 파이프라인
-- 재학습 주기: 주별 + 성능 트리거 방식 (6개월 방치 = 35% 오류율 증가)
+### SIM 결과 (2026-05-22)
+- Bundle OOS 4h: 5/5 FAIL (합성 데이터 한계, IS Sharpe 음수)
+- Paper SIM 1h: 22/22 FAIL consistency 0/8 (GBM 랜덤워크)
+- 결론: 합성 데이터 기반 최적화 한계 재확인
 
-## SIM 결과
-- Paper SIM: 0/22 PASS (합성 데이터, avg 12.33% return)
-- Bundle OOS: 0/5 PASS (OOS Sharpe std 3.1~6.2)
-- narrow_range 0거래 문제: min_oos_trades 개선으로 더 명확한 진단
-
-## 다음 사이클: 195 (A(품질) + C(데이터) + F(리서치))
-- RollingOOSValidator PASS 경로 테스트
-- DataFeed 온체인 컬럼 인터페이스
-- Drift 감지 PSI 설계
+## 다음 Cycle: 196 (B + D + F)
+- B: DrawdownMonitor 롤링 MDD, KellySizer 안정성 테스트
+- D: PSIDriftMonitor 단위 테스트, DualGateADWINMonitor E2E
+- F: DataFeed.fetch_with_regime() 통합 파이프라인 리서치

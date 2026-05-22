@@ -1,5 +1,33 @@
 # Work Log
 
+## [2026-05-22] Cycle 195 — A(품질) + C(데이터) + F(리서치)
+
+**[A] Quality — 테스트 커버리지 개선:**
+- `test_rolling_oos_all_folds_pass`: RollingOOSValidator PASS 경로 테스트 (mock BacktestEngine, all_passed=True 검증)
+- `test_optimizer_fold_decay_positive_e2e`: WalkForwardOptimizer fold_decay=1.0 E2E 실행 → weighted_oos_sharpe 반환 검증
+- `TestOnchainFeatures::test_build_with_cached_regime_*` (4개): build_with_cached_regime() 정상/None/invalid 경로 + build_features_with_cached_regime() 검증
+
+**[C] Data — WebSocket stale watchdog 추가:**
+- `BinanceWebSocketFeed._stale_watchdog()`: 30초마다 ConnectionHealthMonitor.is_stale() 체크
+- `BinanceWebSocketFeed._message_loop()`: _listen()에서 메시지 루프 분리
+- `BinanceWebSocketFeed._listen()` 개선: asyncio.wait(tasks, FIRST_EXCEPTION)으로 message_loop + watchdog 동시 실행
+- stale 감지 시 ConnectionError → _connect_with_retry()의 재연결 루프로 진입
+
+**[C+A] BacktestEngine PF 상한 추가 (SIM 분석 기반):**
+- `profit_factor = min(pf, 999.99)`: 손실 0건 fold의 비현실적 PF(276B) 방지
+- value_area fold 6: 951B → capped at 999.99 (avg_oos_pf 계산 정상화)
+
+**[F] Research — drift detector + PSI 현황:**
+- 현재 `drift_detector.py`에 PSI(Population Stability Index), PageHinkley, CUSUM, ADWIN 전부 구현됨
+- AccuracyDriftMonitor: PH+CUSUM dual-gate + PSIDriftMonitor 연동 지원
+- DualGateADWINMonitor 추가 (피처 + 모델 출력 이중 감지)
+- shadow mode: PaperTrader를 shadow agent로 활용, live 신호와 비교 가능한 구조 이미 존재
+
+**SIM 결과 (2026-05-22 10:21 UTC):**
+- Bundle OOS (4h): 5/5 FAIL — cmf avg_oos=-4.36, elder_impulse -3.36, wick_reversal -3.44, narrow_range 0거래, value_area -1.30
+- Paper SIM (1h GBM): 22/22 FAIL consistency 0/8 — price_action_momentum 최우수 (52.22%, Sharpe 6.90)
+- 결론: 합성 데이터 한계 재확인. narrow_range 신호 조건 4h에서 과도하게 엄격.
+
 ## [2026-05-22] Cycle 194 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML — FeatureBuilder 온체인 피처 추가:**

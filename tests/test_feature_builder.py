@@ -451,3 +451,42 @@ class TestOnchainFeatures:
         # 어떤 레짐이든 온체인 피처 중 하나 이상 포함돼야 함
         onchain = {"exchange_netflow_norm", "sopr_delta"}
         assert onchain & set(X.columns), f"Expected onchain features in {list(X.columns)}"
+
+    # ---- Cycle 195 A: build_with_cached_regime 테스트 ----
+
+    def test_build_with_cached_regime_uses_feed_regime(self):
+        """build_with_cached_regime()가 feed_regime을 그대로 사용한다."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        df = _make_ohlcv(100)
+        builder = RegimeAwareFeatureBuilder()
+        X, y, regime = builder.build_with_cached_regime(df, feed_regime="bull")
+        assert regime == "bull"
+        assert isinstance(X, pd.DataFrame)
+        assert len(X) == len(y)
+
+    def test_build_with_cached_regime_none_falls_back_to_detect(self):
+        """feed_regime=None이면 내부 detect_regime()으로 fallback."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        df = _make_ohlcv(100)
+        builder = RegimeAwareFeatureBuilder()
+        X, y, regime = builder.build_with_cached_regime(df, feed_regime=None)
+        assert regime in {"bull", "bear", "ranging", "crisis"}
+        assert isinstance(X, pd.DataFrame)
+
+    def test_build_with_cached_regime_invalid_falls_back(self):
+        """유효하지 않은 feed_regime → detect_regime() fallback."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        df = _make_ohlcv(100)
+        builder = RegimeAwareFeatureBuilder()
+        X, y, regime = builder.build_with_cached_regime(df, feed_regime="unknown_regime")
+        assert regime in {"bull", "bear", "ranging", "crisis"}
+
+    def test_build_features_with_cached_regime(self):
+        """build_features_with_cached_regime()가 feed_regime 사용 (추론 전용)."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        df = _make_ohlcv(100)
+        builder = RegimeAwareFeatureBuilder()
+        X, regime = builder.build_features_with_cached_regime(df, feed_regime="bear")
+        assert regime == "bear"
+        assert isinstance(X, pd.DataFrame)
+        assert len(X) > 0

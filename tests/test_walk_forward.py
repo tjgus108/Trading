@@ -926,3 +926,83 @@ def test_rolling_oos_min_trades_default_value():
     from src.backtest.walk_forward import RollingOOSValidator
     v = RollingOOSValidator()
     assert v.min_oos_trades == 3
+
+
+# ---------------------------------------------------------------------------
+# Cycle 195 A: PASS 경로 + fold_decay E2E 테스트
+# ---------------------------------------------------------------------------
+
+def test_rolling_oos_all_folds_pass():
+    """모든 fold가 통과하는 PASS 경로 — all_passed=True 코드 패스 검증.
+
+    BacktestEngine을 mock으로 교체해 일정한 IS/OOS 결과를 반환하도록 함.
+    목적: validate() 내 "모든 fold 통과" 분기가 all_passed=True를 반환하는지 검증.
+    """
+    from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+    from unittest.mock import patch, MagicMock
+
+    n = 600
+    prices = np.linspace(100, 200, n)
+    df = pd.DataFrame({
+        "close": prices,
+        "high": prices * 1.005,
+        "low": prices * 0.995,
+        "atr14": np.ones(n),
+    })
+
+    def _stable_result(name="test"):
+        r = MagicMock()
+        r.sharpe_ratio = 2.0
+        r.max_drawdown = 0.05
+        r.profit_factor = 2.0
+        r.total_trades = 20
+        r.win_rate = 0.6
+        r.total_return = 0.15
+        r.passed = True
+        r.fail_reasons = []
+        r.name = name
+        return r
+
+    with patch("src.backtest.walk_forward.BacktestEngine") as MockEngine:
+        mock_engine = MockEngine.return_value
+        mock_engine.run.return_value = _stable_result()
+
+        v = RollingOOSValidator(
+            is_bars=150, oos_bars=100, slide_bars=100, min_oos_trades=1
+        )
+        result = v.validate(AlwaysBuyStrategy(), df)
+
+    assert isinstance(result, BundleOOSResult)
+    assert result.all_passed, f"Expected all_passed=True, got fail_reasons={result.fail_reasons}"
+    assert len(result.folds) >= 1
+    assert result.avg_oos_sharpe == pytest.approx(2.0, abs=0.01)
+    assert "PASS" in result.summary()
+
+
+def test_optimizer_fold_decay_positive_e2e():
+    """fold_decay > 0으로 WalkForwardOptimizer 실행 시 weighted_oos_sharpe가 반환됨."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+    import math
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=3,
+        fold_decay=1.0,
+    )
+    df = make_df(1000)  # window_size=250, is=150>=100, oos=100>=30 → 유효 윈도우 생성
+    result = opt.run(df)
+
+    assert result.weighted_oos_sharpe is not None
+    assert not math.isnan(result.weighted_oos_sharpe)
+    assert not math.isinf(result.weighted_oos_sharpe)
+    # fold_decay=1.0이면 weighted_oos_sharpe가 WalkForwardResult에 기록됨
+    assert "weighted_oos_sharpe" in result.summary()

@@ -1,14 +1,38 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 194 D+E+F 완료)_
+_Last updated: 2026-05-22 (Cycle 195 A+C+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 194 완료
-- 194 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
-- 다음 Cycle 195: **195 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+### 로테이션: Cycle 195 완료
+- 195 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
+- 다음 Cycle 196: **196 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
+
+### 🔥 Cycle 195 주요 성과
+- **RollingOOSValidator PASS 경로 테스트**: mock BacktestEngine으로 all_passed=True 코드 패스 검증
+- **WalkForwardOptimizer fold_decay E2E**: fold_decay=1.0 실행 시 weighted_oos_sharpe 반환 확인
+- **RegimeAwareFeatureBuilder.build_with_cached_regime() 4개 테스트**: 정상/None/invalid/features_only 경로
+- **WebSocket stale watchdog**: _stale_watchdog() + asyncio.wait(FIRST_EXCEPTION) → 자동 재연결 트리거
+- **BacktestEngine PF 상한 999.99**: 손실 0건 fold의 무한대 PF 방지 (BundleOOS avg 정상화)
+
+### 🎯 Cycle 196 권장 작업 (196 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+
+#### B(리스크): Risk Manager 개선
+- `DrawdownMonitor` 롤링 윈도우 MDD 계산 추가 (전체 기간 MDD와 별도 트래킹)
+- `KellySizer` 파라미터 안정성 테스트: rolling_window 크기별 kelly_fraction 변화 검증
+- `CircuitBreaker` 연속 손실 횟수 리셋 조건 명확화 (현재 일부 엣지케이스 미처리)
+
+#### D(ML): ML 파이프라인 개선
+- `drift_detector.py` PSIDriftMonitor 단위 테스트 추가 (현재 미테스트)
+- `DualGateADWINMonitor` 피처 drift 검출 → 재학습 트리거 로직 E2E 테스트
+- AccuracyDriftMonitor.set_feature_reference() 실제 피처 배열로 검증
+
+#### F(리서치): 레짐 기반 전략 스위칭
+- DataFeed.fetch_with_regime() → RegimeAwareFeatureBuilder 통합 파이프라인 리서치
+- bear 레짐 감지 시 short 신호 가중치 증가 아이디어 정리
+- PaperTrader shadow mode 설계: 동일 데이터로 live vs shadow 신호 비교
 
 ### 🔥 Cycle 194 주요 성과
 - **FeatureBuilder 온체인 피처**: exchange_netflow_norm + sopr_delta (선택적, Cycle 193 리서치 반영)
@@ -17,28 +41,6 @@ _Last updated: 2026-05-22 (Cycle 194 D+E+F 완료)_
 - **BundleOOSResult summary() 버그 수정**: 중복 oos_sharpe_std 라인 제거
 - **ML 트레이딩 프로덕션 배포 리서치**: PSI+Page-Hinkley drift 감지 + shadow→canary 파이프라인
 
-### 🎯 Cycle 195 권장 작업 (195 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
-
-#### A(품질): 테스트 커버리지 개선
-- `RollingOOSValidator.validate()` 정상 PASS 경로 테스트 추가 (현재 FAIL 경로만 테스트됨)
-- walk_forward.py `WalkForwardOptimizer`의 `fold_decay > 0` weighted_oos_sharpe E2E 검증
-- feature_builder.py `RegimeAwareFeatureBuilder.build_with_cached_regime()` 테스트 추가
-
-#### C(데이터): DataFeed + 온체인 피처 파이프라인
-- DataFeed.fetch()가 반환하는 df에 `exchange_netflow`, `sopr` 컬럼 추가 인터페이스 설계
-- CryptoQuant/Glassnode mock 데이터로 온체인 피처 E2E 테스트
-- WebSocket ConnectionHealthMonitor stale 감지 → 자동 재연결 트리거 연동
-
-#### F(리서치): Drift 감지 + 재학습 파이프라인
-- Page-Hinkley / ADWIN을 현재 `drift_detector.py`와 비교 (기존 구현 강점/약점 분석)
-- PSI(Population Stability Index) 계산 로직 설계 (피처 분포 변화 감지)
-- shadow mode 실전 구현 아이디어: PaperTrader를 shadow로 사용, live 신호와 비교
-
-### 🔥 Cycle 193 주요 성과
-- **WebSocket ConnectionHealthMonitor**: stale 감지, 재연결 이력, health summary
-- **KellySizer rolling win_rate**: record_trade() + compute_dynamic() — 실전 데이터 기반 자동 포지션 사이징
-- **온체인 리서치**: Exchange Inflow 2σ→1주 하락 72%, 최우선 신호 3개 도출
-
 ### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단 (원격 사이클에서는 합성 SIM만 가능)
 - DataFeed.DEFAULT_FALLBACK_EXCHANGES = ["binance", "okx", "bitget"] 준비됨
@@ -46,10 +48,10 @@ _Last updated: 2026-05-22 (Cycle 194 D+E+F 완료)_
 
 ### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
 
-**SIM 결과 패턴 (Cycle 194):**
-- IS Sharpe 대부분 음수 → 합성 GBM 데이터에서 최적화 신호 없음
-- OOS Sharpe std 3.1~6.2 → 불안정 (min_oos_trades 개선으로 일부 진단 개선됨)
-- narrow_range: 거래 0건 fold 7/9 → 신호 조건 너무 엄격 (4h 타임프레임)
+**SIM 결과 패턴 (Cycle 195):**
+- Bundle OOS (4h): 5/5 FAIL — 합성 GBM 데이터에서 IS Sharpe 음수, OOS std 3~6 (불안정)
+- Paper SIM (1h): 22/22 FAIL consistency — BTC=ETH=SOL 동일 결과 (GBM 랜덤워크 특성)
+- narrow_range: OOS 0거래 (4h에서 신호 조건 너무 엄격)
 - **결론: 실제 Bybit 데이터 확보가 최우선 병목**
 
 ### 📋 Paper Trading 자동화 판정 기준
@@ -84,5 +86,5 @@ _Last updated: 2026-05-22 (Cycle 194 D+E+F 완료)_
 
 ---
 
-**상태**: Cycle 194 완료 → Cycle 195 A(품질) + C(데이터) + F(리서치)
+**상태**: Cycle 195 완료 → Cycle 196 B(리스크) + D(ML) + F(리서치)
 **최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
