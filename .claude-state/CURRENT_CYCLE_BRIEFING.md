@@ -1,25 +1,28 @@
-======================================================================
-🔄 CYCLE 195 COMPLETED — 2026-05-22
-======================================================================
+# Current Cycle Briefing
 
-## 완료된 사이클: 195 (A(품질) + C(데이터) + F(리서치))
+_Cycle 196 — B(리스크) + D(ML) + F(리서치)_
+_Date: 2026-05-22_
 
-### A(품질) — 6개 신규 테스트
-- RollingOOSValidator PASS 경로 (mock BacktestEngine → all_passed=True)
-- WalkForwardOptimizer fold_decay>0 E2E (weighted_oos_sharpe 반환 확인)
-- RegimeAwareFeatureBuilder.build_with_cached_regime() 4개 (정상/None/invalid/features_only)
+## 완료된 작업
 
-### C(데이터) — WebSocket stale 자동 재연결
-- _stale_watchdog(): 30초마다 is_stale() 체크, stale 감지 시 ConnectionError
-- asyncio.wait(FIRST_EXCEPTION)으로 message_loop + watchdog 동시 실행
-- BacktestEngine PF cap 999.99 (합성데이터 0-loss fold 무한대 방지)
+### B(리스크)
+1. **DrawdownMonitor rolling MDD**: `_equity_history` deque + `rolling_mdd()` 메서드 추가. `DrawdownStatus.rolling_mdd_pct` 필드로 노출.
+2. **CircuitBreaker 버그 수정**: 쿨다운 중 `record_trade_result(False)` 호출 시 `_consecutive_losses=0` 즉시 적용 (기존: 무시됨).
+3. **KellySizer rolling_window 테스트 5개**: small/large window, 포지션 차이, min_trades fallback, NaN 무시.
 
-### SIM 결과 (2026-05-22)
-- Bundle OOS 4h: 5/5 FAIL (합성 데이터 한계, IS Sharpe 음수)
-- Paper SIM 1h: 22/22 FAIL consistency 0/8 (GBM 랜덤워크)
-- 결론: 합성 데이터 기반 최적화 한계 재확인
+### D(ML)
+1. **DualGateADWINMonitor E2E 테스트 3개**:
+   - 피처 drift → retrain_count>0
+   - reset() 후 should_retrain=False, count 누적 유지
+   - PSI drift → AccuracyDriftMonitor retrain trigger
 
-## 다음 Cycle: 196 (B + D + F)
-- B: DrawdownMonitor 롤링 MDD, KellySizer 안정성 테스트
-- D: PSIDriftMonitor 단위 테스트, DualGateADWINMonitor E2E
-- F: DataFeed.fetch_with_regime() 통합 파이프라인 리서치
+### F(리서치) — SIM 분석
+- Bundle OOS (4h, GBM): 5/5 FAIL
+  - wick_reversal fold 1 PASS (OOS 4.832) → 나머지 불안정 (-8 이하)
+  - narrow_range: 전 fold 0거래 → 4h 파라미터 완화 필요
+  - OOS Sharpe std 3~7 → 합성 GBM 한계
+
+## 다음 사이클 (197)
+- DrawdownMonitor rolling_window 생성자 파라미터화
+- narrow_range 4h 신호 조건 분석
+- RiskManager 통합 시나리오 테스트

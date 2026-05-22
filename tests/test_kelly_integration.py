@@ -433,3 +433,89 @@ def test_kelly_vol_targeting_combined_scale_down():
     final_qty = vt.adjust(kelly_qty, df)
     # VolTargeting이 Kelly 수량을 더 축소
     assert final_qty <= kelly_qty + 1e-9
+
+
+# ── KellySizer rolling_window 파라미터 안정성 ──────────────────────────
+
+class TestKellyRollingWindowStability:
+    """rolling_window 크기별 kelly_fraction 변화 안정성 검증."""
+
+    def _build_trades(self, n_wins, n_losses, win_pnl=100.0, loss_pnl=-60.0):
+        trades = []
+        for _ in range(n_wins):
+            trades.append({"pnl": win_pnl})
+        for _ in range(n_losses):
+            trades.append({"pnl": loss_pnl})
+        return trades
+
+    def test_small_window_uses_only_recent_trades(self):
+        """rolling_window=10이면 최근 10개 거래만 반영."""
+        ks = KellySizer(rolling_window=10)
+        # 초반 손실 20개 → 최근 10개 수익으로 덮임
+        for _ in range(20):
+            ks.record_trade(-50.0)
+        for _ in range(10):
+            ks.record_trade(100.0)
+        stats = ks.estimate_from_history(min_trades=5)
+        assert stats is not None
+        # 최근 10개가 모두 수익 → win_rate=1.0
+        assert stats["win_rate"] == 1.0
+        assert stats["n_trades"] == 10
+
+    def test_large_window_includes_more_history(self):
+        """rolling_window=100이면 더 많은 거래 이력 포함."""
+        ks = KellySizer(rolling_window=100)
+        # 50 손실 + 50 수익
+        for _ in range(50):
+            ks.record_trade(-30.0)
+        for _ in range(50):
+            ks.record_trade(60.0)
+        stats = ks.estimate_from_history(min_trades=10)
+        assert stats is not None
+        assert stats["n_trades"] == 100
+        # 승률 50%
+        assert abs(stats["win_rate"] - 0.50) < 0.01
+
+    def test_window_size_affects_position_size(self):
+        """긴 손실 시계열 뒤 수익 구간에서 window 크기별 사이즈 차이 확인."""
+        capital = 10000.0
+        price = 50000.0
+
+        ks_small = KellySizer(rolling_window=10)
+        ks_large = KellySizer(rolling_window=100)
+
+        # 공통: 80 손실 → 20 수익
+        for _ in range(80):
+            ks_small.record_trade(-40.0)
+            ks_large.record_trade(-40.0)
+        for _ in range(20):
+            ks_small.record_trade(100.0)
+            ks_large.record_trade(100.0)
+
+        # small window: 최근 10개가 모두 수익 → 공격적
+        qty_small = ks_small.compute_dynamic(capital, price, min_trades=5)
+        # large window: 80 손실 포함 → 보수적
+        qty_large = ks_large.compute_dynamic(capital, price, min_trades=10)
+
+        # 작은 윈도우가 더 공격적이어야 함
+        assert qty_small >= qty_large
+
+    def test_insufficient_trades_returns_min_fraction(self):
+        """min_trades 미만이면 min_fraction * capital 반환."""
+        ks = KellySizer(rolling_window=50, min_fraction=0.001)
+        ks.record_trade(100.0)  # 1개만 기록
+        qty = ks.compute_dynamic(capital=10000.0, price=1.0, min_trades=10)
+        # min_fraction 기반 최소 수량
+        expected = 0.001 * 10000.0 / 1.0
+        assert abs(qty - expected) < 1e-6
+
+    def test_nan_inf_trades_ignored(self):
+        """NaN/inf pnl은 record_trade에서 무시된다."""
+        ks = KellySizer(rolling_window=20)
+        ks.record_trade(float("nan"))
+        ks.record_trade(float("inf"))
+        ks.record_trade(-float("inf"))
+        assert len(ks._trade_history) == 0  # 기록 없음
+
+        ks.record_trade(100.0)
+        assert len(ks._trade_history) == 1

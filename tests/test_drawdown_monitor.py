@@ -444,3 +444,68 @@ def test_to_dict_from_dict_mdd_and_streak_cooldown():
     assert m2.mdd_halt_pct == 0.25
     assert m2.get_mdd_level() == m.get_mdd_level()
     assert m2.current_drawdown() == m.current_drawdown()
+
+
+# ── 롤링 윈도우 MDD ─────────────────────────────────────────
+
+def test_rolling_mdd_zero_on_init():
+    """초기 상태: 롤링 MDD = 0."""
+    m = DrawdownMonitor()
+    assert m.rolling_mdd() == 0.0
+
+
+def test_rolling_mdd_zero_no_decline():
+    """계속 상승하는 경우 롤링 MDD = 0."""
+    m = DrawdownMonitor()
+    for eq in [10000, 10100, 10200, 10300]:
+        m.update(eq)
+    assert m.rolling_mdd() == 0.0
+
+
+def test_rolling_mdd_simple():
+    """10000 → 9000: 10% 롤링 MDD."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(9000)
+    assert abs(m.rolling_mdd() - 0.10) < 1e-6
+
+
+def test_rolling_mdd_partial_recovery():
+    """10000 → 9000 → 9500: 최대 낙폭 10% 유지."""
+    m = DrawdownMonitor()
+    for eq in [10000, 9000, 9500]:
+        m.update(eq)
+    assert abs(m.rolling_mdd() - 0.10) < 1e-6
+
+
+def test_rolling_mdd_in_status():
+    """DrawdownStatus.rolling_mdd_pct에 값이 반영된다."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    status = m.update(8000)   # 20% 낙폭
+    assert abs(status.rolling_mdd_pct - 0.20) < 1e-6
+
+
+def test_rolling_mdd_window_param():
+    """window 파라미터로 최근 N개만 계산."""
+    m = DrawdownMonitor()
+    # 초반: 10000 → 8000 (20% 낙폭)
+    m.update(10000)
+    m.update(8000)
+    # 회복 후 새로운 최근 구간: 9000 → 8800 (약 2.2% 낙폭)
+    m.update(9000)
+    status = m.update(8800)
+    # 전체 윈도우 MDD는 20%
+    assert m.rolling_mdd() >= 0.20
+    # 최근 2개 윈도우 MDD는 약 2.2%
+    recent_mdd = m.rolling_mdd(window=2)
+    assert recent_mdd < 0.05
+
+
+def test_rolling_mdd_resets_on_reset():
+    """reset() 후 롤링 MDD = 0."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.update(8000)
+    m.reset()
+    assert m.rolling_mdd() == 0.0

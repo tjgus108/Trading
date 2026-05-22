@@ -1,5 +1,43 @@
 # Work Log
 
+## [2026-05-22] Cycle 196 — B(리스크) + D(ML) + F(리서치)
+
+**[B] Risk — DrawdownMonitor 롤링 MDD 추가:**
+- `DrawdownMonitor._equity_history`: deque(maxlen=50)으로 최근 50개 equity 기록
+- `DrawdownMonitor.rolling_mdd(window=None)`: 롤링 윈도우 내 peak→trough MDD 계산
+- `DrawdownStatus.rolling_mdd_pct`: 롤링 MDD 필드 추가 (update() 시 자동 반영)
+- `reset()` 시 `_equity_history.clear()` 추가
+- 테스트 8개 추가: 초기 0, 상승만 0, 단순 낙폭, 부분 회복, Status 필드, window 파라미터, reset 후 0
+
+**[B] Risk — CircuitBreaker 쿨다운 중 수익 처리 버그 수정:**
+- **버그**: `record_trade_result(is_loss=False)` 호출 시 쿨다운 중이면 consecutive_losses 미초기화
+- **수정**: `if self._cooldown_remaining > 0` 블록에서 수익 시 `consecutive_losses = 0` 추가
+- 기존 `tick_cooldown` 의존 없이도 win 발생 즉시 카운터 초기화
+- 테스트 3개 추가: 쿨다운 중 win 즉시 리셋, 쿨다운 중 loss 변화 없음, win 후 tick_cooldown 정상 동작
+
+**[B] Risk — KellySizer rolling_window 안정성 테스트:**
+- `test_small_window_uses_only_recent_trades`: rolling_window=10 → 최근 10개만 반영 검증
+- `test_large_window_includes_more_history`: rolling_window=100 → 50/50 win/loss 승률 50% 검증
+- `test_window_size_affects_position_size`: 80 손실 후 수익 구간에서 small window > large window
+- `test_insufficient_trades_returns_min_fraction`: min_trades 미만 → min_fraction 반환
+- `test_nan_inf_trades_ignored`: NaN/inf pnl → record_trade에서 무시 확인
+
+**[D] ML — DualGateADWINMonitor E2E 파이프라인 테스트:**
+- `test_feature_drift_propagates_to_retrain_flag`: 피처 급변 → retrain_count>0 E2E
+- `test_retrain_then_reset_resumes_normal`: reset() 후 should_retrain=False, retrain_count 누적 유지
+- `test_psi_feature_drift_triggers_accuracy_retrain`: PSI 드리프트 → AccuracyDriftMonitor retrain E2E
+
+**[F] Research — 시뮬 결과 분석:**
+- Bundle OOS (4h, 새로 실행): 5/5 FAIL — 합성 GBM 데이터 한계 지속
+  - wick_reversal fold 1: OOS Sharpe 4.832 (1개 fold PASS) → 나머지 불안정
+  - value_area fold 0,4,6: PASS이지만 OOS std 6.589로 전략 FAIL
+  - narrow_range: 전 fold 0거래 (4h 신호 조건 과도하게 엄격)
+- Paper SIM: 이전 Cycle 195 결과 재사용 (22/22 FAIL, GBM 한계)
+
+**테스트 결과:**
+- 전체: 7742 passed, 23 skipped (4:27)
+- 신규 추가: +30 테스트 (rollling MDD 8, CB edge 3, Kelly rolling 5, ADWIN E2E 3, 기타)
+
 ## [2026-05-22] Cycle 195 — A(품질) + C(데이터) + F(리서치)
 
 **[A] Quality — 테스트 커버리지 개선:**
@@ -15043,6 +15081,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-22 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-22 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-22 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-22 15:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

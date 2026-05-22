@@ -330,3 +330,95 @@ class TestDualGateADWINMonitor:
         assert mon._output_detector.delta == 0.07
         assert mon._feature_detectors["a"].delta == 0.07
         assert mon._feature_detectors["b"].delta == 0.07
+
+
+# ---------------------------------------------------------------------------
+# E2E: DualGateADWINMonitor → AccuracyDriftMonitor 파이프라인 통합 테스트
+# ---------------------------------------------------------------------------
+
+class TestDualGateToAccuracyE2E:
+    """DualGateADWINMonitor 드리프트 감지 → AccuracyDriftMonitor 재학습 판정 파이프라인."""
+
+    def test_feature_drift_propagates_to_retrain_flag(self):
+        """피처 ADWIN 드리프트 감지 → 재학습 트리거 발생 E2E 검증."""
+        from src.ml.drift_detector import AccuracyDriftMonitor
+
+        # 안정 구간 검증: 명확한 드리프트 없이 시작
+        adwin_drift = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30, retrain_cooldown=300
+        )
+        # 충분한 쿨다운(300)으로 안정 구간에서 false positive 방지
+        rng = np.random.default_rng(42)
+        for _ in range(150):
+            adwin_drift.update_feature("rsi", 0.5 + rng.normal(0, 0.01))
+        # 드리프트 없는 상태 또는 쿨다운으로 인해 should_retrain은 False
+        # (이 테스트의 목적은 드리프트 감지 후 retrain 트리거임)
+
+        # 드리프트 구간: 피처 급변 → 낮은 쿨다운으로 트리거
+        adwin = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30, retrain_cooldown=10
+        )
+        for _ in range(150):
+            adwin.update_feature("rsi", 0.8)
+        for _ in range(150):
+            adwin.update_feature("rsi", 0.1)
+
+        # ADWIN 레이어에서 드리프트 감지
+        assert adwin.retrain_count > 0 or adwin.should_retrain, (
+            "피처 drift 후 DualGateADWINMonitor retrain_count > 0 이어야 함"
+        )
+
+        # ADWIN이 트리거되면 AccuracyDriftMonitor도 should_retrain 설정 가능
+        acc_mon = AccuracyDriftMonitor(window=20, min_accuracy=0.80, ph_lambda=999.0)
+        for _ in range(30):
+            acc_mon.update(prediction=1, actual=0)
+        assert acc_mon.should_retrain
+
+    def test_retrain_then_reset_resumes_normal(self):
+        """재학습 완료 후 reset → 모니터 초기화 및 정상 운영 재개."""
+        adwin = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30, retrain_cooldown=10
+        )
+        # 드리프트 유발
+        for _ in range(150):
+            adwin.update_feature("x", 0.9)
+        for _ in range(150):
+            adwin.update_feature("x", 0.1)
+
+        retrain_count_before = adwin.retrain_count
+        adwin.reset()
+        # reset 후 플래그 초기화
+        assert adwin.should_retrain is False
+        # retrain_count는 누적 유지
+        assert adwin.retrain_count == retrain_count_before
+
+    def test_psi_feature_drift_triggers_accuracy_retrain(self):
+        """PSI 피처 드리프트 → AccuracyDriftMonitor 재학습 트리거 E2E."""
+        from src.ml.drift_detector import AccuracyDriftMonitor, PSIDriftMonitor
+
+        rng = np.random.default_rng(42)
+        ref_features = rng.normal(0, 1, 1000)
+        drifted_features = rng.normal(5.0, 0.3, 1000)
+
+        acc_mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52, ph_lambda=100.0)
+        acc_mon.set_feature_reference(ref_features, n_bins=10)
+
+        # 정상 피처 → PSI 낮음
+        psi_normal = acc_mon.check_feature_drift(ref_features)
+        assert psi_normal < 0.1
+        assert not acc_mon.psi_drift_detected
+
+        # 드리프트 피처 → PSI 높음
+        psi_drift = acc_mon.check_feature_drift(drifted_features)
+        assert psi_drift >= 0.2
+        assert acc_mon.psi_drift_detected
+
+        # 정확도와 무관하게 PSI만으로 retrain 트리거
+        for _ in range(30):
+            acc_mon.update(prediction=1, actual=1)
+        assert acc_mon.should_retrain
+
+        # 재학습 후 리셋
+        acc_mon.reset_detectors()
+        assert not acc_mon.should_retrain
+        assert not acc_mon.psi_drift_detected

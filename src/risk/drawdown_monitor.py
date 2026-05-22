@@ -73,6 +73,7 @@ class DrawdownStatus:
     cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
     mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
+    rolling_mdd_pct: float = 0.0   # 롤링 윈도우 내 MDD (별도 트래킹)
 
 
 class DrawdownMonitor:
@@ -158,6 +159,8 @@ class DrawdownMonitor:
         self.mdd_halt_pct = mdd_halt_pct
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
+        self._rolling_window: int = 50             # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
+        self._equity_history: Deque[float] = deque(maxlen=self._rolling_window)
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -356,6 +359,34 @@ class DrawdownMonitor:
         level = self.get_mdd_level()
         return level in (MddLevel.LIQUIDATE, MddLevel.FULL_HALT)
 
+    def rolling_mdd(self, window: Optional[int] = None) -> float:
+        """롤링 윈도우 내 MDD 계산.
+
+        전체 기간 peak 대비 낙폭이 아닌 최근 N개 equity 업데이트 내의
+        peak → trough 낙폭을 반환한다. 단기 성과 모니터링에 유용.
+
+        Args:
+            window: 사용할 윈도우 크기. None이면 self._rolling_window 사용.
+
+        Returns:
+            롤링 MDD (0~1). 데이터 부족 시 0.0.
+        """
+        history = list(self._equity_history)
+        if window is not None and window < len(history):
+            history = history[-window:]
+        if len(history) < 2:
+            return 0.0
+        peak = history[0]
+        max_dd = 0.0
+        for eq in history:
+            if eq > peak:
+                peak = eq
+            if peak > 0:
+                dd = (peak - eq) / peak
+                if dd > max_dd:
+                    max_dd = dd
+        return max_dd
+
     @property
     def mdd_level(self) -> MddLevel:
         """현재 MDD 단계 (프로퍼티)."""
@@ -370,6 +401,7 @@ class DrawdownMonitor:
     def update(self, current_equity: float) -> DrawdownStatus:
         """현재 자본금으로 상태 업데이트. DrawdownStatus 반환."""
         self._current = current_equity
+        self._equity_history.append(current_equity)
 
         if self._peak is None or current_equity > self._peak:
             self._peak = current_equity
@@ -457,6 +489,7 @@ class DrawdownMonitor:
             cooldown_active=self.is_in_cooldown(),
             mdd_level=cur_mdd_level,
             mdd_size_multiplier=cur_mdd_size_mult,
+            rolling_mdd_pct=self.rolling_mdd(),
         )
 
     def _check_tiered(
@@ -513,6 +546,7 @@ class DrawdownMonitor:
         self._consecutive_losses = 0
         self._cooldown_until = 0.0
         self._single_loss_cooldown_until = 0.0
+        self._equity_history.clear()
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:

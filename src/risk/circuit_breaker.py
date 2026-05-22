@@ -137,7 +137,9 @@ class CircuitBreaker:
         self._daily_trade_count += 1
 
         if self._cooldown_remaining > 0:
-            # 쿨다운 중에는 카운터 변경 없음
+            # 쿨다운 중이어도 수익 발생 시 연속 손실 카운터 즉시 초기화
+            if not is_loss:
+                self._consecutive_losses = 0
             return
 
         if is_loss:

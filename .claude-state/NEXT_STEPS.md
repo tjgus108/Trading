@@ -1,14 +1,36 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 195 A+C+F 완료)_
+_Last updated: 2026-05-22 (Cycle 196 B+D+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 195 완료
-- 195 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
-- 다음 Cycle 196: **196 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
+### 로테이션: Cycle 196 완료
+- 196 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
+- 다음 Cycle 197: **197 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
+
+### 🔥 Cycle 196 주요 성과
+- **DrawdownMonitor 롤링 MDD**: `rolling_mdd(window)` 메서드 + `DrawdownStatus.rolling_mdd_pct` 필드 추가
+- **CircuitBreaker 버그 수정**: 쿨다운 중 수익 발생 시 consecutive_losses 즉시 0으로 리셋
+- **KellySizer rolling_window 안정성 테스트**: window 크기별 포지션 사이즈 차이 검증 5개
+- **DualGateADWINMonitor E2E 파이프라인 테스트**: PSI drift → AccuracyDriftMonitor retrain trigger
+
+### 🎯 Cycle 197 권장 작업 (197 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+
+#### B(리스크): Risk Manager 추가 개선
+- `DrawdownMonitor.rolling_mdd()` rolling_window 생성자 파라미터화 (현재 50 고정)
+- `CircuitBreaker` rapid_decline 로직 테스트 강화 (cooldown_periods 경계 케이스)
+- `RiskManager` DrawdownMonitor + CircuitBreaker 통합 시나리오 테스트
+
+#### D(ML): ML 파이프라인 개선
+- `AccuracyDriftMonitor` → `DualGateADWINMonitor` 결합 통합 클래스 설계 리서치
+- `drift_detector` 전략 재학습 자동 트리거 → WalkForwardOptimizer 연동 아이디어
+- `trainer.py` 모델 재학습 최소 데이터 요건 검증
+
+#### F(리서치): narrow_range 4h 신호 완화
+- narrow_range 전략 4h 파라미터 범위 분석 (거래 0건 원인 파악)
+- value_area OOS std 6.589 원인 분석 → 파라미터 범위 축소 또는 정규화
 
 ### 🔥 Cycle 195 주요 성과
 - **RollingOOSValidator PASS 경로 테스트**: mock BacktestEngine으로 all_passed=True 코드 패스 검증
@@ -16,23 +38,6 @@ _Last updated: 2026-05-22 (Cycle 195 A+C+F 완료)_
 - **RegimeAwareFeatureBuilder.build_with_cached_regime() 4개 테스트**: 정상/None/invalid/features_only 경로
 - **WebSocket stale watchdog**: _stale_watchdog() + asyncio.wait(FIRST_EXCEPTION) → 자동 재연결 트리거
 - **BacktestEngine PF 상한 999.99**: 손실 0건 fold의 무한대 PF 방지 (BundleOOS avg 정상화)
-
-### 🎯 Cycle 196 권장 작업 (196 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
-
-#### B(리스크): Risk Manager 개선
-- `DrawdownMonitor` 롤링 윈도우 MDD 계산 추가 (전체 기간 MDD와 별도 트래킹)
-- `KellySizer` 파라미터 안정성 테스트: rolling_window 크기별 kelly_fraction 변화 검증
-- `CircuitBreaker` 연속 손실 횟수 리셋 조건 명확화 (현재 일부 엣지케이스 미처리)
-
-#### D(ML): ML 파이프라인 개선
-- `drift_detector.py` PSIDriftMonitor 단위 테스트 추가 (현재 미테스트)
-- `DualGateADWINMonitor` 피처 drift 검출 → 재학습 트리거 로직 E2E 테스트
-- AccuracyDriftMonitor.set_feature_reference() 실제 피처 배열로 검증
-
-#### F(리서치): 레짐 기반 전략 스위칭
-- DataFeed.fetch_with_regime() → RegimeAwareFeatureBuilder 통합 파이프라인 리서치
-- bear 레짐 감지 시 short 신호 가중치 증가 아이디어 정리
-- PaperTrader shadow mode 설계: 동일 데이터로 live vs shadow 신호 비교
 
 ### 🔥 Cycle 194 주요 성과
 - **FeatureBuilder 온체인 피처**: exchange_netflow_norm + sopr_delta (선택적, Cycle 193 리서치 반영)
@@ -86,5 +91,5 @@ _Last updated: 2026-05-22 (Cycle 195 A+C+F 완료)_
 
 ---
 
-**상태**: Cycle 195 완료 → Cycle 196 B(리스크) + D(ML) + F(리서치)
+**상태**: Cycle 196 완료 → Cycle 197 B(리스크) + D(ML) + F(리서치)
 **최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴

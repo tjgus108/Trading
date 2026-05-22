@@ -533,3 +533,54 @@ def test_to_dict_from_dict_roundtrip():
     assert cb2.consecutive_losses == 3
     assert cb2.cooldown_remaining == 2
     assert cb2.is_triggered is False
+
+
+# ── 쿨다운 중 수익 시 연속 손실 카운터 초기화 ─────────────────
+
+def test_win_during_cooldown_resets_consecutive_losses():
+    """쿨다운 중 수익 발생 시 _consecutive_losses가 즉시 0으로 초기화된다."""
+    cb = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=5)
+    # 3회 연속 손실 → 쿨다운 시작
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 5
+    assert cb.consecutive_losses == 3
+
+    # 쿨다운 중 수익 발생
+    cb.record_trade_result(is_loss=False)
+    # consecutive_losses 즉시 초기화
+    assert cb.consecutive_losses == 0
+    # cooldown_remaining은 유지 (tick_cooldown으로만 감소)
+    assert cb.cooldown_remaining == 5
+
+
+def test_loss_during_cooldown_does_not_change_counter():
+    """쿨다운 중 손실 발생 시 _consecutive_losses 변화 없음."""
+    cb = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=5)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    assert cb.consecutive_losses == 3
+
+    # 쿨다운 중 추가 손실 → 카운터 변화 없음
+    cb.record_trade_result(is_loss=True)
+    assert cb.consecutive_losses == 3
+
+
+def test_consecutive_losses_reset_after_cooldown_with_prior_win():
+    """쿨다운 중 수익이 발생한 뒤 tick_cooldown 완료 시 정상 동작."""
+    cb = CircuitBreaker(max_consecutive_losses=3, cooldown_periods=2)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    # 쿨다운 중 수익 → consecutive_losses=0
+    cb.record_trade_result(is_loss=False)
+    assert cb.consecutive_losses == 0
+
+    # tick_cooldown 2회로 쿨다운 종료
+    cb.tick_cooldown()
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 0
+    assert cb.consecutive_losses == 0  # 이미 0이었으므로 변화 없음
+
+    # 이후 손실 1회 → 새 카운터 시작
+    cb.record_trade_result(is_loss=True)
+    assert cb.consecutive_losses == 1
