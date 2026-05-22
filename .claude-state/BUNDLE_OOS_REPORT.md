@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-22T05:24:54.444188Z_
+_Generated: 2026-05-22T10:21:26.406935Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -11,8 +11,8 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | cmf | 9 | 0.000 | -4.356 | 0.667 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 3.368 > 1.5 (불안정) |
 | elder_impulse | 9 | -0.790 | -3.364 | 0.784 | FAIL | Failed folds: [0, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 4.099 > 1.5 (불안정) |
 | wick_reversal | 9 | 0.222 | -3.443 | 0.872 | FAIL | Failed folds: [0, 2, 3, 4, 5, 6, 7]; OOS Sharpe std 4.150 > 1.5 (불안정) |
-| narrow_range | 9 | -0.260 | -0.806 | 30696866931.258 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 7, 8]; OOS Sharpe std 3.162 > 1.5 (불안정) |
-| value_area | 9 | -1.443 | -0.825 | 147054897179.149 | FAIL | Failed folds: [1, 2, 3, 5, 7]; OOS Sharpe std 6.152 > 1.5 (불안정) |
+| narrow_range | 9 | 0.000 | 0.000 | 0.000 | FAIL | 모든 fold 거래 없음 (min_oos_trades=3): folds=[0, 1, 2, 3, 4, 5, 6, 7, 8] |
+| value_area | 9 | -1.969 | -1.298 | 158640537542.330 | FAIL | 저거래 fold 제외 (trades<3): [1, 4, 8]; Failed folds: [2, 3, 5, 7]; OOS Sharpe std 6.589 > 1.5 (불안정) |
 
 **PASS: 0/5** (none)
 **FAIL: 5/5** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
@@ -81,7 +81,7 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | 7 | 3.201 | -6.737 | -2.105 | 0.000 | 2 | 0.13% | 2.49% | FAIL |
 | 8 | 0.103 | 0.000 | 0.000 | 0.000 | 0 | 2.49% | 0.00% | FAIL |
 
-**Fail reasons:** Failed folds: [0, 1, 2, 3, 4, 5, 7, 8]; OOS Sharpe std 3.162 > 1.5 (불안정)
+**Fail reasons:** 모든 fold 거래 없음 (min_oos_trades=3): folds=[0, 1, 2, 3, 4, 5, 6, 7, 8]
 
 ### value_area
 
@@ -97,4 +97,4 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | 7 | 2.656 | -5.864 | -2.208 | 0.141 | 3 | 6.18% | 2.49% | FAIL |
 | 8 | 1.506 | 5.993 | 3.979 | 371650849356.795 | 2 | 3.86% | 0.09% | PASS |
 
-**Fail reasons:** Failed folds: [1, 2, 3, 5, 7]; OOS Sharpe std 6.152 > 1.5 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<3): [1, 4, 8]; Failed folds: [2, 3, 5, 7]; OOS Sharpe std 6.589 > 1.5 (불안정)
