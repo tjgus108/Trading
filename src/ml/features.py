@@ -206,6 +206,19 @@ class FeatureBuilder:
                 oi_norm = oi / (oi.rolling(20, min_periods=1).mean() + 1e-9)
                 feat["fr_oi_interaction"] = fr * oi_norm
 
+        # 온체인 피처 (Cycle 194: 거래소 순유입/SOPR)
+        # exchange_netflow: CEX 순유입 (양수=매도압력, 음수=축적).
+        #   rolling z-score 정규화로 스케일 무관하게 사용.
+        if "exchange_netflow" in df.columns:
+            netflow = df["exchange_netflow"]
+            netflow_mean = netflow.rolling(20, min_periods=1).mean()
+            netflow_std = netflow.rolling(20, min_periods=1).std().fillna(1e-9)
+            feat["netflow_zscore"] = (netflow - netflow_mean) / (netflow_std + 1e-9)
+
+        # sopr_delta: SOPR 1봉 변화량. 양수=이익실현 확대, 음수=공황매도 완화.
+        if "sopr" in df.columns:
+            feat["sopr_delta"] = df["sopr"].diff()
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -344,10 +357,10 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
 
 # 각 레짐의 base 피처 외에 선택적 피처 (df에 컬럼 있으면 추가)
 REGIME_OPTIONAL_FEATURES: Dict[str, List[str]] = {
-    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction"],
-    "bear":    ["delta_fr", "fr_oi_interaction"],
-    "ranging": ["btc_close_lag1"],
-    "crisis":  ["delta_fr"],
+    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction", "sopr_delta"],
+    "bear":    ["delta_fr", "fr_oi_interaction", "netflow_zscore", "sopr_delta"],
+    "ranging": ["btc_close_lag1", "netflow_zscore"],
+    "crisis":  ["delta_fr", "netflow_zscore"],
 }
 
 
@@ -517,6 +530,8 @@ class RegimeAwareFeatureBuilder:
                     "btc_close_lag1": "btc_close",
                     "delta_fr": "funding_rate",
                     "fr_oi_interaction": "open_interest",
+                    "netflow_zscore": "exchange_netflow",
+                    "sopr_delta": "sopr",
                 }.get(feat, feat)
                 if source_col in df.columns:
                     base_feats.append(feat)

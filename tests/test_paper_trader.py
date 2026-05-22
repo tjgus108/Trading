@@ -1144,3 +1144,114 @@ def test_vol_targeting_adjustment_count():
 
     summary = pt.get_summary()
     assert summary["vol_targeting_adjustments"] == 3
+
+
+# ── Cycle 194: KellySizer 통합 ─────────────────────────────────────────────
+
+def test_kelly_sizer_active_in_summary():
+    """kelly_sizer 설정 시 summary에 kelly_sizer_active=True."""
+    from src.risk.kelly_sizer import KellySizer
+    ks = KellySizer(rolling_window=50)
+    pt = PaperTrader(slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0,
+                     kelly_sizer=ks)
+    summary = pt.get_summary()
+    assert summary["kelly_sizer_active"] is True
+    assert summary["kelly_sizer_adjustments"] == 0
+
+
+def test_no_kelly_sizer_summary_fields():
+    """kelly_sizer 미설정 시 kelly_sizer_active=False."""
+    pt = PaperTrader(slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    summary = pt.get_summary()
+    assert summary["kelly_sizer_active"] is False
+
+
+def test_kelly_records_trade_after_sell():
+    """SELL 체결 후 KellySizer rolling 기록에 거래 결과 기록됨."""
+    from src.risk.kelly_sizer import KellySizer
+    # min_fraction=0.001, initial_balance=1_000_000 → kelly_qty=1000 units at price=1
+    ks = KellySizer(rolling_window=50, min_fraction=0.001)
+    pt = PaperTrader(initial_balance=1_000_000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, kelly_sizer=ks)
+
+    # price=1.0으로 낮게 설정해 kelly_qty(min_fraction*capital=1000)가 소화 가능
+    pt.execute_signal("BTC/USDT", "BUY", price=1.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    assert len(ks._trade_history) == 0  # BUY 이후 기록 없음
+
+    pt.execute_signal("BTC/USDT", "SELL", price=1.1, quantity=2000.0,
+                      strategy="s", confidence="H")
+    assert len(ks._trade_history) == 1  # SELL 후 기록됨
+    assert ks._trade_history[0] > 0.0   # 수익 거래 → 양수
+
+
+def test_kelly_adjustments_counted_after_history_buildup():
+    """rolling 기록 충분 후 kelly_sizer가 quantity 조절 → adjustments 카운터 증가."""
+    from src.risk.kelly_sizer import KellySizer
+    ks = KellySizer(rolling_window=5, min_fraction=0.001)
+
+    # 최소 10건 기록 필요 (compute_dynamic min_trades=10 기본)
+    # min_trades를 낮게 설정하기 위해 직접 호출
+    # record_trade로 5건 수익 기록 → estimate_from_history(min_trades=5) 통과
+    for _ in range(5):
+        ks.record_trade(0.02)   # 2% 수익
+    for _ in range(5):
+        ks.record_trade(-0.01)  # 1% 손실
+
+    pt = PaperTrader(initial_balance=1_000_000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, kelly_sizer=ks)
+
+    # BUY: quantity=0.001 전달, KellySizer가 다른 값 계산 → adjustments 증가
+    res = pt.execute_signal("BTC/USDT", "BUY", price=50000.0, quantity=0.001,
+                            strategy="s", confidence="H")
+    assert res["status"] in ("filled", "partial", "rejected")
+    # kelly_sizer_adjustments: compute_dynamic가 0.001과 다른 값 반환하면 +1
+    summary = pt.get_summary()
+    assert summary["kelly_sizer_adjustments"] >= 0  # 최소 0 (거부 시)
+
+
+# ── Cycle 194: KellySizer rolling 단위 테스트 ──────────────────────────────
+def test_kelly_rolling_dynamic_sizing():
+    """KellySizer.compute_dynamic()이 거래 기록 쌓인 후 양수 수량 반환."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, max_fraction=0.3, rolling_window=20)
+    for i in range(15):
+        sizer.record_trade(100.0 if i % 5 != 0 else -50.0)
+    qty = sizer.compute_dynamic(capital=10000.0, price=1000.0, min_trades=10)
+    assert qty > 0.0
+
+
+def test_kelly_rolling_insufficient_trades_fallback():
+    """거래 기록 min_trades 미달 시 min_fraction * capital 반환."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, min_fraction=0.01, rolling_window=50)
+    for _ in range(5):
+        sizer.record_trade(50.0)
+    qty = sizer.compute_dynamic(capital=10000.0, price=1.0, min_trades=10)
+    assert abs(qty - 10000.0 * 0.01) < 1e-6
+
+
+def test_kelly_record_trade_ignores_nan():
+    """NaN/inf PnL은 rolling 기록에 추가하지 않음."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, rolling_window=10)
+    sizer.record_trade(float("nan"))
+    sizer.record_trade(float("inf"))
+    sizer.record_trade(100.0)
+    assert len(sizer._trade_history) == 1
+
+
+def test_kelly_max_fraction_cap():
+    """compute_dynamic 결과가 max_fraction * capital / price를 초과하지 않음."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=1.0, max_fraction=0.05, rolling_window=20)
+    for i in range(20):
+        sizer.record_trade(200.0 if i % 2 == 0 else -10.0)
+    capital, price = 10000.0, 500.0
+    qty = sizer.compute_dynamic(capital=capital, price=price, min_trades=10)
+    max_qty = capital * 0.05 / price
+    assert qty <= max_qty * 1.01

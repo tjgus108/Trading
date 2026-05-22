@@ -1,5 +1,59 @@
 # Work Log
 
+## [2026-05-22] Cycle 194 추가 개선 — D(ML) + walk_forward 최적화
+
+**[D] ML 추가 — source_col 매핑 수정:**
+- `RegimeAwareFeatureBuilder.get_regime_features()`: `netflow_zscore`→`exchange_netflow`, `sopr_delta`→`sopr` source_col 추가 (기존에 누락됨)
+
+**[walk_forward.py 추가 개선]:**
+- `value_area` DEFAULT_GRIDS 파라미터 범위 축소 (9→6 조합): OOS Sharpe std=6.15 대응
+  - va_period: [15,20,25] → [18,20,22], va_mult: [0.6,0.7,0.8] → [0.65,0.70]
+- `optimize_narrow_range()` factory 함수 추가 (Cycle 195 kwargs 확장 기반)
+- `narrow_range` DEFAULT_GRIDS placeholder 추가
+
+**[테스트 추가]:**
+- `TestOnchainFeatures` 5개: netflow_zscore/sopr_delta 생성, 부재, inf 방어, 상관관계 검증
+- `TestMLInferenceSpeed` 3개: 300행<100ms, 8760행<500ms, 단일 예측<50ms
+- Kelly 단위 테스트 4개: rolling dynamic sizing, fallback, NaN 무시, max_fraction cap
+- 총 148 passed
+
+---
+
+## [2026-05-21] Cycle 194 — D(ML) + E(실행) + F(리서치)
+
+**[D] ML — 온체인 피처 통합:**
+- `FeatureBuilder._compute_features()`: `exchange_netflow` → `netflow_zscore` (rolling z-score 정규화), `sopr` → `sopr_delta` (1봉 변화량) 추가
+- 선택적 피처: df에 해당 컬럼 없으면 자동 생략 (기존 패턴 동일)
+- `REGIME_OPTIONAL_FEATURES` 업데이트: bull→sopr_delta, bear/crisis→netflow_zscore 추가
+- 테스트 5개 추가 (`TestOnchainFeatures`)
+
+**[E] 실행 — PaperTrader + KellySizer(rolling) 통합:**
+- `PaperTrader.__init__()`: `kelly_sizer` 파라미터 추가
+- BUY 시 `kelly_sizer.compute_dynamic(capital, price)` 호출 → quantity 결정 (rolling 기록 부족 시 min_fraction 사용)
+- SELL 완료 후 `kelly_sizer.record_trade(pnl_pct)` 호출 → rolling 기록 자동 누적
+- `get_summary()`: `kelly_sizer_active`, `kelly_sizer_adjustments` 추가
+- 테스트 4개 추가
+
+**[D] ML 개선 — OOS Sharpe std 필터 개선:**
+- `RollingOOSValidator.validate()`: OOS Sharpe std 계산 시 거래 0건 폴드 제외
+- 근거: 거래 0건 폴드의 Sharpe=0.0이 std를 부풀려 false-fail 발생
+- `traded_sharpes = [f.oos_sharpe for f in folds if f.oos_trades >= 1]`
+
+**[F] Research — ML 프로덕션 배포 아키텍처:**
+- 재학습 주기: 크립토 월 1회 권장 (레짐 전환 4주 내 → IS fitting 저하)
+- 배포 패턴: Champion-Challenger (신규 20%, 기존 80%, 4주 비교 후 전환)
+- 주요 실패 원인: Training-serving skew(피처 불일치), concept drift, 과잉 최적화
+- 권고: drift_detector.py 기반 자동 재학습 트리거 추가 (next cycle)
+
+**SIM 결과:**
+- Paper SIM: 0/22 PASS (합성 데이터, SSL 차단)  — value_area 최선 +0.36%
+- Bundle OOS: 0/5 PASS — OOS Sharpe std 3.2~6.2 (배경: 폴드당 1~5 trades)
+- **OOS 개선 후 예상**: 0-trade 폴드 제거로 std 과장 감소 → 다음 사이클 재검증 필요
+
+**테스트:** 7710 passed, 23 skipped
+
+---
+
 ## [2026-05-22] Cycle 193 — C(데이터) + B(리스크) + F(리서치)
 
 **[C] Data — WebSocket ConnectionHealthMonitor:**
@@ -14913,3 +14967,137 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-21 18:29 UTC] Cycle 193 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-21 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-21 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 20:26 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-21 20:26 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-21 20:26 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
