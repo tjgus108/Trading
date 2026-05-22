@@ -206,6 +206,19 @@ class FeatureBuilder:
                 oi_norm = oi / (oi.rolling(20, min_periods=1).mean() + 1e-9)
                 feat["fr_oi_interaction"] = fr * oi_norm
 
+        # 온체인 피처 (Cycle 194: Glassnode/CryptoQuant 기반)
+        # exchange_netflow: 거래소 순유입(양수)/순유출(음수) — 대규모 유입 시 매도 압력 신호
+        # sopr: Spent Output Profit Ratio — >1이면 평균 이익 실현, <1이면 손실 패닉 매도
+        if "exchange_netflow" in df.columns:
+            netflow = df["exchange_netflow"]
+            netflow_ma = netflow.rolling(20, min_periods=1).mean()
+            feat["exchange_netflow_norm"] = netflow / (netflow_ma.abs() + 1e-9)
+
+        if "sopr" in df.columns:
+            sopr = df["sopr"]
+            sopr_std = sopr.rolling(28, min_periods=5).std()
+            feat["sopr_delta"] = sopr.diff(28) / (sopr_std + 1e-9)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -344,10 +357,10 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
 
 # 각 레짐의 base 피처 외에 선택적 피처 (df에 컬럼 있으면 추가)
 REGIME_OPTIONAL_FEATURES: Dict[str, List[str]] = {
-    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction"],
-    "bear":    ["delta_fr", "fr_oi_interaction"],
-    "ranging": ["btc_close_lag1"],
-    "crisis":  ["delta_fr"],
+    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta"],
+    "bear":    ["delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta"],
+    "ranging": ["btc_close_lag1", "sopr_delta"],
+    "crisis":  ["delta_fr", "exchange_netflow_norm", "sopr_delta"],
 }
 
 
@@ -517,6 +530,8 @@ class RegimeAwareFeatureBuilder:
                     "btc_close_lag1": "btc_close",
                     "delta_fr": "funding_rate",
                     "fr_oi_interaction": "open_interest",
+                    "exchange_netflow_norm": "exchange_netflow",
+                    "sopr_delta": "sopr",
                 }.get(feat, feat)
                 if source_col in df.columns:
                     base_feats.append(feat)

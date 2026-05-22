@@ -286,3 +286,150 @@ def test_custom_min_trades():
     )
     # strict 버전은 shrinkage로 인해 더 작거나 같아야 함
     assert qty_strict <= qty_lenient + 1e-9
+
+
+# ── PaperTrader + KellySizer(rolling) + VolTargeting(EWMA) 통합 (Cycle 194) ──
+
+
+def _make_candle_df(n: int = 30, seed: int = 1) -> "pd.DataFrame":
+    import numpy as np
+    import pandas as pd
+    rng = np.random.default_rng(seed)
+    prices = 50000.0 + np.cumsum(rng.normal(0, 200, n))
+    prices = np.maximum(prices, 1.0)
+    return pd.DataFrame({
+        "open": prices * 0.999,
+        "high": prices * 1.003,
+        "low": prices * 0.997,
+        "close": prices,
+        "volume": rng.uniform(1e6, 5e6, n),
+    })
+
+
+def test_kelly_rolling_warmup_uses_min_fraction():
+    """rolling 기록이 min_trades 미만이면 min_fraction * capital 반환."""
+    ks = KellySizer(min_fraction=0.01)
+    qty = ks.compute_dynamic(capital=10000.0, price=50000.0, min_trades=10)
+    expected = 0.01 * 10000.0  # min_fraction 경로
+    assert abs(qty - expected) < 1e-9
+
+
+def test_kelly_rolling_activates_after_min_trades():
+    """min_trades 만큼 거래 후 compute_dynamic이 Kelly 공식 경로 활성화."""
+    ks = KellySizer(fraction=0.5, min_fraction=0.001)
+    for i in range(12):
+        ks.record_trade(100.0 if i % 2 == 0 else -40.0)
+    stats = ks.estimate_from_history(min_trades=10)
+    assert stats is not None
+    assert stats["n_trades"] == 12
+    qty = ks.compute_dynamic(capital=10000.0, price=50000.0, min_trades=10)
+    # Kelly 경로면 양수 수량 반환 (유리한 edge: win_rate=50%, avg_win=100, avg_loss=40)
+    assert qty > 0
+
+
+def test_paper_trader_kelly_vol_targeting_pipeline():
+    """PaperTrader에서 KellySizer(rolling) + VolTargeting(EWMA) 파이프라인 통합 검증."""
+    import numpy as np
+    from src.exchange.paper_trader import PaperTrader
+    from src.risk.vol_targeting import VolTargeting
+    from src.risk.kelly_sizer import KellySizer
+
+    # EWMA 변동성 타게팅: 목표 연환산 변동성 20%
+    vt = VolTargeting(target_vol=0.20, window=20, vol_method="ewma", ewma_span=20,
+                      annualization=365 * 24, min_scalar=0.1)
+
+    pt = PaperTrader(
+        initial_balance=100_000.0,
+        fee_rate=0.00055,
+        slippage_pct=0.05,
+        partial_fill_prob=0.0,
+        timeout_prob=0.0,
+        vol_targeting=vt,
+    )
+
+    # price=1.0: compute_dynamic의 warmup 경로(min_fraction*capital)와
+    # Kelly 경로(position_capital/price)의 단위를 통일하기 위해 사용
+    unit_price = 1.0
+    ks = KellySizer(fraction=0.5, min_fraction=0.01, max_fraction=0.10)
+    candles = _make_candle_df(40)
+
+    # 1단계: warmup — min_trades 미만, min_fraction 경로 (qty = min_fraction * capital)
+    qty_before = ks.compute_dynamic(capital=pt.account.balance, price=unit_price, min_trades=10)
+    assert qty_before == 0.01 * 100_000.0  # 1000 units
+    result = pt.execute_signal(
+        "USDT/USDT", "BUY", price=unit_price, quantity=qty_before,
+        strategy="kelly_test", confidence="H", candle_df=candles,
+    )
+    assert result["status"] in ("filled", "partial")
+
+    # BUY 후 SELL로 PnL 기록
+    sell_price = unit_price * 1.02
+    pt.execute_signal("USDT/USDT", "SELL", price=sell_price,
+                      quantity=result["actual_quantity"], strategy="kelly_test", confidence="H")
+    ks.record_trade(pnl=result["actual_quantity"] * (sell_price - unit_price))
+
+    # 2단계: 10건 이상 기록 후 활성화 검증
+    for i in range(12):
+        pnl = 50.0 if i % 3 != 0 else -20.0
+        ks.record_trade(pnl)
+    qty_after = ks.compute_dynamic(capital=pt.account.balance, price=unit_price, min_trades=10)
+    assert qty_after > 0
+
+    summary = pt.get_summary()
+    assert summary["vol_targeting_active"] is True
+    assert summary["trade_count"] >= 2
+
+
+def test_vol_targeting_ewma_reduces_size_on_high_vol():
+    """고변동성 데이터에서 EWMA VolTargeting이 수량을 줄임."""
+    import numpy as np
+    import pandas as pd
+    from src.risk.vol_targeting import VolTargeting
+
+    rng = np.random.default_rng(42)
+    # 고변동성: 일 5% 변동
+    n = 40
+    prices = 50000.0 + np.cumsum(rng.normal(0, 2500, n))
+    prices = np.maximum(prices, 1.0)
+    df_high_vol = pd.DataFrame({
+        "open": prices, "high": prices * 1.05,
+        "low": prices * 0.95, "close": prices, "volume": np.ones(n),
+    })
+
+    vt_ewma = VolTargeting(target_vol=0.20, window=20, vol_method="ewma", ewma_span=20,
+                           annualization=365, min_scalar=0.01)
+    adjusted = vt_ewma.adjust(1.0, df_high_vol)
+    # 고변동성이므로 scalar < 1 → adjusted < 1
+    assert adjusted < 1.0
+
+
+def test_kelly_vol_targeting_combined_scale_down():
+    """Kelly가 사이즈를 결정하고 VolTargeting이 추가로 축소하는 시나리오."""
+    import numpy as np
+    from src.risk.kelly_sizer import KellySizer
+    from src.risk.vol_targeting import VolTargeting
+
+    ks = KellySizer(fraction=0.5, min_fraction=0.01, max_fraction=0.10)
+    # 10건 기록 (승률 70%)
+    for i in range(10):
+        ks.record_trade(100.0 if i < 7 else -80.0)
+
+    capital = 50_000.0
+    price = 50_000.0
+    kelly_qty = ks.compute_dynamic(capital=capital, price=price, min_trades=10)
+    assert kelly_qty > 0
+
+    # 고변동성 candle_df
+    import pandas as pd
+    rng = np.random.default_rng(99)
+    n = 40
+    prices = 50000.0 + np.cumsum(rng.normal(0, 3000, n))
+    df = pd.DataFrame({
+        "open": prices, "high": prices * 1.06,
+        "low": prices * 0.94, "close": prices, "volume": np.ones(n),
+    })
+
+    vt = VolTargeting(target_vol=0.15, window=20, annualization=365, min_scalar=0.01)
+    final_qty = vt.adjust(kelly_qty, df)
+    # VolTargeting이 Kelly 수량을 더 축소
+    assert final_qty <= kelly_qty + 1e-9

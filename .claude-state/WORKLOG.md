@@ -1,5 +1,47 @@
 # Work Log
 
+## [2026-05-22] Cycle 194 — D(ML) + E(실행) + F(리서치)
+
+**[D] ML — FeatureBuilder 온체인 피처 추가:**
+- `exchange_netflow_norm`: netflow / rolling20_mean.abs() — 거래소 순유입 정규화 신호
+- `sopr_delta`: sopr.diff(28) / rolling28_std — SOPR 28일 변화율 z-score
+- 두 피처 모두 선택적 (df에 컬럼 있을 때만 추가 — 기존 btc_close_lag1 패턴 동일)
+- REGIME_OPTIONAL_FEATURES에 온체인 피처 등록 (bull/bear/ranging/crisis)
+- RegimeAwareFeatureBuilder.get_regime_features() source_col 매핑 추가
+- 테스트 8개 추가 (netflow/sopr 추가 확인, inf 방어, 레짐 통합)
+
+**[E] Execution — PaperTrader + KellySizer(rolling) + VolTargeting(EWMA) 통합 테스트:**
+- `test_kelly_rolling_warmup_uses_min_fraction`: warmup 경로 min_fraction * capital 확인
+- `test_kelly_rolling_activates_after_min_trades`: 12건 기록 후 Kelly 경로 활성화 확인
+- `test_paper_trader_kelly_vol_targeting_pipeline`: 전체 파이프라인 통합 E2E 테스트
+- `test_vol_targeting_ewma_reduces_size_on_high_vol`: EWMA 고변동성 시 축소 확인
+- `test_kelly_vol_targeting_combined_scale_down`: Kelly 후 VolTargeting 추가 축소 확인
+- 테스트 5개 추가 (kelly_integration.py)
+
+**[D] ML 코드 개선 — RollingOOSValidator min_oos_trades:**
+- `RollingOOSValidator.__init__`에 `min_oos_trades: int = 3` 파라미터 추가
+- 거래 수 < min_oos_trades fold → 집계(avg_sharpe, avg_wfe, std)에서 제외
+- 모든 fold 제외 시 early return + "모든 fold 거래 없음" fail reason
+- 저거래 fold_id 목록을 fail_reasons에 기록
+- BundleOOSResult.summary() 중복 oos_sharpe_std 라인 버그 수정
+- 테스트 4개 추가
+
+**[F] Research — ML 트레이딩 시스템 프로덕션 배포:**
+- Feature Store(Feast/Tecton) + Model Registry(MLflow) + shadow→canary CI/CD 파이프라인이 표준
+- 재학습: 주별이 cost/benefit 최적 (성능 트리거 방식 > 고정 스케줄)
+- Drift 감지: Page-Hinkley(급격 변화) + ADWIN(점진적) + PSI>0.2 재학습 트리거
+- 6개월 방치 = 오류율 35% 증가, 91% 모델 저하 → Champion-Challenger shadow mode 필수
+
+**SIM 결과:**
+- Paper SIM (합성): 0/22 PASS — 평균 수익 12.33%, 최고 price_action_momentum 52.22%
+- Bundle OOS (4h, 합성): 0/5 PASS — OOS Sharpe std 3.1~6.2, 모두 불안정
+- narrow_range: 9 fold 중 7개 거래 0건 → min_oos_trades 개선으로 더 명확한 진단 가능
+- 결론: 합성 데이터 한계 지속. 실거래소 데이터 확보 최우선.
+
+**테스트:** 7714 passed, 23 skipped (기존 대비 17개 신규 추가)
+
+---
+
 ## [2026-05-22] Cycle 193 — C(데이터) + B(리스크) + F(리서치)
 
 **[C] Data — WebSocket ConnectionHealthMonitor:**
@@ -14913,3 +14955,70 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-21 18:29 UTC] Cycle 193 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-22 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-22 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-22 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures

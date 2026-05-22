@@ -708,7 +708,6 @@ class BundleOOSResult:
             f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
             f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
-            f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
@@ -733,6 +732,7 @@ class RollingOOSValidator:
         min_wfe: float = 0.5,
         sharpe_decay_max: float = 0.60,
         mdd_expand_max: float = 2.0,
+        min_oos_trades: int = 3,   # 거래 수 미달 fold는 집계에서 제외 (신호 없음)
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -740,6 +740,7 @@ class RollingOOSValidator:
         self.min_wfe = min_wfe
         self.sharpe_decay_max = sharpe_decay_max
         self.mdd_expand_max = mdd_expand_max
+        self.min_oos_trades = min_oos_trades
 
     def validate(
         self,
@@ -836,17 +837,41 @@ class RollingOOSValidator:
             )
 
         import statistics as _stats
-        avg_wfe = sum(f.wfe for f in folds) / len(folds)
-        avg_sharpe = sum(f.oos_sharpe for f in folds) / len(folds)
-        avg_pf = sum(f.oos_pf for f in folds) / len(folds)
-        oos_sharpes = [f.oos_sharpe for f in folds]
+
+        # min_oos_trades 미달 fold는 신호 없음 — 집계에서 제외
+        low_trade_fold_ids = [f.fold_id for f in folds if f.oos_trades < self.min_oos_trades]
+        active_folds = [f for f in folds if f.oos_trades >= self.min_oos_trades]
+
+        if not active_folds:
+            return BundleOOSResult(
+                strategy_name=strategy.name,
+                folds=folds,
+                avg_wfe=0.0,
+                avg_oos_sharpe=0.0,
+                avg_oos_pf=0.0,
+                oos_sharpe_std=0.0,
+                all_passed=False,
+                fail_reasons=[
+                    f"모든 fold 거래 없음 (min_oos_trades={self.min_oos_trades}): "
+                    f"folds={low_trade_fold_ids}"
+                ],
+            )
+
+        avg_wfe = sum(f.wfe for f in active_folds) / len(active_folds)
+        avg_sharpe = sum(f.oos_sharpe for f in active_folds) / len(active_folds)
+        avg_pf = sum(f.oos_pf for f in active_folds) / len(active_folds)
+        oos_sharpes = [f.oos_sharpe for f in active_folds]
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
-        all_passed = all(f.passed for f in folds)
+        all_passed = all(f.passed for f in active_folds)
 
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
+        if low_trade_fold_ids:
+            bundle_fails.append(
+                f"저거래 fold 제외 (trades<{self.min_oos_trades}): {low_trade_fold_ids}"
+            )
         if not all_passed:
-            failed_ids = [f.fold_id for f in folds if not f.passed]
+            failed_ids = [f.fold_id for f in active_folds if not f.passed]
             bundle_fails.append(f"Failed folds: {failed_ids}")
         if oos_std > self.OOS_SHARPE_STD_MAX:
             bundle_fails.append(

@@ -367,3 +367,87 @@ class TestEdgeCases:
         assert fb.threshold == 0.003
         assert fb.binary is False
         assert fb.triple_barrier is False
+
+
+# ── 온체인 피처 테스트 (Cycle 194) ────────────────────────────────────────────
+
+
+class TestOnchainFeatures:
+    """exchange_netflow, sopr 기반 온체인 파생 피처."""
+
+    def test_exchange_netflow_norm_added(self):
+        """exchange_netflow 컬럼 있으면 exchange_netflow_norm 추가."""
+        df = _make_ohlcv(100)
+        rng = np.random.default_rng(42)
+        df["exchange_netflow"] = rng.normal(0, 1000, 100)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "exchange_netflow_norm" in X.columns
+
+    def test_sopr_delta_added(self):
+        """sopr 컬럼 있으면 sopr_delta 추가."""
+        df = _make_ohlcv(100)
+        rng = np.random.default_rng(42)
+        df["sopr"] = 1.0 + rng.normal(0, 0.05, 100)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "sopr_delta" in X.columns
+
+    def test_no_onchain_columns_no_features(self):
+        """온체인 컬럼 없으면 관련 피처 미생성."""
+        df = _make_ohlcv(100)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "exchange_netflow_norm" not in X.columns
+        assert "sopr_delta" not in X.columns
+
+    def test_exchange_netflow_norm_no_inf(self):
+        """netflow=0인 구간 있어도 inf 없음."""
+        df = _make_ohlcv(100)
+        df["exchange_netflow"] = 0.0  # 분모 안전 처리 검증
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "exchange_netflow_norm" in X.columns
+        assert not np.isinf(X["exchange_netflow_norm"].dropna()).any()
+
+    def test_sopr_delta_no_inf(self):
+        """sopr 상수값에도 inf 없음."""
+        df = _make_ohlcv(100)
+        df["sopr"] = 1.0  # 분모(std)=0 방어 확인
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "sopr_delta" in X.columns
+        assert not np.isinf(X["sopr_delta"].dropna()).any()
+
+    def test_both_onchain_features_together(self):
+        """두 온체인 피처 동시에 추가."""
+        df = _make_ohlcv(100)
+        rng = np.random.default_rng(7)
+        df["exchange_netflow"] = rng.normal(0, 500, 100)
+        df["sopr"] = 1.0 + rng.normal(0, 0.05, 100)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "exchange_netflow_norm" in X.columns
+        assert "sopr_delta" in X.columns
+
+    def test_regime_optional_features_include_onchain(self):
+        """REGIME_OPTIONAL_FEATURES에 온체인 피처 포함됨."""
+        from src.ml.features import REGIME_OPTIONAL_FEATURES
+        all_optionals = set()
+        for v in REGIME_OPTIONAL_FEATURES.values():
+            all_optionals.update(v)
+        assert "exchange_netflow_norm" in all_optionals
+        assert "sopr_delta" in all_optionals
+
+    def test_regime_aware_builder_includes_onchain(self):
+        """RegimeAwareFeatureBuilder에서 온체인 피처가 선택됨."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        df = _make_ohlcv(100)
+        rng = np.random.default_rng(7)
+        df["exchange_netflow"] = rng.normal(0, 500, 100)
+        df["sopr"] = 1.0 + rng.normal(0, 0.05, 100)
+        builder = RegimeAwareFeatureBuilder()
+        X, y, regime = builder.build_with_regime(df)
+        # 어떤 레짐이든 온체인 피처 중 하나 이상 포함돼야 함
+        onchain = {"exchange_netflow_norm", "sopr_delta"}
+        assert onchain & set(X.columns), f"Expected onchain features in {list(X.columns)}"

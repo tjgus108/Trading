@@ -844,3 +844,85 @@ def test_fold_decay_positive_early_high_weighted_less():
     assert weighted < avg, (
         f"초기 fold OOS 높을 때 weighted({weighted:.4f}) < avg({avg:.4f}) 여야 함"
     )
+
+
+# ── RollingOOSValidator min_oos_trades 테스트 (Cycle 194) ──────────────────────
+
+def test_rolling_oos_min_trades_skips_zero_trade_folds():
+    """0거래 fold가 min_oos_trades 미달이면 집계에서 제외."""
+    from src.backtest.walk_forward import RollingOOSValidator
+    from src.strategy.base import BaseStrategy
+    import pandas as pd, numpy as np
+
+    class AlwaysHoldStrategy(BaseStrategy):
+        """신호를 전혀 내지 않는 전략 (거래 0건)."""
+        name = "always_hold"
+        def generate(self, df):
+            last = df.iloc[-1]
+            return Signal(
+                action=Action.HOLD, confidence=Confidence.LOW,
+                strategy=self.name, entry_price=float(last["close"]),
+                reasoning="hold", invalidation="none",
+            )
+
+    n = 300
+    prices = 100.0 + np.cumsum(np.random.default_rng(1).normal(0, 1, n))
+    df = pd.DataFrame({
+        "open": prices, "high": prices * 1.01,
+        "low": prices * 0.99, "close": prices, "volume": np.ones(n),
+    })
+
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50, min_oos_trades=1)
+    result = v.validate(AlwaysHoldStrategy(), df)
+
+    assert result.all_passed is False
+    # 모든 fold 0거래 → "모든 fold 거래 없음" fail reason
+    assert any("거래 없음" in r or "저거래" in r for r in result.fail_reasons)
+
+
+def test_rolling_oos_low_trade_fold_excluded_from_stats():
+    """min_oos_trades 미달 fold(거래 0건)가 집계 통계에 포함되지 않고 fail_reason에 기록됨."""
+    from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+    import numpy as np
+
+    n = 500
+    rng = np.random.default_rng(42)
+    prices = 100.0 + np.cumsum(rng.normal(0, 1, n))
+    df = pd.DataFrame({
+        "open": prices, "high": prices * 1.01,
+        "low": prices * 0.99, "close": prices, "volume": np.ones(n),
+    })
+
+    # HoldStrategy는 거래 0건 → min_oos_trades=1 설정 시 모두 제외
+    v = RollingOOSValidator(is_bars=150, oos_bars=75, slide_bars=75, min_oos_trades=1)
+    result = v.validate(HoldStrategy(), df)
+    assert isinstance(result, BundleOOSResult)
+    assert result.all_passed is False
+    # 저거래 또는 거래없음 관련 fail reason 포함
+    all_reasons = " ".join(result.fail_reasons)
+    assert "거래 없음" in all_reasons or "저거래" in all_reasons
+
+
+def test_rolling_oos_summary_no_duplicate_field():
+    """BundleOOSResult.summary()에 oos_sharpe_std 중복 없음."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.0, oos_sharpe=0.8,
+        is_mdd=0.05, oos_mdd=0.07, wfe=0.8, oos_pf=1.5,
+        oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test", folds=[fold],
+        avg_wfe=0.8, avg_oos_sharpe=0.8, avg_oos_pf=1.5,
+        oos_sharpe_std=0.1, all_passed=True, fail_reasons=[],
+    )
+    summary = result.summary()
+    assert summary.count("oos_sharpe_std") == 1, "oos_sharpe_std가 중복되면 안 됨"
+
+
+def test_rolling_oos_min_trades_default_value():
+    """RollingOOSValidator 기본 min_oos_trades=3."""
+    from src.backtest.walk_forward import RollingOOSValidator
+    v = RollingOOSValidator()
+    assert v.min_oos_trades == 3
