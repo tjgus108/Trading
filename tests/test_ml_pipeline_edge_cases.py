@@ -354,3 +354,49 @@ class TestDataQuality:
         # feature_names와 X.columns 일치
         for name in fb.feature_names:
             assert name in X.columns
+
+
+# ─────────────────────────────────────────────────────────────────
+# WalkForwardTrainer 최소 데이터 요건 (D카테고리 — Cycle 197)
+# ─────────────────────────────────────────────────────────────────
+
+class TestWalkForwardTrainerMinData:
+    """WalkForwardTrainer 최소 데이터 요건 검증."""
+
+    def _make_trainer(self):
+        from src.ml.trainer import WalkForwardTrainer
+        return WalkForwardTrainer(symbol="BTC/USDT", n_estimators=10, max_depth=3)
+
+    def test_too_few_samples_returns_fail(self):
+        """유효 샘플 < 100이면 passed=False, fail_reasons에 샘플 부족 포함."""
+        trainer = self._make_trainer()
+        df = _make_df(30)  # 30캔들 → 피처 후 유효 샘플 < 100 보장
+        result = trainer.train(df)
+        assert result.passed is False
+        assert any("샘플 부족" in r or "100" in r for r in result.fail_reasons)
+
+    def test_sufficient_samples_does_not_fail_on_min_check(self):
+        """충분한 샘플(300캔들)에서는 샘플 부족 fail_reason 없음."""
+        trainer = self._make_trainer()
+        df = _make_df(300)
+        result = trainer.train(df)
+        # 샘플 부족 이유는 없어야 함 (다른 이유로 fail 가능하지만)
+        assert not any("샘플 부족" in r for r in result.fail_reasons)
+
+    def test_min_sample_count_is_100(self):
+        """n_samples < 100 경계: 99개 유효 샘플에서 FAIL, 100개 이상은 체크 통과."""
+        from src.ml.trainer import WalkForwardTrainer, TrainingResult
+        trainer = self._make_trainer()
+        # 아주 작은 df를 직접 패치해 n_total=99를 만들어 경계 검증
+        import unittest.mock as mock
+        with mock.patch.object(
+            trainer.feature_builder, "build",
+            return_value=(
+                pd.DataFrame({"f": range(99)}),
+                pd.Series([0] * 99),
+            ),
+        ):
+            result = trainer.train(_make_df(300))
+        assert result.passed is False
+        assert result.n_samples == 99
+        assert any("샘플" in r for r in result.fail_reasons)

@@ -898,3 +898,127 @@ def test_confidence_lowercase_accepted():
     med = _sized("MEDIUM")
     high_lower = _sized("high")
     assert high_lower.position_size == pytest.approx(med.position_size * 1.5, rel=1e-3)
+
+
+# ── DrawdownMonitor + RiskManager 통합 시나리오 (Cycle 197 B카테고리) ──────────
+
+class TestDrawdownMonitorRiskIntegration:
+    """DrawdownMonitor와 RiskManager를 함께 사용하는 시나리오 테스트."""
+
+    def _make_rm(self, **kwargs):
+        return RiskManager(
+            risk_per_trade=0.01,
+            atr_multiplier_sl=1.5,
+            atr_multiplier_tp=3.0,
+            max_position_size=0.10,
+            **kwargs,
+        )
+
+    def test_drawdown_monitor_rolling_window_custom(self):
+        """rolling_window 파라미터가 생성자에서 정상 설정되고 rolling_mdd에 반영."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        m = DrawdownMonitor(max_drawdown_pct=0.20, rolling_window=10)
+        assert m._rolling_window == 10
+
+        for eq in [10000, 9500, 9000, 9200, 9100]:
+            m.update(eq)
+
+        # window=3: 9000→9200→9100 구간의 MDD
+        mdd_3 = m.rolling_mdd(window=3)
+        # window=None(=10): 전체 히스토리 MDD
+        mdd_full = m.rolling_mdd()
+        assert mdd_full >= mdd_3  # 긴 윈도우 MDD >= 짧은 윈도우
+
+    def test_drawdown_to_dict_from_dict_preserves_rolling_window(self):
+        """to_dict/from_dict 후 rolling_window 복원 확인."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        m = DrawdownMonitor(max_drawdown_pct=0.15, rolling_window=20)
+        m.update(10000)
+        m.update(9000)
+        d = m.to_dict()
+        assert d["rolling_window"] == 20
+
+        restored = DrawdownMonitor.from_dict(d)
+        assert restored._rolling_window == 20
+
+    def test_drawdown_halt_blocks_subsequent_trades(self):
+        """DrawdownMonitor가 halt 상태이면 리스크 평가 전 차단 확인.
+
+        DrawdownMonitor와 RiskManager를 직접 연동하는 간단한 통합 패턴:
+        DrawdownMonitor.is_halted() → True이면 RiskManager.evaluate() 스킵.
+        """
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        import pandas as pd, numpy as np
+
+        monitor = DrawdownMonitor(max_drawdown_pct=0.10)
+        rm = self._make_rm()
+
+        equity = 10000.0
+        monitor.update(equity)
+
+        # 10% 이상 낙폭 → halted
+        equity = 8900.0
+        status = monitor.update(equity)
+        assert status.halted is True
+
+        # halted 상태에서는 거래 평가 불가 (시뮬레이션: 호출자가 is_halted() 체크)
+        if monitor.is_halted():
+            blocked = True
+        else:
+            idx = pd.date_range("2024-01-01", periods=50, freq="1h")
+            df = pd.DataFrame(
+                {"open": 50000, "high": 51000, "low": 49000, "close": 50000,
+                 "volume": 10, "atr14": 500, "ema20": 50000, "ema50": 50000},
+                index=idx,
+            )
+            result = rm.evaluate(
+                signal_action="BUY", account_balance=equity,
+                entry_price=50000, atr=500, df=df
+            )
+            blocked = not result.approved
+
+        assert blocked is True
+
+    def test_circuit_breaker_and_drawdown_monitor_dual_gate(self):
+        """CircuitBreaker(낙폭) + DrawdownMonitor(MDD) 이중 게이트 패턴.
+
+        회로 차단기: 일일 낙폭 초과 → CircuitBreaker TRIGGERED
+        DrawdownMonitor: peak 대비 전체 MDD 초과 → HALTED
+        둘 중 하나라도 차단이면 거래 불가.
+        """
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        from src.risk.circuit_breaker import CircuitBreaker as CB
+        import pandas as pd
+
+        dd_monitor = DrawdownMonitor(max_drawdown_pct=0.15)
+        cb = CB(daily_drawdown_limit=0.05, total_drawdown_limit=0.15)
+
+        peak = 10000.0
+        dd_monitor.update(peak)
+
+        # 시나리오: 일일 낙폭만 초과 (CircuitBreaker 트리거)
+        current = 9400.0
+        cb_result = cb.check(
+            current_balance=current,
+            peak_balance=peak,
+            daily_start_balance=peak,
+        )
+        dd_status = dd_monitor.update(current)
+
+        cb_blocked = cb_result["triggered"]        # 6% > 5% → triggered
+        dd_blocked = dd_status.halted              # 6% < 15% → not halted
+
+        assert cb_blocked is True
+        assert dd_blocked is False
+
+        # 완전히 두 게이트 모두 차단: 15%+ 낙폭
+        current2 = 8400.0
+        cb_result2 = cb.check(
+            current_balance=current2,
+            peak_balance=peak,
+            daily_start_balance=peak,
+        )
+        dd_status2 = dd_monitor.update(current2)
+
+        assert cb_result2["triggered"] is True
+        assert dd_status2.halted is True

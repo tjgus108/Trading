@@ -1,36 +1,37 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 196 B+D+F 완료)_
+_Last updated: 2026-05-22 (Cycle 197 B+D+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 196 완료
-- 196 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
-- 다음 Cycle 197: **197 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
+### 로테이션: Cycle 197 완료
+- 197 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
+- 다음 Cycle 198: **198 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)**
 
-### 🔥 Cycle 196 주요 성과
-- **DrawdownMonitor 롤링 MDD**: `rolling_mdd(window)` 메서드 + `DrawdownStatus.rolling_mdd_pct` 필드 추가
-- **CircuitBreaker 버그 수정**: 쿨다운 중 수익 발생 시 consecutive_losses 즉시 0으로 리셋
-- **KellySizer rolling_window 안정성 테스트**: window 크기별 포지션 사이즈 차이 검증 5개
-- **DualGateADWINMonitor E2E 파이프라인 테스트**: PSI drift → AccuracyDriftMonitor retrain trigger
+### 🔥 Cycle 197 주요 성과
+- **DrawdownMonitor rolling_window 파라미터화**: `rolling_window: int = 50` 생성자 파라미터, to_dict/from_dict 완전 직렬화
+- **CircuitBreaker rapid_decline 경계 케이스 테스트 4개**: 정확히-threshold, 미달, cooldown 만료, reset_daily 초기화
+- **DrawdownMonitor + CircuitBreaker 통합 시나리오 테스트 4개**: 이중 게이트 패턴 검증
+- **WalkForwardTrainer 최소 데이터 요건 3개**: n<100 → FAIL, 경계 99샘플 mock 검증
+- **DualGateADWIN + AccuracyDriftMonitor 결합 retrain 4개**: 정확도 급락, 피처 분포 급변, cooldown, PSI
 
-### 🎯 Cycle 197 권장 작업 (197 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 198 권장 작업 (198 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+
+#### C(데이터): Data & Infrastructure 개선
+- `DataFeed` fallback_exchanges 실제 동작 테스트 강화 (mock exchange로 bybit 차단 시나리오)
+- `OrderFlowAnalyzer` 또는 VPIN 정확도 검증 테스트 추가
+- WebSocket stale watchdog reconnection 타이밍 테스트
 
 #### B(리스크): Risk Manager 추가 개선
-- `DrawdownMonitor.rolling_mdd()` rolling_window 생성자 파라미터화 (현재 50 고정)
-- `CircuitBreaker` rapid_decline 로직 테스트 강화 (cooldown_periods 경계 케이스)
-- `RiskManager` DrawdownMonitor + CircuitBreaker 통합 시나리오 테스트
+- `DrawdownMonitor.rolling_window` 파라미터 + `RiskManager` 통합 (reset_daily 전달)
+- `CircuitBreaker` 연속 손실 + rapid_decline 동시 발생 시나리오 테스트
+- `VolTargeting` ATR-기반 포지션 사이즈 + DrawdownMonitor size_multiplier 결합 테스트
 
-#### D(ML): ML 파이프라인 개선
-- `AccuracyDriftMonitor` → `DualGateADWINMonitor` 결합 통합 클래스 설계 리서치
-- `drift_detector` 전략 재학습 자동 트리거 → WalkForwardOptimizer 연동 아이디어
-- `trainer.py` 모델 재학습 최소 데이터 요건 검증
-
-#### F(리서치): narrow_range 4h 신호 완화
-- narrow_range 전략 4h 파라미터 범위 분석 (거래 0건 원인 파악)
-- value_area OOS std 6.589 원인 분석 → 파라미터 범위 축소 또는 정규화
+#### F(리서치): 실 데이터 전략 검증 방법 연구
+- 로컬 환경 DataFeed fallback 활성화 절차 문서화
+- narrow_range 1h 신호 조건 완화 아이디어 (NR7→NR4, VOL_SPIKE_MULT 1.2→1.0 시 4h 신호 수 예측)
 
 ### 🔥 Cycle 195 주요 성과
 - **RollingOOSValidator PASS 경로 테스트**: mock BacktestEngine으로 all_passed=True 코드 패스 검증

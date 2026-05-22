@@ -584,3 +584,94 @@ def test_consecutive_losses_reset_after_cooldown_with_prior_win():
     # 이후 손실 1회 → 새 카운터 시작
     cb.record_trade_result(is_loss=True)
     assert cb.consecutive_losses == 1
+
+
+# ── rapid_decline 경계 케이스 ────────────────────────────────────────────────
+
+def test_rapid_decline_triggered_exactly_at_threshold():
+    """decline이 rapid_decline_pct와 정확히 같을 때 트리거.
+    daily_drawdown_limit을 높여 rapid_decline 체크가 먼저 도달하도록 설정.
+    """
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.20,   # rapid_decline보다 훨씬 높게 설정
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=10,
+    )
+    cb.record_price(100.0)
+    cb.record_price(95.0)  # (100-95)/100 = 0.05 == threshold
+    result = cb.check(
+        current_balance=9500, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is True
+    assert cb.rapid_decline_cooldown == 10
+
+
+def test_rapid_decline_just_below_threshold_no_trigger():
+    """decline이 threshold 직하에서는 rapid_decline 트리거 없음."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.20,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=10,
+    )
+    cb.record_price(100.0)
+    cb.record_price(95.1)  # (100-95.1)/100 ≈ 0.049 < 0.05
+    result = cb.check(
+        current_balance=9510, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False
+    assert cb.rapid_decline_cooldown == 0
+
+
+def test_rapid_decline_cooldown_expires_exactly():
+    """rapid_decline_cooldown_periods번 record_price 후 쿨다운 만료."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=3,
+    )
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락 → 트리거
+    cb.check(current_balance=9000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 3
+
+    cb.record_price(91.0)  # -1
+    assert cb.rapid_decline_cooldown == 2
+    cb.record_price(92.0)  # -2
+    assert cb.rapid_decline_cooldown == 1
+    cb.record_price(93.0)  # -3 → 만료
+    assert cb.rapid_decline_cooldown == 0
+
+    # 만료 후 check → triggered=False (낙폭 조건 없으면)
+    result = cb.check(
+        current_balance=9500, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False
+
+
+def test_rapid_decline_reset_by_reset_daily():
+    """reset_daily() 호출 시 rapid_decline 쿨다운이 초기화된다."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=30,
+    )
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락 → 쿨다운 30 시작
+    cb.check(current_balance=9000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 30
+
+    cb.reset_daily(9000.0)
+    assert cb.rapid_decline_cooldown == 0
+    # reset 후 check → triggered=False
+    result = cb.check(
+        current_balance=9000, peak_balance=10000, daily_start_balance=9000
+    )
+    assert result["triggered"] is False

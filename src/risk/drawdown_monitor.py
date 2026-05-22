@@ -125,6 +125,7 @@ class DrawdownMonitor:
         mdd_block_pct: float = 0.10,
         mdd_liquidate_pct: float = 0.15,
         mdd_halt_pct: float = 0.20,
+        rolling_window: int = 50,
     ) -> None:
         """
         Args:
@@ -143,6 +144,7 @@ class DrawdownMonitor:
             mdd_block_pct:     MDD 진입 차단 기준 (기본 10%). 신규 진입 차단.
             mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
             mdd_halt_pct:      MDD 완전 중단 기준 (기본 20%). 전체 거래 중단.
+            rolling_window:    rolling_mdd() 기본 윈도우 크기 (equity 업데이트 횟수, 기본 50).
         """
         self.max_drawdown_pct = max_drawdown_pct
         self.recovery_pct = recovery_pct
@@ -159,7 +161,7 @@ class DrawdownMonitor:
         self.mdd_halt_pct = mdd_halt_pct
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
-        self._rolling_window: int = 50             # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
+        self._rolling_window: int = rolling_window  # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
         self._equity_history: Deque[float] = deque(maxlen=self._rolling_window)
 
         self._peak: Optional[float] = None
@@ -591,6 +593,7 @@ class DrawdownMonitor:
             "mdd_block_pct": self.mdd_block_pct,
             "mdd_liquidate_pct": self.mdd_liquidate_pct,
             "mdd_halt_pct": self.mdd_halt_pct,
+            "rolling_window": self._rolling_window,
             "_peak": self._peak,
             "_current": self._current,
             "_halted": self._halted,
@@ -621,6 +624,7 @@ class DrawdownMonitor:
             mdd_block_pct=data.get("mdd_block_pct", 0.10),
             mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
             mdd_halt_pct=data.get("mdd_halt_pct", 0.20),
+            rolling_window=data.get("rolling_window", 50),
         )
         obj._peak = data["_peak"]
         obj._current = data["_current"]

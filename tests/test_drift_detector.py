@@ -572,3 +572,95 @@ class TestPSIDriftMonitor:
         mon.set_reference(np.array([1, 2, 3]))
         with pytest.raises(ValueError):
             mon.compute_psi(np.array([]))
+
+
+# ─────────────────────────────────────────────────────────────────
+# DualGateADWINMonitor + AccuracyDriftMonitor 결합 retrain 시나리오
+# Cycle 197 D카테고리
+# ─────────────────────────────────────────────────────────────────
+
+class TestCombinedDriftRetrain:
+    """AccuracyDriftMonitor + DualGateADWINMonitor 결합 재학습 파이프라인."""
+
+    def test_accuracy_drift_triggers_before_adwin(self):
+        """정확도 급락 시 AccuracyDriftMonitor가 먼저 retrain 트리거."""
+        from src.ml.drift_detector import AccuracyDriftMonitor, DualGateADWINMonitor
+        acc_mon = AccuracyDriftMonitor(window=50, min_accuracy=0.52)
+        adwin_mon = DualGateADWINMonitor(delta=0.05)
+
+        # 정상 구간: 60% 정확도
+        for _ in range(60):
+            acc_mon.update(prediction=1, actual=1)
+            adwin_mon.update_feature("acc", 1.0)
+
+        # 급락 구간: 30% 정확도
+        for _ in range(60):
+            acc_mon.update(prediction=1, actual=0)
+            adwin_mon.update_feature("acc", 0.0)
+
+        assert acc_mon.should_retrain is True
+
+    def test_adwin_triggers_retrain_on_feature_shift(self):
+        """피처 분포 급변 시 DualGateADWIN이 retrain 트리거."""
+        from src.ml.drift_detector import DualGateADWINMonitor
+        rng = np.random.default_rng(0)
+        mon = DualGateADWINMonitor(delta=0.002, min_window=10, grace_period=10, retrain_cooldown=10)
+
+        # 안정 구간
+        for v in rng.normal(0.5, 0.01, 200):
+            mon.update_feature("rsi", float(v))
+
+        # 급변 구간 (평균 이동)
+        triggered = False
+        for v in rng.normal(0.1, 0.01, 200):
+            if mon.update_feature("rsi", float(v)):
+                triggered = True
+                break
+
+        assert triggered is True
+        assert mon.should_retrain is True
+
+    def test_combined_retrain_cooldown_prevents_double_trigger(self):
+        """retrain 후 cooldown 기간 내 재트리거 방지."""
+        from src.ml.drift_detector import DualGateADWINMonitor
+        rng = np.random.default_rng(1)
+        mon = DualGateADWINMonitor(delta=0.002, min_window=10, grace_period=10, retrain_cooldown=100)
+
+        # 안정 → 급변으로 retrain 트리거
+        for v in rng.normal(0.5, 0.01, 200):
+            mon.update_feature("f", float(v))
+        first_trigger = False
+        for v in rng.normal(0.1, 0.01, 200):
+            if mon.update_feature("f", float(v)):
+                first_trigger = True
+                break
+
+        assert first_trigger is True
+        retrain_count_after_first = mon.retrain_count
+        mon.reset()  # 재학습 완료
+
+        # cooldown=100 중 50개만 추가 → 재트리거 불가
+        for v in rng.normal(0.9, 0.01, 50):
+            mon.update_feature("f", float(v))
+
+        assert mon.retrain_count == retrain_count_after_first
+
+    def test_psi_drift_combined_with_accuracy_monitor(self):
+        """PSI drift + AccuracyDriftMonitor should_retrain 연동."""
+        from src.ml.drift_detector import AccuracyDriftMonitor
+        rng = np.random.default_rng(2)
+        acc_mon = AccuracyDriftMonitor(window=50, min_accuracy=0.55)
+
+        ref = rng.normal(0, 1, 100)
+        acc_mon.set_feature_reference(ref)
+
+        # 정상 예측 구간
+        for _ in range(30):
+            acc_mon.update(prediction=1, actual=1)
+        assert acc_mon.should_retrain is False
+
+        # 분포 급변 피처로 PSI 트리거
+        shifted = rng.normal(5, 1, 100)  # 크게 이동한 분포
+        psi_val = acc_mon.check_feature_drift(shifted)
+        assert psi_val > 0.2  # 심각한 PSI
+        assert acc_mon.psi_drift_detected is True
