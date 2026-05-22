@@ -32,7 +32,10 @@
   - wick_reversal fold 1: OOS Sharpe 4.832 (1개 fold PASS) → 나머지 불안정
   - value_area fold 0,4,6: PASS이지만 OOS std 6.589로 전략 FAIL
   - narrow_range: 전 fold 0거래 (4h 신호 조건 과도하게 엄격)
-- Paper SIM: 이전 Cycle 195 결과 재사용 (22/22 FAIL, GBM 한계)
+- Paper SIM (1h GBM, 2026-05-22 15:20 UTC): 22/22 FAIL, 일관성 0/8
+  - price_action_momentum 최우수: +52.22%, Sharpe 6.90, PF 1.87, Trades 85
+  - cmf 2위: +46.21%, Sharpe 5.99 — IS 기반 수치이지만 GBM에서 과적합
+  - 결론: 합성 GBM 데이터 한계 재확인. 실 데이터 없이 0/8 일관성 달성 불가
 
 **테스트 결과:**
 - 전체: 7742 passed, 23 skipped (4:27)

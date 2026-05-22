@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-05-22T10:26:13.027656Z_
+_Generated: 2026-05-22T15:20:54.534964Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-05-22T10:21:11.757714Z_
+_Generated: 2026-05-22T15:16:42.293307Z_
 _Symbol: BTC/USDT_
 _Data Source: Synthetic GBM x8640 (BTC/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -59,10 +59,10 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
-| `value_area` | +0.85% | 0.36 | 73035618598.32 | 6 | 0/8 | FAIL |
+| `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
-| `price_cluster` | +0.28% | 0.29 | 43378136196.86 | 0 | 0/8 | FAIL |
-| `wick_reversal` | +0.16% | -0.25 | 36289090010.98 | 1 | 0/8 | FAIL |
+| `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
+| `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
 | `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
@@ -78,7 +78,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-05-22T10:23:41.966834Z_
+_Generated: 2026-05-22T15:18:48.472910Z_
 _Symbol: ETH/USDT_
 _Data Source: Synthetic GBM x8640 (ETH/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -130,10 +130,10 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
-| `value_area` | +0.85% | 0.36 | 73035618598.32 | 6 | 0/8 | FAIL |
+| `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
-| `price_cluster` | +0.28% | 0.29 | 43378136196.86 | 0 | 0/8 | FAIL |
-| `wick_reversal` | +0.16% | -0.25 | 36289090010.98 | 1 | 0/8 | FAIL |
+| `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
+| `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
 | `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
@@ -149,7 +149,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-05-22T10:26:13.026187Z_
+_Generated: 2026-05-22T15:20:54.531810Z_
 _Symbol: SOL/USDT_
 _Data Source: Synthetic GBM x8640 (SOL/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -201,10 +201,10 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
-| `value_area` | +0.85% | 0.36 | 73035618598.32 | 6 | 0/8 | FAIL |
+| `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
-| `price_cluster` | +0.28% | 0.29 | 43378136196.86 | 0 | 0/8 | FAIL |
-| `wick_reversal` | +0.16% | -0.25 | 36289090010.98 | 1 | 0/8 | FAIL |
+| `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
+| `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
 | `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
