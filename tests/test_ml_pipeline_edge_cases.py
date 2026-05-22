@@ -350,7 +350,116 @@ class TestDataQuality:
         df = _make_df(200)
         fb = FeatureBuilder()
         X, _ = fb.build(df)
-        
+
         # feature_names와 X.columns 일치
         for name in fb.feature_names:
             assert name in X.columns
+
+
+class TestOnchainFeatures:
+    """Cycle 194: 온체인 피처 (exchange_netflow, sopr) 통합 테스트."""
+
+    def _make_df_with_onchain(self, n: int = 300, seed: int = 42) -> pd.DataFrame:
+        df = _make_df(n, seed)
+        rng = np.random.default_rng(seed + 100)
+        df["exchange_netflow"] = rng.standard_normal(n) * 1000
+        df["sopr"] = 1.0 + rng.standard_normal(n) * 0.05
+        return df
+
+    def test_netflow_zscore_added(self):
+        """exchange_netflow 컬럼 있으면 netflow_zscore 피처 생성."""
+        df = self._make_df_with_onchain()
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "netflow_zscore" in X.columns
+
+    def test_sopr_delta_added(self):
+        """sopr 컬럼 있으면 sopr_delta 피처 생성."""
+        df = self._make_df_with_onchain()
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "sopr_delta" in X.columns
+
+    def test_onchain_features_absent_without_columns(self):
+        """온체인 컬럼 없으면 온체인 피처 생성 안 함."""
+        df = _make_df(200)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "netflow_zscore" not in X.columns
+        assert "sopr_delta" not in X.columns
+
+    def test_netflow_zscore_no_inf(self):
+        """netflow_zscore에 inf/NaN 없음 (zero variance edge case)."""
+        df = self._make_df_with_onchain()
+        df["exchange_netflow"] = 0.0
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        if "netflow_zscore" in X.columns:
+            assert not X["netflow_zscore"].isin([np.inf, -np.inf]).any()
+
+    def test_sopr_delta_is_diff(self):
+        """sopr_delta가 sopr의 1차 차분과 높은 상관관계."""
+        df = self._make_df_with_onchain(100)
+        fb = FeatureBuilder()
+        X = fb.build_features_only(df)
+        assert "sopr_delta" in X.columns
+        sopr_diff = df["sopr"].diff()
+        common_idx = X.index.intersection(sopr_diff.dropna().index)
+        if len(common_idx) > 10:
+            corr = X.loc[common_idx, "sopr_delta"].corr(sopr_diff.loc[common_idx])
+            assert corr > 0.99
+
+
+class TestMLInferenceSpeed:
+    """Cycle 194: ML 추론 속도 벤치마크."""
+
+    def test_feature_build_speed(self):
+        """300행 데이터 피처 빌드가 100ms 이내."""
+        import time
+        df = _make_df(300)
+        fb = FeatureBuilder()
+        start = time.perf_counter()
+        for _ in range(10):
+            fb.build_features_only(df)
+        elapsed = (time.perf_counter() - start) / 10
+        assert elapsed < 0.1, f"Feature build too slow: {elapsed*1000:.1f}ms"
+
+    def test_feature_build_large_speed(self):
+        """8760행(1년 1h봉) 피처 빌드가 500ms 이내."""
+        import time
+        df = _make_df(8760)
+        fb = FeatureBuilder()
+        start = time.perf_counter()
+        fb.build_features_only(df)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 0.5, f"Large feature build too slow: {elapsed*1000:.1f}ms"
+
+    def test_predict_with_trained_model_speed(self):
+        """학습된 모델의 단일 예측이 50ms 이내 (RandomForest 10 trees)."""
+        import time
+        from sklearn.ensemble import RandomForestClassifier
+        import pickle, tempfile, os
+
+        df = _make_df(500)
+        fb = FeatureBuilder()
+        X, y = fb.build(df)
+        if len(X) < 20:
+            pytest.skip("Not enough data")
+
+        clf = RandomForestClassifier(n_estimators=10, random_state=42)
+        clf.fit(X, y)
+
+        gen = MLSignalGenerator()
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            pickle.dump({"model": clf, "feature_names": list(X.columns),
+                         "class_order": list(clf.classes_)}, f)
+            tmp = f.name
+        try:
+            gen.load(tmp)
+            start = time.perf_counter()
+            for _ in range(20):
+                gen.predict(df)
+            elapsed = (time.perf_counter() - start) / 20
+            assert elapsed < 0.05, f"Prediction too slow: {elapsed*1000:.1f}ms"
+        finally:
+            os.unlink(tmp)

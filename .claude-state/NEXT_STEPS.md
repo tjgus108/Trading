@@ -14,6 +14,10 @@ _Last updated: 2026-05-21 (Cycle 194 D+E+F 완료)_
 - **FeatureBuilder 온체인 피처**: exchange_netflow→netflow_zscore, sopr→sopr_delta (선택적)
 - **PaperTrader KellySizer 통합**: compute_dynamic BUY 사이징 + SELL 후 record_trade
 - **OOS Sharpe std 필터 개선**: 0-trade 폴드 제외로 노이즈 감소 (traded_sharpes 기준)
+- **source_col 매핑 수정**: get_regime_features에 netflow_zscore→exchange_netflow 추가
+- **value_area 그리드 축소**: 9→6 조합 (OOS std=6.15 대응), optimize_narrow_range() 추가
+- **ML 추론 속도 테스트**: 300행<100ms, 8760행<500ms, 단일 예측<50ms 벤치마크
+- **Kelly 단위 테스트 4개**: rolling dynamic, fallback, NaN 무시, max_fraction cap
 
 ### 🎯 Cycle 195 권장 작업 (195 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 

@@ -1,5 +1,24 @@
 # Work Log
 
+## [2026-05-22] Cycle 194 추가 개선 — D(ML) + walk_forward 최적화
+
+**[D] ML 추가 — source_col 매핑 수정:**
+- `RegimeAwareFeatureBuilder.get_regime_features()`: `netflow_zscore`→`exchange_netflow`, `sopr_delta`→`sopr` source_col 추가 (기존에 누락됨)
+
+**[walk_forward.py 추가 개선]:**
+- `value_area` DEFAULT_GRIDS 파라미터 범위 축소 (9→6 조합): OOS Sharpe std=6.15 대응
+  - va_period: [15,20,25] → [18,20,22], va_mult: [0.6,0.7,0.8] → [0.65,0.70]
+- `optimize_narrow_range()` factory 함수 추가 (Cycle 195 kwargs 확장 기반)
+- `narrow_range` DEFAULT_GRIDS placeholder 추가
+
+**[테스트 추가]:**
+- `TestOnchainFeatures` 5개: netflow_zscore/sopr_delta 생성, 부재, inf 방어, 상관관계 검증
+- `TestMLInferenceSpeed` 3개: 300행<100ms, 8760행<500ms, 단일 예측<50ms
+- Kelly 단위 테스트 4개: rolling dynamic sizing, fallback, NaN 무시, max_fraction cap
+- 총 148 passed
+
+---
+
 ## [2026-05-21] Cycle 194 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML — 온체인 피처 통합:**

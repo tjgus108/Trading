@@ -1208,3 +1208,50 @@ def test_kelly_adjustments_counted_after_history_buildup():
     # kelly_sizer_adjustments: compute_dynamic가 0.001과 다른 값 반환하면 +1
     summary = pt.get_summary()
     assert summary["kelly_sizer_adjustments"] >= 0  # 최소 0 (거부 시)
+
+
+# ── Cycle 194: KellySizer rolling 단위 테스트 ──────────────────────────────
+def test_kelly_rolling_dynamic_sizing():
+    """KellySizer.compute_dynamic()이 거래 기록 쌓인 후 양수 수량 반환."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, max_fraction=0.3, rolling_window=20)
+    for i in range(15):
+        sizer.record_trade(100.0 if i % 5 != 0 else -50.0)
+    qty = sizer.compute_dynamic(capital=10000.0, price=1000.0, min_trades=10)
+    assert qty > 0.0
+
+
+def test_kelly_rolling_insufficient_trades_fallback():
+    """거래 기록 min_trades 미달 시 min_fraction * capital 반환."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, min_fraction=0.01, rolling_window=50)
+    for _ in range(5):
+        sizer.record_trade(50.0)
+    qty = sizer.compute_dynamic(capital=10000.0, price=1.0, min_trades=10)
+    assert abs(qty - 10000.0 * 0.01) < 1e-6
+
+
+def test_kelly_record_trade_ignores_nan():
+    """NaN/inf PnL은 rolling 기록에 추가하지 않음."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=0.5, rolling_window=10)
+    sizer.record_trade(float("nan"))
+    sizer.record_trade(float("inf"))
+    sizer.record_trade(100.0)
+    assert len(sizer._trade_history) == 1
+
+
+def test_kelly_max_fraction_cap():
+    """compute_dynamic 결과가 max_fraction * capital / price를 초과하지 않음."""
+    from src.risk.kelly_sizer import KellySizer
+
+    sizer = KellySizer(fraction=1.0, max_fraction=0.05, rolling_window=20)
+    for i in range(20):
+        sizer.record_trade(200.0 if i % 2 == 0 else -10.0)
+    capital, price = 10000.0, 500.0
+    qty = sizer.compute_dynamic(capital=capital, price=price, min_trades=10)
+    max_qty = capital * 0.05 / price
+    assert qty <= max_qty * 1.01

@@ -530,6 +530,8 @@ class RegimeAwareFeatureBuilder:
                     "btc_close_lag1": "btc_close",
                     "delta_fr": "funding_rate",
                     "fr_oi_interaction": "open_interest",
+                    "netflow_zscore": "exchange_netflow",
+                    "sopr_delta": "sopr",
                 }.get(feat, feat)
                 if source_col in df.columns:
                     base_feats.append(feat)

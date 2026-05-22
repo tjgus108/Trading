@@ -55,8 +55,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "min_volatility": [0.001, 0.002, 0.003],
     },
     "value_area": {
-        "va_period": [15, 20, 25],
-        "va_mult": [0.6, 0.7, 0.8],
+        # Cycle 194: OOS Sharpe std=6.15 → 파라미터 범위 축소 (9→6 조합)
+        "va_period": [18, 20, 22],
+        "va_mult": [0.65, 0.70],
+    },
+    "narrow_range": {
+        # NarrowRangeStrategy 클래스 상수 기반 → 추후 kwargs 수용 시 그리드 확장
+        "placeholder": [None],
     },
     "frama": {
         "period": [14, 16, 18],
@@ -661,6 +666,28 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
         strategy_name="frama",
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["frama"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
+    )
+    return opt.run(df)
+
+
+def optimize_narrow_range(df: pd.DataFrame, n_windows: int = 3,
+                          plateau_pct: float = 0.9) -> WalkForwardResult:
+    """NarrowRange 전략 파라미터 최적화 (Cycle 194).
+
+    NarrowRangeStrategy는 클래스 상수(ATR_THRESHOLD=0.85, VOL_SPIKE_MULT=1.2)를 사용.
+    현재는 단일 조합만 실행. Cycle 195에서 kwargs 수용 후 그리드 확장 예정.
+    """
+    from src.strategy.narrow_range import NarrowRangeStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return NarrowRangeStrategy()
+
+    opt = WalkForwardOptimizer(
+        strategy_name="narrow_range",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["narrow_range"],
         n_windows=n_windows,
         plateau_pct=plateau_pct,
     )
