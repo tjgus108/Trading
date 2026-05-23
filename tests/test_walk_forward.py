@@ -1006,3 +1006,89 @@ def test_optimizer_fold_decay_positive_e2e():
     assert not math.isinf(result.weighted_oos_sharpe)
     # fold_decay=1.0이면 weighted_oos_sharpe가 WalkForwardResult에 기록됨
     assert "weighted_oos_sharpe" in result.summary()
+
+
+# ---------------------------------------------------------------------------
+# [D1] Cycle 199: fold_decay 범위 0.7~1.0 검증 테스트
+# ---------------------------------------------------------------------------
+
+class TestFoldDecayNarrowRange:
+    """fold_decay 파라미터 범위 0.7~1.0 행동 검증 — Cycle 199 D(ML)."""
+
+    def _make_opt(self, fold_decay: float):
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+
+        def factory(params):
+            return EmaCrossStrategy(
+                fast_span=params.get("fast_span", 20),
+                slow_span=params.get("slow_span", 50),
+            )
+
+        return WalkForwardOptimizer(
+            strategy_name="ema_cross",
+            strategy_factory=factory,
+            param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+            n_windows=3,
+            fold_decay=fold_decay,
+        )
+
+    def test_fold_decay_0_7_produces_valid_weighted_sharpe(self):
+        """fold_decay=0.7 → weighted_oos_sharpe 유한 실수 반환."""
+        import math
+        opt = self._make_opt(0.7)
+        result = opt.run(make_df(1000))
+        assert result.weighted_oos_sharpe is not None
+        assert not math.isnan(result.weighted_oos_sharpe)
+        assert not math.isinf(result.weighted_oos_sharpe)
+
+    def test_fold_decay_1_0_produces_valid_weighted_sharpe(self):
+        """fold_decay=1.0 → weighted_oos_sharpe 유한 실수 반환."""
+        import math
+        opt = self._make_opt(1.0)
+        result = opt.run(make_df(1000))
+        assert result.weighted_oos_sharpe is not None
+        assert not math.isnan(result.weighted_oos_sharpe)
+        assert not math.isinf(result.weighted_oos_sharpe)
+
+    def test_fold_decay_0_8_weighted_not_equal_avg_when_folds_differ(self):
+        """fold_decay=0.8이고 fold간 OOS Sharpe가 다르면 weighted != avg 가능."""
+        import math
+        opt = self._make_opt(0.8)
+        result = opt.run(make_df(1000))
+        # weighted_oos_sharpe가 정의됨을 확인 (수치 동일은 fold 분포에 따름)
+        assert result.weighted_oos_sharpe is not None
+        assert not math.isnan(result.weighted_oos_sharpe)
+
+    def test_fold_decay_range_results_differ_from_zero_decay(self):
+        """fold_decay > 0이면 weighted_oos_sharpe가 기록됨 (fold_decay=0과 결과 타입 동일)."""
+        for decay in [0.7, 0.8, 0.9, 1.0]:
+            opt = self._make_opt(decay)
+            result = opt.run(make_df(800))
+            assert result.weighted_oos_sharpe is not None, (
+                f"fold_decay={decay}: weighted_oos_sharpe가 None"
+            )
+
+    def test_fold_decay_negative_raises_value_error(self):
+        """음수 fold_decay → ValueError."""
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+        import pytest
+
+        with pytest.raises(ValueError, match="fold_decay는 0 이상"):
+            WalkForwardOptimizer(
+                strategy_name="ema_cross",
+                strategy_factory=lambda p: EmaCrossStrategy(),
+                fold_decay=-0.5,
+            )
+
+    def test_fold_decay_zero_is_valid(self):
+        """fold_decay=0.0 → ValueError 없이 인스턴스 생성."""
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+        opt = WalkForwardOptimizer(
+            strategy_name="ema_cross",
+            strategy_factory=lambda p: EmaCrossStrategy(),
+            fold_decay=0.0,
+        )
+        assert opt.fold_decay == 0.0

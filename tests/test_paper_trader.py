@@ -193,9 +193,99 @@ def test_partial_fill_records_actual_quantity():
         if result["status"] == "partial":
             partial_fills += 1
             assert result["actual_quantity"] <= result["requested_quantity"]
-    
+
     # 확률 50%이므로 일부는 부분체결될 것으로 예상
     assert partial_fills > 0
+
+
+# ── [E1] Cycle 199: SL/TP 청산 조건 검증 ─────────────────────────────────────
+
+class TestPaperTraderSLTP:
+    """PaperTrader.check_sl_tp() — stop_loss/take_profit 청산 조건 단위 테스트."""
+
+    def _buy(self, pt, price=1000.0, qty=1.0):
+        pt.execute_signal(
+            "BTC/USDT", "BUY", price=price, quantity=qty,
+            strategy="setup", confidence="H",
+        )
+
+    def test_no_position_returns_no_hit(self):
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        result = pt.check_sl_tp("BTC/USDT", current_price=900.0, stop_loss=950.0)
+        assert result["hit"] is False
+        assert result["type"] is None
+        assert result["pnl"] is None
+
+    def test_stop_loss_hit_triggers_sell(self):
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp("BTC/USDT", current_price=900.0, stop_loss=950.0)
+        assert result["hit"] is True
+        assert result["type"] == "sl"
+        assert result["pnl"] is not None
+        assert result["pnl"] < 0  # SL → 손실
+        assert pt.account.positions.get("BTC/USDT", 0.0) == 0.0
+
+    def test_take_profit_hit_triggers_sell(self):
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp("BTC/USDT", current_price=1200.0, take_profit=1100.0)
+        assert result["hit"] is True
+        assert result["type"] == "tp"
+        assert result["pnl"] is not None
+        assert result["pnl"] > 0  # TP → 이익
+        assert pt.account.positions.get("BTC/USDT", 0.0) == 0.0
+
+    def test_price_between_sl_tp_no_hit(self):
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp(
+            "BTC/USDT", current_price=1050.0,
+            stop_loss=950.0, take_profit=1200.0,
+        )
+        assert result["hit"] is False
+        assert pt.account.positions.get("BTC/USDT", 0.0) > 0.0
+
+    def test_sl_exactly_at_price(self):
+        """current_price == stop_loss → SL 발동."""
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp("BTC/USDT", current_price=950.0, stop_loss=950.0)
+        assert result["hit"] is True
+        assert result["type"] == "sl"
+
+    def test_tp_exactly_at_price(self):
+        """current_price == take_profit → TP 발동."""
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp("BTC/USDT", current_price=1100.0, take_profit=1100.0)
+        assert result["hit"] is True
+        assert result["type"] == "tp"
+
+    def test_sl_takes_priority_over_tp_when_both_set_and_sl_hit(self):
+        """current_price < sl < tp: SL이 우선."""
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt, price=1000.0)
+        result = pt.check_sl_tp(
+            "BTC/USDT", current_price=800.0,
+            stop_loss=900.0, take_profit=1200.0,
+        )
+        assert result["hit"] is True
+        assert result["type"] == "sl"
+
+    def test_no_sl_no_tp_never_hits(self):
+        pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0)
+        self._buy(pt)
+        result = pt.check_sl_tp("BTC/USDT", current_price=500.0)
+        assert result["hit"] is False
 
 
 def test_summary_includes_slippage_stats():

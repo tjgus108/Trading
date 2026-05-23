@@ -163,6 +163,11 @@ class WalkForwardOptimizer:
                         양수면 w_i = exp(fold_decay * i) (i가 클수록 최근 fold).
                         weighted_oos_sharpe 계산에만 사용; PASS/FAIL은 avg_oos_sharpe 기준.
         """
+        if fold_decay < 0:
+            raise ValueError(
+                f"fold_decay는 0 이상이어야 합니다 (음수면 초기 fold에 가중치, 비직관적). "
+                f"입력값: {fold_decay}. 권장 범위: 0.0 (균일) ~ 1.0 (최근 강조)."
+            )
         self.strategy_name = strategy_name
         self.strategy_factory = strategy_factory
         self.n_windows = n_windows

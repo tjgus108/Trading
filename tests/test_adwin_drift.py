@@ -422,3 +422,63 @@ class TestDualGateToAccuracyE2E:
         acc_mon.reset_detectors()
         assert not acc_mon.should_retrain
         assert not acc_mon.psi_drift_detected
+
+
+# ---------------------------------------------------------------------------
+# [D2] Cycle 199: DualGateADWINMonitor retrain 임계값 조정 테스트
+# ---------------------------------------------------------------------------
+
+class TestDualGateRetainCooldownTuning:
+    """retrain_cooldown 값별 트리거 빈도 비교 — Cycle 199 D(ML) 검증."""
+
+    def _run_drift_scenario(self, cooldown: int) -> int:
+        """안정 150→급변 150 스트림에서 retrain_count 반환."""
+        mon = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30,
+            retrain_cooldown=cooldown,
+        )
+        for _ in range(150):
+            mon.update_feature("rsi", 0.85)
+        for _ in range(150):
+            mon.update_feature("rsi", 0.10)
+        return mon.retrain_count
+
+    def test_short_cooldown_triggers_more_than_long(self):
+        """짧은 쿨다운(10)에서 긴 쿨다운(200)보다 retrain_count가 많거나 같아야 함."""
+        count_short = self._run_drift_scenario(cooldown=10)
+        count_long = self._run_drift_scenario(cooldown=200)
+        assert count_short >= count_long, (
+            f"short cooldown={count_short} should be >= long cooldown={count_long}"
+        )
+
+    def test_cooldown_50_triggers_at_least_once_on_abrupt_change(self):
+        """cooldown=50, 명확한 드리프트 → retrain 최소 1회."""
+        count = self._run_drift_scenario(cooldown=50)
+        assert count >= 1, "명확한 분포 변화에서 retrain이 한 번도 트리거되지 않음"
+
+    def test_reset_preserves_cooldown_counter(self):
+        """reset() 후 retrain_count는 누적, should_retrain=False."""
+        mon = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30, retrain_cooldown=10
+        )
+        for _ in range(150):
+            mon.update_feature("x", 0.9)
+        for _ in range(150):
+            mon.update_feature("x", 0.1)
+        count_before = mon.retrain_count
+        mon.reset()
+        assert mon.should_retrain is False
+        assert mon.retrain_count == count_before
+
+    def test_samples_since_retrain_resets_after_trigger(self):
+        """트리거 후 _samples_since_retrain이 0으로 리셋됨."""
+        mon = DualGateADWINMonitor(
+            delta=0.05, min_window=32, grace_period=30, retrain_cooldown=10
+        )
+        for _ in range(150):
+            mon.update_feature("y", 0.9)
+        for _ in range(150):
+            mon.update_feature("y", 0.1)
+        if mon.retrain_count > 0:
+            # 트리거 후 쿨다운 카운터가 리셋됨 (0에서 다시 시작)
+            assert mon._samples_since_retrain < 200

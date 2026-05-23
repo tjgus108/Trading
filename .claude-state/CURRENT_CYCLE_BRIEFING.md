@@ -1,32 +1,39 @@
 # Current Cycle Briefing
 
-_Cycle 198 — C(데이터) + B(리스크) + F(리서치)_
-_Date: 2026-05-23_
+_Updated: 2026-05-23 — Cycle 199 완료_
 
-## 완료된 작업
+## 현재 상태
 
-### C(데이터)
-1. **DataFeed stale cache 개선** (`src/data/feed.py`):
-   - `fetch()` except 블록: fallback_exchange_ids 구성 시 오류 타입 무관하게 stale cache 시도
-   - 기존: transient error만 시도 → 개선: fallback 소진 후도 stale cache 복구
-2. **신규 테스트 3개** (`tests/test_feed_error_handling.py`):
-   - `TestFallbackExhaustedStaleCacheFallback` 클래스
+| 항목 | 값 |
+|------|-----|
+| 완료 사이클 | Cycle 199 |
+| 다음 사이클 | Cycle 200 |
+| 카테고리 | A(품질) + C(데이터) + F(리서치) |
+| 테스트 수 | 7785 passed, 23 skipped |
+| PASS 전략 수 | 22개 (QUALITY_AUDIT.csv) |
+| SIM 결과 | 0/5 Bundle OOS PASS, 0/22 Paper SIM PASS (합성 데이터) |
 
-### B(리스크)
-1. **CircuitBreaker 동시 시나리오 3개** (`tests/test_circuit_breaker.py`):
-   - rapid_decline + consecutive_losses 동시 발생 (cooldown 우선)
-   - 쿨다운 만료 후 rapid_decline 이어받기
-   - rapid_decline + ATR 급등 우선순위
-2. **VolTargeting + DrawdownMonitor 결합 4개** (`tests/test_vol_targeting.py`):
-   - NORMAL/WARN/BLOCK_ENTRY 단계별 size_multiplier 정확성 검증
+## Cycle 199 변경 요약
 
-### F(리서치)
-- narrow_range OOS 0거래 원인: 4h 합성 GBM에서 NR7 패턴 거의 미발생
-- value_area 실데이터 검증 1순위 (합성 4h OOS 4/9 PASS)
-- 실데이터 없이 전략 판정 불가 확인 → 로컬 환경 DataFeed fallback 필수
+### 버그 수정
+- `src/exchange/paper_trader.py`: BUY 잔액 부족 체크를 타임아웃 이전으로 이동
+  → `test_buy_insufficient_balance_rejected` 비결정적 실패(1%) 완전 해결
 
-## 다음 사이클 (Cycle 199)
-- 199 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)**
-- D: WalkForwardOptimizer fold_decay 범위 축소, RegimeAwareFeatureBuilder 피처 중요도
-- E: PaperTrader 청산 조건 검증, ImplShortfall 단위 테스트
-- F: value_area 실데이터 OOS 우선, narrow_range NR4 완화 검토
+### 기능 추가
+- `src/exchange/paper_trader.py`: `check_sl_tp()` 메서드
+  → stop_loss/take_profit 도달 시 자동 SELL 실행
+
+### 검증 강화
+- `src/backtest/walk_forward.py`: `fold_decay < 0` → ValueError (권장 범위 0.0~1.0)
+
+### 테스트 +18개
+- `TestPaperTraderSLTP` (8개): SL/TP 청산 케이스
+- `TestFoldDecayNarrowRange` (4개): fold_decay 0.7~1.0 범위 smoke test
+- `TestDualGateRetainCooldownTuning` (4개): cooldown 값별 트리거 빈도 비교
+- fold_decay 음수/0 검증 (2개)
+
+## 다음 사이클 우선순위 (Cycle 200)
+
+1. **A(품질)**: elder_impulse fold 1 PASS 원인 분석 + BacktestEngine 엣지 케이스
+2. **C(데이터)**: narrow_range NR7→NR4 신호 빈도 코드 분석
+3. **F(리서치)**: elder_impulse + wick_reversal 공통 PASS fold 특성 분석

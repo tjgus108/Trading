@@ -205,6 +205,12 @@ class PaperTrader:
         if price <= 0:
             return {"status": "rejected", "reason": "price must be positive"}
 
+        # 잔액 사전 체크 — 타임아웃/슬리피지 계산 전에 수행 (결정론적 거부)
+        if action == "BUY":
+            est_cost = price * quantity * (1 + self.fee_rate)
+            if est_cost > self.account.balance:
+                return {"status": "rejected", "reason": "insufficient balance"}
+
         # 타임아웃 체크
         if random.random() < self.timeout_prob:
             return {"status": "timeout", "reason": "simulated timeout", "symbol": symbol}
@@ -358,6 +364,49 @@ class PaperTrader:
             if dd > max_dd:
                 max_dd = dd
         return max_dd * 100.0  # 퍼센트 반환
+
+    def check_sl_tp(
+        self,
+        symbol: str,
+        current_price: float,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+    ) -> dict:
+        """현재가 기준 stop_loss/take_profit 조건 도달 여부 확인.
+
+        포지션이 없거나 SL/TP 미지정이면 {"hit": False}를 반환.
+        조건 도달 시 자동으로 SELL 신호를 실행한다.
+
+        Returns:
+            {"hit": bool, "type": "sl"|"tp"|None, "pnl": float|None}
+        """
+        position_qty = self.account.positions.get(symbol, 0.0)
+        if position_qty <= 0:
+            return {"hit": False, "type": None, "pnl": None}
+
+        hit_type = None
+        if stop_loss is not None and current_price <= stop_loss:
+            hit_type = "sl"
+        elif take_profit is not None and current_price >= take_profit:
+            hit_type = "tp"
+
+        if hit_type is None:
+            return {"hit": False, "type": None, "pnl": None}
+
+        result = self.execute_signal(
+            symbol=symbol,
+            action="SELL",
+            price=current_price,
+            quantity=position_qty,
+            strategy="sl_tp",
+            confidence="AUTO",
+        )
+        return {
+            "hit": True,
+            "type": hit_type,
+            "pnl": result.get("pnl"),
+            "status": result.get("status"),
+        }
 
     def reset(self) -> None:
         """계좌 초기화 (테스트용)"""
