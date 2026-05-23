@@ -882,17 +882,33 @@ class DualGateADWINMonitor:
 
         Returns:
             bool: 어느 게이트든 드리프트 감지 시 True.
+
+        Note:
+            update_feature() / update_model_output()은 각 호출마다
+            _samples_since_retrain을 +1 한다. 이 메서드가 N개 피처 + 모델 출력을
+            한 번에 처리하면 N+1번 증가 → cooldown이 N+1배 빨리 만료되는 버그 발생.
+            배치 내 retrain 미트리거 시 카운터를 pre+1로 보정해 1 sample = 1 증가를 유지.
         """
+        pre_count = self._samples_since_retrain
+        pre_retrain = self._retrain_count
         any_drift = False
+        n_updates = 0
 
         if feature_values:
             for name, val in feature_values.items():
                 if self.update_feature(name, val):
                     any_drift = True
+                n_updates += 1
 
         if model_proba is not None:
             if self.update_model_output(model_proba):
                 any_drift = True
+            n_updates += 1
+
+        # 배치 호출 시 N+1 과잉 증가 보정: retrain 미트리거 시만 적용
+        # retrain 트리거 시 _trigger_retrain()이 카운터를 0으로 리셋했으므로 건드리지 않음
+        if n_updates > 1 and self._retrain_count == pre_retrain:
+            self._samples_since_retrain = pre_count + 1
 
         return any_drift
 

@@ -509,3 +509,37 @@ def test_rolling_mdd_resets_on_reset():
     m.update(8000)
     m.reset()
     assert m.rolling_mdd() == 0.0
+
+
+# ── [B1] Cycle 201: to_dict/from_dict 복원 후 rolling_mdd 정확성 ──────────────
+
+def test_to_dict_includes_equity_history():
+    """to_dict()가 _equity_history를 포함해야 한다."""
+    m = DrawdownMonitor(rolling_window=10)
+    for eq in [10000, 9800, 9600, 10100]:
+        m.update(eq)
+    d = m.to_dict()
+    assert "_equity_history" in d
+    assert d["_equity_history"] == [10000.0, 9800.0, 9600.0, 10100.0]
+
+
+def test_from_dict_restores_rolling_mdd():
+    """from_dict() 복원 후 rolling_mdd()가 0이 아닌 올바른 값을 반환해야 한다."""
+    m = DrawdownMonitor(rolling_window=10)
+    for eq in [10000, 9500, 9200, 9800]:
+        m.update(eq)
+    expected_mdd = m.rolling_mdd()
+    assert expected_mdd > 0.0, "기준 rolling_mdd가 양수여야 함"
+
+    restored = DrawdownMonitor.from_dict(m.to_dict())
+    assert abs(restored.rolling_mdd() - expected_mdd) < 1e-9
+
+
+def test_from_dict_without_equity_history_key_is_safe():
+    """이전 버전 직렬화 데이터(_equity_history 키 없음)도 안전하게 복원."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    d = m.to_dict()
+    del d["_equity_history"]
+    restored = DrawdownMonitor.from_dict(d)
+    assert restored.rolling_mdd() == 0.0

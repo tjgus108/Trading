@@ -605,6 +605,7 @@ class DrawdownMonitor:
             "_consecutive_losses": self._consecutive_losses,
             "_cooldown_until": self._cooldown_until,
             "_single_loss_cooldown_until": self._single_loss_cooldown_until,
+            "_equity_history": list(self._equity_history),
         }
 
     @classmethod
@@ -637,6 +638,8 @@ class DrawdownMonitor:
         obj._consecutive_losses = data.get("_consecutive_losses", 0)
         obj._cooldown_until = data.get("_cooldown_until", 0.0)
         obj._single_loss_cooldown_until = data.get("_single_loss_cooldown_until", 0.0)
+        for eq in data.get("_equity_history", []):
+            obj._equity_history.append(float(eq))
         return obj
 
 

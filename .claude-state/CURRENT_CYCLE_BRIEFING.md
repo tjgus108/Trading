@@ -1,6 +1,6 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-23 — Cycle 200 완료_
+_Updated: 2026-05-23 — Cycle 201 완료 (B+D+F)_
 
 ## 현재 상태
 

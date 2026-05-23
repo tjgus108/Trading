@@ -183,8 +183,11 @@ def test_timeout_returns_timeout_status():
 
 
 def test_partial_fill_records_actual_quantity():
-    """부분체결 시 actual_quantity가 요청 수량보다 작음"""
-    pt = PaperTrader(initial_balance=50000.0, partial_fill_prob=0.5,
+    """부분체결 시 actual_quantity가 요청 수량보다 작음.
+    initial_balance=300000: 20회 × 10BTC@1000 = 200000 비용, 잔액 충분히 확보.
+    P(0 partials | prob=0.5, n=20) = 2^-20 < 0.0001%
+    """
+    pt = PaperTrader(initial_balance=300000.0, partial_fill_prob=0.5,
                      timeout_prob=0.0)
     partial_fills = 0
     for _ in range(20):

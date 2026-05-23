@@ -1,5 +1,47 @@
 # Work Log
 
+## [2026-05-23] Cycle 201 — B(리스크) + D(ML) + F(리서치)
+
+**SIM 결과 요약:**
+- Bundle OOS 4h (합성): 0/5 PASS — GBM 랜덤워크 한계 지속 (동일 패턴)
+  - cmf: 0/9 fold PASS, Sharpe std 3.368 (IS 전부 음수)
+  - elder_impulse: 1/9 fold PASS (fold 1 OOS=3.794) — fold 1 반복 패턴
+  - wick_reversal: 2/9 fold PASS (fold 1=4.832, fold 8=0.372) — fold 8 OOS PF=1.141 < 1.5
+  - narrow_range: 0/9 trades — 4h 조건 미트리거 동일
+  - value_area: 4 fold PASS-like 있으나 OOS Sharpe std=6.589 > 1.5 → 불안정
+- Paper SIM 1h (합성): 0/22 PASS consistency
+  - Top: price_action_momentum (Sharpe 6.90, +52.22%), cmf (5.99, +46.21%)
+  - value_area: avg 6 trades (1h에서도 저거래)
+  - wick_reversal, volume_breakout, price_cluster: 1h에서도 0-1 trades
+
+**[B1] DrawdownMonitor.to_dict()/from_dict() 직렬화 버그 수정:**
+- `src/risk/drawdown_monitor.py`: `to_dict()`에 `_equity_history` 필드 추가
+- `from_dict()`에 `_equity_history` 복원 로직 추가 (이전 버전 호환: 키 없으면 빈 이력)
+- 기존 버그: 재시작 후 `rolling_mdd()` 항상 0.0 반환 → rolling_mdd_pct 필드 오염
+- 수정 후: 50개 equity 이력 복원 → 재시작 직후에도 정확한 rolling MDD 표시
+- 테스트 3개 추가: `test_to_dict_includes_equity_history`, `test_from_dict_restores_rolling_mdd`, `test_from_dict_without_equity_history_key_is_safe`
+
+**[D1] DualGateADWINMonitor.update() 배치 카운터 과잉 증가 버그 수정:**
+- `src/ml/drift_detector.py`: `update()` 메서드에 배치 보정 로직 추가
+- 기존 버그: N개 피처 배치 + 모델 출력 1개 → `_samples_since_retrain` N+1배 증가
+  - 예: 10 피처 배치 → cooldown=50이 실제 5 샘플 후 만료 (의도: 50 샘플)
+- 수정: retrain 미트리거 시 `_samples_since_retrain = pre_count + 1`로 보정
+- 개별 `update_feature()` / `update_model_output()` 호출은 기존 동작 유지 (하위 호환)
+- 테스트 3개 추가: `test_batch_update_counts_as_one_sample`, `test_batch_update_multiple_steps`, `test_single_feature_call_still_counts_one`
+
+**[E(기존)] test_partial_fill_records_actual_quantity flaky 테스트 수정:**
+- `tests/test_paper_trader.py`: initial_balance 50000 → 300000으로 증가
+- 기존 버그: 잔액 부족으로 20회 중 4-5회만 partial_fill 도달 → P(0 partials) = 6.25% flaky
+- 수정 후: 20회 모두 사용 가능, P(0 partials) = 2^-20 ≈ 0.0001%
+
+**[F] 리서치 인사이트 (Cycle 201 SIM 분석):**
+- fold 1 PASS 반복 (elder_impulse, wick_reversal): seed=42 GBM 고유 패턴, 실데이터와 무관
+- value_area OOS std=6.589 지속: 저거래(2-6 trades/fold) + GBM artifact → 파라미터 완화 필요하나 합성데이터로 불가
+- DualGateADWIN 버그 영향: 실전 5피처 사용 시 cooldown=50이 10 샘플 후 만료 → 과잉 retrain 가능성 있었음
+- 실데이터 없이 OOS 개선 한계 확인: 다음 우선순위는 로컬 환경에서 DataFeed fallback 활성화
+
+**테스트 통계:** 7788 → 7794 (신규 7개 추가 [3+3+1], 0 실패, 23 skipped)
+
 ## [2026-05-23] Cycle 200 — A(품질) + C(데이터) + F(리서치)
 
 **SIM 결과 요약:**
@@ -16131,6 +16173,140 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-23 10:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 20:04 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-23 20:04 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 20:04 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 20:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-23 20:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 20:23 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

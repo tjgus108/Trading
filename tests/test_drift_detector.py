@@ -664,3 +664,40 @@ class TestCombinedDriftRetrain:
         psi_val = acc_mon.check_feature_drift(shifted)
         assert psi_val > 0.2  # 심각한 PSI
         assert acc_mon.psi_drift_detected is True
+
+
+# ── [D1] Cycle 201: DualGateADWINMonitor.update() 배치 카운터 보정 ─────────────
+
+class TestDualGateADWINBatchCounterFix:
+    """update()로 N 피처를 배치 처리해도 _samples_since_retrain가 1만 증가해야 한다."""
+
+    def test_batch_update_counts_as_one_sample(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05, retrain_cooldown=50)
+
+        # 10개 피처를 배치 업데이트
+        feature_values = {f"f{i}": 0.5 for i in range(10)}
+        mon.update(feature_values=feature_values, model_proba=0.6)
+
+        # N=10 피처 + 1 모델출력 = 11번이 아닌 1번만 카운트되어야 함
+        assert mon._samples_since_retrain == 1
+
+    def test_batch_update_multiple_steps(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05, retrain_cooldown=50)
+
+        feature_values = {f"f{i}": 0.5 for i in range(5)}
+        for _ in range(10):
+            mon.update(feature_values=feature_values, model_proba=0.6)
+
+        # 10 스텝 → _samples_since_retrain == 10 (피처 수 무관)
+        assert mon._samples_since_retrain == 10
+
+    def test_single_feature_call_still_counts_one(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05, retrain_cooldown=50)
+
+        # 개별 호출: 각 호출이 1 샘플로 카운트되어야 함 (기존 동작 유지)
+        mon.update_feature("rsi", 0.5)
+        mon.update_feature("ema", 1.02)
+        assert mon._samples_since_retrain == 2
