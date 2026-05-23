@@ -1,38 +1,38 @@
 # Next Steps
 
-_Last updated: 2026-05-23 (Cycle 199 D+E+F 완료)_
+_Last updated: 2026-05-23 (Cycle 200 A+C+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 199 완료
-- 199 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
-- 다음 Cycle 200: **200 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+### 로테이션: Cycle 200 완료
+- 200 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
+- 다음 Cycle 201: **201 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
 
-### 🔥 Cycle 199 주요 성과
-- **E1 버그 수정**: PaperTrader.execute_signal() 잔액 사전 체크를 타임아웃 전으로 이동 → test_buy_insufficient_balance_rejected 비결정적 실패 수정
-- **E2 기능 추가**: PaperTrader.check_sl_tp() — SL/TP 도달 시 자동 SELL 실행
-- **D1 검증 강화**: WalkForwardOptimizer fold_decay 음수 ValueError 추가 (권장 범위 0.0~1.0 명시)
-- **테스트 18개 추가**: fold_decay 범위 검증, DualGateADWIN cooldown 비교, PaperTrader SL/TP 8개
+### 🔥 Cycle 200 주요 성과
+- **A1 개선**: BacktestEngine.run() atr=0 신호 무시 추적 → fail_reasons에 "atr=0 skipped N signal(s)" 추가
+  - narrow_range 4h 0거래 원인 진단 가능 (atr=0 vs 신호 자체 없음 구분)
+  - 테스트 3개 추가
+- **C1 개선**: DataFeed.fetch() stale cache fallback 성공 시 30초 TTL로 _cache 재저장
+  - 거래소 다운 시 반복 retry 방지 (30초마다 1회만 재시도)
 
-### 🎯 Cycle 200 권장 작업 (200 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 201 권장 작업 (201 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): Quality Assurance
-- `BacktestEngine.run()` 엣지 케이스 검토: 거래 0건 전략의 Sharpe/PF 반환 값 일관성
-- QUALITY_AUDIT.csv 재감사: `value_area`, `wick_reversal`의 IS Sharpe 수치 재확인
-  (IS Sharpe 높지만 OOS 전부 FAIL → IS 과최적화 가능성)
-- `elder_impulse` fold 1 PASS 구간 분석: 어느 시장 상황인지 확인 (상승 추세 구간 가능성)
+#### B(리스크): Risk Management
+- `DrawdownMonitor` 로직 검토: 현재 고점 기준 MDD 계산이 rolling vs. running 방식인지 확인
+- `KellySizer` 분수 Kelly 적용 여부 확인: full Kelly는 과대 포지션 위험 — half Kelly (0.5x) 설정 검토
+- `CircuitBreaker` 연속 손실 기반 룰: 현재 연속 손실 횟수 기준이 있는지, 없으면 추가 검토
 
-#### C(데이터): Data & Infrastructure
-- `DataFeed.fetch()` 캐시 TTL 정책 검토: 합성 fallback 시 캐시 갱신 여부
-- `RegimeAwareFeatureBuilder` 피처 중요도 출력 (합성 데이터 기준 feature_importances_)
-- `narrow_range` 신호 완화: NR7 → NR4 전환 시 4h fold당 예상 거래 수 계산 (코드 분석)
+#### D(ML): ML & Signals
+- `WalkForwardOptimizer` fold_decay 0.7 기본값 재검토: 합성 데이터에서 fold 1 bias 줄이는 방향
+- `DualGateADWINMonitor` retrain 빈도: cooldown=100 기준 실거래에서 적절한지 코드 분석
+- `RegimeAwareFeatureBuilder` feature_importances_ 출력 (합성 데이터 기준 어느 피처가 높은지)
 
 #### F(리서치): SIM 결과 기반
-- **elder_impulse + wick_reversal**: 두 전략이 fold 1 동시 PASS → 동일 구간 → 공통 특성 분석
-- **narrow_range 0거래**: NR7 조건이 4h 합성 데이터에서 왜 미트리거인지 코드 분석
-- **합성 vs 실데이터 갭**: IS Sharpe 음수(합성)이지만 IS Sharpe 양수(실데이터) 현상 원인 분석
+- **narrow_range NR4 전환 효과**: NR4 적용 시 4h fold당 예상 거래 수 분석 (NR7 조건 빈도 1/7 vs NR4 1/4)
+- **elder_impulse + wick_reversal fold 1 동시 PASS**: fold 1 구간 공통 특성 → 실데이터 확보 시 우선 검증 후보
+- **value_area OOS Sharpe std=6.589 지속**: 저거래(2-6 trades/fold) + GBM artifacts → 파라미터 조정 필요
 
 ### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 199)
 

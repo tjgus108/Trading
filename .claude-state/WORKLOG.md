@@ -1,5 +1,41 @@
 # Work Log
 
+## [2026-05-23] Cycle 200 — A(품질) + C(데이터) + F(리서치)
+
+**SIM 결과 요약:**
+- Bundle OOS 4h (합성): 0/5 PASS — IS Sharpe 전부 음수 (GBM 랜덤워크), 패턴 지속
+  - elder_impulse: 1/9 fold PASS (fold 1 OOS Sharpe=3.794, OOS PF=1.901) → 동일 구간 반복
+  - wick_reversal: 2/9 fold PASS (fold 1=4.832, fold 8=0.372 OOS PF=1.141) → fold 8은 PF 미달
+  - narrow_range: 9/9 fold 거래 0건 (min_oos_trades=3 미달), fold 2/7에 1-2 trades만
+  - value_area: 4 fold PASS 이지만 OOS Sharpe std=6.589 → 불안정 지속
+- Paper SIM 1h (합성): 0/22 PASS consistency
+  - 상위 합성 성과: price_action_momentum (Sharpe 6.90, +52.22%), cmf (Sharpe 5.99, +46.21%)
+  - narrow_range: avg 14 trades (1h에서는 신호 나옴, 4h에서만 0 trades)
+
+**[A1] BacktestEngine atr=0 신호 무시 추적 개선:**
+- `src/backtest/engine.py`: `run()` 에 `signals_skipped_atr0` 카운터 추가
+- atr=0 상태에서 신호 무시 시 `logger.debug` + 카운터 증가
+- 0거래 + 신호 무시 발생 시 `fail_reasons`에 `"atr=0 skipped N signal(s) — 포지션 미진입"` 추가
+- 진단 정확도 개선: "no trades generated"만으로는 atr=0 원인 불명이었던 문제 해소
+- 테스트 3개 추가: `test_atr0_signals_skipped_recorded_in_fail_reasons`, `test_atr0_no_skip_reason_when_no_signals`, `test_normal_atr_no_skip_reason`
+
+**[C1] DataFeed stale cache fallback 재저장 개선:**
+- `src/data/feed.py`: `fetch()` 에서 `_use_cache_fallback()` 성공 시 `_cache`에 30초 TTL로 재저장
+- 기존: stale 데이터 반환 후 캐시 미갱신 → 다음 호출도 full retry 사이클 반복 (3회 재시도)
+- 수정: `_cache[key] = (fallback, time.time() - cache_ttl + 30)` → 30초 동안 캐시 히트
+- 효과: 거래소 다운 시 30초마다 1회만 재시도, 나머지는 캐시 히트로 CPU/네트워크 절약
+
+**[F] 리서치 인사이트 (Cycle 200 SIM 분석):**
+- narrow_range 1h vs 4h 갭 확인: 1h avg 14 trades vs 4h 0 trades → 4h bar 기준 NR7+ATR축소 동시 충족 빈도 낮음
+  - NR4 전환 시 ~1.75x 더 많은 후보 발생 예상 (1/4 vs 1/7 base probability)
+  - ATR_THRESHOLD=0.85 추가 필터가 4h에서 더 강한 수축 요구
+- elder_impulse fold 1 PASS: IS Sharpe=-2.859 (GBM 랜덤워크), OOS PASS는 우연 가능성 높음
+  - 실데이터 없이 fold 1 구간 의미 판단 불가 — 실데이터 확보가 최우선
+- wick_reversal fold 8 OOS PF=1.141: PF < 1.5 → 실데이터 기준 미달
+- 합성 GBM의 구조적 한계: IS Sharpe 음수 → OOS std 해석 무의미, fold PASS는 우연/GBM 패턴 artifacts
+
+**테스트 통계:** 7785 → 7788 (신규 3개 추가, 0 실패, 23 skipped)
+
 ## [2026-05-23] Cycle 199 — D(ML) + E(실행) + F(리서치)
 
 **SIM 결과 요약:**
@@ -16028,6 +16064,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-23 05:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 10:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-23 10:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-23 10:12 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

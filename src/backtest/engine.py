@@ -135,6 +135,7 @@ class BacktestEngine:
         equity_curve = [balance]
         total_fees = 0.0
         total_slippage_cost = 0.0
+        signals_skipped_atr0 = 0  # 신호 생성됐으나 atr=0으로 포지션 미진입 횟수
 
         position = None  # {"side": "BUY"/"SELL", "entry": float, "sl": float, "tp": float, "size": float, "hold_candles": int, "raw_entry": float}
 
@@ -182,6 +183,12 @@ class BacktestEngine:
                 signal = strategy.generate(window)
                 if signal.action != Action.HOLD:
                     atr = candle["atr14"]
+                    if atr <= 0:
+                        signals_skipped_atr0 += 1
+                        logger.debug(
+                            "Signal %s skipped at idx=%d: atr14=0 (no position sizing possible)",
+                            signal.action.value, i,
+                        )
                     if atr > 0:
                         sl_dist = atr * self.atr_multiplier_sl
                         # Confidence 기반 리스크 배율 (HIGH=1.5%, MEDIUM=1%, LOW=0.5%)
@@ -232,7 +239,12 @@ class BacktestEngine:
             total_slippage_cost += slip
         equity_curve.append(balance)
 
-        return self._compute_metrics(strategy.name, trades, equity_curve, total_fees, total_slippage_cost)
+        result = self._compute_metrics(strategy.name, trades, equity_curve, total_fees, total_slippage_cost)
+        if not trades and signals_skipped_atr0 > 0:
+            reason = f"atr=0 skipped {signals_skipped_atr0} signal(s) — 포지션 미진입"
+            if reason not in result.fail_reasons:
+                result.fail_reasons.append(reason)
+        return result
 
     @staticmethod
     def apply_wfe(result: "BacktestResult", is_sharpe: float) -> "BacktestResult":

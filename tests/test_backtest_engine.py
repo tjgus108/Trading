@@ -683,3 +683,65 @@ def test_get_slippage_non_adaptive_returns_fixed():
     engine = BacktestEngine(slippage=0.003, adaptive_slippage=False)
     candle = pd.Series({"close": 100.0, "atr14": 5.0})
     assert engine._get_slippage(candle) == 0.003
+
+
+# ---------------------------------------------------------------------------
+# atr=0 신호 무시 추적 테스트 (Cycle 200 A1)
+# ---------------------------------------------------------------------------
+
+class ZeroAtrBuyStrategy(BaseStrategy):
+    """항상 BUY 신호를 반환하지만 atr14=0인 DataFrame을 사용하는 전략 시나리오."""
+    name = "zero_atr_buy"
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        return Signal(
+            action=Action.BUY,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test zero atr",
+            invalidation="none",
+        )
+
+
+def make_zero_atr_df(n: int = 200) -> pd.DataFrame:
+    """atr14=0인 테스트용 DataFrame (포지션 미진입 유도)."""
+    np.random.seed(0)
+    closes = 100.0 * np.cumprod(1 + np.random.randn(n) * 0.002)
+    highs = closes * 1.005
+    lows = closes * 0.995
+    atr14 = np.zeros(n)  # ATR=0 → 포지션 사이징 불가
+    return pd.DataFrame({"close": closes, "high": highs, "low": lows, "atr14": atr14})
+
+
+def test_atr0_signals_skipped_recorded_in_fail_reasons():
+    """atr=0으로 인해 신호가 무시되면 fail_reasons에 기록됨."""
+    engine = BacktestEngine()
+    df = make_zero_atr_df(n=200)
+    result = engine.run(ZeroAtrBuyStrategy(), df)
+    assert result.total_trades == 0
+    assert result.passed is False
+    # 신호 무시 기록이 fail_reasons에 포함되어야 함
+    atr_skip_reasons = [r for r in result.fail_reasons if "atr=0" in r]
+    assert len(atr_skip_reasons) == 1, f"Expected atr=0 skip reason, got: {result.fail_reasons}"
+    assert "skipped" in atr_skip_reasons[0]
+
+
+def test_atr0_no_skip_reason_when_no_signals():
+    """신호 자체가 없으면 atr=0 skip reason이 추가되지 않아야 함."""
+    engine = BacktestEngine()
+    df = make_zero_atr_df(n=200)
+    result = engine.run(HoldStrategy(), df)
+    assert result.total_trades == 0
+    atr_skip_reasons = [r for r in result.fail_reasons if "atr=0" in r]
+    assert len(atr_skip_reasons) == 0
+
+
+def test_normal_atr_no_skip_reason():
+    """정상 ATR에서는 atr=0 skip reason이 없어야 함."""
+    engine = BacktestEngine()
+    df = make_df(n=200)  # atr14=1.0
+    result = engine.run(AlwaysBuyStrategy(), df)
+    atr_skip_reasons = [r for r in result.fail_reasons if "atr=0" in r]
+    assert len(atr_skip_reasons) == 0

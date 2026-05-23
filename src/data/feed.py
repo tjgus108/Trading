@@ -315,6 +315,10 @@ class DataFeed:
                 fallback = self._use_cache_fallback(key)
                 if fallback:
                     self._fallback_count += 1
+                    # 재저장: 짧은 TTL(30s)로 캐시 갱신 → 반복 재시도 방지
+                    # 거래소가 계속 다운돼도 30초마다 1회만 retry, 나머지는 캐시 히트
+                    _STALE_REUSE_TTL = 30
+                    self._cache[key] = (fallback, time.time() - self._cache_ttl + _STALE_REUSE_TTL)
                     return fallback
 
             raise
