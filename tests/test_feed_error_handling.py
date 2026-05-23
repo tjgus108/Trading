@@ -297,5 +297,60 @@ class TestExchangeFallback:
         assert "okx" in feed._fallback_exchange_ids
 
 
+class TestFallbackExhaustedStaleCacheFallback:
+    """exchange fallback 전부 실패 시 stale cache로 복구하는 시나리오."""
+
+    _CANDLE = [[1704067200000, 42000, 42500, 41800, 42300, 100]]
+
+    def _make_feed_with_stale(self, fallback_ids=None):
+        """초기 성공 fetch로 stale cache를 채운 뒤, 이후 항상 실패하는 feed 반환."""
+        connector = MagicMock()
+        # 첫 호출: 성공 (stale cache 채움)
+        connector.fetch_ohlcv.return_value = self._CANDLE
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=fallback_ids or [])
+        feed.fetch("BTC/USDT", "1h", limit=1)
+        # 이후: connector 실패
+        connector.fetch_ohlcv.side_effect = TimeoutError("SSL blocked")
+        return feed
+
+    def test_all_fallbacks_fail_uses_stale_cache(self):
+        """primary + 모든 fallback 실패 → stale cache 반환."""
+        feed = self._make_feed_with_stale(fallback_ids=["binance", "okx"])
+        # force cache expiry
+        feed._cache.clear()
+
+        with patch.object(feed, "_fetch_public_ohlcv", side_effect=ValueError("no data")):
+            result = feed.fetch("BTC/USDT", "1h", limit=1)
+
+        assert result is not None
+        assert result.symbol == "BTC/USDT"
+        assert feed._fallback_count >= 1
+
+    def test_stale_cache_not_used_when_no_fallbacks_configured(self):
+        """fallback 목록이 비어있으면 non-transient error 시 stale cache 미사용."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._CANDLE
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=[])
+        feed.fetch("BTC/USDT", "1h", limit=1)
+        feed._cache.clear()
+        connector.fetch_ohlcv.side_effect = ValueError("fatal error")
+
+        with pytest.raises(ValueError):
+            feed.fetch("BTC/USDT", "1h", limit=1)
+
+    def test_transient_error_still_uses_stale_cache_without_fallbacks(self):
+        """fallback 없어도 transient error이면 stale cache 시도 (기존 동작 유지)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._CANDLE
+        feed = DataFeed(connector, max_retries=1, fallback_exchange_ids=[])
+        feed.fetch("BTC/USDT", "1h", limit=1)
+        feed._cache.clear()
+        connector.fetch_ohlcv.side_effect = TimeoutError("timeout")
+
+        result = feed.fetch("BTC/USDT", "1h", limit=1)
+        assert result is not None
+        assert feed._fallback_count >= 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -675,3 +675,91 @@ def test_rapid_decline_reset_by_reset_daily():
         current_balance=9000, peak_balance=10000, daily_start_balance=9000
     )
     assert result["triggered"] is False
+
+
+# ── 연속 손실 + rapid_decline 동시 발생 시나리오 ─────────────────
+
+def test_rapid_decline_and_consecutive_losses_simultaneous():
+    """rapid_decline + 연속 손실 쿨다운 동시 발생: 낙폭 체크가 우선."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=10,
+        max_consecutive_losses=2,
+        cooldown_periods=5,
+    )
+    # 연속 손실 2회 → 쿨다운 시작
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 5
+
+    # 동시에 rapid_decline 발생
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락
+
+    result = cb.check(
+        current_balance=9000, peak_balance=10000, daily_start_balance=10000
+    )
+    # 연속 손실 쿨다운이 rapid_decline보다 먼저 체크됨
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+
+
+def test_rapid_decline_triggers_after_cooldown_expires():
+    """연속 손실 쿨다운 만료 후 rapid_decline이 차단을 이어받음."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=5,
+        max_consecutive_losses=2,
+        cooldown_periods=2,
+    )
+    # 연속 손실 → 쿨다운 시작
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 2
+
+    # rapid_decline도 설정
+    cb.record_price(100.0)
+    cb.record_price(90.0)
+
+    # 쿨다운 만료
+    cb.tick_cooldown()
+    cb.tick_cooldown()
+    assert cb.cooldown_remaining == 0
+
+    # rapid_decline이 이어받아 차단
+    result = cb.check(
+        current_balance=9000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is True
+    assert "급속" in result["reason"]
+
+
+def test_rapid_decline_and_atr_surge_combined():
+    """rapid_decline 감지 + ATR 급등 동시: triggered=True (rapid_decline 우선)."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=5,
+        atr_surge_multiplier=2.0,
+    )
+    cb.record_price(100.0)
+    cb.record_price(90.0)
+
+    result = cb.check(
+        current_balance=9000,
+        peak_balance=10000,
+        daily_start_balance=10000,
+        current_atr=5.0,
+        baseline_atr=2.0,  # 2.5x surge
+    )
+    # rapid_decline이 ATR surge보다 우선 처리되어 triggered=True
+    assert result["triggered"] is True
+    assert "급속" in result["reason"]

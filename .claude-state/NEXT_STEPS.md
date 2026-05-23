@@ -1,64 +1,54 @@
 # Next Steps
 
-_Last updated: 2026-05-22 (Cycle 197 B+D+F 완료)_
+_Last updated: 2026-05-23 (Cycle 198 C+B+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 197 완료
-- 197 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
-- 다음 Cycle 198: **198 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)**
+### 로테이션: Cycle 198 완료
+- 198 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** 패턴 ✅
+- 다음 Cycle 199: **199 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
 
-### 🔥 Cycle 197 주요 성과
-- **DrawdownMonitor rolling_window 파라미터화**: `rolling_window: int = 50` 생성자 파라미터, to_dict/from_dict 완전 직렬화
-- **CircuitBreaker rapid_decline 경계 케이스 테스트 4개**: 정확히-threshold, 미달, cooldown 만료, reset_daily 초기화
-- **DrawdownMonitor + CircuitBreaker 통합 시나리오 테스트 4개**: 이중 게이트 패턴 검증
-- **WalkForwardTrainer 최소 데이터 요건 3개**: n<100 → FAIL, 경계 99샘플 mock 검증
-- **DualGateADWIN + AccuracyDriftMonitor 결합 retrain 4개**: 정확도 급락, 피처 분포 급변, cooldown, PSI
+### 🔥 Cycle 198 주요 성과
+- **DataFeed exchange fallback 소진 후 stale cache**: fallback_exchange_ids 구성 시 오류 타입 무관하게 stale cache 시도 (primary + 모든 fallback 실패 케이스 대응)
+- **CircuitBreaker 동시 발생 시나리오 3개**: rapid_decline + consecutive_losses, 쿨다운 만료 후 rapid_decline 이어받음, rapid_decline + ATR 급등 우선순위 확인
+- **VolTargeting + DrawdownMonitor 결합 4개**: NORMAL/WARN/BLOCK_ENTRY 전 단계에서 MDD size_multiplier가 vol_adjusted에 정확히 곱해지는 것 검증
 
-### 🎯 Cycle 198 권장 작업 (198 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 199 권장 작업 (199 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): Data & Infrastructure 개선
-- `DataFeed` fallback_exchanges 실제 동작 테스트 강화 (mock exchange로 bybit 차단 시나리오)
-- `OrderFlowAnalyzer` 또는 VPIN 정확도 검증 테스트 추가
-- WebSocket stale watchdog reconnection 타이밍 테스트
+#### D(ML): ML & Signals 개선
+- `WalkForwardOptimizer` fold_decay 파라미터 범위 좁히기 (현재 0.5~1.0 → 0.7~1.0 검토)
+- `RegimeAwareFeatureBuilder` 피처 중요도 분석 — 실데이터 없이 합성 데이터 기준이라도 feature_importances_ 출력
+- `DualGateADWIN` retrain 트리거 임계값 조정 테스트
 
-#### B(리스크): Risk Manager 추가 개선
-- `DrawdownMonitor.rolling_window` 파라미터 + `RiskManager` 통합 (reset_daily 전달)
-- `CircuitBreaker` 연속 손실 + rapid_decline 동시 발생 시나리오 테스트
-- `VolTargeting` ATR-기반 포지션 사이즈 + DrawdownMonitor size_multiplier 결합 테스트
+#### E(실행): Execution & Paper Trading
+- `PaperTrader` 포지션 청산 조건 검증 (stop_loss, take_profit 가격 도달 시 확실히 청산)
+- TWAP 실행기 슬리피지 모델 정확도 점검
+- `ImplShortfall` 계산 로직 단위 테스트
 
 #### F(리서치): 실 데이터 전략 검증 방법 연구
-- 로컬 환경 DataFeed fallback 활성화 절차 문서화
-- narrow_range 1h 신호 조건 완화 아이디어 (NR7→NR4, VOL_SPIKE_MULT 1.2→1.0 시 4h 신호 수 예측)
+- **value_area 실데이터 OOS 검증 우선**: 합성 데이터에서 4/9 fold PASS → 실데이터 기준 가장 유망
+- **narrow_range 신호 완화**: NR7 → NR4 전환 시 4h에서 거래 수 예측 (현재 0건)
+- **elder_impulse fold 1 분석**: 특정 시장 상황에서만 OOS PASS → 레짐 필터 추가 검토
 
-### 🔥 Cycle 195 주요 성과
-- **RollingOOSValidator PASS 경로 테스트**: mock BacktestEngine으로 all_passed=True 코드 패스 검증
-- **WalkForwardOptimizer fold_decay E2E**: fold_decay=1.0 실행 시 weighted_oos_sharpe 반환 확인
-- **RegimeAwareFeatureBuilder.build_with_cached_regime() 4개 테스트**: 정상/None/invalid/features_only 경로
-- **WebSocket stale watchdog**: _stale_watchdog() + asyncio.wait(FIRST_EXCEPTION) → 자동 재연결 트리거
-- **BacktestEngine PF 상한 999.99**: 손실 0건 fold의 무한대 PF 방지 (BundleOOS avg 정상화)
+### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 198)
 
-### 🔥 Cycle 194 주요 성과
-- **FeatureBuilder 온체인 피처**: exchange_netflow_norm + sopr_delta (선택적, Cycle 193 리서치 반영)
-- **KellySizer(rolling) + VolTargeting(EWMA) + PaperTrader 통합 테스트 5개**: E2E 검증
-- **RollingOOSValidator min_oos_trades=3**: 저거래 fold 집계 제외 → 더 정확한 전략 판정
-- **BundleOOSResult summary() 버그 수정**: 중복 oos_sharpe_std 라인 제거
-- **ML 트레이딩 프로덕션 배포 리서치**: PSI+Page-Hinkley drift 감지 + shadow→canary 파이프라인
+**Bundle OOS (4h) — 합성 데이터:**
+- 5/5 FAIL — IS Sharpe 전부 음수 (GBM 랜덤워크)
+- narrow_range: 9 fold 전부 OOS 거래 0건 → 신호 조건 너무 엄격
+- value_area: 4/9 PASS fold → 가장 안정적 (실데이터 검증 1순위)
+- OOS Sharpe std 3~6 (매우 불안정) → 합성 데이터 한계
+
+**Paper SIM (1h) — 합성 데이터:**
+- 0/22 PASS consistency — BTC=ETH=SOL 동일 패턴 (GBM 랜덤워크)
+- 합성 데이터 IS Sharpe 높은 전략: cmf(5.99), price_action_momentum(6.90)
+- **결론: 실제 Bybit 데이터 확보가 최우선 병목**
 
 ### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단 (원격 사이클에서는 합성 SIM만 가능)
 - DataFeed.DEFAULT_FALLBACK_EXCHANGES = ["binance", "okx", "bitget"] 준비됨
 - 로컬 환경에서 `DataFeed(connector, fallback_exchange_ids=DataFeed.DEFAULT_FALLBACK_EXCHANGES)` 활성화
-
-### ⚠️ 핵심 문제: 전략 전부 OOS FAIL (합성 데이터 한계 확인)
-
-**SIM 결과 패턴 (Cycle 195):**
-- Bundle OOS (4h): 5/5 FAIL — 합성 GBM 데이터에서 IS Sharpe 음수, OOS std 3~6 (불안정)
-- Paper SIM (1h): 22/22 FAIL consistency — BTC=ETH=SOL 동일 결과 (GBM 랜덤워크 특성)
-- narrow_range: OOS 0거래 (4h에서 신호 조건 너무 엄격)
-- **결론: 실제 Bybit 데이터 확보가 최우선 병목**
 
 ### 📋 Paper Trading 자동화 판정 기준
 
@@ -83,6 +73,7 @@ _Last updated: 2026-05-22 (Cycle 197 B+D+F 완료)_
 | value_area | 5.24 | 53% | 1.84 | 30 | 5.0% | RANGE |
 
 **⚠️ 위 수치는 IS(In-Sample) 성과. OOS 검증 시 전략 전부 FAIL.**
+**value_area → 합성 4h OOS에서 4/9 PASS → 실데이터 검증 최우선.**
 
 ---
 
@@ -92,5 +83,5 @@ _Last updated: 2026-05-22 (Cycle 197 B+D+F 완료)_
 
 ---
 
-**상태**: Cycle 196 완료 → Cycle 197 B(리스크) + D(ML) + F(리서치)
-**최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → WF 파라미터 최적화 + 실데이터 조합으로 OOS PASS 전략 발굴
+**상태**: Cycle 198 완료 → Cycle 199 D(ML) + E(실행) + F(리서치)
+**최우선 과제**: 로컬 환경에서 DataFeed fallback 활성화 → value_area 실데이터 OOS 검증

@@ -301,18 +301,22 @@ class DataFeed:
         except Exception as e:
             self._circuit_breaker.record_failure()  # Track failure
             self._last_error_time = time.time()
-            
-            # Transient 에러 시 캐시 폴백 시도
-            if _is_transient_error(e):
+
+            # Stale cache 시도 조건:
+            # - transient 에러: 네트워크 일시 장애 → stale 데이터로 대체
+            # - exchange fallback 구성됨: primary + 모든 fallback 거래소 실패 → 오류 종류 무관하게 stale 시도
+            should_try_cache = _is_transient_error(e) or bool(self._fallback_exchange_ids)
+            if should_try_cache:
                 logger.warning(
-                    "Fetch failed with transient error (%s): attempting cache fallback for %s %s",
+                    "Fetch failed (%s, error=%s): attempting cache fallback for %s %s",
+                    "transient" if _is_transient_error(e) else "fallback-exhausted",
                     type(e).__name__, symbol, timeframe
                 )
                 fallback = self._use_cache_fallback(key)
                 if fallback:
                     self._fallback_count += 1
                     return fallback
-            
+
             raise
 
     def _fetch_with_retry(self, symbol: str, timeframe: str, limit: int) -> DataSummary:

@@ -219,3 +219,109 @@ def test_ewma_adjust_returns_positive():
     df = _make_df(closes)
     result = vt.adjust(base_size=0.01, df=df)
     assert result > 0.0
+
+
+# ── VolTargeting + DrawdownMonitor 결합 시나리오 ─────────────────────────────────
+
+def _make_ohlcv_df(closes):
+    """close 기반 간단한 OHLCV DataFrame 생성."""
+    arr = np.asarray(closes, dtype=float)
+    return pd.DataFrame({
+        "open": arr * 0.999,
+        "high": arr * 1.002,
+        "low": arr * 0.998,
+        "close": arr,
+        "volume": np.ones(len(arr)) * 1000,
+    })
+
+
+def test_vol_targeting_combined_with_drawdown_normal():
+    """MDD NORMAL → size_multiplier=1.0. VolTargeting scalar만 반영."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    vt = VolTargeting(target_vol=0.20, annualization=1)
+    monitor = DrawdownMonitor()
+    monitor.update(10000)
+    monitor.update(9900)   # 1% 낙폭 → NORMAL
+
+    rng = np.random.default_rng(7)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_ohlcv_df(closes)
+
+    base_size = 0.05
+    vol_adjusted = vt.adjust(base_size, df)
+    mdd_multiplier = monitor.get_size_multiplier()
+
+    final_size = vol_adjusted * mdd_multiplier
+    assert mdd_multiplier == 1.0
+    assert final_size == vol_adjusted
+
+
+def test_vol_targeting_combined_with_drawdown_warn():
+    """MDD WARN → size_multiplier=0.5. VolTargeting * 0.5 적용."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    vt = VolTargeting(target_vol=0.20, annualization=1)
+    monitor = DrawdownMonitor(mdd_warn_pct=0.05)
+    monitor.update(10000)
+    monitor.update(9400)  # 6% 낙폭 → WARN
+
+    rng = np.random.default_rng(9)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_ohlcv_df(closes)
+
+    base_size = 0.05
+    vol_adjusted = vt.adjust(base_size, df)
+    mdd_multiplier = monitor.get_size_multiplier()
+
+    final_size = vol_adjusted * mdd_multiplier
+    assert mdd_multiplier == 0.5
+    assert abs(final_size - vol_adjusted * 0.5) < 1e-9
+
+
+def test_vol_targeting_combined_with_drawdown_block():
+    """MDD BLOCK_ENTRY → size_multiplier=0.0. 최종 포지션 0."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    vt = VolTargeting(target_vol=0.20, annualization=1)
+    monitor = DrawdownMonitor(mdd_block_pct=0.08)
+    monitor.update(10000)
+    monitor.update(9100)  # 9% 낙폭 → BLOCK_ENTRY
+
+    rng = np.random.default_rng(11)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.01, 25))
+    df = _make_ohlcv_df(closes)
+
+    base_size = 0.05
+    vol_adjusted = vt.adjust(base_size, df)
+    mdd_multiplier = monitor.get_size_multiplier()
+
+    final_size = vol_adjusted * mdd_multiplier
+    assert mdd_multiplier == 0.0
+    assert final_size == 0.0
+
+
+def test_vol_targeting_combined_high_vol_reduces_by_mdd():
+    """고변동성 구간: DrawdownMonitor WARN이 VolTargeting 결과를 50% 추가 감소."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    vt = VolTargeting(target_vol=0.20, max_scalar=2.0, min_scalar=0.1, annualization=1)
+    monitor = DrawdownMonitor(mdd_warn_pct=0.05)
+    monitor.update(10000)
+    monitor.update(9400)  # 6% → WARN
+
+    # 고변동성 구간 (std ~5%)
+    rng = np.random.default_rng(13)
+    closes = 100 * np.cumprod(1 + rng.normal(0, 0.05, 25))
+    df = _make_ohlcv_df(closes)
+
+    base_size = 0.10
+    vol_adjusted = vt.adjust(base_size, df)
+    mdd_multiplier = monitor.get_size_multiplier()
+
+    final_size = vol_adjusted * mdd_multiplier
+    # MDD WARN → multiplier=0.5, final은 vol_adjusted의 50%
+    assert mdd_multiplier == 0.5
+    assert abs(final_size - vol_adjusted * 0.5) < 1e-9
+    # MDD 없는 경우(mdd_multiplier=1.0)보다 항상 작음
+    assert final_size < vol_adjusted

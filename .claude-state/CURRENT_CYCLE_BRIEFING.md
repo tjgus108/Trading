@@ -1,30 +1,32 @@
 # Current Cycle Briefing
 
-_Cycle 197 — B(리스크) + D(ML) + F(리서치)_
-_Date: 2026-05-22_
+_Cycle 198 — C(데이터) + B(리스크) + F(리서치)_
+_Date: 2026-05-23_
 
 ## 완료된 작업
 
+### C(데이터)
+1. **DataFeed stale cache 개선** (`src/data/feed.py`):
+   - `fetch()` except 블록: fallback_exchange_ids 구성 시 오류 타입 무관하게 stale cache 시도
+   - 기존: transient error만 시도 → 개선: fallback 소진 후도 stale cache 복구
+2. **신규 테스트 3개** (`tests/test_feed_error_handling.py`):
+   - `TestFallbackExhaustedStaleCacheFallback` 클래스
+
 ### B(리스크)
-1. **DrawdownMonitor rolling_window 파라미터화**: `__init__`에 `rolling_window: int = 50` 추가. `to_dict()`/`from_dict()`도 직렬화/복원 완전 지원.
-2. **CircuitBreaker rapid_decline 경계 테스트 4개**: 정확히-threshold 트리거, threshold 미달 미트리거, cooldown 정확 만료, reset_daily 초기화.
-3. **DrawdownMonitor + CircuitBreaker 이중 게이트 통합 테스트 4개**: rolling_window E2E, 직렬화 보존, halt→차단 흐름, 이중 게이트 패턴.
+1. **CircuitBreaker 동시 시나리오 3개** (`tests/test_circuit_breaker.py`):
+   - rapid_decline + consecutive_losses 동시 발생 (cooldown 우선)
+   - 쿨다운 만료 후 rapid_decline 이어받기
+   - rapid_decline + ATR 급등 우선순위
+2. **VolTargeting + DrawdownMonitor 결합 4개** (`tests/test_vol_targeting.py`):
+   - NORMAL/WARN/BLOCK_ENTRY 단계별 size_multiplier 정확성 검증
 
-### D(ML)
-1. **WalkForwardTrainer 최소 데이터 3개**: 30캔들→FAIL, 300캔들→min_check PASS, n=99 mock→경계 검증.
-2. **DualGateADWIN + AccuracyDriftMonitor 결합 4개**: 정확도 급락, 피처 분포 급변, cooldown 재트리거 방지, PSI > 0.2 드리프트.
+### F(리서치)
+- narrow_range OOS 0거래 원인: 4h 합성 GBM에서 NR7 패턴 거의 미발생
+- value_area 실데이터 검증 1순위 (합성 4h OOS 4/9 PASS)
+- 실데이터 없이 전략 판정 불가 확인 → 로컬 환경 DataFeed fallback 필수
 
-### F(리서치) — SIM 분석 + narrow_range 원인 파악
-- **Paper SIM (합성 GBM)**: 22/22 FAIL, 일관성 0/8 (GBM 랜덤워크 한계)
-- **Bundle OOS (4h)**:
-  - narrow_range 0거래 **원인 파악**: NR7(7봉) + ATR≤85% + Volume≥1.2x 3중 필터가 4h에서 동시 충족 극히 드묾
-  - **권고**: NR4로 완화, ATR_THRESHOLD=0.95, VOL_SPIKE_MULT=1.0 (1h에서 검증 후 판단)
-  - value_area OOS std 6.589: 합성 데이터에서 fold별 편차 크고 실 데이터 필요
-
-## 테스트 현황
-- 7753 passed, 17 skipped (Cycle 197 추가 +15개)
-
-## 다음 사이클 (198)
-- C(데이터): DataFeed fallback 테스트, WebSocket reconnection 타이밍
-- B(리스크): VolTargeting + DrawdownMonitor 결합, CircuitBreaker 동시 발생 시나리오
-- F(리서치): narrow_range 1h 파라미터 조정 후 예상 신호 수 계산
+## 다음 사이클 (Cycle 199)
+- 199 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)**
+- D: WalkForwardOptimizer fold_decay 범위 축소, RegimeAwareFeatureBuilder 피처 중요도
+- E: PaperTrader 청산 조건 검증, ImplShortfall 단위 테스트
+- F: value_area 실데이터 OOS 우선, narrow_range NR4 완화 검토
