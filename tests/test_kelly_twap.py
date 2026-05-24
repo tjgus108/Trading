@@ -229,10 +229,10 @@ class TestTWAPExecutor:
         assert required == actual, f"Missing fields: {required - actual}"
 
     def test_twap_slippage_default(self):
-        """daily_volume 없으면 기본값 0.0005 반환."""
+        """daily_volume 없으면 Bybit taker 0.055% 기본값 반환."""
         executor = TWAPExecutor()
         slip = executor.estimate_slippage(qty=1.0, price=50_000.0)
-        assert slip == 0.0005
+        assert slip == 0.00055
 
     def test_twap_total_qty_preserved(self):
         """TWAPResult.total_qty가 입력 total_qty와 일치."""

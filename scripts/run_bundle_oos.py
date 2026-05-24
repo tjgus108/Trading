@@ -314,6 +314,39 @@ def run_bundle_oos(
     return results
 
 
+def format_is_diagnosis(results: list[tuple[str, BundleOOSResult]]) -> str:
+    """IS Sharpe 음수 fold 자동 진단 섹션 생성."""
+    lines = ["## IS Sharpe 음수 진단\n"]
+    lines.append("| Strategy | 음수 IS fold | 전체 fold | 음수 비율 | 진단 |")
+    lines.append("|----------|-------------|-----------|----------|------|")
+    all_negative_strategies = []
+    for name, r in results:
+        if not r.folds:
+            lines.append(f"| {name} | - | 0 | - | 데이터 부족 |")
+            continue
+        neg_count = sum(1 for f in r.folds if f.is_sharpe < 0)
+        total = len(r.folds)
+        ratio = neg_count / total
+        if ratio >= 1.0:
+            diag = "⚠️ IS 전부 음수 (GBM 합성 또는 전략 미작동)"
+            all_negative_strategies.append(name)
+        elif ratio >= 0.7:
+            diag = "🔴 IS 대부분 음수 (불안정)"
+        elif ratio >= 0.3:
+            diag = "🟡 IS 일부 음수"
+        else:
+            diag = "🟢 IS 대체로 양수"
+        lines.append(f"| {name} | {neg_count} | {total} | {ratio:.0%} | {diag} |")
+
+    if all_negative_strategies:
+        lines.append(
+            f"\n**경고**: {', '.join(all_negative_strategies)} 전략은 IS Sharpe 전부 음수 → "
+            "실거래소 데이터 검증 필요 (GBM 합성 데이터 한계)"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def generate_report(
     results: list[tuple[str, BundleOOSResult]],
     symbol: str,
@@ -334,6 +367,9 @@ def generate_report(
     failed = [name for name, r in results if not r.all_passed]
     lines.append(f"\n**PASS: {len(passed)}/5** ({', '.join(passed) if passed else 'none'})")
     lines.append(f"**FAIL: {len(failed)}/5** ({', '.join(failed) if failed else 'none'})\n")
+
+    # IS 음수 진단 섹션
+    lines.append(format_is_diagnosis(results))
 
     # Fold별 상세
     lines.append("## Fold Details\n")

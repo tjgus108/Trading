@@ -293,7 +293,7 @@ class TWAPExecutor:
             슬리피지 비율 (소수, e.g. 0.001 = 0.1%). 항상 양수 (불리한 방향).
         """
         if daily_volume is None or daily_volume <= 0:
-            base = 0.0005
+            base = 0.00055  # Bybit taker fee 0.055% — PaperTrader fee_rate와 일관성
         else:
             ratio = qty / daily_volume
             base = 0.1 * float(np.sqrt(ratio))

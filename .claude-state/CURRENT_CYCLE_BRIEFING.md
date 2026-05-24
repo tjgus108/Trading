@@ -1,47 +1,44 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-24 — Cycle 203 완료 (C+B+F)_
+_Updated: 2026-05-24 — Cycle 204 완료 (D+E+F)_
 
 ## 현재 상태
 
 | 항목 | 값 |
 |------|-----|
-| 완료 사이클 | Cycle 203 |
-| 다음 사이클 | Cycle 204 |
-| 카테고리 | D(ML) + E(실행) + F(리서치) |
-| 테스트 수 | 361 passed (관련 테스트만, 전체 7800+) |
+| 완료 사이클 | Cycle 204 |
+| 다음 사이클 | Cycle 205 |
+| 카테고리 | A(품질) + C(데이터) + F(리서치) |
+| 테스트 수 | 7800 passed |
 | PASS 전략 수 | 22개 (QUALITY_AUDIT.csv) |
 | SIM 결과 | 0/5 Bundle OOS PASS, 0/22 Paper SIM PASS (합성 데이터) |
 
-## Cycle 203 변경 요약
+## Cycle 204 변경 요약
 
-### C1 개선: DataFeed._fetch_public_ohlcv() SSL 재시도
-- `src/data/feed.py`: SSL 오류(ccxt.NetworkError, "ssl"/"certificate") → `verify=False` 재시도
-- 원격 SSL 인터셉션 환경에서 fallback 거래소 접근 가능성 향상
+### D1 개선: run_bundle_oos.py IS 음수 fold 자동 진단 섹션
+- `scripts/run_bundle_oos.py`: `format_is_diagnosis()` 함수 추가 → `generate_report()` 통합
+- fold별 IS Sharpe 음수 비율 자동 집계: ⚠️ 전부음수 / 🔴 대부분 / 🟡 일부 / 🟢 양호
+- IS 전부 음수 전략 목록 자동 경고 → GBM 합성 한계 자동 진단
 
-### B1 문서화: DrawdownMonitor.get_size_multiplier()
-- `src/risk/drawdown_monitor.py`: streak cooldown 만료 후에도 size 0.5 유지 이유 주석
-- 의도: "시간 경과가 아닌 실적으로 신뢰 회복" — win 발생 시에만 복원
+### E1 개선: TWAPExecutor.estimate_slippage() 기본값 조정
+- `src/exchange/twap.py`: `daily_volume=None` 시 기본 슬리피지 0.0005 → 0.00055
+- Bybit taker 0.055% & PaperTrader fee_rate=0.00055 일관성 확보
+- 테스트 `test_twap_slippage_default` 기대값 업데이트
 
-### B2 문서화: manager.py CircuitBreaker 중복 상황
-- `src/risk/manager.py`: circuit_breaker.py(미사용)와의 관계 및 통합 시 주의사항 명시
+## SIM 결과 주요 패턴 (Cycle 204)
 
-## SIM 결과 주요 패턴 (Cycle 203)
-
-- Paper SIM 1h (합성, GBM): 0/22 PASS — GBM 한계, Cycle 202와 동일
-  - price_action_momentum: avg Sharpe=6.90 (합성 과적합), 0/8 consistency
-  - elder_impulse: avg Sharpe=1.32 (22개 중 최저) → 실데이터 PASS 유력 후보
+- Paper SIM 1h (합성, GBM): 0/22 PASS (동일 패턴)
+  - price_action_momentum: avg Sharpe=6.90 (과적합), cmf: 5.99
+  - elder_impulse: avg Sharpe=1.32 (최저) → 실데이터 PASS 유력 후보
 - Bundle OOS 4h (합성): 0/5 PASS
-  - cmf: IS Sharpe 전부 음수, avg OOS=-4.356
-  - elder_impulse fold 1 PASS (OOS=3.794, 반복 패턴)
-  - wick_reversal fold 1,8 PASS
-  - narrow_range: 0 trades 지속 (NR7+ATR 4h 미트리거)
-  - value_area: OOS std=6.589 불안정
+  - IS 음수 진단: cmf(9/9), elder_impulse(8/9), wick_reversal(9/9) fold 음수
+  - narrow_range: 0 trades 지속 (min_oos_trades=3 전체 제외)
+  - value_area: OOS std=6.589, fold 0(OOS=3.559), fold 6(OOS=9.516) 강한 편차
 
-## 다음 사이클 우선순위 (Cycle 204, 204 mod 5 = 4)
+## 다음 사이클 우선순위 (Cycle 205, 205 mod 5 = 0)
 
-**D(ML) + E(실행) + F(리서치)**
+**A(품질) + C(데이터) + F(리서치)**
 
-1. **D(ML)**: WalkForwardOptimizer fail_reasons 보고서 노출, get_feature_importance() 활용
-2. **E(실행)**: TWAP 파라미터 점검, 슬리피지 모델 확인
-3. **F(리서치)**: narrow_range 0 trades 원인 분석, value_area std 축소 방안
+1. **A(품질)**: format_is_diagnosis() 단위 테스트, value_area va_mult 범위 축소 검토
+2. **C(데이터)**: narrow_range NarrowRange 전략 파라미터 확인, DataFeed SSL 재시도 테스트
+3. **F(리서치)**: elder_impulse fold 2 IS양수→OOS급락 원인 분석, value_area 상위 fold 패턴
