@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-24T10:07:40.419981Z_
+_Generated: 2026-05-24T15:38:57.226928Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -16,6 +16,18 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
 **PASS: 0/5** (none)
 **FAIL: 5/5** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
+
+## IS Sharpe 음수 진단
+
+| Strategy | 음수 IS fold | 전체 fold | 음수 비율 | 진단 |
+|----------|-------------|-----------|----------|------|
+| cmf | 9 | 9 | 100% | ⚠️ IS 전부 음수 (GBM 합성 또는 전략 미작동) |
+| elder_impulse | 8 | 9 | 89% | 🔴 IS 대부분 음수 (불안정) |
+| wick_reversal | 9 | 9 | 100% | ⚠️ IS 전부 음수 (GBM 합성 또는 전략 미작동) |
+| narrow_range | 5 | 9 | 56% | 🟡 IS 일부 음수 |
+| value_area | 5 | 9 | 56% | 🟡 IS 일부 음수 |
+
+**경고**: cmf, wick_reversal 전략은 IS Sharpe 전부 음수 → 실거래소 데이터 검증 필요 (GBM 합성 데이터 한계)
 
 ## Fold Details
 
@@ -77,9 +89,9 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | 3 | -2.597 | 0.000 | 0.000 | 0.000 | 0 | 1.25% | 0.00% | FAIL |
 | 4 | -2.597 | 0.000 | 0.000 | 0.000 | 0 | 1.25% | 0.00% | FAIL |
 | 5 | -2.597 | 0.000 | 0.000 | 0.000 | 0 | 1.25% | 0.00% | FAIL |
-| 6 | 2.303 | 4.231 | 1.837 | 999.990 | 1 | 0.09% | 0.13% | PASS |
-| 7 | 3.201 | -6.737 | -2.105 | 0.000 | 2 | 0.13% | 2.49% | FAIL |
-| 8 | 0.103 | 0.000 | 0.000 | 0.000 | 0 | 2.49% | 0.00% | FAIL |
+| 6 | 2.303 | 5.981 | 2.597 | 999.990 | 2 | 0.09% | 0.14% | PASS |
+| 7 | 3.937 | -6.737 | -1.711 | 0.000 | 2 | 0.14% | 2.49% | FAIL |
+| 8 | 1.573 | 0.000 | 0.000 | 0.000 | 0 | 2.49% | 0.00% | FAIL |
 
 **Fail reasons:** 모든 fold 거래 없음 (min_oos_trades=3): folds=[0, 1, 2, 3, 4, 5, 6, 7, 8]
 

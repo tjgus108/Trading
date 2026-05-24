@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-05-24T10:13:25.467589Z_
+_Generated: 2026-05-24T15:38:27.572753Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T10:09:09.500290Z_
+_Generated: 2026-05-24T15:33:19.219202Z_
 _Symbol: BTC/USDT_
 _Data Source: Synthetic GBM x8640 (BTC/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -78,7 +78,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T10:11:17.045123Z_
+_Generated: 2026-05-24T15:35:54.218899Z_
 _Symbol: ETH/USDT_
 _Data Source: Synthetic GBM x8640 (ETH/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -149,7 +149,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T10:13:25.465878Z_
+_Generated: 2026-05-24T15:38:27.570868Z_
 _Symbol: SOL/USDT_
 _Data Source: Synthetic GBM x8640 (SOL/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_

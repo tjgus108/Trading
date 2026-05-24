@@ -21,6 +21,13 @@ class NarrowRangeStrategy(BaseStrategy):
     VOL_SPIKE_MULT = 1.2
     ATR_THRESHOLD = 0.85  # 평균의 85% 이하
 
+    def __init__(self, nr_lookback: int = 5, **kwargs):
+        """
+        Args:
+            nr_lookback: NR lookback 기간 (NR5=5, NR7=7). 4h봉 신호 부족 완화를 위해 기본 5.
+        """
+        self.nr_lookback = max(4, int(nr_lookback))  # 최소 4봉 (NR4 확인용)
+
     def _is_nr(self, ranges: pd.Series, idx: int, n: int) -> bool:
         """idx번 봉이 최근 n봉 중 최소 range인지 확인."""
         if idx < n - 1:
@@ -33,23 +40,23 @@ class NarrowRangeStrategy(BaseStrategy):
             return self._hold(df, f"데이터 부족: {len(df)} < {self.MIN_ROWS}")
 
         # current = 마지막 완성봉 (iloc[-2])
-        # prev    = 그 이전 봉 (iloc[-3]) → NR7 후보
+        # prev    = 그 이전 봉 (iloc[-3]) → NR 후보
         curr_idx = len(df) - 2  # 완성봉
-        prev_idx = curr_idx - 1  # NR7 후보봉
+        prev_idx = curr_idx - 1  # NR 후보봉
 
-        if prev_idx < 6:
-            return self._hold(df, "NR7 판단에 필요한 이전 봉 부족")
+        if prev_idx < self.nr_lookback - 1:
+            return self._hold(df, f"NR{self.nr_lookback} 판단에 필요한 이전 봉 부족")
 
         ranges = df["high"] - df["low"]
 
-        # prev봉이 NR7, NR4 확인
-        is_nr7 = self._is_nr(ranges, prev_idx, 7)
+        # prev봉이 NR(lookback), NR4 확인
+        is_nr7 = self._is_nr(ranges, prev_idx, self.nr_lookback)
         is_nr4 = self._is_nr(ranges, prev_idx, 4)
 
         if not is_nr7:
             return self._hold(
                 df,
-                f"NR7 조건 미충족: prev_range={float(ranges.iloc[prev_idx]):.4f}",
+                f"NR{self.nr_lookback} 조건 미충족: prev_range={float(ranges.iloc[prev_idx]):.4f}",
             )
 
         # ATR 축소 확인 (NR 기간 ATR이 평균보다 작은지)

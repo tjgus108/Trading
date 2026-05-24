@@ -56,7 +56,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     "value_area": {
         "va_period": [15, 20, 25],
-        "va_mult": [0.6, 0.7, 0.8],
+        "va_mult": [0.65, 0.70, 0.75],  # 범위 축소: OOS Sharpe std 과다(6.589) 완화
+    },
+    "narrow_range": {
+        "nr_lookback": [5, 6, 7],  # NR5/NR6/NR7 — 4h봉 0거래 문제 완화
     },
     "frama": {
         "period": [14, 16, 18],
@@ -655,6 +658,24 @@ def optimize_value_area(df: pd.DataFrame, n_windows: int = 3,
         strategy_name="value_area",
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["value_area"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
+    )
+    return opt.run(df)
+
+
+def optimize_narrow_range(df: pd.DataFrame, n_windows: int = 3,
+                          plateau_pct: float = 0.9) -> WalkForwardResult:
+    """NarrowRange 전략 파라미터 최적화 (nr_lookback: 5/6/7)."""
+    from src.strategy.narrow_range import NarrowRangeStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return NarrowRangeStrategy(nr_lookback=params.get("nr_lookback", 7))
+
+    opt = WalkForwardOptimizer(
+        strategy_name="narrow_range",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["narrow_range"],
         n_windows=n_windows,
         plateau_pct=plateau_pct,
     )

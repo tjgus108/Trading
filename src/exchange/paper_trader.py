@@ -205,11 +205,15 @@ class PaperTrader:
         if price <= 0:
             return {"status": "rejected", "reason": "price must be positive"}
 
-        # 잔액 사전 체크 — 타임아웃/슬리피지 계산 전에 수행 (결정론적 거부)
+        # 결정론적 거부 체크 — 타임아웃/슬리피지 계산 전에 수행
         if action == "BUY":
             est_cost = price * quantity * (1 + self.fee_rate)
             if est_cost > self.account.balance:
                 return {"status": "rejected", "reason": "insufficient balance"}
+        elif action == "SELL":
+            held = self.account.positions.get(symbol, 0.0)
+            if held <= 0:
+                return {"status": "rejected", "reason": "no position to sell"}
 
         # 타임아웃 체크
         if random.random() < self.timeout_prob:

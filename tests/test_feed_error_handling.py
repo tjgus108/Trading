@@ -352,5 +352,76 @@ class TestFallbackExhaustedStaleCacheFallback:
         assert feed._fallback_count >= 1
 
 
+class TestFetchPublicOhlcvSSLRetry:
+    """_fetch_public_ohlcv SSL 오류 → verify=False 재시도 로직 단위 테스트."""
+
+    _CANDLE = [[1704067200000, 42000, 42500, 41800, 42300, 100]]
+
+    @pytest.mark.skipif(ccxt is None, reason="ccxt not installed")
+    def test_ssl_error_retries_with_verify_false(self):
+        """SSL NetworkError 발생 시 verify=False 인스턴스로 재시도한다."""
+        connector = MagicMock()
+        feed = DataFeed(connector)
+
+        ssl_exc = ccxt.NetworkError("SSL certificate verification failed")
+        mock_ex_ssl = MagicMock()
+        mock_ex_ssl.fetch_ohlcv.return_value = self._CANDLE
+        mock_ex_no_ssl = MagicMock()
+        mock_ex_no_ssl.fetch_ohlcv.return_value = self._CANDLE
+
+        def exchange_factory(config=None):
+            config = config or {}
+            if config.get("verify") is False:
+                return mock_ex_no_ssl
+            mock_ex_ssl.fetch_ohlcv.side_effect = ssl_exc
+            return mock_ex_ssl
+
+        with patch.object(ccxt, "binance", side_effect=exchange_factory):
+            result = feed._fetch_public_ohlcv("binance", "BTC/USDT", "1h", 1)
+
+        assert result == self._CANDLE
+        mock_ex_no_ssl.fetch_ohlcv.assert_called_once()
+
+    @pytest.mark.skipif(ccxt is None, reason="ccxt not installed")
+    def test_non_ssl_error_not_retried(self):
+        """SSL 관련이 아닌 에러는 verify=False 재시도 없이 바로 raise."""
+        connector = MagicMock()
+        feed = DataFeed(connector)
+
+        non_ssl_exc = ValueError("bad symbol")
+        mock_ex = MagicMock()
+        mock_ex.fetch_ohlcv.side_effect = non_ssl_exc
+
+        with patch.object(ccxt, "binance", return_value=mock_ex):
+            with pytest.raises(ValueError):
+                feed._fetch_public_ohlcv("binance", "BTC/USDT", "1h", 1)
+
+        # fetch_ohlcv는 1회만 호출 (재시도 없음)
+        mock_ex.fetch_ohlcv.assert_called_once()
+
+    @pytest.mark.skipif(ccxt is None, reason="ccxt not installed")
+    def test_certificate_error_string_triggers_ssl_retry(self):
+        """에러 메시지에 'certificate'이 포함되면 verify=False 재시도."""
+        connector = MagicMock()
+        feed = DataFeed(connector)
+
+        cert_exc = ccxt.NetworkError("certificate verify failed: unable to get local issuer")
+        mock_ex_ssl = MagicMock()
+        mock_ex_no_ssl = MagicMock()
+        mock_ex_no_ssl.fetch_ohlcv.return_value = self._CANDLE
+
+        def exchange_factory(config=None):
+            config = config or {}
+            if config.get("verify") is False:
+                return mock_ex_no_ssl
+            mock_ex_ssl.fetch_ohlcv.side_effect = cert_exc
+            return mock_ex_ssl
+
+        with patch.object(ccxt, "binance", side_effect=exchange_factory):
+            result = feed._fetch_public_ohlcv("binance", "BTC/USDT", "1h", 1)
+
+        assert result == self._CANDLE
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

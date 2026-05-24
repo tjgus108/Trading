@@ -1,44 +1,55 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-24 — Cycle 204 완료 (D+E+F)_
+_Updated: 2026-05-24 — Cycle 205 완료 (A+C+F)_
 
 ## 현재 상태
 
 | 항목 | 값 |
 |------|-----|
-| 완료 사이클 | Cycle 204 |
-| 다음 사이클 | Cycle 205 |
-| 카테고리 | A(품질) + C(데이터) + F(리서치) |
-| 테스트 수 | 7800 passed |
+| 완료 사이클 | Cycle 205 |
+| 다음 사이클 | Cycle 206 |
+| 카테고리 | B(리스크) + D(ML) + F(리서치) |
+| 테스트 수 | 7803 passed |
 | PASS 전략 수 | 22개 (QUALITY_AUDIT.csv) |
 | SIM 결과 | 0/5 Bundle OOS PASS, 0/22 Paper SIM PASS (합성 데이터) |
 
-## Cycle 204 변경 요약
+## Cycle 205 변경 요약
 
-### D1 개선: run_bundle_oos.py IS 음수 fold 자동 진단 섹션
-- `scripts/run_bundle_oos.py`: `format_is_diagnosis()` 함수 추가 → `generate_report()` 통합
-- fold별 IS Sharpe 음수 비율 자동 집계: ⚠️ 전부음수 / 🔴 대부분 / 🟡 일부 / 🟢 양호
-- IS 전부 음수 전략 목록 자동 경고 → GBM 합성 한계 자동 진단
+### A1 버그 수정: PaperTrader SELL 포지션 체크
+- `src/exchange/paper_trader.py`: SELL 포지션 없음 사전 체크 추가 (timeout 이전)
+- 수정 전: `timeout_prob=0.01` 확률로 "timeout" 반환 → `test_sell_no_position_rejected` 간헐적 실패
+- 수정 후: 결정론적 거부 → 테스트 안정화
 
-### E1 개선: TWAPExecutor.estimate_slippage() 기본값 조정
-- `src/exchange/twap.py`: `daily_volume=None` 시 기본 슬리피지 0.0005 → 0.00055
-- Bybit taker 0.055% & PaperTrader fee_rate=0.00055 일관성 확보
-- 테스트 `test_twap_slippage_default` 기대값 업데이트
+### A2 DEFAULT_GRIDS value_area 범위 축소
+- `src/backtest/walk_forward.py`: va_mult [0.6, 0.7, 0.8] → [0.65, 0.70, 0.75]
+- OOS Sharpe std=6.589 완화 목적
 
-## SIM 결과 주요 패턴 (Cycle 204)
+### A3 NarrowRangeStrategy lookback 파라미터화
+- `src/strategy/narrow_range.py`: `nr_lookback` 파라미터 추가 (기본값 5, 이전 하드코딩 7)
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS narrow_range 추가 + `optimize_narrow_range()` 함수
+- 4h OOS 거래 수 소폭 개선 (fold 6: 1→2건)
+
+### C1 DataFeed SSL retry 단위 테스트 추가
+- `tests/test_feed_error_handling.py`: `TestFetchPublicOhlcvSSLRetry` 클래스 (3개 테스트)
+  - SSL NetworkError → verify=False 재시도 확인
+  - 비-SSL 에러는 재시도 없음 확인
+  - "certificate" 문자열 에러 재시도 확인
+
+## SIM 결과 주요 패턴 (Cycle 205)
 
 - Paper SIM 1h (합성, GBM): 0/22 PASS (동일 패턴)
-  - price_action_momentum: avg Sharpe=6.90 (과적합), cmf: 5.99
-  - elder_impulse: avg Sharpe=1.32 (최저) → 실데이터 PASS 유력 후보
+  - price_action_momentum: avg Sharpe=6.90, cmf: 5.99
+  - elder_impulse: avg Sharpe=1.32, 28 trades (실데이터 후보)
 - Bundle OOS 4h (합성): 0/5 PASS
-  - IS 음수 진단: cmf(9/9), elder_impulse(8/9), wick_reversal(9/9) fold 음수
-  - narrow_range: 0 trades 지속 (min_oos_trades=3 전체 제외)
-  - value_area: OOS std=6.589, fold 0(OOS=3.559), fold 6(OOS=9.516) 강한 편차
+  - narrow_range: nr_lookback=5로도 min_oos_trades=3 미달
+    → ATR_THRESHOLD 완화(0.85→0.90) 또는 min_oos_trades 2로 하향 검토
+  - elder_impulse fold 1 PASS (OOS=3.794)
+  - wick_reversal fold 1,8 PASS
 
-## 다음 사이클 우선순위 (Cycle 205, 205 mod 5 = 0)
+## 다음 사이클 우선순위 (Cycle 206, 206 mod 5 = 1)
 
-**A(품질) + C(데이터) + F(리서치)**
+**B(리스크) + D(ML) + F(리서치)**
 
-1. **A(품질)**: format_is_diagnosis() 단위 테스트, value_area va_mult 범위 축소 검토
-2. **C(데이터)**: narrow_range NarrowRange 전략 파라미터 확인, DataFeed SSL 재시도 테스트
-3. **F(리서치)**: elder_impulse fold 2 IS양수→OOS급락 원인 분석, value_area 상위 fold 패턴
+1. **B(리스크)**: DrawdownMonitor Kelly Sizer 파라미터 검토, CircuitBreaker 개선
+2. **D(ML)**: RF 모델 피처 중요도 분석 또는 앙상블 가중치 검토
+3. **F(리서치)**: narrow_range ATR_THRESHOLD 완화 효과 측정, elder_impulse 실데이터 검증 방안
