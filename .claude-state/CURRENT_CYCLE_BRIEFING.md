@@ -1,53 +1,47 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-24 — Cycle 202 완료 (B+D+F)_
+_Updated: 2026-05-24 — Cycle 203 완료 (C+B+F)_
 
 ## 현재 상태
 
 | 항목 | 값 |
 |------|-----|
-| 완료 사이클 | Cycle 202 |
-| 다음 사이클 | Cycle 203 |
-| 카테고리 | C(데이터) + B(리스크) + F(리서치) |
-| 테스트 수 | 7801 passed, 23 skipped |
+| 완료 사이클 | Cycle 203 |
+| 다음 사이클 | Cycle 204 |
+| 카테고리 | D(ML) + E(실행) + F(리서치) |
+| 테스트 수 | 361 passed (관련 테스트만, 전체 7800+) |
 | PASS 전략 수 | 22개 (QUALITY_AUDIT.csv) |
 | SIM 결과 | 0/5 Bundle OOS PASS, 0/22 Paper SIM PASS (합성 데이터) |
 
-## Cycle 202 변경 요약
+## Cycle 203 변경 요약
 
-### D1 개선: WalkForwardOptimizer IS 전체 음수 진단
-- `src/backtest/walk_forward.py`: `run()` 내 avg IS Sharpe < -0.5 시 fail_reasons 추가
-- `"IS 전체 음수: avg IS Sharpe=X.XXX — 전략 미작동 또는 합성 데이터(GBM)"` 메시지
-- GBM 합성 데이터에서 cmf/wick_reversal/elder_impulse IS 전부 음수 패턴 자동 진단
+### C1 개선: DataFeed._fetch_public_ohlcv() SSL 재시도
+- `src/data/feed.py`: SSL 오류(ccxt.NetworkError, "ssl"/"certificate") → `verify=False` 재시도
+- 원격 SSL 인터셉션 환경에서 fallback 거래소 접근 가능성 향상
 
-### D2 개선: RegimeAwareFeatureBuilder.get_feature_importance()
-- `src/ml/features.py`: RF 50트리 빠른 fit으로 레짐별 피처 중요도 dict 반환
-- 사용법: `builder.get_feature_importance(df, regime="bull")` → `{feature: importance}`
-- 합성 데이터 vs 실데이터 피처 중요도 비교에 활용 예정
+### B1 문서화: DrawdownMonitor.get_size_multiplier()
+- `src/risk/drawdown_monitor.py`: streak cooldown 만료 후에도 size 0.5 유지 이유 주석
+- 의도: "시간 경과가 아닌 실적으로 신뢰 회복" — win 발생 시에만 복원
 
-### B1 검증: KellySizer ATR low 케이스 테스트
-- `tests/test_kelly_sizer_regime_edge_cases.py`: `test_atr_low_does_not_expand_size` 추가
-- ATR 낮을 때 포지션 확대 없음 (min(target_atr/atr, 1.0) = 1.0) 의도적 보수적 설계 검증
+### B2 문서화: manager.py CircuitBreaker 중복 상황
+- `src/risk/manager.py`: circuit_breaker.py(미사용)와의 관계 및 통합 시 주의사항 명시
 
-### 테스트 +6개
-- `test_all_is_sharpe_negative_adds_fail_reason` (walk_forward)
-- `TestGetFeatureImportance.*` 4개 (feature_builder)
-- `test_atr_low_does_not_expand_size` (kelly_sizer)
+## SIM 결과 주요 패턴 (Cycle 203)
 
-## SIM 결과 주요 패턴 (Cycle 202)
+- Paper SIM 1h (합성, GBM): 0/22 PASS — GBM 한계, Cycle 202와 동일
+  - price_action_momentum: avg Sharpe=6.90 (합성 과적합), 0/8 consistency
+  - elder_impulse: avg Sharpe=1.32 (22개 중 최저) → 실데이터 PASS 유력 후보
+- Bundle OOS 4h (합성): 0/5 PASS
+  - cmf: IS Sharpe 전부 음수, avg OOS=-4.356
+  - elder_impulse fold 1 PASS (OOS=3.794, 반복 패턴)
+  - wick_reversal fold 1,8 PASS
+  - narrow_range: 0 trades 지속 (NR7+ATR 4h 미트리거)
+  - value_area: OOS std=6.589 불안정
 
-- Paper SIM 1h (합성, GBM): 0/22 PASS — GBM 한계, 결과 Cycle 201과 동일
-  - price_action_momentum: avg Sharpe=6.90, +52.22% (합성 과적합)
-  - cmf: avg Sharpe=5.99, +46.21% (합성 과적합)
-  - value_area: avg 6 trades, Consistency 0/8 → 신호 조건 여전히 엄격
-- Bundle OOS 4h (합성): 0/5 PASS — IS 전부 음수 (새 fail_reason으로 진단됨)
-  - elder_impulse fold 1: OOS Sharpe=3.794 (반복 패턴, GBM 특정 구간)
-  - wick_reversal fold 8: OOS PF=1.141 < 1.5 기준 미달
+## 다음 사이클 우선순위 (Cycle 204, 204 mod 5 = 4)
 
-## 다음 사이클 우선순위 (Cycle 203, 203 mod 5 = 3)
+**D(ML) + E(실행) + F(리서치)**
 
-**C(데이터) + B(리스크) + F(리서치)**
-
-1. **C(데이터)**: DataFeed retry/fallback 파라미터 점검, OrderFlowAnalyzer VPIN 정확도
-2. **B(리스크)**: DrawdownMonitor streak cooldown 만료 후 size 복원 동작 문서화
-3. **F(리서치)**: get_feature_importance() 활용하여 합성 vs 실데이터 피처 중요도 비교 계획
+1. **D(ML)**: WalkForwardOptimizer fail_reasons 보고서 노출, get_feature_importance() 활용
+2. **E(실행)**: TWAP 파라미터 점검, 슬리피지 모델 확인
+3. **F(리서치)**: narrow_range 0 trades 원인 분석, value_area std 축소 방안

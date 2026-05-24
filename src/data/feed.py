@@ -606,14 +606,26 @@ class DataFeed:
     def _fetch_public_ohlcv(
         self, exchange_id: str, symbol: str, timeframe: str, limit: int
     ) -> list:
-        """공개 API로 OHLCV 조회 (인증 불필요). 실패 시 예외 발생."""
+        """공개 API로 OHLCV 조회 (인증 불필요). SSL 오류 시 verify=False로 재시도."""
         if ccxt is None:
             raise RuntimeError("ccxt not available for public fallback")
         exchange_class = getattr(ccxt, exchange_id, None)
         if exchange_class is None:
             raise ValueError(f"Unknown exchange: {exchange_id}")
         ex = exchange_class({"enableRateLimit": True, "timeout": 15000})
-        raw = ex.fetch_ohlcv(symbol, timeframe, limit=limit)
+        try:
+            raw = ex.fetch_ohlcv(symbol, timeframe, limit=limit)
+        except Exception as first_exc:
+            # SSL 인터셉션 환경에서 인증서 검증 실패 시 verify=False로 재시도
+            if isinstance(first_exc, (ccxt.NetworkError,)) or "ssl" in str(first_exc).lower() or "certificate" in str(first_exc).lower():
+                logger.info(
+                    "DataFeed: SSL error on %s fallback, retrying with verify=False",
+                    exchange_id,
+                )
+                ex_no_ssl = exchange_class({"enableRateLimit": True, "timeout": 15000, "verify": False})
+                raw = ex_no_ssl.fetch_ohlcv(symbol, timeframe, limit=limit)
+            else:
+                raise
         if not raw:
             raise ValueError(f"No OHLCV data from {exchange_id} for {symbol}")
         return raw

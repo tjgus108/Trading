@@ -48,7 +48,13 @@ class RiskResult:
 
 
 class CircuitBreaker:
-    """하드코딩된 서킷 브레이커. LLM 판단 없이 규칙으로만 동작."""
+    """하드코딩된 서킷 브레이커. LLM 판단 없이 규칙으로만 동작.
+
+    Note: circuit_breaker.py의 CircuitBreaker는 더 복잡한 기능(rapid_decline,
+    ATR surge, correlation throttle, tick_cooldown 등)을 갖추고 있지만 현재
+    미사용 상태. orchestrator.py는 이 클래스를 사용. 통합 검토 시 이 클래스를
+    circuit_breaker.py로 교체하거나 인터페이스를 맞춰야 함.
+    """
 
     def __init__(
         self,

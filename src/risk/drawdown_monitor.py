@@ -309,6 +309,11 @@ class DrawdownMonitor:
         - 연속 손실 >= threshold: 0.5 (50% 축소, streak_cooldown 중에도 유지)
         - MDD 단계별: get_mdd_size_multiplier() 결과
         - 정상: 1.0
+
+        Note: streak cooldown(_cooldown_until) 만료 후에도 consecutive_losses가
+        loss_streak_threshold 이상이면 0.5 유지. size 복원은 오직 win 발생 시
+        record_trade() → consecutive_losses 초기화를 통해서만 이루어짐.
+        (의도적 보수적 설계 — 시간 경과가 아닌 실적으로 신뢰 회복)
         """
         if self.is_in_cooldown():
             return 0.0
