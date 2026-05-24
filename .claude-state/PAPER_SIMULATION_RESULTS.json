@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated": "2026-05-24T15:38:27.573120Z",
+    "generated": "2026-05-24T20:24:25.507430Z",
     "symbols": [
       "BTC/USDT",
       "ETH/USDT",
@@ -1370,6 +1370,110 @@
         ]
       },
       {
+        "name": "narrow_range",
+        "overall_passed": false,
+        "consistency_score": 0.0,
+        "passed_windows": 0,
+        "total_windows": 8,
+        "avg_sharpe": 0.8265,
+        "avg_return": 0.026212,
+        "avg_max_dd": 0.06475,
+        "avg_profit_factor": 1.3772,
+        "avg_trades": 15.2,
+        "avg_win_rate": 0.437,
+        "avg_final_balance": 10262.12,
+        "window_results": [
+          {
+            "window": 1,
+            "sharpe": 3.359,
+            "total_return": 0.0926,
+            "max_dd": 0.0699,
+            "profit_factor": 1.81,
+            "trades": 21,
+            "win_rate": 0.5238,
+            "passed": false,
+            "final_balance": 10926.0
+          },
+          {
+            "window": 2,
+            "sharpe": -5.311,
+            "total_return": -0.0987,
+            "max_dd": 0.1243,
+            "profit_factor": 0.315,
+            "trades": 14,
+            "win_rate": 0.1429,
+            "passed": false,
+            "final_balance": 9013.0
+          },
+          {
+            "window": 3,
+            "sharpe": 3.029,
+            "total_return": 0.0876,
+            "max_dd": 0.062,
+            "profit_factor": 1.711,
+            "trades": 22,
+            "win_rate": 0.5,
+            "passed": false,
+            "final_balance": 10875.999999999998
+          },
+          {
+            "window": 4,
+            "sharpe": -1.509,
+            "total_return": -0.0261,
+            "max_dd": 0.0738,
+            "profit_factor": 0.731,
+            "trades": 11,
+            "win_rate": 0.3636,
+            "passed": false,
+            "final_balance": 9739.0
+          },
+          {
+            "window": 5,
+            "sharpe": -0.173,
+            "total_return": -0.0038,
+            "max_dd": 0.0495,
+            "profit_factor": 1.01,
+            "trades": 11,
+            "win_rate": 0.4545,
+            "passed": false,
+            "final_balance": 9962.0
+          },
+          {
+            "window": 6,
+            "sharpe": 3.5,
+            "total_return": 0.0757,
+            "max_dd": 0.0545,
+            "profit_factor": 2.231,
+            "trades": 13,
+            "win_rate": 0.5385,
+            "passed": false,
+            "final_balance": 10757.000000000002
+          },
+          {
+            "window": 7,
+            "sharpe": 0.225,
+            "total_return": 0.003,
+            "max_dd": 0.0577,
+            "profit_factor": 1.086,
+            "trades": 13,
+            "win_rate": 0.3846,
+            "passed": false,
+            "final_balance": 10029.999999999998
+          },
+          {
+            "window": 8,
+            "sharpe": 3.492,
+            "total_return": 0.0794,
+            "max_dd": 0.0263,
+            "profit_factor": 2.124,
+            "trades": 17,
+            "win_rate": 0.5882,
+            "passed": false,
+            "final_balance": 10794.0
+          }
+        ]
+      },
+      {
         "name": "roc_ma_cross",
         "overall_passed": false,
         "consistency_score": 0.0,
@@ -1990,110 +2094,6 @@
             "win_rate": 0,
             "passed": false,
             "final_balance": 10000
-          }
-        ]
-      },
-      {
-        "name": "narrow_range",
-        "overall_passed": false,
-        "consistency_score": 0.0,
-        "passed_windows": 0,
-        "total_windows": 8,
-        "avg_sharpe": -0.3789,
-        "avg_return": -0.007025,
-        "avg_max_dd": 0.0697,
-        "avg_profit_factor": 0.9959,
-        "avg_trades": 13.6,
-        "avg_win_rate": 0.3958,
-        "avg_final_balance": 9929.75,
-        "window_results": [
-          {
-            "window": 1,
-            "sharpe": 1.638,
-            "total_return": 0.0402,
-            "max_dd": 0.0699,
-            "profit_factor": 1.362,
-            "trades": 20,
-            "win_rate": 0.45,
-            "passed": false,
-            "final_balance": 10402.0
-          },
-          {
-            "window": 2,
-            "sharpe": -3.129,
-            "total_return": -0.0617,
-            "max_dd": 0.0897,
-            "profit_factor": 0.536,
-            "trades": 13,
-            "win_rate": 0.2308,
-            "passed": false,
-            "final_balance": 9383.0
-          },
-          {
-            "window": 3,
-            "sharpe": -0.884,
-            "total_return": -0.0265,
-            "max_dd": 0.127,
-            "profit_factor": 0.917,
-            "trades": 20,
-            "win_rate": 0.35,
-            "passed": false,
-            "final_balance": 9735.0
-          },
-          {
-            "window": 4,
-            "sharpe": -0.182,
-            "total_return": -0.0039,
-            "max_dd": 0.0634,
-            "profit_factor": 0.988,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9961.0
-          },
-          {
-            "window": 5,
-            "sharpe": -1.664,
-            "total_return": -0.0246,
-            "max_dd": 0.0666,
-            "profit_factor": 0.696,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9754.0
-          },
-          {
-            "window": 6,
-            "sharpe": 1.333,
-            "total_return": 0.0247,
-            "max_dd": 0.0545,
-            "profit_factor": 1.407,
-            "trades": 12,
-            "win_rate": 0.4167,
-            "passed": false,
-            "final_balance": 10247.0
-          },
-          {
-            "window": 7,
-            "sharpe": -0.696,
-            "total_return": -0.0137,
-            "max_dd": 0.0472,
-            "profit_factor": 0.888,
-            "trades": 11,
-            "win_rate": 0.3636,
-            "passed": false,
-            "final_balance": 9863.0
-          },
-          {
-            "window": 8,
-            "sharpe": 0.553,
-            "total_return": 0.0093,
-            "max_dd": 0.0393,
-            "profit_factor": 1.173,
-            "trades": 15,
-            "win_rate": 0.4667,
-            "passed": false,
-            "final_balance": 10093.0
           }
         ]
       },
@@ -3660,6 +3660,110 @@
         ]
       },
       {
+        "name": "narrow_range",
+        "overall_passed": false,
+        "consistency_score": 0.0,
+        "passed_windows": 0,
+        "total_windows": 8,
+        "avg_sharpe": 0.8265,
+        "avg_return": 0.026212,
+        "avg_max_dd": 0.06475,
+        "avg_profit_factor": 1.3772,
+        "avg_trades": 15.2,
+        "avg_win_rate": 0.437,
+        "avg_final_balance": 10262.12,
+        "window_results": [
+          {
+            "window": 1,
+            "sharpe": 3.359,
+            "total_return": 0.0926,
+            "max_dd": 0.0699,
+            "profit_factor": 1.81,
+            "trades": 21,
+            "win_rate": 0.5238,
+            "passed": false,
+            "final_balance": 10926.0
+          },
+          {
+            "window": 2,
+            "sharpe": -5.311,
+            "total_return": -0.0987,
+            "max_dd": 0.1243,
+            "profit_factor": 0.315,
+            "trades": 14,
+            "win_rate": 0.1429,
+            "passed": false,
+            "final_balance": 9013.0
+          },
+          {
+            "window": 3,
+            "sharpe": 3.029,
+            "total_return": 0.0876,
+            "max_dd": 0.062,
+            "profit_factor": 1.711,
+            "trades": 22,
+            "win_rate": 0.5,
+            "passed": false,
+            "final_balance": 10875.999999999998
+          },
+          {
+            "window": 4,
+            "sharpe": -1.509,
+            "total_return": -0.0261,
+            "max_dd": 0.0738,
+            "profit_factor": 0.731,
+            "trades": 11,
+            "win_rate": 0.3636,
+            "passed": false,
+            "final_balance": 9739.0
+          },
+          {
+            "window": 5,
+            "sharpe": -0.173,
+            "total_return": -0.0038,
+            "max_dd": 0.0495,
+            "profit_factor": 1.01,
+            "trades": 11,
+            "win_rate": 0.4545,
+            "passed": false,
+            "final_balance": 9962.0
+          },
+          {
+            "window": 6,
+            "sharpe": 3.5,
+            "total_return": 0.0757,
+            "max_dd": 0.0545,
+            "profit_factor": 2.231,
+            "trades": 13,
+            "win_rate": 0.5385,
+            "passed": false,
+            "final_balance": 10757.000000000002
+          },
+          {
+            "window": 7,
+            "sharpe": 0.225,
+            "total_return": 0.003,
+            "max_dd": 0.0577,
+            "profit_factor": 1.086,
+            "trades": 13,
+            "win_rate": 0.3846,
+            "passed": false,
+            "final_balance": 10029.999999999998
+          },
+          {
+            "window": 8,
+            "sharpe": 3.492,
+            "total_return": 0.0794,
+            "max_dd": 0.0263,
+            "profit_factor": 2.124,
+            "trades": 17,
+            "win_rate": 0.5882,
+            "passed": false,
+            "final_balance": 10794.0
+          }
+        ]
+      },
+      {
         "name": "roc_ma_cross",
         "overall_passed": false,
         "consistency_score": 0.0,
@@ -4280,110 +4384,6 @@
             "win_rate": 0,
             "passed": false,
             "final_balance": 10000
-          }
-        ]
-      },
-      {
-        "name": "narrow_range",
-        "overall_passed": false,
-        "consistency_score": 0.0,
-        "passed_windows": 0,
-        "total_windows": 8,
-        "avg_sharpe": -0.3789,
-        "avg_return": -0.007025,
-        "avg_max_dd": 0.0697,
-        "avg_profit_factor": 0.9959,
-        "avg_trades": 13.6,
-        "avg_win_rate": 0.3958,
-        "avg_final_balance": 9929.75,
-        "window_results": [
-          {
-            "window": 1,
-            "sharpe": 1.638,
-            "total_return": 0.0402,
-            "max_dd": 0.0699,
-            "profit_factor": 1.362,
-            "trades": 20,
-            "win_rate": 0.45,
-            "passed": false,
-            "final_balance": 10402.0
-          },
-          {
-            "window": 2,
-            "sharpe": -3.129,
-            "total_return": -0.0617,
-            "max_dd": 0.0897,
-            "profit_factor": 0.536,
-            "trades": 13,
-            "win_rate": 0.2308,
-            "passed": false,
-            "final_balance": 9383.0
-          },
-          {
-            "window": 3,
-            "sharpe": -0.884,
-            "total_return": -0.0265,
-            "max_dd": 0.127,
-            "profit_factor": 0.917,
-            "trades": 20,
-            "win_rate": 0.35,
-            "passed": false,
-            "final_balance": 9735.0
-          },
-          {
-            "window": 4,
-            "sharpe": -0.182,
-            "total_return": -0.0039,
-            "max_dd": 0.0634,
-            "profit_factor": 0.988,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9961.0
-          },
-          {
-            "window": 5,
-            "sharpe": -1.664,
-            "total_return": -0.0246,
-            "max_dd": 0.0666,
-            "profit_factor": 0.696,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9754.0
-          },
-          {
-            "window": 6,
-            "sharpe": 1.333,
-            "total_return": 0.0247,
-            "max_dd": 0.0545,
-            "profit_factor": 1.407,
-            "trades": 12,
-            "win_rate": 0.4167,
-            "passed": false,
-            "final_balance": 10247.0
-          },
-          {
-            "window": 7,
-            "sharpe": -0.696,
-            "total_return": -0.0137,
-            "max_dd": 0.0472,
-            "profit_factor": 0.888,
-            "trades": 11,
-            "win_rate": 0.3636,
-            "passed": false,
-            "final_balance": 9863.0
-          },
-          {
-            "window": 8,
-            "sharpe": 0.553,
-            "total_return": 0.0093,
-            "max_dd": 0.0393,
-            "profit_factor": 1.173,
-            "trades": 15,
-            "win_rate": 0.4667,
-            "passed": false,
-            "final_balance": 10093.0
           }
         ]
       },
@@ -5950,6 +5950,110 @@
         ]
       },
       {
+        "name": "narrow_range",
+        "overall_passed": false,
+        "consistency_score": 0.0,
+        "passed_windows": 0,
+        "total_windows": 8,
+        "avg_sharpe": 0.8265,
+        "avg_return": 0.026212,
+        "avg_max_dd": 0.06475,
+        "avg_profit_factor": 1.3772,
+        "avg_trades": 15.2,
+        "avg_win_rate": 0.437,
+        "avg_final_balance": 10262.12,
+        "window_results": [
+          {
+            "window": 1,
+            "sharpe": 3.359,
+            "total_return": 0.0926,
+            "max_dd": 0.0699,
+            "profit_factor": 1.81,
+            "trades": 21,
+            "win_rate": 0.5238,
+            "passed": false,
+            "final_balance": 10926.0
+          },
+          {
+            "window": 2,
+            "sharpe": -5.311,
+            "total_return": -0.0987,
+            "max_dd": 0.1243,
+            "profit_factor": 0.315,
+            "trades": 14,
+            "win_rate": 0.1429,
+            "passed": false,
+            "final_balance": 9013.0
+          },
+          {
+            "window": 3,
+            "sharpe": 3.029,
+            "total_return": 0.0876,
+            "max_dd": 0.062,
+            "profit_factor": 1.711,
+            "trades": 22,
+            "win_rate": 0.5,
+            "passed": false,
+            "final_balance": 10875.999999999998
+          },
+          {
+            "window": 4,
+            "sharpe": -1.509,
+            "total_return": -0.0261,
+            "max_dd": 0.0738,
+            "profit_factor": 0.731,
+            "trades": 11,
+            "win_rate": 0.3636,
+            "passed": false,
+            "final_balance": 9739.0
+          },
+          {
+            "window": 5,
+            "sharpe": -0.173,
+            "total_return": -0.0038,
+            "max_dd": 0.0495,
+            "profit_factor": 1.01,
+            "trades": 11,
+            "win_rate": 0.4545,
+            "passed": false,
+            "final_balance": 9962.0
+          },
+          {
+            "window": 6,
+            "sharpe": 3.5,
+            "total_return": 0.0757,
+            "max_dd": 0.0545,
+            "profit_factor": 2.231,
+            "trades": 13,
+            "win_rate": 0.5385,
+            "passed": false,
+            "final_balance": 10757.000000000002
+          },
+          {
+            "window": 7,
+            "sharpe": 0.225,
+            "total_return": 0.003,
+            "max_dd": 0.0577,
+            "profit_factor": 1.086,
+            "trades": 13,
+            "win_rate": 0.3846,
+            "passed": false,
+            "final_balance": 10029.999999999998
+          },
+          {
+            "window": 8,
+            "sharpe": 3.492,
+            "total_return": 0.0794,
+            "max_dd": 0.0263,
+            "profit_factor": 2.124,
+            "trades": 17,
+            "win_rate": 0.5882,
+            "passed": false,
+            "final_balance": 10794.0
+          }
+        ]
+      },
+      {
         "name": "roc_ma_cross",
         "overall_passed": false,
         "consistency_score": 0.0,
@@ -6570,110 +6674,6 @@
             "win_rate": 0,
             "passed": false,
             "final_balance": 10000
-          }
-        ]
-      },
-      {
-        "name": "narrow_range",
-        "overall_passed": false,
-        "consistency_score": 0.0,
-        "passed_windows": 0,
-        "total_windows": 8,
-        "avg_sharpe": -0.3789,
-        "avg_return": -0.007025,
-        "avg_max_dd": 0.0697,
-        "avg_profit_factor": 0.9959,
-        "avg_trades": 13.6,
-        "avg_win_rate": 0.3958,
-        "avg_final_balance": 9929.75,
-        "window_results": [
-          {
-            "window": 1,
-            "sharpe": 1.638,
-            "total_return": 0.0402,
-            "max_dd": 0.0699,
-            "profit_factor": 1.362,
-            "trades": 20,
-            "win_rate": 0.45,
-            "passed": false,
-            "final_balance": 10402.0
-          },
-          {
-            "window": 2,
-            "sharpe": -3.129,
-            "total_return": -0.0617,
-            "max_dd": 0.0897,
-            "profit_factor": 0.536,
-            "trades": 13,
-            "win_rate": 0.2308,
-            "passed": false,
-            "final_balance": 9383.0
-          },
-          {
-            "window": 3,
-            "sharpe": -0.884,
-            "total_return": -0.0265,
-            "max_dd": 0.127,
-            "profit_factor": 0.917,
-            "trades": 20,
-            "win_rate": 0.35,
-            "passed": false,
-            "final_balance": 9735.0
-          },
-          {
-            "window": 4,
-            "sharpe": -0.182,
-            "total_return": -0.0039,
-            "max_dd": 0.0634,
-            "profit_factor": 0.988,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9961.0
-          },
-          {
-            "window": 5,
-            "sharpe": -1.664,
-            "total_return": -0.0246,
-            "max_dd": 0.0666,
-            "profit_factor": 0.696,
-            "trades": 9,
-            "win_rate": 0.4444,
-            "passed": false,
-            "final_balance": 9754.0
-          },
-          {
-            "window": 6,
-            "sharpe": 1.333,
-            "total_return": 0.0247,
-            "max_dd": 0.0545,
-            "profit_factor": 1.407,
-            "trades": 12,
-            "win_rate": 0.4167,
-            "passed": false,
-            "final_balance": 10247.0
-          },
-          {
-            "window": 7,
-            "sharpe": -0.696,
-            "total_return": -0.0137,
-            "max_dd": 0.0472,
-            "profit_factor": 0.888,
-            "trades": 11,
-            "win_rate": 0.3636,
-            "passed": false,
-            "final_balance": 9863.0
-          },
-          {
-            "window": 8,
-            "sharpe": 0.553,
-            "total_return": 0.0093,
-            "max_dd": 0.0393,
-            "profit_factor": 1.173,
-            "trades": 15,
-            "win_rate": 0.4667,
-            "passed": false,
-            "final_balance": 10093.0
           }
         ]
       },

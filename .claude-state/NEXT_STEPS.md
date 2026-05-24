@@ -1,61 +1,62 @@
 # Next Steps
 
-_Last updated: 2026-05-24 (Cycle 205 A+C+F 완료)_
+_Last updated: 2026-05-24 (Cycle 206 B+D+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 205 완료
-- 205 mod 5 = 0 → **A(품질) + C(데이터) + F(리서치)** 패턴 ✅
-- 다음 Cycle 206: **206 mod 5 = 1 → B(리스크) + D(ML) + F(리서치)**
+### 로테이션: Cycle 206 완료
+- 206 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
+- 다음 Cycle 207: **207 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
 
-### 🔥 Cycle 205 주요 성과
-- **A1 버그 수정**: `paper_trader.py` SELL 포지션 없음 체크 → timeout 이전으로 이동
-  - `test_sell_no_position_rejected` 간헐적 실패 영구 수정
-- **A2 개선**: `DEFAULT_GRIDS` value_area va_mult 범위 축소 [0.6,0.7,0.8]→[0.65,0.70,0.75]
-  - OOS Sharpe std 6.589 완화 목적 (실데이터 검증 필요)
-- **A3 개선**: `NarrowRangeStrategy` nr_lookback 파라미터화 (기본 5, 이전 하드코딩 7)
-  - `DEFAULT_GRIDS` narrow_range 추가 + `optimize_narrow_range()` 함수
-  - 4h OOS 거래 수 fold 6: 1→2건 (min_oos_trades=3 아직 미달)
-- **C1 테스트**: `test_feed_error_handling.py` SSL retry 3개 단위 테스트 추가
+### 🔥 Cycle 206 주요 성과
+- **B1**: KellySizer kelly_cap 0.25 → 0.20 (더 보수적 포지션 상한)
+- **B2**: DrawdownMonitor `streak_recovery_grace_seconds` 하이브리드 회복 추가
+  - 마지막 손실 이후 grace_seconds 경과 → consecutive_losses 자동 리셋
+  - 기본값 0 (비활성), live 환경에서 streak_cooldown_seconds과 동일 값 권장
+- **B3**: DataFeed CircuitBreaker `recovery_timeout` 60s → 300s (API 재시도 폭주 방지)
+- **D1**: MLSignalGenerator `get_low_importance_features(threshold)` helper 추가
+- **F**: narrow_range ATR_THRESHOLD 0.85→0.90, VOL_SPIKE_MULT 1.2→1.0 완화
+  - 4h OOS 거래 0건 문제 완화 목적 → 다음 사이클 SIM에서 효과 확인 필요
 
-### 🎯 Cycle 206 권장 작업 (206 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 207 권장 작업 (207 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): Risk Management
-- DrawdownMonitor.get_size_multiplier() — streak cooldown 로직 재검토
-  - consecutive_losses 리셋 시점 조정: 실적 기반 vs. 시간 기반 하이브리드 검토
-- KellySizer max_kelly 파라미터: 기본값 0.25 → 0.20 보수화 검토
-  - Sharpe std가 높은 전략군 (value_area std=6.589) 대상 케어 필요
-- CircuitBreaker recovery_timeout=60s → 300s 연장: API 재시도 폭주 방지
+#### B(리스크): Risk Management (2회 연속 B)
+- DrawdownMonitor `streak_recovery_grace_seconds` 실효성 검증
+  - 기본값 0이므로 live config에 명시적 활성화 필요 (`config/` 파일 확인)
+- VaR/CVaR 계산 정확도 검증: `src/risk/portfolio_optimizer.py` 코드 리뷰
+  - 특히 normal distribution 가정 vs. fat-tail 보정 여부
+- CircuitBreaker `max_consecutive_losses=5` → 4로 하향 검토
+  - 현재 DrawdownMonitor와 CircuitBreaker 간 streak 임계값 불일치 (3 vs 5)
 
 #### D(ML): ML & Signals
-- RF 모델 피처 중요도 분석 (`src/ml/` 아래 모델 파일 확인)
-  - 낮은 기여도 피처 제거 → 모델 경량화 + 과적합 방지
-- 앙상블 가중치 정기 업데이트: SIM 결과 기반 전략별 가중치 재조정
+- MLSignalGenerator `get_low_importance_features()` 활용:
+  - 실제 RF 모델 학습 후 threshold=0.01 피처 목록 추출
+  - FeatureBuilder에서 해당 피처 제거 후 재학습 효과 측정
+- HMM 레짐 감지 모델 (`src/ml/hmm_model.py`) 상태 확인
+  - 현재 사용 중인지, 또는 단독 활성화 가능한지 확인
 
 #### F(리서치): SIM 결과 기반
-- **narrow_range 신호 조건 완화 검토**:
-  - ATR_THRESHOLD 0.85 → 0.90 (더 여유로운 ATR 수축 조건)
-  - VOL_SPIKE_MULT 1.2 → 1.0 (거래량 급증 조건 완화)
-  - 변경 전 단위 테스트로 신호 빈도 측정 필수
-- **elder_impulse OOS std=4.099 원인 분석**:
-  - fold 1 (OOS=3.794) vs fold 2 (OOS=-5.556) 차이: GBM seed 구간 특성
-  - 실데이터 검증 우선순위 유지
+- **narrow_range ATR 완화 효과 측정**:
+  - ATR_THRESHOLD 0.90으로 4h Bundle OOS 재실행하여 거래 수 변화 확인
+  - 여전히 0건이면: min_oos_trades 2 하향 또는 nr_lookback 추가 완화 검토
+- **elder_impulse fold 1 PASS 분석**:
+  - fold 1 OOS 구간 특성 분석 (2024Q1 등 특정 시장 국면 대응 가능성)
+  - 실데이터 검증 환경 준비 (로컬 환경에서 DataFeed fallback 활성화)
 
-### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 205 / 합성 GBM 환경)
+### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 206 / 합성 GBM 환경)
 
 **Bundle OOS (4h) — 합성 데이터:**
 - 0/5 PASS — GBM IS 음수 패턴 지속
-- narrow_range: nr_lookback=5로도 min_oos_trades=3 미달
-  → ATR_THRESHOLD 완화(0.85→0.90) 또는 min_oos_trades 2 하향 검토
-- value_area: OOS Sharpe std=6.589 (최대 불안정), va_mult 범위 축소 적용됨 (실데이터 효과 미확인)
+- narrow_range: ATR_THRESHOLD 0.90, VOL_SPIKE_MULT 1.0 적용됨 → 다음 SIM에서 거래 수 확인
+- value_area: OOS Sharpe std=6.589 (va_mult 범위 축소 적용됨, 실데이터 효과 미확인)
 - elder_impulse: fold 1 PASS (OOS=3.794) — 실데이터 PASS 후보
 
 **Paper SIM (1h) — 합성 데이터:**
 - 0/22 PASS — GBM 한계 동일
 - 상위 합성 성과: price_action_momentum (6.90), cmf (5.99)
-- elder_impulse: avg Sharpe=1.32, 28 trades — 22개 중 상대적으로 거래 수 안정
+- elder_impulse: avg Sharpe=1.32, 28 trades — 22개 중 상대적으로 안정
 
 ### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단 (원격 사이클에서는 합성 SIM만 가능)
@@ -96,5 +97,5 @@ _Last updated: 2026-05-24 (Cycle 205 A+C+F 완료)_
 
 ---
 
-**상태**: Cycle 205 완료 → Cycle 206 B(리스크) + D(ML) + F(리서치) 예정
-**최우선 과제**: narrow_range ATR 조건 완화 + elder_impulse/wick_reversal 실데이터 OOS 검증
+**상태**: Cycle 206 완료 → Cycle 207 B(리스크) + D(ML) + F(리서치) 예정
+**최우선 과제**: narrow_range ATR 완화 효과 다음 SIM 확인 + elder_impulse 실데이터 OOS 검증

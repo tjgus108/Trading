@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-05-24T15:38:27.572753Z_
+_Generated: 2026-05-24T20:24:25.506992Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T15:33:19.219202Z_
+_Generated: 2026-05-24T20:19:24.379510Z_
 _Symbol: BTC/USDT_
 _Data Source: Synthetic GBM x8640 (BTC/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -22,7 +22,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | 테스트 전략 | 22개 |
 | PASS (일관성 50%+) | 0개 |
 | FAIL | 22개 |
-| 평균 수익률 | 12.33% |
+| 평균 수익률 | 12.48% |
 | 최고 수익률 | 52.22% (price_action_momentum) |
 | 최저 수익률 | -5.86% (engulfing_zone) |
 
@@ -58,19 +58,19 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `linear_channel_rev` | +7.91% | 3.25 | 2.21 | 17 | 0/8 | FAIL |
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
+| `narrow_range` | +2.62% | 0.83 | 1.38 | 15 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
 | `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
 | `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
 | `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
-| `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
 | `engulfing_zone` | -5.86% | -2.78 | 0.59 | 11 | 0/8 | FAIL |
 
 ## 포트폴리오 가상 배분
 
-- **전체 22개 균등배분**: +12.33% -> $11,233
+- **전체 22개 균등배분**: +12.48% -> $11,248
 - **Top 5 균등배분**: +36.09% -> $13,609
 
 
@@ -78,7 +78,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T15:35:54.218899Z_
+_Generated: 2026-05-24T20:21:54.562432Z_
 _Symbol: ETH/USDT_
 _Data Source: Synthetic GBM x8640 (ETH/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -93,7 +93,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | 테스트 전략 | 22개 |
 | PASS (일관성 50%+) | 0개 |
 | FAIL | 22개 |
-| 평균 수익률 | 12.33% |
+| 평균 수익률 | 12.48% |
 | 최고 수익률 | 52.22% (price_action_momentum) |
 | 최저 수익률 | -5.86% (engulfing_zone) |
 
@@ -129,19 +129,19 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `linear_channel_rev` | +7.91% | 3.25 | 2.21 | 17 | 0/8 | FAIL |
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
+| `narrow_range` | +2.62% | 0.83 | 1.38 | 15 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
 | `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
 | `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
 | `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
-| `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
 | `engulfing_zone` | -5.86% | -2.78 | 0.59 | 11 | 0/8 | FAIL |
 
 ## 포트폴리오 가상 배분
 
-- **전체 22개 균등배분**: +12.33% -> $11,233
+- **전체 22개 균등배분**: +12.48% -> $11,248
 - **Top 5 균등배분**: +36.09% -> $13,609
 
 
@@ -149,7 +149,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-05-24T15:38:27.570868Z_
+_Generated: 2026-05-24T20:24:25.505117Z_
 _Symbol: SOL/USDT_
 _Data Source: Synthetic GBM x8640 (SOL/USDT-like)_
 _Data Range: 0 ~ 8639 (8640봉)_
@@ -164,7 +164,7 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | 테스트 전략 | 22개 |
 | PASS (일관성 50%+) | 0개 |
 | FAIL | 22개 |
-| 평균 수익률 | 12.33% |
+| 평균 수익률 | 12.48% |
 | 최고 수익률 | 52.22% (price_action_momentum) |
 | 최저 수익률 | -5.86% (engulfing_zone) |
 
@@ -200,17 +200,17 @@ _통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD
 | `linear_channel_rev` | +7.91% | 3.25 | 2.21 | 17 | 0/8 | FAIL |
 | `elder_impulse` | +5.62% | 1.32 | 1.41 | 28 | 0/8 | FAIL |
 | `positional_scaling` | +3.39% | 1.06 | 1.98 | 12 | 0/8 | FAIL |
+| `narrow_range` | +2.62% | 0.83 | 1.38 | 15 | 0/8 | FAIL |
 | `roc_ma_cross` | +2.49% | 0.95 | 1.35 | 18 | 0/8 | FAIL |
 | `value_area` | +0.85% | 0.36 | 125.85 | 6 | 0/8 | FAIL |
 | `dema_cross` | +0.29% | -0.20 | 1.75 | 6 | 0/8 | FAIL |
 | `price_cluster` | +0.28% | 0.29 | 250.00 | 0 | 0/8 | FAIL |
 | `wick_reversal` | +0.16% | -0.25 | 125.22 | 1 | 0/8 | FAIL |
 | `volume_breakout` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
-| `narrow_range` | -0.70% | -0.38 | 1.00 | 14 | 0/8 | FAIL |
 | `frama` | -3.99% | -0.98 | 0.96 | 43 | 0/8 | FAIL |
 | `engulfing_zone` | -5.86% | -2.78 | 0.59 | 11 | 0/8 | FAIL |
 
 ## 포트폴리오 가상 배분
 
-- **전체 22개 균등배분**: +12.33% -> $11,233
+- **전체 22개 균등배분**: +12.48% -> $11,248
 - **Top 5 균등배분**: +36.09% -> $13,609

@@ -35,7 +35,7 @@ class KellySizer:
         min_fraction: float = 0.001,
         max_drawdown: Optional[float] = None,
         leverage: float = 1.0,
-        kelly_cap: float = 0.25,
+        kelly_cap: float = 0.20,
         regime_smooth_alpha: float = 0.0,
         rolling_window: int = 50,
     ) -> None:
@@ -46,7 +46,7 @@ class KellySizer:
             min_fraction: 자본 대비 최소 포지션 비율
             max_drawdown: 허용 최대 낙폭 (e.g. 0.05 = 5%). None이면 DD 제약 미적용.
             leverage: 레버리지 배수 (기본 1.0 = 현물)
-            kelly_cap: Full Kelly fraction 상한 (기본 0.25 = Quarter-Kelly cap).
+            kelly_cap: Full Kelly fraction 상한 (기본 0.20 = Fifth-Kelly cap).
                        kelly_f * fraction 결과가 이 값을 초과하지 않도록 제한.
                        풀 Kelly → 파멸 경로 방지 핵심 안전장치.
             regime_smooth_alpha: 레짐 전환 시 EMA 스무딩 계수 (0~1).
@@ -254,7 +254,7 @@ class KellySizer:
         leverage: float = 1.0,
         min_trades: Optional[int] = None,
         regime: Optional[str] = None,
-        kelly_cap: float = 0.25,
+        kelly_cap: float = 0.20,
         mdd_size_multiplier: float = 1.0,
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.

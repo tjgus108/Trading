@@ -18,8 +18,8 @@ class NarrowRangeStrategy(BaseStrategy):
     MIN_ROWS = 25
     ATR_LOOKBACK = 20
     VOL_LOOKBACK = 20
-    VOL_SPIKE_MULT = 1.2
-    ATR_THRESHOLD = 0.85  # 평균의 85% 이하
+    VOL_SPIKE_MULT = 1.0   # 완화: 1.2→1.0 (4h봉 거래 수 증가 목적, Cycle 206)
+    ATR_THRESHOLD = 0.90   # 완화: 0.85→0.90 (더 여유로운 ATR 수축 조건, Cycle 206)
 
     def __init__(self, nr_lookback: int = 5, **kwargs):
         """

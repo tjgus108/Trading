@@ -18,10 +18,10 @@ from src.risk.drawdown_monitor import DrawdownMonitor, MddLevel
 class TestQuarterCap:
     """kelly_cap 파라미터가 fractional Kelly를 올바르게 제한하는지 검증."""
 
-    def test_default_kelly_cap_is_025(self):
-        """기본 kelly_cap=0.25 확인."""
+    def test_default_kelly_cap_is_020(self):
+        """기본 kelly_cap=0.20 확인 (0.25→0.20 보수화, Cycle 206)."""
         sizer = KellySizer()
-        assert sizer.kelly_cap == 0.25
+        assert sizer.kelly_cap == 0.20
 
     def test_quarter_cap_limits_high_kelly(self):
         """극단적 edge에서 fractional_f가 kelly_cap(0.25)을 초과하지 않음."""

@@ -38,14 +38,14 @@ class CircuitState(Enum):
 class CircuitBreaker:
     """Simple circuit breaker to prevent cascading failures."""
     
-    def __init__(self, 
+    def __init__(self,
                  failure_threshold: int = 5,
-                 recovery_timeout: int = 60,
+                 recovery_timeout: int = 300,
                  success_threshold: int = 2):
         """
         Args:
             failure_threshold: Consecutive failures before OPEN state
-            recovery_timeout: Seconds before attempting recovery
+            recovery_timeout: Seconds before attempting recovery (300s = 5min, API 재시도 폭주 방지)
             success_threshold: Consecutive successes to fully close
         """
         self.failure_threshold = failure_threshold

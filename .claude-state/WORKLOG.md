@@ -1,5 +1,42 @@
 # Work Log
 
+## [2026-05-24] Cycle 206 — B(리스크) + D(ML) + F(리서치)
+
+**SIM 결과 요약 (20:22 UTC Bundle OOS, 20:24 UTC Paper SIM):**
+- Bundle OOS 4h (합성): 0/5 PASS — GBM IS 음수 패턴 지속
+  - narrow_range: 모든 fold 거래 0건 (min_oos_trades=3 미달, ATR_THRESHOLD 완화 적용됨)
+  - value_area: OOS Sharpe std=6.589 (여전히 불안정, va_mult 범위 축소 효과는 실데이터에서 검증 필요)
+  - elder_impulse: fold 1 PASS (OOS=3.794) → 실데이터 우선 검증 후보
+  - wick_reversal: fold 6 PASS (OOS=5.981, 2trades) — fold 수 부족
+- Paper SIM 1h (합성): 0/22 PASS
+  - price_action_momentum: avg Sharpe=6.90, cmf: 5.99 (동일 패턴)
+  - elder_impulse: avg Sharpe=1.32, 28 trades
+
+**[B1] KellySizer kelly_cap 보수화:**
+- `src/risk/kelly_sizer.py`: kelly_cap 기본값 0.25 → 0.20 (파멸 경로 방지 강화)
+- `tests/test_kelly_quarter_cap.py`: `test_default_kelly_cap_is_025` → `test_default_kelly_cap_is_020`
+- `tests/test_kelly_twap.py`: `test_kelly_max_drawdown_constraint_active` — max_drawdown 파라미터 조정 (0.02→0.01, DD가 kelly_cap보다 binding하도록)
+
+**[B2] DrawdownMonitor 하이브리드 streak 회복:**
+- `src/risk/drawdown_monitor.py`: `streak_recovery_grace_seconds` 파라미터 추가 (기본 0=비활성)
+  - 마지막 손실 이후 grace_seconds 경과 시 consecutive_losses 자동 초기화
+  - 실적 기반(win 발생)과 시간 기반 혼합 회복 지원
+  - `_last_loss_at` 상태 추가 + to_dict/from_dict/reset 모두 반영
+
+**[B3] DataFeed CircuitBreaker recovery_timeout 연장:**
+- `src/data/feed.py`: recovery_timeout 기본값 60s → 300s (5분)
+  - API 장애 직후 재시도 폭주 방지 (연장된 OPEN → HALF_OPEN 전환 대기)
+
+**[D1] MLSignalGenerator 피처 pruning helper:**
+- `src/ml/model.py`: `get_low_importance_features(threshold=0.01)` 추가
+  - 중요도 threshold 미만 피처 이름 반환 (모델 경량화/과적합 방지 지원)
+
+**[F] narrow_range 신호 조건 완화:**
+- `src/strategy/narrow_range.py`: ATR_THRESHOLD 0.85 → 0.90, VOL_SPIKE_MULT 1.2 → 1.0
+  - 4h 봉 거래 수 증가 목적 (현재 모든 fold 거래 0건)
+
+**테스트:** 7803 passed, 23 skipped → 전체 통과 확인
+
 ## [2026-05-24] Cycle 205 — A(품질) + C(데이터) + F(리서치)
 
 **SIM 결과 요약 (15:24 UTC 실행):**
@@ -16984,6 +17021,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-24 15:40 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-24 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-24 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-24 20:12 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

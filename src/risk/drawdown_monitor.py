@@ -121,6 +121,7 @@ class DrawdownMonitor:
         single_loss_halt_pct: float = 0.02,
         cooldown_seconds: float = 3600.0,
         streak_cooldown_seconds: float = 14400.0,
+        streak_recovery_grace_seconds: float = 0.0,
         mdd_warn_pct: float = 0.05,
         mdd_block_pct: float = 0.10,
         mdd_liquidate_pct: float = 0.15,
@@ -140,6 +141,9 @@ class DrawdownMonitor:
             cooldown_seconds:      단일 큰 손실 후 쿨다운 지속 시간 (초). 기본 1시간.
             streak_cooldown_seconds: 연속 손실(loss_streak_threshold 도달) 후 쿨다운 지속 시간 (초).
                                      기본 4시간. 0으로 설정 시 연속 손실 쿨다운 비활성화.
+            streak_recovery_grace_seconds: 마지막 손실 이후 이 시간이 경과하면 consecutive_losses 자동 초기화.
+                                     하이브리드(실적+시간) 회복 지원. 0이면 비활성(기본, 실적 기반만).
+                                     예) streak_cooldown_seconds와 동일 값(4h) 설정 시: 마지막 손실 4시간 후 자동 복원.
             mdd_warn_pct:      MDD 경고 기준 (기본 5%). 포지션 50% 축소.
             mdd_block_pct:     MDD 진입 차단 기준 (기본 10%). 신규 진입 차단.
             mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
@@ -155,6 +159,7 @@ class DrawdownMonitor:
         self.single_loss_halt_pct = single_loss_halt_pct
         self.cooldown_seconds = cooldown_seconds
         self.streak_cooldown_seconds = streak_cooldown_seconds
+        self.streak_recovery_grace_seconds = streak_recovery_grace_seconds
         self.mdd_warn_pct = mdd_warn_pct
         self.mdd_block_pct = mdd_block_pct
         self.mdd_liquidate_pct = mdd_liquidate_pct
@@ -179,6 +184,7 @@ class DrawdownMonitor:
         self._consecutive_losses: int = 0
         self._cooldown_until: float = 0.0   # epoch seconds; 0=쿨다운 없음
         self._single_loss_cooldown_until: float = 0.0  # 단일 손실로 인한 쿨다운
+        self._last_loss_at: float = 0.0     # 마지막 손실 시각 (하이브리드 회복용)
 
     # ── 기준 잔고 설정 ─────────────────────────────────────────
 
@@ -256,6 +262,7 @@ class DrawdownMonitor:
 
         # 손실 처리
         self._consecutive_losses += 1
+        self._last_loss_at = time.monotonic()
         logger.info(
             "DrawdownMonitor: 연속 손실 %d회 (threshold=%d)",
             self._consecutive_losses, self.loss_streak_threshold,
@@ -317,6 +324,20 @@ class DrawdownMonitor:
         """
         if self.is_in_cooldown():
             return 0.0
+        # 하이브리드 streak 회복: grace_seconds 설정 시 마지막 손실 이후 충분한 시간이
+        # 경과하면 consecutive_losses 자동 초기화 (실적+시간 혼합 방식)
+        if (
+            self.streak_recovery_grace_seconds > 0
+            and self._consecutive_losses >= self.loss_streak_threshold
+            and self._last_loss_at > 0
+            and time.monotonic() - self._last_loss_at >= self.streak_recovery_grace_seconds
+        ):
+            logger.info(
+                "DrawdownMonitor: 하이브리드 streak 회복 — %.1f초 무손실 경과, consecutive_losses %d 초기화",
+                time.monotonic() - self._last_loss_at,
+                self._consecutive_losses,
+            )
+            self._consecutive_losses = 0
         streak_mult = 0.5 if self._consecutive_losses >= self.loss_streak_threshold else 1.0
         mdd_mult = self.get_mdd_size_multiplier()
         return min(streak_mult, mdd_mult)
@@ -553,6 +574,7 @@ class DrawdownMonitor:
         self._consecutive_losses = 0
         self._cooldown_until = 0.0
         self._single_loss_cooldown_until = 0.0
+        self._last_loss_at = 0.0
         self._equity_history.clear()
         logger.info("DrawdownMonitor: reset")
 
@@ -610,6 +632,7 @@ class DrawdownMonitor:
             "_consecutive_losses": self._consecutive_losses,
             "_cooldown_until": self._cooldown_until,
             "_single_loss_cooldown_until": self._single_loss_cooldown_until,
+            "_last_loss_at": self._last_loss_at,
             "_equity_history": list(self._equity_history),
         }
 
@@ -626,6 +649,7 @@ class DrawdownMonitor:
             single_loss_halt_pct=data.get("single_loss_halt_pct", 0.02),
             cooldown_seconds=data.get("cooldown_seconds", 3600.0),
             streak_cooldown_seconds=data.get("streak_cooldown_seconds", 14400.0),
+            streak_recovery_grace_seconds=data.get("streak_recovery_grace_seconds", 0.0),
             mdd_warn_pct=data.get("mdd_warn_pct", 0.05),
             mdd_block_pct=data.get("mdd_block_pct", 0.10),
             mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
@@ -643,6 +667,7 @@ class DrawdownMonitor:
         obj._consecutive_losses = data.get("_consecutive_losses", 0)
         obj._cooldown_until = data.get("_cooldown_until", 0.0)
         obj._single_loss_cooldown_until = data.get("_single_loss_cooldown_until", 0.0)
+        obj._last_loss_at = data.get("_last_loss_at", 0.0)
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
         return obj

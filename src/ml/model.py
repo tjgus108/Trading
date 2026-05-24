@@ -179,6 +179,17 @@ class MLSignalGenerator:
             ranked = ranked[:top_n]
         return ranked
 
+    def get_low_importance_features(self, threshold: float = 0.01) -> List[str]:
+        """중요도 threshold 미만인 피처 이름 반환 (모델 경량화/과적합 방지 목적).
+
+        Args:
+            threshold: 중요도 하한선. 이 값 미만인 피처는 제거 후보.
+
+        Returns:
+            낮은 중요도 피처 이름 리스트. 모델 미로드 시 빈 리스트.
+        """
+        return [name for name, imp in self._feature_importances.items() if imp < threshold]
+
     def _hold(self, note: str) -> MLPrediction:
         """note와 함께 HOLD 신호(confidence=0)를 반환하는 내부 헬퍼."""
         return MLPrediction(
