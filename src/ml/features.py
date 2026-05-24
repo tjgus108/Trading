@@ -552,6 +552,39 @@ class RegimeAwareFeatureBuilder:
             return X_all
         return X_all[available]
 
+    def get_feature_importance(
+        self, df: pd.DataFrame, regime: Optional[str] = None
+    ) -> Dict[str, float]:
+        """빠른 RF fit으로 레짐별 피처 중요도 반환.
+
+        Args:
+            df: OHLCV DataFrame
+            regime: 사용할 레짐 (None이면 detect_regime()으로 자동 감지)
+
+        Returns:
+            {feature_name: importance} — 합계 1.0으로 정규화. 데이터 부족 시 빈 dict.
+        """
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+        except ImportError:
+            return {}
+
+        if regime is None:
+            regime = detect_regime(df, lookback=self.regime_lookback)
+
+        X_all, y = self._base.build(df)
+        X = self._select(X_all, regime, df)
+
+        if X.empty or len(X) < 20:
+            return {}
+
+        rf = RandomForestClassifier(
+            n_estimators=50, max_depth=4, random_state=42, n_jobs=1
+        )
+        rf.fit(X.values, y.values)
+        importances = rf.feature_importances_
+        return {col: round(float(imp), 4) for col, imp in zip(X.columns, importances)}
+
     # 기존 FeatureBuilder API 위임 (기존 코드와 호환)
     def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """기존 FeatureBuilder.build() 호환 — 레짐 감지 없이 전체 피처 반환."""

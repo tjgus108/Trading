@@ -1,5 +1,41 @@
 # Work Log
 
+## [2026-05-24] Cycle 202 — B(리스크) + D(ML) + F(리서치)
+
+**SIM 결과 요약:**
+- Bundle OOS 4h (합성): 0/5 PASS — GBM 랜덤워크 한계 동일 패턴 (Cycle 201과 동일)
+  - cmf: 0/9 PASS, IS Sharpe 전부 음수, avg OOS=-4.356
+  - elder_impulse: 1/9 PASS (fold 1 OOS=3.794) — 패턴 고착
+  - wick_reversal: 2/9 PASS (fold 1=4.832, fold 8=0.372) — fold 8 OOS PF=1.141 미달
+  - narrow_range: 0/9 trades — 4h 트리거 조건 미충족 지속
+  - value_area: 4 fold near-PASS, OOS Sharpe std=6.589 불안정
+- Paper SIM 1h (합성): 이전 주기 결과 활용 (0/22 PASS), 신규 실행 중
+
+**[D1] WalkForwardOptimizer._optimize_in_sample() IS 전체 음수 fail_reason 추가:**
+- `src/backtest/walk_forward.py`: `run()` 내 avg IS Sharpe < -0.5 시 fail_reasons 추가
+- `"IS 전체 음수: avg IS Sharpe=X.XXX — 전략 미작동 또는 합성 데이터(GBM)"` 메시지
+- GBM 합성 데이터에서 cmf/wick_reversal 등이 IS 전부 음수인 이유 진단 가능
+- 테스트 1개 추가: `test_all_is_sharpe_negative_adds_fail_reason`
+
+**[D2] RegimeAwareFeatureBuilder.get_feature_importance() 진단 메서드 추가:**
+- `src/ml/features.py`: RF 50트리로 빠른 피처 중요도 계산 메서드 추가
+- 레짐별 피처 서브셋 기준으로 RF fit → 중요도 dict 반환
+- GBM 합성 데이터에서 어떤 피처가 높은 중요도인지 파악 → 실데이터 검증 우선순위 결정
+- 테스트 4개 추가: `TestGetFeatureImportance.*`
+
+**[B1] KellySizer ATR low 케이스 테스트 추가:**
+- `tests/test_kelly_sizer_regime_edge_cases.py`: `test_atr_low_does_not_expand_size` 추가
+- `atr < target_atr` 시 `atr_factor = min(target_atr/atr, 1.0) = 1.0` → 확대 없음 확인
+- ATR 낮을 때 포지션 확대 없는 보수적 설계 의도 검증
+
+**[F] 리서치 인사이트 (Cycle 202 SIM 분석):**
+- IS 전체 음수 진단: cmf fold 0~8 모두 avg IS=-3.31 → GBM 합성 데이터 완전 확인
+- elder_impulse fold 1 PASS 3사이클 연속 → seed=42 GBM 특정 구간 패턴, 실데이터와 무관
+- get_feature_importance() 활용: 합성 데이터에서 return_1/return_3 피처 중요도 높음 → 실데이터 검증 시 이 피처 우선 분석 필요
+- value_area OOS std=6.589 지속: GBM 환경에서 신호 조건 완화해도 안정성 개선 불가
+
+**테스트 통계:** 7795 → 7801 (신규 6개 추가 [1+4+1], 0 실패, 23 skipped)
+
 ## [2026-05-23] Cycle 201 — B(리스크) + D(ML) + F(리서치)
 
 **SIM 결과 요약:**
@@ -16307,6 +16343,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-23 20:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-24 00:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-24 00:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-24 00:17 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

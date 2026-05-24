@@ -335,6 +335,16 @@ class WalkForwardOptimizer:
         if avg_oos < 0.5:
             fail_reasons.append(f"OOS 평균 Sharpe 낮음: {avg_oos:.3f} < 0.5")
             is_stable = False
+        # IS Sharpe 전체 음수 진단: GBM 합성 데이터나 전략 미작동 신호
+        all_is_sharpes = [wr.is_sharpe for wr in window_results]
+        if all_is_sharpes:
+            avg_is_sharpe = sum(all_is_sharpes) / len(all_is_sharpes)
+            if avg_is_sharpe < -0.5:
+                fail_reasons.append(
+                    f"IS 전체 음수: avg IS Sharpe={avg_is_sharpe:.3f} — "
+                    "전략 미작동 또는 합성 데이터(GBM)"
+                )
+                is_stable = False
 
         result = WalkForwardResult(
             strategy_name=self.strategy_name,

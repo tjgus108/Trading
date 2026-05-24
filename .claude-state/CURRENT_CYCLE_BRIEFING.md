@@ -1,42 +1,53 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-23 — Cycle 201 완료 (B+D+F)_
+_Updated: 2026-05-24 — Cycle 202 완료 (B+D+F)_
 
 ## 현재 상태
 
 | 항목 | 값 |
 |------|-----|
-| 완료 사이클 | Cycle 200 |
-| 다음 사이클 | Cycle 201 |
-| 카테고리 | B(리스크) + D(ML) + F(리서치) |
-| 테스트 수 | 7788 passed, 23 skipped |
+| 완료 사이클 | Cycle 202 |
+| 다음 사이클 | Cycle 203 |
+| 카테고리 | C(데이터) + B(리스크) + F(리서치) |
+| 테스트 수 | 7801 passed, 23 skipped |
 | PASS 전략 수 | 22개 (QUALITY_AUDIT.csv) |
 | SIM 결과 | 0/5 Bundle OOS PASS, 0/22 Paper SIM PASS (합성 데이터) |
 
-## Cycle 200 변경 요약
+## Cycle 202 변경 요약
 
-### 진단 개선 (A1)
-- `src/backtest/engine.py`: atr=0으로 신호 무시 시 `fail_reasons`에 기록
-  → narrow_range 4h 0거래 원인 진단 가능 (atr=0 vs 신호 자체 없음 구분)
+### D1 개선: WalkForwardOptimizer IS 전체 음수 진단
+- `src/backtest/walk_forward.py`: `run()` 내 avg IS Sharpe < -0.5 시 fail_reasons 추가
+- `"IS 전체 음수: avg IS Sharpe=X.XXX — 전략 미작동 또는 합성 데이터(GBM)"` 메시지
+- GBM 합성 데이터에서 cmf/wick_reversal/elder_impulse IS 전부 음수 패턴 자동 진단
 
-### 인프라 개선 (C1)
-- `src/data/feed.py`: stale cache fallback 성공 시 30초 TTL로 `_cache` 재저장
-  → 거래소 다운 시 반복 retry 방지 (30초마다 1회만 재시도, 나머지 캐시 히트)
+### D2 개선: RegimeAwareFeatureBuilder.get_feature_importance()
+- `src/ml/features.py`: RF 50트리 빠른 fit으로 레짐별 피처 중요도 dict 반환
+- 사용법: `builder.get_feature_importance(df, regime="bull")` → `{feature: importance}`
+- 합성 데이터 vs 실데이터 피처 중요도 비교에 활용 예정
 
-### 테스트 +3개
-- `test_atr0_signals_skipped_recorded_in_fail_reasons`: atr=0 skip reason 기록 확인
-- `test_atr0_no_skip_reason_when_no_signals`: 신호 없으면 atr=0 reason 없음
-- `test_normal_atr_no_skip_reason`: 정상 ATR에서 atr=0 reason 없음
+### B1 검증: KellySizer ATR low 케이스 테스트
+- `tests/test_kelly_sizer_regime_edge_cases.py`: `test_atr_low_does_not_expand_size` 추가
+- ATR 낮을 때 포지션 확대 없음 (min(target_atr/atr, 1.0) = 1.0) 의도적 보수적 설계 검증
 
-## SIM 결과 주요 패턴 (Cycle 200)
+### 테스트 +6개
+- `test_all_is_sharpe_negative_adds_fail_reason` (walk_forward)
+- `TestGetFeatureImportance.*` 4개 (feature_builder)
+- `test_atr_low_does_not_expand_size` (kelly_sizer)
 
-- elder_impulse: fold 1 PASS (OOS Sharpe=3.794) — 3 사이클 연속 동일 fold → 특정 구간 의존
-- wick_reversal: fold 1/8 PASS — fold 8 OOS PF=1.141 (PF 기준 미달)
-- narrow_range: 1h avg 14 trades (정상) vs 4h 0 trades → 4h NR7+ATR축소 동시 충족 빈도 낮음
-- 합성 GBM 한계 지속 → IS Sharpe 음수, 실데이터 확보가 최우선 병목
+## SIM 결과 주요 패턴 (Cycle 202)
 
-## 다음 사이클 우선순위 (Cycle 201)
+- Paper SIM 1h (합성, GBM): 0/22 PASS — GBM 한계, 결과 Cycle 201과 동일
+  - price_action_momentum: avg Sharpe=6.90, +52.22% (합성 과적합)
+  - cmf: avg Sharpe=5.99, +46.21% (합성 과적합)
+  - value_area: avg 6 trades, Consistency 0/8 → 신호 조건 여전히 엄격
+- Bundle OOS 4h (합성): 0/5 PASS — IS 전부 음수 (새 fail_reason으로 진단됨)
+  - elder_impulse fold 1: OOS Sharpe=3.794 (반복 패턴, GBM 특정 구간)
+  - wick_reversal fold 8: OOS PF=1.141 < 1.5 기준 미달
 
-1. **B(리스크)**: DrawdownMonitor rolling vs. running, KellySizer half Kelly 확인
-2. **D(ML)**: DualGateADWIN cooldown 분석, RegimeAwareFeatureBuilder 피처 중요도
-3. **F(리서치)**: narrow_range NR4 전환 효과 분석
+## 다음 사이클 우선순위 (Cycle 203, 203 mod 5 = 3)
+
+**C(데이터) + B(리스크) + F(리서치)**
+
+1. **C(데이터)**: DataFeed retry/fallback 파라미터 점검, OrderFlowAnalyzer VPIN 정확도
+2. **B(리스크)**: DrawdownMonitor streak cooldown 만료 후 size 복원 동작 문서화
+3. **F(리서치)**: get_feature_importance() 활용하여 합성 vs 실데이터 피처 중요도 비교 계획

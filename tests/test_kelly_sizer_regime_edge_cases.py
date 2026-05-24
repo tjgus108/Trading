@@ -264,6 +264,20 @@ class TestKellySizerEdgeCases:
         ratio = size_high_atr / size_normal if size_normal > 0 else 0
         assert abs(ratio - 0.5) < 0.01, f"Expected ~0.5, got {ratio}"
 
+    def test_atr_low_does_not_expand_size(self):
+        """ATR 낮을 때(atr < target_atr) 포지션 사이즈 확대 없음 — atr_factor 상한 1.0."""
+        sizer = KellySizer()
+        base_params = dict(
+            win_rate=0.55, avg_win=0.02, avg_loss=0.01,
+            capital=10000, price=100, target_atr=2.0,
+        )
+        size_no_atr = sizer.compute(**base_params)
+        size_low_atr = sizer.compute(**base_params, atr=1.0)  # atr < target_atr
+        # atr_factor = min(2.0/1.0, 1.0) = 1.0 → 확대 없음
+        assert abs(size_low_atr - size_no_atr) < 1e-9, (
+            f"낮은 ATR 시 확대 금지: size_low_atr={size_low_atr}, size_no_atr={size_no_atr}"
+        )
+
     def test_kelly_cap_limits_high_kelly(self):
         """kelly_cap=0.25 → Full Kelly 초과 방지."""
         sizer = KellySizer(kelly_cap=0.25, fraction=1.0)

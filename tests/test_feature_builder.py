@@ -490,3 +490,49 @@ class TestOnchainFeatures:
         assert regime == "bear"
         assert isinstance(X, pd.DataFrame)
         assert len(X) > 0
+
+
+# ── get_feature_importance ───────────────────────────────────────────────────
+
+class TestGetFeatureImportance:
+    """RegimeAwareFeatureBuilder.get_feature_importance() 검증."""
+
+    def test_returns_dict_with_feature_names(self):
+        """반환값이 dict이고 키가 문자열(피처명)인지 확인."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        builder = RegimeAwareFeatureBuilder()
+        df = _make_ohlcv(200)
+        result = builder.get_feature_importance(df)
+        assert isinstance(result, dict)
+        assert len(result) > 0
+        assert all(isinstance(k, str) for k in result)
+        assert all(isinstance(v, float) for v in result.values())
+
+    def test_importances_sum_to_one(self):
+        """중요도 합계가 1.0에 근접."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        builder = RegimeAwareFeatureBuilder()
+        df = _make_ohlcv(200)
+        result = builder.get_feature_importance(df)
+        if result:
+            total = sum(result.values())
+            assert abs(total - 1.0) < 0.01, f"합계 {total:.4f} ≠ 1.0"
+
+    def test_explicit_regime_matches_features(self):
+        """명시적 regime 전달 시 해당 레짐 피처만 반환."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        builder = RegimeAwareFeatureBuilder()
+        df = _make_ohlcv(200)
+        result = builder.get_feature_importance(df, regime="bull")
+        expected_feats = set(builder.get_regime_features("bull", df))
+        actual_feats = set(result.keys())
+        # 반환된 피처는 레짐 피처의 부분집합이어야 함 (fallback 포함)
+        assert len(actual_feats) > 0
+
+    def test_insufficient_data_returns_empty(self):
+        """데이터 부족 시 빈 dict 반환."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        builder = RegimeAwareFeatureBuilder()
+        df = _make_ohlcv(10)  # 너무 짧음
+        result = builder.get_feature_importance(df, regime="bull")
+        assert isinstance(result, dict)

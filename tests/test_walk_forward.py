@@ -1092,3 +1092,47 @@ class TestFoldDecayNarrowRange:
             fold_decay=0.0,
         )
         assert opt.fold_decay == 0.0
+
+
+def test_all_is_sharpe_negative_adds_fail_reason():
+    """IS 전체 음수(avg < -0.5) 시 fail_reasons에 진단 메시지 추가."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.base import BaseStrategy
+    import pandas as pd, numpy as np
+
+    # 랜덤워크(GBM) 데이터 — IS Sharpe 전부 음수 유도
+    np.random.seed(0)
+    n = 800
+    closes = 100.0 * np.cumprod(1 - 0.003 + np.random.randn(n) * 0.015)
+    highs = closes * 1.01
+    lows  = closes * 0.99
+    df = pd.DataFrame({
+        "close": closes, "high": highs, "low": lows,
+        "open": closes * 0.999, "volume": np.full(n, 1000.0),
+        "atr14": np.full(n, 2.0), "rsi14": np.full(n, 45.0),
+        "vwap": closes, "ema50": closes, "ema20": closes, "ema9": closes,
+        "ema21": closes, "donchian_high": highs, "donchian_low": lows,
+        "volume_ma20": np.full(n, 1000.0), "macd": np.zeros(n),
+        "macd_signal": np.zeros(n), "bb_upper": highs, "bb_lower": lows,
+        "adx": np.full(n, 20.0), "plus_di": np.full(n, 20.0),
+        "minus_di": np.full(n, 20.0),
+    })
+
+    class AlwaysSell(BaseStrategy):
+        def generate_signals(self, df):
+            return pd.Series([-1] * len(df), index=df.index)
+
+    opt = WalkForwardOptimizer(
+        strategy_name="always_sell",
+        strategy_factory=lambda p: AlwaysSell(),
+        param_grid={},
+        n_windows=3,
+    )
+    result = opt.run(df)
+    # IS 전체 음수인 경우 fail_reason에 진단 메시지 포함 여부 확인
+    all_is = [wr.is_sharpe for wr in result.windows]
+    avg_is = sum(all_is) / len(all_is) if all_is else 0.0
+    if avg_is < -0.5:
+        assert any("IS 전체 음수" in r for r in result.fail_reasons), (
+            f"avg IS={avg_is:.3f} < -0.5 인데 fail_reasons에 IS 진단 없음: {result.fail_reasons}"
+        )
