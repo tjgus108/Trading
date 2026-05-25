@@ -60,6 +60,7 @@ class RiskConfig:
     risk_per_trade: float
     max_consecutive_losses: int = 5
     flash_crash_pct: float = 0.10
+    streak_recovery_grace_seconds: float = 0.0
 
 
 @dataclass
@@ -286,6 +287,7 @@ def load_config(path: str = "config/config.yaml") -> AppConfig:
             risk_per_trade=rsk.get("risk_per_trade", 0.01),
             max_consecutive_losses=rsk.get("max_consecutive_losses", 5),
             flash_crash_pct=rsk.get("flash_crash_pct", 0.10),
+            streak_recovery_grace_seconds=rsk.get("streak_recovery_grace_seconds", 0.0),
         ),
         logging=LoggingConfig(
             level=log.get("level", "INFO"),

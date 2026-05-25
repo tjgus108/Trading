@@ -814,6 +814,7 @@ class BotOrchestrator:
         self._impl_shortfall_samples: List[float] = []
         self._drawdown_monitor = DrawdownMonitor(
             max_drawdown_pct=getattr(cfg.risk, "max_drawdown", 0.20),
+            streak_recovery_grace_seconds=getattr(cfg.risk, "streak_recovery_grace_seconds", 0.0),
         )
         self._health_checker = DataFeedsHealthCheck()
 

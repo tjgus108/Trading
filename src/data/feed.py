@@ -15,7 +15,10 @@ except ImportError:
     ccxt = None  # type: ignore[assignment]
 import numpy as np
 import pandas as pd
-from scipy import stats
+try:
+    from scipy import stats as _scipy_stats
+except ImportError:
+    _scipy_stats = None  # type: ignore[assignment]
 
 from src.exchange.connector import ExchangeConnector
 from enum import Enum
@@ -715,8 +718,14 @@ class DataFeed:
             try:
                 log_returns = np.log(df["close"].pct_change() + 1).dropna()
                 if len(log_returns) > 2:
-                    kurtosis_val = stats.kurtosis(log_returns)
-                    skewness_val = stats.skew(log_returns)
+                    if _scipy_stats is not None:
+                        kurtosis_val = _scipy_stats.kurtosis(log_returns)
+                        skewness_val = _scipy_stats.skew(log_returns)
+                    else:
+                        arr = log_returns.values
+                        mu, std = arr.mean(), arr.std()
+                        kurtosis_val = float(np.mean(((arr - mu) / std) ** 4) - 3) if std > 0 else 0.0
+                        skewness_val = float(np.mean(((arr - mu) / std) ** 3)) if std > 0 else 0.0
             except:
                 pass
 

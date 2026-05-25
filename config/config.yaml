@@ -19,6 +19,7 @@ risk:
   risk_per_trade: 0.01      # 트레이드당 계좌 위험 비율 1%
   max_consecutive_losses: 4
   flash_crash_pct: 0.10     # 단일 캔들 10% 이상 변동 시 서킷 브레이커
+  streak_recovery_grace_seconds: 14400  # 연속 손실 후 4시간 무손실 시 자동 복원
 
 logging:
   level: INFO

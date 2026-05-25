@@ -902,13 +902,21 @@ class RollingOOSValidator:
 
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
+        low_trade_ratio = len(low_trade_fold_ids) / len(folds) if folds else 0.0
         if low_trade_fold_ids:
             bundle_fails.append(
                 f"저거래 fold 제외 (trades<{self.min_oos_trades}): {low_trade_fold_ids}"
             )
+        # 저거래 fold가 40% 초과 → 신호 생성 자체 부족 → FAIL
+        if low_trade_ratio > 0.4:
+            bundle_fails.append(
+                f"저거래 fold 비율 {low_trade_ratio:.0%} > 40% (신호 부족)"
+            )
+            all_passed = False
         if not all_passed:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
-            bundle_fails.append(f"Failed folds: {failed_ids}")
+            if failed_ids:
+                bundle_fails.append(f"Failed folds: {failed_ids}")
         if oos_std > self.OOS_SHARPE_STD_MAX:
             bundle_fails.append(
                 f"OOS Sharpe std {oos_std:.3f} > {self.OOS_SHARPE_STD_MAX} (불안정)"
