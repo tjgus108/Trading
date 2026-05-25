@@ -436,12 +436,15 @@ class DataFeed:
                 self._regime_cache.pop(symbol, None)
 
     def _evict_if_needed(self):
-        """캐시가 max_cache_size를 초과하면 가장 오래된 엔트리 제거 (LRU)."""
-        if len(self._cache) <= self._max_cache_size:
-            return
-        # 타임스탬프 기준 가장 오래된 엔트리 제거
-        oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
-        del self._cache[oldest_key]
+        """캐시가 max_cache_size를 초과하면 가장 오래된 엔트리 제거 (LRU).
+        stale_cache도 동일 한도 적용 (무제한 증가 방지).
+        """
+        if len(self._cache) > self._max_cache_size:
+            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+            del self._cache[oldest_key]
+        if len(self._stale_cache) > self._max_cache_size:
+            oldest_key = min(self._stale_cache, key=lambda k: self._stale_cache[k][1])
+            del self._stale_cache[oldest_key]
 
     def cache_stats(self) -> dict:
         """
