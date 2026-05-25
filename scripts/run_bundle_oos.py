@@ -262,11 +262,12 @@ def run_bundle_oos(
     timeframe: str = "4h",
     limit: int = 4320,
     dry_run: bool = False,
+    min_oos_trades: int = 3,
 ) -> list[tuple[str, BundleOOSResult]]:
     """5-Bundle 전략에 대해 Rolling OOS 검증 실행."""
     mode = "DRY-RUN (synthetic)" if dry_run else "LIVE"
     logger.info("=== 5-Bundle Rolling OOS Validation [%s] ===", mode)
-    logger.info("Symbol: %s | Timeframe: %s | Candles: %d", symbol, timeframe, limit)
+    logger.info("Symbol: %s | Timeframe: %s | Candles: %d | min_oos_trades: %d", symbol, timeframe, limit, min_oos_trades)
 
     # 데이터 수집
     if dry_run:
@@ -287,6 +288,7 @@ def run_bundle_oos(
         min_wfe=0.50,
         sharpe_decay_max=0.60,
         mdd_expand_max=2.0,
+        min_oos_trades=min_oos_trades,
     )
 
     results: list[tuple[str, BundleOOSResult]] = []
@@ -390,6 +392,10 @@ def main():
         "--dry-run", action="store_true",
         help="합성 데이터로 검증 (ccxt 불필요)",
     )
+    parser.add_argument(
+        "--min-trades", type=int, default=3,
+        help="저거래 fold 제외 임계값 (기본: 3). 저빈도 전략 분석 시 2로 낮추면 더 많은 fold 포함.",
+    )
     args = parser.parse_args()
 
     results = run_bundle_oos(
@@ -397,6 +403,7 @@ def main():
         timeframe=args.timeframe,
         limit=args.limit,
         dry_run=args.dry_run,
+        min_oos_trades=args.min_trades,
     )
 
     # 콘솔 요약 출력

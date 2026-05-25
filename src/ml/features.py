@@ -104,6 +104,33 @@ class FeatureBuilder:
             return pd.DataFrame()
         return self._compute_features(df).dropna()
 
+    def build_with_feature_selection(
+        self,
+        df: pd.DataFrame,
+        drop_features: List[str],
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """낮은 중요도 피처를 제거하고 build() 수행.
+
+        MLSignalGenerator.get_low_importance_features()와 연계:
+            low_feats = gen.get_low_importance_features(threshold=0.01)
+            X, y = builder.build_with_feature_selection(df, low_feats)
+
+        Args:
+            df: OHLCV DataFrame
+            drop_features: 제거할 피처 이름 목록
+
+        Returns:
+            X, y — drop_features 제거 후의 피처 행렬 + 레이블
+        """
+        X, y = self.build(df)
+        if X.empty or not drop_features:
+            return X, y
+        cols_to_drop = [c for c in drop_features if c in X.columns]
+        if cols_to_drop:
+            logger.debug("FeatureBuilder: dropping %d low-importance features: %s", len(cols_to_drop), cols_to_drop)
+            X = X.drop(columns=cols_to_drop)
+        return X, y
+
     # ------------------------------------------------------------------
     # Feature computation
     # ------------------------------------------------------------------

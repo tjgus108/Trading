@@ -208,13 +208,24 @@ class PortfolioOptimizer:
         """
         if len(port_returns) < 2:
             return 0.0, 0.0
-        from scipy.stats import norm
         mu = float(np.mean(port_returns))
         sigma = float(np.std(port_returns, ddof=1))
         if sigma <= 0:
             return 0.0, 0.0
-        # z-score for the (1-confidence) quantile
-        z = norm.ppf(1.0 - confidence)  # e.g. -1.645 for 95%
+
+        # z-score and pdf: scipy preferred, numpy fallback if unavailable
+        try:
+            from scipy.stats import norm as _norm
+            z = _norm.ppf(1.0 - confidence)
+            _norm_pdf = lambda x: _norm.pdf(x)
+        except ImportError:
+            # numpy approximation: ppf via rational approximation (Abramowitz & Stegun)
+            p = 1.0 - confidence
+            t = float(np.sqrt(-2.0 * np.log(p)))
+            c0, c1, c2 = 2.515517, 0.802853, 0.010328
+            d1, d2, d3 = 1.432788, 0.189269, 0.001308
+            z = -(t - (c0 + c1 * t + c2 * t ** 2) / (1 + d1 * t + d2 * t ** 2 + d3 * t ** 3))
+            _norm_pdf = lambda x: np.exp(-0.5 * x ** 2) / np.sqrt(2 * np.pi)
 
         # Cornish-Fisher expansion: 왜도/첨도로 z 보정
         n = len(port_returns)
@@ -240,7 +251,7 @@ class PortfolioOptimizer:
         p_var = -(mu + z_var * sigma)
         # Parametric CVaR (Expected Shortfall under normal, using original z)
         # ES = -(mu - sigma * pdf(z) / (1-confidence))
-        p_cvar = -(mu - sigma * norm.pdf(z) / (1.0 - confidence))
+        p_cvar = -(mu - sigma * _norm_pdf(z) / (1.0 - confidence))
         return max(0.0, p_var), max(0.0, p_cvar)
 
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
