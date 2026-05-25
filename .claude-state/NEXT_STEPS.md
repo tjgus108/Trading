@@ -1,59 +1,58 @@
 # Next Steps
 
-_Last updated: 2026-05-25 (Cycle 207 B+D+F 완료)_
+_Last updated: 2026-05-25 (Cycle 208 C+B+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 207 완료
-- 207 mod 5 = 2 → **B(리스크) + D(ML) + F(리서치)** 패턴 ✅
-- 다음 Cycle 208: **208 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)**
+### 로테이션: Cycle 208 완료
+- 208 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** 패턴 ✅
+- 다음 Cycle 209: **209 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
 
-### 🔥 Cycle 207 주요 성과
-- **B1**: config.yaml `max_consecutive_losses: 5 → 4` (DrawdownMonitor threshold 3과 불일치 완화)
-- **B2**: `portfolio_optimizer._parametric_var_cvar` scipy fallback 추가 (numpy 기반 대체)
-- **D1**: `FeatureBuilder.build_with_feature_selection()` 추가 — MLSignalGenerator 피처 pruning 연계
-- **F**: `run_bundle_oos.py --min-trades` CLI 옵션 추가 (기본 3, 저빈도 전략 분석 시 2 사용)
-- **SIM**: narrow_range ATR 완화 효과 확인 (fold 1, 6 PASS → 이전 0 PASS에서 개선)
+### 🔥 Cycle 208 주요 성과
+- **B1**: `config/config.yaml` + `src/config.py`: `streak_recovery_grace_seconds: 14400` 설정 지원 완성
+  - DrawdownMonitor의 하이브리드 streak 회복 기능이 config에서 직접 제어 가능
+- **C1**: `src/data/feed.py` `_evict_if_needed()`: stale_cache 크기 제한 추가 (무제한 증가 버그 수정)
+- **SIM**: narrow_range 3 PASS fold (Cycle 207 2 PASS에서 진전), value_area 3 PASS fold
 
-### 🎯 Cycle 208 권장 작업 (208 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 209 권장 작업 (209 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): Data & Infrastructure
-- DataFeed WebSocket 안정성 점검: `src/data/feed.py` recovery_timeout=300s 적용 후 안정성 확인
-- DataFeed 캐시 전략: 동일 심볼/타임프레임 재요청 시 메모리 캐시 TTL 활용 여부 확인
-- `src/data/` 모듈 전체 임포트 에러 없는지 확인 (ccxt 없는 환경에서도 graceful)
+#### D(ML): ML & Signals
+- `src/ml/features.py` `build_with_feature_selection()` 실사용 확인
+  - MLSignalGenerator와의 연동 테스트
+  - 피처 중요도가 낮은 피처 5개 이상 제거 후 Sharpe 변화 확인
+- RF 모델 재학습 여부 확인 (`scripts/train_ml.py` 실행 가능 환경 검증)
+- 앙상블 가중치 (ML + 기술적 신호) 최적화 검토
 
-#### B(리스크): Risk Management
-- DrawdownMonitor `streak_recovery_grace_seconds` live config 활성화 확인
-  - `config/config.yaml`에 `streak_recovery_grace_seconds: 14400` 추가 고려
-- CircuitBreaker `max_consecutive_losses=4` (Cycle 207 적용) 동작 검증
-  - DrawdownMonitor `loss_streak_threshold=3`: 3회 손실 → 50% 축소
-  - CircuitBreaker `max_consecutive_losses=4`: 4회 손실 → 쿨다운
-  - 두 모듈이 순차적으로 단계적 차단 적용됨 → 의도된 설계 확인
-- VaR/CVaR scipy fallback 검증: scipy 없는 환경 시뮬레이션 테스트
+#### E(실행): Execution
+- TWAP executor 검증: `src/exchange/` 내 TWAP 구현 점검
+- Paper trading 슬리피지 모델 정확도 점검
+- `dry_run=true` 상태에서 주문 플로우 시뮬레이션 검증
 
 #### F(리서치): SIM 결과 기반
-- **narrow_range 2 PASS fold 심층 분석**:
-  - fold 1 (2022년 중반?): OOS=1.422, trades=4, PF=1.560 → 어떤 시장 환경?
-  - fold 6 (2023-24년?): OOS=2.809, trades=4, PF=2.268 → 유사 환경 탐색
-  - 공통점 분석: 좁은 레인지 구간 특성 (ATR 낮은 구간)
-- **--min-trades 2 옵션으로 narrow_range 재검증**:
-  - `python3 scripts/run_bundle_oos.py --symbol BTC/USDT --timeframe 4h --min-trades 2`
-  - fold 3 (trades=2, OOS=5.980) 포함 시 효과 측정 — 단, 2-trade fold 신뢰도 낮음
-- **value_area OOS Sharpe std=6.589 대응**:
-  - std가 높은 원인: fold별 va_mult 최적값 달라짐
-  - 다음 사이클에서 va_mult 고정값(예: 1.5 단일)으로 std 감소 여부 확인
+- **narrow_range 3 PASS fold 심층 분석**:
+  - fold 1 (OOS=1.422, 4 trades), fold 3 (OOS=5.980, 2 trades), fold 6 (OOS=2.809, 4 trades)
+  - 공통점: ATR 낮은 구간 (좁은 레인지), IS Sharpe가 비교적 양수에 가까움
+  - --min-trades 2 검증: `python3 scripts/run_bundle_oos.py --symbol BTC/USDT --timeframe 4h --min-trades 2`
+- **value_area 3 PASS fold 분석**:
+  - fold 0(OOS=3.559), fold 4(OOS=1.056), fold 6(OOS=9.516) — std=6.589 여전히 불안정
+  - va_mult 단일 고정값 시도: std 감소 효과 확인 목적
+- **elder_impulse 4사이클 연속 fold 1 PASS**:
+  - fold 1 기간 특성 분석: 2022년 중반 특정 시장 구조 (강한 추세 구간?)
+  - 해당 구간 공통점 분석 → regime filter로 활성화 조건 검토
 
-### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 207 / 합성 GBM 환경)
+### ⚠️ 핵심 문제: SIM 결과 패턴 (Cycle 208 / 합성 GBM 환경)
 
 **Bundle OOS (4h) — 합성 데이터:**
 - 0/5 PASS — GBM IS 음수 패턴 지속
-- **narrow_range: ATR_THRESHOLD=0.90, VOL_SPIKE_MULT=1.0 → fold 1,6 PASS (진전)**
-- value_area: fold 0,6 PASS (2 fold) — std=6.589 여전히 불안정
-- elder_impulse: fold 1 PASS (OOS=3.794) — 3개 사이클 연속 동일 패턴
+- **narrow_range: fold 1,3,6 PASS (3 PASS fold) → Cycle 207 대비 +1 개선**
+- **value_area: fold 0,4,6 PASS (3 PASS fold) — std=6.589 불안정**
+- elder_impulse: fold 1 PASS (OOS=3.794) — 4사이클 연속 동일
+- wick_reversal: fold 1,8 PASS (2 PASS fold)
+- cmf: 0 PASS fold (IS 전부 음수, GBM에서 역방향 신호)
 
-**Paper SIM (1h) — 합성 데이터:**
+**Paper SIM (1h) — 합성 데이터 (Cycle 207 결과):**
 - 0/22 PASS — GBM 한계 동일
 - 상위: price_action_momentum(6.90), cmf(5.99), momentum_quality(5.64)
 - elder_impulse: 1.32 Sharpe, 28 trades (안정적)
@@ -86,7 +85,8 @@ _Last updated: 2026-05-25 (Cycle 207 B+D+F 완료)_
 | value_area | 5.24 | 53% | 1.84 | 30 | 5.0% | RANGE |
 
 **⚠️ 위 수치는 IS(In-Sample) 성과. OOS 검증 시 전략 전부 FAIL.**
-**narrow_range: Cycle 207에서 fold 1,6 PASS (합성 4h) → 실데이터 검증 우선 후보 추가됨.**
+**narrow_range: Cycle 208에서 fold 1,3,6 PASS (합성 4h) → 최다 PASS fold 전략. 실데이터 검증 우선 후보.**
+**value_area: Cycle 208에서 fold 0,4,6 PASS (합성 4h) → std 불안정, va_mult 고정 실험 필요.**
 
 ---
 
@@ -96,5 +96,5 @@ _Last updated: 2026-05-25 (Cycle 207 B+D+F 완료)_
 
 ---
 
-**상태**: Cycle 207 완료 → Cycle 208 C(데이터) + B(리스크) + F(리서치) 예정
+**상태**: Cycle 208 완료 → Cycle 209 D(ML) + E(실행) + F(리서치) 예정
 **최우선 과제**: narrow_range --min-trades 2 검증 + elder_impulse/narrow_range 실데이터 OOS 검증

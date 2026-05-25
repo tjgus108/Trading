@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-05-25] Cycle 208 — C(데이터) + B(리스크) + F(리서치)
+
+**SIM 결과 요약 (Bundle OOS 4h + Paper SIM 1h):**
+- Bundle OOS 4h (합성): 0/5 PASS — GBM IS 음수 패턴 지속
+  - **narrow_range**: fold 1(OOS=1.422, PASS), fold 3(OOS=5.980, PASS), fold 6(OOS=2.809, PASS) → **3 PASS fold** (Cycle 207 2 PASS에서 개선!)
+  - **value_area**: fold 0(OOS=3.559), fold 4(OOS=1.056), fold 6(OOS=9.516) → 3 PASS fold
+  - **elder_impulse**: fold 1 PASS (OOS=3.794) — 4사이클 연속 동일 패턴
+  - **wick_reversal**: fold 1(OOS=4.832 PASS), fold 8(OOS=0.372 PASS)
+  - **cmf**: 0 PASS fold (IS 전부 음수)
+- Paper SIM 1h (합성, Cycle 207 결과 재사용): 0/22 PASS
+  - 상위: price_action_momentum(6.90), cmf(5.99), momentum_quality(5.64)
+  - elder_impulse: 1.32 Sharpe, 28 trades
+
+**[B1] RiskConfig streak_recovery_grace_seconds 설정 지원 추가:**
+- `config/config.yaml`: `streak_recovery_grace_seconds: 14400` 추가 (4시간 무손실 경과 시 연속 손실 자동 초기화)
+- `src/config.py`: RiskConfig 필드 추가 + _RISK_DEFAULTS + load_config() 지원
+  - Cycle 207에 DrawdownMonitor에 구현된 기능을 실제 config에서 제어 가능하게 연결
+
+**[C1] DataFeed stale_cache 크기 제한 버그 수정:**
+- `src/data/feed.py`: `_evict_if_needed()` 에 stale_cache 크기 제한 추가
+  - 기존: hot cache만 max_cache_size 적용, stale_cache 무제한 증가
+  - 수정: stale_cache도 max_cache_size 동일 제한 적용 → 메모리 누수 방지
+
+**테스트:** 141 passed (test_drawdown_monitor, test_circuit_breaker, test_feed_boundary, test_feed_error_handling, test_config)
+
 ## [2026-05-25] Cycle 207 — B(리스크) + D(ML) + F(리서치)
 
 **SIM 결과 요약 (Bundle OOS 4h + Paper SIM 1h):**
