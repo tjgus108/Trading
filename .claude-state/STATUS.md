@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-05-25 (Cycle 195)_
+_Last updated: 2026-05-25 (Cycle 208)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -17,7 +17,7 @@ _Last updated: 2026-05-25 (Cycle 195)_
 - **라이브**: live_paper_trader **100% 준비**
 - **OOS 인프라**: `scripts/run_bundle_oos.py` — 5-Bundle Rolling OOS 자동 실행 + 리포트 생성
 
-## 최근 작업 (Cycle 195)
+## 최근 작업 (Cycle 208)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
 | D (ML) | ✅ | 추론 벤치마크(p50/p95/p99) + OnChainFeatureStub(netflow/sopr/tvl) |
