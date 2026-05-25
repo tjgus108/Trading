@@ -1,6 +1,15 @@
 # Current Cycle Briefing
 
-_Updated: 2026-05-25 — Cycle 207 완료 (B+D+F)_
+_Updated: 2026-05-25 — Cycle 208 완료 (C+B+F)_
+
+## 이번 사이클 (208) 완료 내용
+- **C1**: feed.py scipy graceful fallback (numpy kurtosis/skewness 대체)
+- **B1**: DrawdownMonitor.to_dict() streak_recovery_grace_seconds 누락 버그 수정
+- **B2**: config.yaml streak_recovery_grace_seconds: 14400 활성화
+- **SIM**: Bundle OOS 0/5, narrow_range 3 PASS fold (개선)
+- **테스트**: 7803 passed, 23 skipped
+
+## 다음 사이클 (209): D(ML) + E(실행) + F(리서치)
 
 ## 현재 상태
 - **사이클**: 207 완료 → 208 예정

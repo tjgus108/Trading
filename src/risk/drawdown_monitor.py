@@ -616,6 +616,7 @@ class DrawdownMonitor:
             "single_loss_halt_pct": self.single_loss_halt_pct,
             "cooldown_seconds": self.cooldown_seconds,
             "streak_cooldown_seconds": self.streak_cooldown_seconds,
+            "streak_recovery_grace_seconds": self.streak_recovery_grace_seconds,
             "mdd_warn_pct": self.mdd_warn_pct,
             "mdd_block_pct": self.mdd_block_pct,
             "mdd_liquidate_pct": self.mdd_liquidate_pct,
