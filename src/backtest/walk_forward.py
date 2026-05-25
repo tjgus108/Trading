@@ -104,6 +104,16 @@ class WalkForwardResult:
     param_stability_cv: Dict[str, float] = field(default_factory=dict)
     # time-decay 가중평균 OOS Sharpe (정보 제공용, PASS/FAIL 기준 아님)
     weighted_oos_sharpe: Optional[float] = None
+    # WFE: Walk Forward Efficiency = avg OOS Sharpe / avg IS Sharpe
+    # > 0.7이면 robust, <= 0이면 과최적화 심각
+    wfe: Optional[float] = None
+    # fold_pass_rate: OOS Sharpe > 0인 fold 비율 (0.0~1.0)
+    fold_pass_rate: Optional[float] = None
+
+    @property
+    def is_robust(self) -> bool:
+        """WFE > 0.7이면 robust 판정. wfe가 None이면 False."""
+        return self.wfe is not None and self.wfe > 0.7
 
     def summary(self) -> str:
         verdict = "STABLE" if self.is_stable else "UNSTABLE"
@@ -116,6 +126,11 @@ class WalkForwardResult:
             f"  overfit_windows: {self.overfit_windows}/{len(self.windows)}",
             f"  verdict: {verdict}",
         ]
+        if self.wfe is not None:
+            robust_tag = "ROBUST" if self.is_robust else "NOT_ROBUST"
+            lines.append(f"  wfe: {self.wfe:.3f} ({robust_tag})")
+        if self.fold_pass_rate is not None:
+            lines.append(f"  fold_pass_rate: {self.fold_pass_rate:.2%}")
         if self.weighted_oos_sharpe is not None:
             lines.append(f"  weighted_oos_sharpe: {self.weighted_oos_sharpe:.3f}")
         if self.param_stability_cv:
@@ -183,6 +198,14 @@ class WalkForwardOptimizer:
 
     def run(self, df: pd.DataFrame) -> WalkForwardResult:
         """Walk-forward 최적화 실행."""
+        # 파라미터 수 과적합 경고 (5개 초과 시)
+        n_params = len(self._param_grid)
+        if n_params > 5:
+            logger.warning(
+                "[%s] 파라미터 수 %d > 5 — 과적합 위험. 단순 전략(2~3 파라미터) 권장.",
+                self.strategy_name, n_params,
+            )
+
         if not self._param_grid:
             return WalkForwardResult(
                 strategy_name=self.strategy_name,
@@ -330,6 +353,21 @@ class WalkForwardOptimizer:
             # fold_decay=0이면 동일 가중치 → weighted == avg
             weighted_oos_sharpe = avg_oos
 
+        # WFE = avg OOS Sharpe / avg IS Sharpe
+        all_is_sharpes = [wr.is_sharpe for wr in window_results]
+        avg_is_sharpe = sum(all_is_sharpes) / len(all_is_sharpes) if all_is_sharpes else 0.0
+        if abs(avg_is_sharpe) > 1e-9:
+            wfe = round(avg_oos / avg_is_sharpe, 4)
+        else:
+            wfe = None  # IS Sharpe ≈ 0이면 WFE 정의 불가
+
+        # fold_pass_rate: OOS Sharpe > 0인 fold 비율
+        if window_results:
+            positive_oos_folds = sum(1 for wr in window_results if wr.oos_sharpe > 0)
+            fold_pass_rate = round(positive_oos_folds / len(window_results), 4)
+        else:
+            fold_pass_rate = None
+
         fail_reasons = []
         is_stable = True
         if oos_std > OOS_STD_MAX:
@@ -339,9 +377,7 @@ class WalkForwardOptimizer:
             fail_reasons.append(f"OOS 평균 Sharpe 낮음: {avg_oos:.3f} < 0.5")
             is_stable = False
         # IS Sharpe 전체 음수 진단: GBM 합성 데이터나 전략 미작동 신호
-        all_is_sharpes = [wr.is_sharpe for wr in window_results]
         if all_is_sharpes:
-            avg_is_sharpe = sum(all_is_sharpes) / len(all_is_sharpes)
             if avg_is_sharpe < -0.5:
                 fail_reasons.append(
                     f"IS 전체 음수: avg IS Sharpe={avg_is_sharpe:.3f} — "
@@ -361,6 +397,8 @@ class WalkForwardOptimizer:
             last_is_sharpe_dist=last_is_sharpe_dist,
             param_stability_cv=param_stability_cv,
             weighted_oos_sharpe=round(weighted_oos_sharpe, 4),
+            wfe=wfe,
+            fold_pass_rate=fold_pass_rate,
         )
         logger.info(result.summary())
         return result

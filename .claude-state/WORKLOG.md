@@ -1,5 +1,36 @@
 # Work Log
 
+## [2026-05-26] Cycle 210 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — WFE + fold_pass_rate + 파라미터 경고:**
+- WalkForwardResult에 wfe, fold_pass_rate, is_robust 속성 추가
+- WFE = avg OOS Sharpe / avg IS Sharpe, fold_pass_rate = OOS Sharpe>0 비율
+- WFE>0.7이면 robust 판정 (is_robust property)
+- WalkForwardOptimizer.run()에서 파라미터 5개 초과 시 WARNING 로그
+- 테스트 6개 추가 (48→54 통과)
+
+**[E] Execution — PaperTrader 통합 검증 + PerformanceTracker 일간 리포트:**
+- TestPaperTraderIntegration 11개 테스트: VolTargeting+KellySizer+TieredSlippage 동시 동작 E2E 검증
+- PerformanceTracker: get_daily_pnl(), get_daily_summary() 추가 (승률/PF/Sharpe 일간 기준)
+- flaky 테스트 수정 (partial_fill_prob=0.0 누락)
+- 테스트 136 passed (paper_trader + performance_tracker)
+
+**[SIM] Seed 다양화 효과 확인:**
+- BTC/ETH/SOL 3심볼 결과 확실히 분화됨 (이전: 100% 동일)
+- 여전히 0/22 PASS, 합성 GBM 한계
+- cmf(50~53%), PAM(55~66%), momentum_quality 3심볼 양수 — 실데이터 검증 우선 대상
+- value_area PF=999.99 artifact 대폭 감소 (BTC 2.30, ETH 1.34, SOL 4.32)
+
+**[F] Research — 거래 빈도 최적화 + WFE 실전:**
+- fold당 최소 30 trades 필요 (학술 기준, 현 15는 절반)
+- 4h→1h 이동으로 거래 수 4배 가능 (파라미터 변경 없이)
+- WFE>0.7 기준 타당하나 합성 데이터에서는 낙관적 편향
+- 7일 train/28일 test가 81개 WF 조합 중 Sharpe 최고(1.252)
+
+**테스트:** walk_forward 54, paper_trader 136, 전체 1318 passed
+
+---
+
 ## [2026-05-26] Cycle 209 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[C] Data — 합성 데이터 seed 다양화:**
@@ -15450,3 +15481,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-25 15:27 UTC] Cycle 210 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

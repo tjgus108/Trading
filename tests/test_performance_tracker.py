@@ -216,3 +216,153 @@ def test_get_hourly_pnl_old_trade_excluded():
     t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=old_ts)
     result = t.get_hourly_pnl("strat", hours=24)
     assert sum(result) == pytest.approx(0.0), "trade older than cutoff must be excluded"
+
+
+# --- get_daily_pnl 테스트 ---
+
+def test_get_daily_pnl_returns_correct_length():
+    """get_daily_pnl이 days 길이의 리스트를 반환."""
+    t = make_tracker()
+    result = t.get_daily_pnl("strat", days=7)
+    assert isinstance(result, list)
+    assert len(result) == 7
+
+
+def test_get_daily_pnl_empty_strategy():
+    """거래 없으면 모두 0.0."""
+    t = make_tracker()
+    result = t.get_daily_pnl("no_strat", days=5)
+    assert result == [0.0] * 5
+
+
+def test_get_daily_pnl_recent_trade_in_last_bucket():
+    """방금 기록한 거래는 마지막 버킷(index -1)에 합산."""
+    import time
+    t = make_tracker()
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=time.time())
+    result = t.get_daily_pnl("strat", days=7)
+    assert result[-1] == pytest.approx(100.0)
+    assert sum(result[:-1]) == pytest.approx(0.0)
+
+
+def test_get_daily_pnl_old_trade_excluded():
+    """cutoff 이전 거래는 집계에서 제외."""
+    import time
+    t = make_tracker()
+    old_ts = time.time() - 8 * 86400  # 8일 전
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=old_ts)
+    result = t.get_daily_pnl("strat", days=7)
+    assert sum(result) == pytest.approx(0.0)
+
+
+def test_get_daily_pnl_multiple_trades_same_day():
+    """같은 날 여러 거래는 합산."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=now)
+    t.record_trade("strat", -20.0, 150.0, 130.0, timestamp=now - 100)
+    t.record_trade("strat", 30.0, 130.0, 160.0, timestamp=now - 200)
+    result = t.get_daily_pnl("strat", days=7)
+    assert result[-1] == pytest.approx(60.0)  # 50 + (-20) + 30
+
+
+def test_get_daily_pnl_trades_across_days():
+    """여러 날에 걸친 거래가 올바른 버킷에 분류."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)  # 오늘
+    t.record_trade("strat", -50.0, 200.0, 150.0, timestamp=now - 86400)  # 어제
+    t.record_trade("strat", 75.0, 150.0, 225.0, timestamp=now - 2 * 86400)  # 그제
+    result = t.get_daily_pnl("strat", days=7)
+    assert result[-1] == pytest.approx(100.0)   # 오늘
+    assert result[-2] == pytest.approx(-50.0)    # 어제
+    assert result[-3] == pytest.approx(75.0)     # 그제
+
+
+# --- get_daily_summary 테스트 ---
+
+def test_get_daily_summary_empty():
+    """거래 없는 전략의 daily summary."""
+    t = make_tracker()
+    summary = t.get_daily_summary("no_strat", days=7)
+    assert summary["days"] == 7
+    assert summary["total_trades"] == 0
+    assert summary["total_pnl"] == 0.0
+    assert summary["win_rate"] == 0.0
+    assert summary["profit_factor"] is None
+    assert summary["sharpe"] is None
+
+
+def test_get_daily_summary_with_trades():
+    """거래가 있는 전략의 daily summary 기본 키 확인."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=now)
+    t.record_trade("strat", -20.0, 150.0, 130.0, timestamp=now - 100)
+    t.record_trade("strat", 30.0, 130.0, 160.0, timestamp=now - 200)
+
+    summary = t.get_daily_summary("strat", days=7)
+    assert summary["total_trades"] == 3
+    assert summary["total_pnl"] == pytest.approx(60.0)
+    assert summary["win_rate"] == pytest.approx(2 / 3, abs=0.01)
+    assert "daily_pnl" in summary
+    assert len(summary["daily_pnl"]) == 7
+
+
+def test_get_daily_summary_profit_factor():
+    """PF 계산 정확성 검증."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    # wins: 100, 50 (total=150), losses: -30, -20 (total=50)
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)
+    t.record_trade("strat", 50.0, 200.0, 250.0, timestamp=now - 100)
+    t.record_trade("strat", -30.0, 250.0, 220.0, timestamp=now - 200)
+    t.record_trade("strat", -20.0, 220.0, 200.0, timestamp=now - 300)
+
+    summary = t.get_daily_summary("strat", days=7)
+    assert summary["profit_factor"] == pytest.approx(150.0 / 50.0, abs=0.01)
+
+
+def test_get_daily_summary_all_wins_pf_inf():
+    """모두 수익이면 PF는 inf."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 10.0, 100.0, 110.0, timestamp=now)
+    t.record_trade("strat", 20.0, 110.0, 130.0, timestamp=now - 100)
+
+    summary = t.get_daily_summary("strat", days=7)
+    assert summary["profit_factor"] == float("inf")
+
+
+def test_get_daily_summary_sharpe_with_multiple_days():
+    """여러 날에 걸친 거래에서 Sharpe 계산."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    # 3일간 거래 → daily_pnl에 비제로 값이 최소 2개
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)
+    t.record_trade("strat", -30.0, 200.0, 170.0, timestamp=now - 86400)
+    t.record_trade("strat", 50.0, 170.0, 220.0, timestamp=now - 2 * 86400)
+
+    summary = t.get_daily_summary("strat", days=7)
+    # 3일간 비제로 거래 → Sharpe 계산 가능
+    assert summary["sharpe"] is not None
+    assert isinstance(summary["sharpe"], float)
+
+
+def test_get_daily_summary_excludes_old_trades():
+    """window 밖의 거래는 summary에서 제외."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=now - 10 * 86400)  # 10일 전
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=now)  # 오늘
+
+    summary = t.get_daily_summary("strat", days=7)
+    assert summary["total_trades"] == 1  # 10일 전 거래 제외
+    assert summary["total_pnl"] == pytest.approx(50.0)

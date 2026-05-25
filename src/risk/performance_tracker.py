@@ -172,6 +172,93 @@ class LivePerformanceTracker:
 
         return buckets
 
+    def get_daily_pnl(self, strategy: str, days: int = 7) -> list:
+        """최근 N일간의 일별 합산 PnL 리스트 반환.
+
+        Returns:
+            길이 days인 list. index 0 = 가장 오래된 날,
+            index -1 = 오늘. 거래 없는 날은 0.0.
+        """
+        now = time.time()
+        cutoff = now - days * 86400.0
+        buckets = [0.0] * days
+
+        for t in self._trades[strategy]:
+            ts = t.get("timestamp", 0.0)
+            if ts < cutoff:
+                continue
+            age_seconds = now - ts
+            bucket_idx = days - 1 - int(age_seconds // 86400)
+            if 0 <= bucket_idx < days:
+                buckets[bucket_idx] += t["pnl"]
+
+        return buckets
+
+    def get_daily_summary(self, strategy: str, days: int = 7) -> dict:
+        """일간 기준 성과 요약: 승률, PF, Sharpe.
+
+        최근 days일간의 거래를 기반으로 계산.
+
+        Returns:
+            {
+              "days": int,
+              "total_trades": int,
+              "total_pnl": float,
+              "daily_pnl": list[float],
+              "win_rate": float,
+              "profit_factor": float | None,
+              "sharpe": float | None,
+            }
+        """
+        now = time.time()
+        cutoff = now - days * 86400.0
+
+        trades_in_window = [
+            t for t in self._trades[strategy]
+            if t.get("timestamp", 0.0) >= cutoff
+        ]
+
+        total_trades = len(trades_in_window)
+        pnls = [t["pnl"] for t in trades_in_window]
+        total_pnl = sum(pnls)
+
+        # 승률
+        wins = sum(1 for p in pnls if p > 0)
+        win_rate = wins / total_trades if total_trades > 0 else 0.0
+
+        # Profit Factor
+        gross_profit = sum(p for p in pnls if p > 0)
+        gross_loss = abs(sum(p for p in pnls if p <= 0))
+        if gross_loss < 1e-9:
+            pf = float("inf") if gross_profit > 0 else None
+        else:
+            pf = gross_profit / gross_loss
+
+        # 일별 PnL → Sharpe (일간 기준, 연환산)
+        daily_pnl = self.get_daily_pnl(strategy, days=days)
+        non_zero_days = [d for d in daily_pnl if d != 0.0]
+        if len(non_zero_days) >= 2:
+            n = len(daily_pnl)
+            mean_d = sum(daily_pnl) / n
+            variance = sum((d - mean_d) ** 2 for d in daily_pnl) / n
+            std_d = variance ** 0.5
+            if std_d > 0:
+                sharpe = (mean_d / std_d) * sqrt(365)
+            else:
+                sharpe = None
+        else:
+            sharpe = None
+
+        return {
+            "days": days,
+            "total_trades": total_trades,
+            "total_pnl": round(total_pnl, 8),
+            "daily_pnl": daily_pnl,
+            "win_rate": round(win_rate, 4),
+            "profit_factor": round(pf, 4) if pf is not None and pf != float("inf") else pf,
+            "sharpe": round(sharpe, 4) if sharpe is not None else None,
+        }
+
     def get_summary(self, strategy: str) -> dict:
         """전략별 요약 반환."""
         trades = self._trades[strategy]

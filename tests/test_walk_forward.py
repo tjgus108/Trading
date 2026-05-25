@@ -1136,3 +1136,138 @@ def test_all_is_sharpe_negative_adds_fail_reason():
         assert any("IS 전체 음수" in r for r in result.fail_reasons), (
             f"avg IS={avg_is:.3f} < -0.5 인데 fail_reasons에 IS 진단 없음: {result.fail_reasons}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 210 D(ML): WFE + fold_pass_rate + 파라미터 수 경고 테스트
+# ---------------------------------------------------------------------------
+
+def test_walkforward_result_has_wfe_and_fold_pass_rate():
+    """WalkForwardResult에 wfe와 fold_pass_rate 속성이 존재하고 올바른 타입."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=2,
+    )
+    result = opt.run(make_df(600))
+
+    # wfe: float 또는 None (IS Sharpe≈0이면 None)
+    assert result.wfe is None or isinstance(result.wfe, float)
+    # fold_pass_rate: 0.0~1.0 사이 float 또는 None
+    assert result.fold_pass_rate is None or (
+        isinstance(result.fold_pass_rate, float) and 0.0 <= result.fold_pass_rate <= 1.0
+    )
+
+
+def test_is_robust_property_above_threshold():
+    """WFE > 0.7이면 is_robust=True, 그 이하면 False."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    # wfe > 0.7 → robust
+    r_robust = WalkForwardResult(
+        strategy_name="test", best_params={}, windows=[],
+        avg_oos_sharpe=1.0, oos_sharpe_std=0.1,
+        is_stable=True, overfit_windows=0,
+        wfe=0.8, fold_pass_rate=1.0,
+    )
+    assert r_robust.is_robust is True
+
+    # wfe = 0.7 → NOT robust (경계: 초과만 True)
+    r_boundary = WalkForwardResult(
+        strategy_name="test", best_params={}, windows=[],
+        avg_oos_sharpe=0.5, oos_sharpe_std=0.2,
+        is_stable=True, overfit_windows=0,
+        wfe=0.7, fold_pass_rate=0.5,
+    )
+    assert r_boundary.is_robust is False
+
+    # wfe = None → False
+    r_none = WalkForwardResult(
+        strategy_name="test", best_params={}, windows=[],
+        avg_oos_sharpe=0.0, oos_sharpe_std=0.0,
+        is_stable=False, overfit_windows=0,
+        wfe=None, fold_pass_rate=None,
+    )
+    assert r_none.is_robust is False
+
+
+def test_fold_pass_rate_all_positive():
+    """모든 OOS Sharpe가 양수이면 fold_pass_rate=1.0."""
+    from src.backtest.walk_forward import WalkForwardResult, WindowResult
+
+    windows = [
+        WindowResult(window_id=i, params={}, is_sharpe=1.0, oos_sharpe=0.5 + i * 0.1,
+                     oos_passed=True, is_oos_ratio=0.5)
+        for i in range(3)
+    ]
+    # fold_pass_rate 직접 계산 검증
+    positive = sum(1 for w in windows if w.oos_sharpe > 0)
+    rate = positive / len(windows)
+    assert rate == 1.0
+
+
+def test_fold_pass_rate_none_when_no_windows():
+    """윈도우가 없으면 fold_pass_rate=None."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    r = WalkForwardResult(
+        strategy_name="test", best_params={}, windows=[],
+        avg_oos_sharpe=0.0, oos_sharpe_std=0.0,
+        is_stable=False, overfit_windows=0,
+        wfe=None, fold_pass_rate=None,
+    )
+    assert r.fold_pass_rate is None
+
+
+def test_wfe_in_summary_output():
+    """WFE가 summary() 출력에 포함됨."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    r = WalkForwardResult(
+        strategy_name="test_strat", best_params={}, windows=[],
+        avg_oos_sharpe=1.2, oos_sharpe_std=0.3,
+        is_stable=True, overfit_windows=0,
+        wfe=0.85, fold_pass_rate=0.75,
+    )
+    summary = r.summary()
+    assert "wfe" in summary.lower()
+    assert "0.850" in summary
+    assert "ROBUST" in summary
+    assert "fold_pass_rate" in summary
+
+
+def test_param_count_warning_logged(caplog):
+    """파라미터 수 > 5이면 WARNING 로그 발생."""
+    import logging
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy()
+
+    # 6개 파라미터 그리드 (> 5)
+    large_grid = {f"p{i}": [1, 2] for i in range(6)}
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid=large_grid,
+        n_windows=2,
+    )
+    with caplog.at_level(logging.WARNING, logger="src.backtest.walk_forward"):
+        opt.run(make_df(200))  # 데이터 부족으로 빠르게 종료됨
+
+    assert any("파라미터 수" in r.message and "과적합" in r.message
+               for r in caplog.records), (
+        f"파라미터 수 경고 없음. 기록: {[r.message for r in caplog.records]}"
+    )

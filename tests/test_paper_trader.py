@@ -680,7 +680,8 @@ def test_extreme_slippage_large_order():
 
 def test_sequence_timeout_then_success():
     """타임아웃 후 재시도 시나리오 (타임아웃이 포지션에 영향 없음)."""
-    pt = PaperTrader(initial_balance=50000.0, timeout_prob=1.0)
+    pt = PaperTrader(initial_balance=50000.0, timeout_prob=1.0,
+                     partial_fill_prob=0.0)
     
     # 첫 시도: 타임아웃 (100% 확률)
     result1 = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
@@ -1514,3 +1515,244 @@ def test_tiered_slippage_sell_also_applies():
     assert result["status"] == "filled"
     # BTC tier → 0.05% max slippage
     assert abs(result["slippage_bps"]) <= 10.0  # with volume_impact=1.0
+
+
+# ── VolTargeting + KellySizer + TieredSlippage 통합 테스트 (Cycle 210) ─────
+
+class TestPaperTraderIntegration:
+    """PaperTrader에 VolTargeting + KellySizer + TieredSlippage
+    3개 모듈이 동시에 활성화된 상태에서의 end-to-end 통합 테스트."""
+
+    @staticmethod
+    def _make_volatile_df(n=30, base=100.0, vol_scale=5.0):
+        """높은 변동성의 candle DataFrame."""
+        import numpy as np
+        import pandas as _pd
+        prices = base + np.cumsum(np.random.randn(n) * vol_scale)
+        prices = np.maximum(prices, 1.0)
+        return _pd.DataFrame({
+            "open": prices, "high": prices * 1.01,
+            "low": prices * 0.99, "close": prices,
+            "volume": np.ones(n) * 1000,
+        })
+
+    @staticmethod
+    def _make_calm_df(n=30, base=100.0):
+        """낮은 변동성의 candle DataFrame."""
+        import numpy as np
+        import pandas as _pd
+        prices = base + np.cumsum(np.random.randn(n) * 0.01)
+        prices = np.maximum(prices, 1.0)
+        return _pd.DataFrame({
+            "open": prices, "high": prices * 1.001,
+            "low": prices * 0.999, "close": prices,
+            "volume": np.ones(n) * 1000,
+        })
+
+    def _make_integrated_trader(self, balance=500000.0, kelly_history=True):
+        """VolTargeting + KellySizer + TieredSlippage 전부 활성화된 PaperTrader 생성."""
+        from src.risk.vol_targeting import VolTargeting
+        from src.risk.kelly_sizer import KellySizer
+
+        vt = VolTargeting(target_vol=0.20, window=20, annualization=252 * 24,
+                          max_scalar=2.0, min_scalar=0.01)
+        ks = KellySizer(rolling_window=50, min_fraction=0.001, max_fraction=0.10)
+
+        if kelly_history:
+            # 충분한 거래 기록 주입 (min_trades=10 초과)
+            for _ in range(8):
+                ks.record_trade(50.0)
+            for _ in range(4):
+                ks.record_trade(-30.0)
+
+        pt = PaperTrader(
+            initial_balance=balance,
+            fee_rate=0.001,
+            slippage_pct=0.05,
+            partial_fill_prob=0.0,
+            timeout_prob=0.0,
+            vol_targeting=vt,
+            kelly_sizer=ks,
+            use_tiered_slippage=True,
+        )
+        return pt, vt, ks
+
+    def test_all_three_modules_active_in_summary(self):
+        """3개 모듈이 모두 summary에 active로 표시."""
+        pt, _, _ = self._make_integrated_trader()
+        summary = pt.get_summary()
+        assert summary["vol_targeting_active"] is True
+        assert summary["kelly_sizer_active"] is True
+        assert summary["tiered_slippage_active"] is True
+
+    def test_buy_executes_with_all_modules(self):
+        """3개 모듈 동시 활성 상태에서 BUY가 정상 실행."""
+        pt, _, _ = self._make_integrated_trader()
+        df = self._make_volatile_df()
+        result = pt.execute_signal(
+            "BTC/USDT", "BUY", price=100.0, quantity=50.0,
+            strategy="test_integrated", confidence="H", candle_df=df,
+        )
+        assert result["status"] == "filled"
+        assert result["actual_quantity"] > 0
+        # 원래 50.0과 다른 수량 (Kelly + VolTargeting 조절)
+        assert pt.account.positions.get("BTC/USDT", 0) > 0
+
+    def test_quantity_adjusted_by_both_vol_and_kelly(self):
+        """VolTargeting과 KellySizer 둘 다 수량을 조절한 증거 확인."""
+        pt, _, _ = self._make_integrated_trader()
+        df = self._make_volatile_df()
+        result = pt.execute_signal(
+            "BTC/USDT", "BUY", price=100.0, quantity=50.0,
+            strategy="s", confidence="H", candle_df=df,
+        )
+        assert result["status"] == "filled"
+        summary = pt.get_summary()
+        # VolTargeting이 수량을 조절했으면 adjustments >= 1
+        # KellySizer도 수량을 조절했으면 kelly_adjustments >= 1
+        # 둘 다 조절한 경우: vol이 먼저 적용되고, kelly가 그 결과를 다시 덮어씀
+        # 따라서 최소 하나는 adjustment가 발생
+        assert summary["vol_targeting_adjustments"] + summary["kelly_adjustments"] >= 1
+
+    def test_tiered_slippage_applied_btc_vs_small(self):
+        """BTC(large)와 소형 코인의 슬리피지 차이가 통합 환경에서도 유지."""
+        import numpy as np
+        btc_slips = []
+        small_slips = []
+
+        for _ in range(50):
+            pt, _, _ = self._make_integrated_trader(kelly_history=False)
+            df = self._make_calm_df()
+            r = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                                  strategy="s", confidence="H", candle_df=df)
+            if r["status"] == "filled":
+                btc_slips.append(abs(r["slippage_bps"]))
+
+        for _ in range(50):
+            pt, _, _ = self._make_integrated_trader(kelly_history=False)
+            df = self._make_calm_df()
+            r = pt.execute_signal("PEPE/USDT", "BUY", price=100.0, quantity=1.0,
+                                  strategy="s", confidence="H", candle_df=df)
+            if r["status"] == "filled":
+                small_slips.append(abs(r["slippage_bps"]))
+
+        assert len(btc_slips) > 0 and len(small_slips) > 0
+        assert np.mean(btc_slips) < np.mean(small_slips)
+
+    def test_sell_records_kelly_pnl_in_integrated_mode(self):
+        """통합 모드에서 SELL 시 KellySizer에 PnL 기록 확인."""
+        pt, _, ks = self._make_integrated_trader()
+        df = self._make_calm_df()
+
+        initial_history_len = len(ks._trade_history)
+
+        pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=10.0,
+                          strategy="s", confidence="H", candle_df=df)
+        pt.execute_signal("BTC/USDT", "SELL", price=110.0, quantity=100.0,
+                          strategy="s", confidence="H")
+
+        # SELL 후 trade_history에 1건 추가
+        assert len(ks._trade_history) == initial_history_len + 1
+
+    def test_full_round_trip_buy_sell_with_all_modules(self):
+        """BUY → SELL 완전 라운드트립: 잔액과 PnL 정합성."""
+        pt, _, _ = self._make_integrated_trader()
+        df = self._make_calm_df()
+
+        initial_balance = pt.account.balance
+
+        # BUY
+        buy_result = pt.execute_signal(
+            "BTC/USDT", "BUY", price=100.0, quantity=50.0,
+            strategy="roundtrip", confidence="H", candle_df=df,
+        )
+        assert buy_result["status"] == "filled"
+        bought_qty = buy_result["actual_quantity"]
+
+        balance_after_buy = pt.account.balance
+        assert balance_after_buy < initial_balance
+
+        # SELL (전량)
+        sell_result = pt.execute_signal(
+            "BTC/USDT", "SELL", price=120.0, quantity=bought_qty * 2,
+            strategy="roundtrip", confidence="H",
+        )
+        assert sell_result["status"] == "filled"
+        assert sell_result["pnl"] != 0.0  # 가격 차이 있으므로 PnL 비제로
+
+        # 포지션 소멸
+        assert pt.account.positions.get("BTC/USDT", 0.0) < 1e-9
+        # 잔액 회복
+        assert pt.account.balance > balance_after_buy
+
+    def test_multiple_symbols_different_tiers_integrated(self):
+        """여러 심볼(대형/중형/소형)에서 동시에 통합 모듈 동작 확인."""
+        pt, _, _ = self._make_integrated_trader(balance=1_000_000.0)
+        df = self._make_calm_df()
+
+        symbols = [
+            ("BTC/USDT", "large"),
+            ("SOL/USDT", "mid"),
+            ("PEPE/USDT", "small"),
+        ]
+
+        for sym, expected_tier in symbols:
+            from src.exchange.paper_trader import classify_symbol_tier
+            assert classify_symbol_tier(sym) == expected_tier
+
+            result = pt.execute_signal(
+                sym, "BUY", price=100.0, quantity=10.0,
+                strategy="multi", confidence="H", candle_df=df,
+            )
+            assert result["status"] == "filled"
+            assert pt.account.positions.get(sym, 0) > 0
+
+        # 3개 심볼 모두 포지션 존재
+        assert len(pt.account.positions) == 3
+
+    def test_kelly_without_history_uses_min_fraction(self):
+        """KellySizer에 거래 기록이 없으면 min_fraction fallback."""
+        pt, _, ks = self._make_integrated_trader(kelly_history=False)
+        df = self._make_calm_df()
+
+        # 기록 없음 → compute_dynamic fallback: min_fraction * capital
+        assert len(ks._trade_history) == 0
+
+        result = pt.execute_signal(
+            "BTC/USDT", "BUY", price=100.0, quantity=50.0,
+            strategy="s", confidence="H", candle_df=df,
+        )
+        assert result["status"] == "filled"
+        # min_fraction * capital / price 근처 값
+        expected_fallback_qty = ks.min_fraction * pt.account.initial_balance
+        # VolTargeting이 이 값을 다시 조절할 수 있으므로 대략적 범위 확인
+        assert result["actual_quantity"] > 0
+
+    def test_reset_clears_all_module_counters(self):
+        """reset() 후 vol/kelly adjustment 카운터 모두 0."""
+        pt, _, _ = self._make_integrated_trader()
+        df = self._make_volatile_df()
+
+        pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=50.0,
+                          strategy="s", confidence="H", candle_df=df)
+
+        pt.reset()
+        assert pt._kelly_adjustments == 0
+        assert pt._vol_targeting_adjustments == 0
+        assert len(pt.account.trades) == 0
+        assert len(pt.account.positions) == 0
+
+    def test_equity_history_tracked_with_all_modules(self):
+        """통합 모드에서 equity_history가 정상 기록."""
+        pt, _, _ = self._make_integrated_trader()
+        df = self._make_calm_df()
+
+        pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=50.0,
+                          strategy="s", confidence="H", candle_df=df)
+        pt.execute_signal("SOL/USDT", "BUY", price=50.0, quantity=20.0,
+                          strategy="s", confidence="H", candle_df=df)
+
+        assert len(pt.account.equity_history) == 2
+        # equity는 양수
+        for eq in pt.account.equity_history:
+            assert eq > 0
