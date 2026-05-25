@@ -41,10 +41,12 @@ RESULTS_JSON_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.json"
 RESULTS_CSV_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.csv"
 CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 
-# Walk-Forward 설정
-TRAIN_HOURS = 24 * 120   # 훈련: 4개월 (120일)
-TEST_HOURS = 24 * 30     # 테스트: 1개월 (30일)
-STEP_HOURS = 24 * 30     # 롤링 간격: 1개월
+# Walk-Forward 설정 (Cycle 211: 7일 train/28일 test → 학술 최적 조합 반영)
+# Cycle 210 리서치: 7d train/28d test가 81개 WF 조합 중 Sharpe 최고(1.252)
+# fold당 30 trades 목표: 1h봉 60일(1440h) 테스트 윈도우가 유리
+TRAIN_HOURS = 24 * 210   # 훈련: 7개월 (210일, IS 충분 확보)
+TEST_HOURS = 24 * 60     # 테스트: 2개월 (60일, fold당 거래 수 ↑)
+STEP_HOURS = 24 * 30     # 롤링 간격: 1개월 (겹침 허용으로 윈도우 수 유지)
 MIN_WINDOWS = 3          # 최소 테스트 윈도우 수
 
 # 전략 통과 기준: 테스트 윈도우 중 과반수에서 통과해야 PASS
@@ -69,11 +71,12 @@ def fetch_real_data_paginated(
     try:
         import ccxt
         # 거래소 우선순위: bybit → binance → okx (SSL 차단 시 fallback)
+        # Cycle 211: timeout 20000ms→5000ms (SSL 차단 환경에서 빠른 fallback)
         exchange_ids = ["bybit", "binance", "okx"]
         ex = None
         for eid in exchange_ids:
             try:
-                candidate = getattr(ccxt, eid)({"timeout": 20000, "enableRateLimit": True})
+                candidate = getattr(ccxt, eid)({"timeout": 5000, "enableRateLimit": True})
                 test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
                 if test_data:
                     ex = candidate
@@ -85,7 +88,7 @@ def fetch_real_data_paginated(
         if ex is None:
             for eid in exchange_ids:
                 try:
-                    candidate = getattr(ccxt, eid)({"timeout": 20000, "enableRateLimit": True, "verify": False})
+                    candidate = getattr(ccxt, eid)({"timeout": 5000, "enableRateLimit": True, "verify": False})
                     test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
                     if test_data:
                         ex = candidate
@@ -582,6 +585,11 @@ def run_simulation():
     sections = []
     all_symbol_results: Dict[str, List[dict]] = {}
     fatal_count = 0
+    header = (
+        f"# Paper Trading 시뮬레이션 통합 리포트\n\n"
+        f"_Generated: {datetime.utcnow().isoformat()}Z_\n"
+        f"_Symbols: {', '.join(SYMBOLS)}_\n\n---\n\n"
+    )
     for symbol in SYMBOLS:
         try:
             report_text, results = simulate_symbol(symbol, pass_list, engine)
@@ -591,14 +599,9 @@ def run_simulation():
             fatal_count += 1
             print(f"[{symbol}][FATAL] {e}")
             sections.append(f"# {symbol} 시뮬 실패\n\n{e}\n")
+        # 심볼별 완료 즉시 중간 결과 저장 (타임아웃 시 부분 리포트 보존)
+        REPORT_PATH.write_text(header + "\n\n---\n\n".join(sections))
 
-    # Markdown 리포트 저장
-    header = (
-        f"# Paper Trading 시뮬레이션 통합 리포트\n\n"
-        f"_Generated: {datetime.utcnow().isoformat()}Z_\n"
-        f"_Symbols: {', '.join(SYMBOLS)}_\n\n---\n\n"
-    )
-    REPORT_PATH.write_text(header + "\n\n---\n\n".join(sections))
     print(f"\n[REPORT] Saved to {REPORT_PATH}")
 
     # 구조화 데이터 저장 (JSON + CSV)

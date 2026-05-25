@@ -109,6 +109,8 @@ class WalkForwardResult:
     wfe: Optional[float] = None
     # fold_pass_rate: OOS Sharpe > 0인 fold 비율 (0.0~1.0)
     fold_pass_rate: Optional[float] = None
+    # low_trades_folds: OOS trades < 30인 fold 수 (통계적 신뢰도 낮음 경고)
+    low_trades_folds: int = 0
 
     @property
     def is_robust(self) -> bool:
@@ -131,6 +133,8 @@ class WalkForwardResult:
             lines.append(f"  wfe: {self.wfe:.3f} ({robust_tag})")
         if self.fold_pass_rate is not None:
             lines.append(f"  fold_pass_rate: {self.fold_pass_rate:.2%}")
+        if self.low_trades_folds > 0:
+            lines.append(f"  [WARN] low_trades_folds: {self.low_trades_folds}/{len(self.windows)} (OOS<30 trades)")
         if self.weighted_oos_sharpe is not None:
             lines.append(f"  weighted_oos_sharpe: {self.weighted_oos_sharpe:.3f}")
         if self.param_stability_cv:
@@ -257,6 +261,7 @@ class WalkForwardOptimizer:
         last_is_sharpe_dist: Dict[str, float] = {}
         # fold별 최적 파라미터 수집 (파라미터 안정성 CV 계산용)
         fold_params_history: List[dict] = []
+        low_trades_folds = 0  # OOS trades < 30인 fold 수
 
         for i, (is_df, oos_df) in enumerate(windows):
             # IS 최적화 (Sharpe - λ*CV 목적함수 + 플래토 룰 적용)
@@ -269,6 +274,15 @@ class WalkForwardOptimizer:
             # OOS 검증
             oos_strategy = self.strategy_factory(best_params)
             oos_result = self._engine.run(oos_strategy, oos_df)
+
+            # OOS 거래 수 통계적 신뢰도 경고 (학술 기준: fold당 30 trades)
+            MIN_RELIABLE_OOS_TRADES = 30
+            if oos_result.total_trades < MIN_RELIABLE_OOS_TRADES:
+                low_trades_folds += 1
+                logger.warning(
+                    "[%s] Window %d: OOS trades=%d < %d — 통계적 신뢰도 낮음 (Sharpe 편향 가능성)",
+                    self.strategy_name, i, oos_result.total_trades, MIN_RELIABLE_OOS_TRADES,
+                )
 
             # WFE 계산 및 적용 (과최적화 필터)
             BacktestEngine.apply_wfe(oos_result, best_is_sharpe)
@@ -293,8 +307,9 @@ class WalkForwardOptimizer:
 
             oos_vs_is_gap = oos_result.sharpe_ratio - best_is_sharpe
             logger.info(
-                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f gap=%.3f params=%s",
-                i, best_is_sharpe, oos_result.sharpe_ratio, ratio, oos_vs_is_gap, best_params,
+                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f gap=%.3f trades=%d params=%s",
+                i, best_is_sharpe, oos_result.sharpe_ratio, ratio, oos_vs_is_gap,
+                oos_result.total_trades, best_params,
             )
 
         # 최종 파라미터 선택: OOS Sharpe 평균 가장 높은 파라미터
@@ -399,6 +414,7 @@ class WalkForwardOptimizer:
             weighted_oos_sharpe=round(weighted_oos_sharpe, 4),
             wfe=wfe,
             fold_pass_rate=fold_pass_rate,
+            low_trades_folds=low_trades_folds,
         )
         logger.info(result.summary())
         return result

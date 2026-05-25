@@ -83,7 +83,7 @@ def fetch_bybit_data(
     ex = None
     for eid in exchange_ids:
         try:
-            candidate = getattr(ccxt, eid)({"timeout": 30000, "enableRateLimit": True})
+            candidate = getattr(ccxt, eid)({"timeout": 5000, "enableRateLimit": True})
             # load_markets 없이 빠른 연결 테스트: fetch_ohlcv 소량으로 확인
             test_data = candidate.fetch_ohlcv(symbol, timeframe, limit=2)
             if test_data:
@@ -109,7 +109,7 @@ def fetch_bybit_data(
     if ex is None:
         raise RuntimeError("모든 거래소 연결 실패 (bybit/binance/okx, SSL skip 포함)")
 
-    ex.timeout = 30000
+    ex.timeout = 10000
     now_ms = int(time.time() * 1000)
     since = now_ms - limit * interval_ms
 

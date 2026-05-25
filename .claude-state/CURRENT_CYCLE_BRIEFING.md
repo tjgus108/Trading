@@ -1,51 +1,35 @@
 ======================================================================
-🔄 CYCLE 210 — 2026-05-25T15:27:38.900416Z
+🔄 CYCLE 211 완료 — 2026-05-25T20:44:55Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (병렬 3개)
+## 이번 사이클 카테고리: A(품질) + C(데이터) + F(리서치)
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### [A] Quality Assurance — 완료
+- OOS trades < 30 WARNING 추가 (WalkForwardOptimizer)
+- WalkForwardResult.low_trades_folds 필드 + summary() 표시
+- walk_forward 54 tests 모두 통과
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+### [C] Data Infrastructure — 완료
+- paper_simulation.py: TRAIN_HOURS 120→210일, TEST_HOURS 30→60일
+- 결과: 3 윈도우 → 4 윈도우 (통계 신뢰도 향상)
+- SSL 타임아웃 20000→5000ms (빠른 fallback)
+- 중간 결과 저장 로직 추가 (타임아웃 내성)
 
-### [SIM] Paper Simulation & Auto-improve
-- **Agent**: backtest-agent
-- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
+### [F] Research — 완료
+- 1h 타임프레임 이미 사용 중 확인
+- 단순 전략(1-2 param) = fold 30 trades 달성 가장 현실적
+- OOS trades < 30 저신뢰도 fold 집계 제외 → Cycle 212에 구현 검토
 
-### [F] Research
-- **Agent**: strategy-researcher-agent
-- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
+## 시뮬레이션 결과
+- Paper WF: BTC/ETH/SOL 0/22 PASS (합성 GBM 한계)
+- Bundle OOS: 0/5 PASS (IS Sharpe 전부 음수 = GBM 한계)
+- 유망 전략: cmf, price_action_momentum, momentum_quality, htf_ema (3심볼 top 5)
+- 문제 전략: volume_breakout, price_cluster (0 trades 완전 실패)
 
-## 이전 사이클 현황
-**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
-  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
-  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
-  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
-  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
+## 전체 테스트
+- 7857 passed, 23 skipped (신규 추가 0건)
 
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
-  - ERROR 기록 존재
-
-## ⛔ 금지 사항
-- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
-- 한 카테고리에 2 사이클 연속 집중 금지
-- 실패 사례 리서치 없이 코드만 작성 금지
-
-## 📋 사이클 종료 시 필수 수행
-1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
-2. STATUS.md 업데이트 (전체 현황)
-3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
-4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
-5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
-
-## 🚀 실행 지침 (Claude Code 세션용)
-이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
-1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
-2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
-3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
-4. 커밋 + push
+## 다음 사이클
+- Cycle 212: B(리스크) + D(ML) + F(리서치)
+- 우선: volume_breakout/price_cluster 0 trades 조사 + OOS trades 필터
+======================================================================

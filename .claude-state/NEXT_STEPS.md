@@ -1,58 +1,60 @@
 # Next Steps
 
-_Last updated: 2026-05-26 (Cycle 210 D+E+SIM+F 완료)_
+_Last updated: 2026-05-25 (Cycle 211 A+C+SIM+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 210 완료
-- 210 mod 5 = 0 → **D(ML) + E(실행) + F(리서치)** 패턴 ✅
-- 다음 Cycle 211: **211 mod 5 = 1 → A(품질) + C(데이터) + F(리서치)**
+### 로테이션: Cycle 211 완료
+- 211 mod 5 = 1 → **A(품질) + C(데이터) + F(리서치)** ✅
+- 다음 Cycle 212: **212 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)**
 
-### 🔥 Cycle 210 주요 성과
-- **WFE/fold_pass_rate/is_robust**: WalkForwardResult에 추가, WFE>0.7 robust 판정
-- **파라미터 5개↑ WARNING**: WalkForwardOptimizer에서 과적합 위험 경고
-- **PaperTrader 3모듈 통합 E2E**: VolTargeting+KellySizer+TieredSlippage 동시 동작 11 테스트
-- **PerformanceTracker 일간 리포트**: get_daily_pnl() + get_daily_summary() 추가
-- **Seed 다양화 확인**: 3심볼 결과 분화됨, PF=999.99 artifact 감소
-- **리서치**: fold당 30+ trades 필요, 4h→1h 이동으로 4배 가능
+### 🔥 Cycle 211 주요 성과
+- **OOS trades 신뢰도 경고**: WalkForwardOptimizer에 low_trades_folds 추가 (< 30 trades = WARNING)
+- **WalkForwardResult.low_trades_folds**: 투명성 개선, summary()에 표시
+- **Walk-Forward 윈도우 확대**: 3→4 윈도우 (TRAIN=210일, TEST=60일, STEP=30일)
+- **타임아웃 단축**: 거래소 SSL 5초 (20초→5초), 빠른 합성 fallback
+- **중간 결과 저장**: 심볼별 완료 즉시 REPORT 저장 (타임아웃 내성)
 
-### 🎯 Cycle 211 권장 작업 (211 mod 5 = 1 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 212 권장 작업 (212 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): 전략 품질 감사 + 타임프레임 이동 검토
-- 355개 전략 중 파라미터 5개 초과 전략 스캔 (자동화)
-- cmf, PAM, momentum_quality 전략을 1h 타임프레임으로 시뮬 가능성 검토
-- BacktestEngine MIN_TRADES=15 → 30 상향 검토 (학술 기준)
+#### B(리스크): Risk 모듈 검증 강화
+- DrawdownMonitor의 graceful degradation 검증 (기존 streak recovery 확인)
+- KellySizer의 극단값 처리 (fraction > 1.0 clamping 확인)
+- CircuitBreaker 임계값 현실화: 현재 임계값이 합성 데이터 기준인지 검토
+- **VaR/CVaR** 계산에서 낮은 trades 샘플 편향 경고 추가 고려
 
-#### C(데이터): Walk-Forward 윈도우 크기 최적화
-- 현재 train=2880h/test=720h(30일) → test=1440h(60일)로 확대 검토
-- 7일 train / 28일 test 조합 테스트 (리서치 최적 조합)
-- DataFeed 실데이터 접근 SSL 문제 해결
+#### D(ML): OOS trades 30+ 필터 적용 검토
+- WalkForwardOptimizer: low_trades_folds > n_windows/2 이면 UNSTABLE 판정 추가
+- 단순 전략(donchian_breakout, ema_cross) OOS trades 검증: fold당 30 확보 가능?
+- ML 피처 중요도 분석: 현재 시그널에서 가장 유효한 피처 TOP 5 확인
 
-#### F(리서치): 1h 타임프레임 전략 실전 사례
-- 1h 기반 크립토 전략의 실전 성과 벤치마크
-- multi-timeframe 접근법 (1h 진입 + 4h 방향성 필터)
+#### F(리서치): 합성 vs 실데이터 성능 차이 분석
+- cmf, price_action_momentum이 합성 GBM에서도 일관된 이유 분석
+- volume_breakout, price_cluster의 0 trades 원인 코드 검토
+- 실데이터 없이 전략 품질 측정 가능한 대안 지표 리서치
 
-### ⚠️ 핵심 인사이트 (Cycle 210 리서치)
-- fold당 최소 30 trades (우리 기준 15는 절반)
-- 4h→1h 이동: 파라미터 변경 없이 거래 수 4배
-- WFE>0.7 실데이터에서만 유효 (합성 낙관적 편향)
-- 7일 train/28일 test가 81개 WF 조합 중 Sharpe 최고(1.252)
+### ⚠️ 핵심 인사이트 (Cycle 211 시뮬)
+- cmf, price_action_momentum: 3 심볼 모두 TOP 3 (합성 데이터에서도 일관성 있음)
+- volume_breakout, price_cluster → 0 거래 (신호 조건 과도 엄격 → Cycle 212 검토)
+- 4 윈도우 테스트: 각 윈도우에서 Sharpe≥1.0 + PF≥1.5 + Trades≥15 + MDD≤20% 동시 충족 어려움
+- 실데이터 없이는 0/22 PASS가 의미 없음 (GBM 한계 재확인)
 
 ### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단
-- DataFeed.DEFAULT_FALLBACK_EXCHANGES = ["binance", "okx", "bitget"] 준비됨
+- 합성 데이터(GBM) 결과는 방향성 참고만 가능 (PASS/FAIL 판정 불가)
+- 거래소 SSL 타임아웃: 5000ms (이전 20000ms에서 단축)
 
-### 📋 Paper Trading 자동화 판정 기준
+### 📋 시뮬레이션 파라미터 현황 (Cycle 211 기준)
 
-| 지표 | Go 조건 | No-Go 트리거 |
-|------|---------|-------------|
-| Profit Factor | ≥ 1.4 | < 1.0 즉시 중단 |
-| MDD | ≤ 15% | > 20% 즉시 중단 |
-| Sharpe (rolling 4주) | ≥ 0.8 | < 0.3 |
-| WFE (OOS/IS 수익 비율) | ≥ 0.50 | < 0.30 |
-| 주간 승률 | ≥ 45% | < 30% |
+| 설정 | 값 | 변경 사유 |
+|------|----|---------| 
+| TRAIN_HOURS | 5040h (210일) | 이전 2880h(120일) → IS 충분 확보 |
+| TEST_HOURS | 1440h (60일) | 이전 720h(30일) → fold당 trades ↑ |
+| STEP_HOURS | 720h (30일) | 유지 (겹침 허용) |
+| WF Windows | 4개 | 이전 3개 → 통계 신뢰도 향상 |
+| SSL Timeout | 5000ms | 이전 20000ms → 빠른 fallback |
 
-**상태**: Cycle 210 완료 → Cycle 211 A(품질) + C(데이터) + F(리서치)
-**최우선 과제**: 타임프레임 1h 이동 검토 + fold 최소 거래 수 30 상향 + 실데이터 확보
+**상태**: Cycle 211 완료 → Cycle 212 B(리스크) + D(ML) + F(리서치)
+**최우선 과제**: volume_breakout/price_cluster 0 trades 버그 조사 + OOS trades 필터 로직 추가

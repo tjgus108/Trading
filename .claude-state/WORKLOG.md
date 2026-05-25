@@ -1,5 +1,40 @@
 # Work Log
 
+## [2026-05-25] Cycle 211 — A(품질) + C(데이터) + SIM + F(리서치)
+
+**[A] 품질 — WalkForwardOptimizer OOS trades 신뢰도 경고:**
+- `src/backtest/walk_forward.py`: OOS trades < 30인 fold에 WARNING 로그 추가 (학술 기준)
+- WalkForwardResult에 `low_trades_folds` 필드 추가 (int, 기본=0)
+- `summary()` 메서드에 "[WARN] low_trades_folds: N/M" 출력 추가
+- WalkForwardOptimizer 루프에서 low_trades_folds 카운터 누적 → 결과 객체 전달
+- walk_forward 테스트 54개 모두 통과
+
+**[C] 데이터 — Walk-Forward 윈도우 최적화:**
+- `scripts/paper_simulation.py` TRAIN_HOURS 120일→210일, TEST_HOURS 30일→60일
+- 결과: 3 윈도우 → 4 윈도우로 증가 (통계 신뢰도 향상)
+- 거래소 SSL 타임아웃 5000ms로 단축 (이전 20000ms), run_bundle_oos.py도 동일 적용
+- 심볼별 완료 즉시 중간 리포트 저장 (타임아웃 시 부분 결과 보존)
+
+**[SIM] Paper WF (BTC/ETH/SOL, 4 윈도우):**
+- BTC 0/22, ETH 0/22, SOL 0/22 PASS (합성 GBM 데이터 한계)
+- 유망 전략 (3심볼 모두 상위권): cmf, price_action_momentum, momentum_quality, htf_ema
+- volume_breakout, price_cluster → 0 trades 완전 실패 (신호 조건 과도 엄격)
+- AvgTrades 30+ 충족: cmf(126), price_action_momentum(165), supertrend_multi(119), momentum_quality(117)
+
+**[SIM] Bundle OOS (BTC/USDT, 4h봉):**
+- 0/5 PASS, IS Sharpe 전부 음수 (GBM 합성 한계 확인)
+- wick_reversal 거래 수 가장 풍부 (20-28/fold), value_area PASS fold 4/9 (가장 많음)
+- OOS Sharpe std 3.4~6.6 (임계 1.5 초과) → GBM 분포 불안정
+
+**[F] 리서치 — 1h 타임프레임 + 단순 전략:**
+- paper_simulation.py에서 이미 1h 타임프레임 사용 중 확인
+- 단순 전략: donchian_breakout(1 param), ema_cross(2), dema_cross(2) → fold 30 trades 가장 현실적
+- 실제 개선: OOS trades < 30 저신뢰도 fold를 집계에서 제외하는 필터 연구 제안 → Cycle 212로 이월
+
+**테스트:** walk_forward 54 passed, 전체 7857 passed (23 skipped)
+
+---
+
 ## [2026-05-26] Cycle 210 — D(ML) + E(실행) + SIM + F(리서치)
 
 **[D] ML — WFE + fold_pass_rate + 파라미터 경고:**
@@ -15484,3 +15519,70 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-25 15:27 UTC] Cycle 210 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-25 20:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-25 20:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-25 20:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
