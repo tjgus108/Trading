@@ -1,4 +1,7 @@
 """tests/test_drawdown_monitor.py — DrawdownMonitor 3층 서킷브레이커 테스트."""
+import time
+from unittest.mock import patch
+
 import pytest
 from src.risk.drawdown_monitor import AlertLevel, DrawdownMonitor, MddLevel
 
@@ -543,3 +546,166 @@ def test_from_dict_without_equity_history_key_is_safe():
     del d["_equity_history"]
     restored = DrawdownMonitor.from_dict(d)
     assert restored.rolling_mdd() == 0.0
+
+
+# ── streak_recovery_grace_seconds 통합 테스트 ────────────────────────────────
+
+
+class TestStreakRecoveryGraceSeconds:
+    """streak_recovery_grace_seconds 파라미터 통합 테스트.
+
+    마지막 손실 후 grace_seconds 경과 시 consecutive_losses가 자동 초기화되어
+    size_multiplier가 0.5 → 1.0으로 복원되는지 검증.
+    time.monotonic()을 모킹하여 시간 경과를 시뮬레이션.
+    """
+
+    def test_grace_disabled_by_default(self):
+        """streak_recovery_grace_seconds=0 (기본값): 시간 경과로 복원 안 됨.
+
+        연속 손실 threshold 도달 후 아무리 시간이 지나도
+        win 없이는 consecutive_losses 초기화 안 됨.
+        """
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=0.0,  # 비활성 (기본)
+        )
+        # 연속 손실 3회 → size_multiplier=0.5
+        for i in range(3):
+            m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
+        assert m.consecutive_losses == 3
+        assert m.get_size_multiplier() == 0.5
+
+        # 시간이 아무리 지나도 복원 안 됨 (grace 비활성)
+        # monotonic을 크게 앞으로 밀어도 복원 없음
+        future_time = time.monotonic() + 999999
+        with patch("time.monotonic", return_value=future_time):
+            assert m.get_size_multiplier() == 0.5
+            assert m.consecutive_losses == 3  # 변화 없음
+
+    def test_grace_resets_after_elapsed(self):
+        """streak_recovery_grace_seconds=14400 (4시간): 마지막 손실 후 4시간 경과 시 초기화."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,  # 4시간
+        )
+        # 연속 손실 3회
+        base_time = time.monotonic()
+        with patch("time.monotonic", return_value=base_time):
+            for i in range(3):
+                m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
+
+        # 마지막 손실 직후: size_multiplier=0.5
+        with patch("time.monotonic", return_value=base_time + 1):
+            assert m.consecutive_losses == 3
+            assert m.get_size_multiplier() == 0.5
+
+        # 2시간 경과: 아직 복원 안 됨 (14400초 미만)
+        with patch("time.monotonic", return_value=base_time + 7200):
+            assert m.get_size_multiplier() == 0.5
+            assert m.consecutive_losses == 3
+
+        # 4시간 경과: 자동 초기화 → size_multiplier=1.0
+        with patch("time.monotonic", return_value=base_time + 14400):
+            mult = m.get_size_multiplier()
+            assert mult == 1.0, f"Expected 1.0 after grace period, got {mult}"
+            assert m.consecutive_losses == 0
+
+    def test_grace_not_triggered_below_threshold(self):
+        """연속 손실이 threshold 미만이면 grace 로직 미적용."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,
+        )
+        # 연속 손실 2회 (threshold 미만)
+        base_time = time.monotonic()
+        with patch("time.monotonic", return_value=base_time):
+            m.record_trade_result(pnl=-100, equity=9900)
+            m.record_trade_result(pnl=-100, equity=9800)
+
+        assert m.consecutive_losses == 2
+        # threshold 미만이므로 이미 size_multiplier=1.0
+        assert m.get_size_multiplier() == 1.0
+
+        # 시간 경과해도 consecutive_losses는 2 유지 (grace 트리거 조건 미충족)
+        with patch("time.monotonic", return_value=base_time + 14400):
+            assert m.get_size_multiplier() == 1.0
+            assert m.consecutive_losses == 2  # 초기화 안 됨
+
+    def test_grace_win_resets_before_time(self):
+        """grace 시간 만료 전에 win이 먼저 발생하면 win으로 초기화."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,
+        )
+        base_time = time.monotonic()
+        with patch("time.monotonic", return_value=base_time):
+            for i in range(3):
+                m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
+
+        assert m.consecutive_losses == 3
+        # 1시간 후 win 발생 → 즉시 초기화 (grace 만료 전)
+        with patch("time.monotonic", return_value=base_time + 3600):
+            m.record_trade_result(pnl=200, equity=9900)
+            assert m.consecutive_losses == 0
+            assert m.get_size_multiplier() == 1.0
+
+    def test_grace_with_update_status_reflects_recovery(self):
+        """grace 복원 후 update() 호출 시 DrawdownStatus에 올바르게 반영."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,
+        )
+        base_time = time.monotonic()
+        with patch("time.monotonic", return_value=base_time):
+            m.update(10000)
+            for i in range(3):
+                m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
+
+        # grace 전: size_multiplier=0.5
+        with patch("time.monotonic", return_value=base_time + 100):
+            status_before = m.update(9700)
+            assert status_before.size_multiplier == 0.5
+            assert status_before.consecutive_losses == 3
+
+        # grace 후: size_multiplier=1.0, consecutive_losses는 get_size_multiplier() 호출 시
+        # 초기화되므로 update() 이후 내부 상태는 0이 됨
+        with patch("time.monotonic", return_value=base_time + 14400):
+            status_after = m.update(9700)
+            assert status_after.size_multiplier == 1.0
+            # Note: DrawdownStatus.consecutive_losses는 get_size_multiplier() 호출 전에 캡처되므로
+            # 첫 번째 update()에서는 아직 3일 수 있음. 핵심은 size_multiplier=1.0 복원.
+            # 이후 다시 update()하면 내부 _consecutive_losses=0이 반영됨.
+            assert m.consecutive_losses == 0  # 내부 상태는 초기화됨
+
+    def test_grace_new_loss_after_recovery_restarts_count(self):
+        """grace로 초기화 후 새 손실 발생 시 consecutive_losses 1부터 재시작."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,
+        )
+        base_time = time.monotonic()
+        with patch("time.monotonic", return_value=base_time):
+            for i in range(3):
+                m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
+
+        # grace 경과 → 초기화
+        with patch("time.monotonic", return_value=base_time + 14400):
+            assert m.get_size_multiplier() == 1.0
+            assert m.consecutive_losses == 0
+
+        # 새 손실 발생 → consecutive_losses=1
+        with patch("time.monotonic", return_value=base_time + 14500):
+            m.record_trade_result(pnl=-50, equity=9650)
+            assert m.consecutive_losses == 1
+            assert m.get_size_multiplier() == 1.0  # threshold 미만
+
+    def test_grace_serialization_roundtrip(self):
+        """streak_recovery_grace_seconds가 to_dict/from_dict에서 보존."""
+        m = DrawdownMonitor(
+            loss_streak_threshold=3,
+            streak_recovery_grace_seconds=14400.0,
+        )
+        m.update(10000)
+        d = m.to_dict()
+        m2 = DrawdownMonitor.from_dict(d)
+        assert m2.streak_recovery_grace_seconds == 14400.0

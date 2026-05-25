@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-25T00:22:29.397191Z_
+_Generated: 2026-05-25T14:59:15.579378Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -11,8 +11,8 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | cmf | 9 | 0.000 | -4.356 | 0.667 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 3.368 > 1.5 (불안정) |
 | elder_impulse | 9 | -0.790 | -3.364 | 0.784 | FAIL | Failed folds: [0, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 4.099 > 1.5 (불안정) |
 | wick_reversal | 9 | 0.222 | -3.443 | 0.872 | FAIL | Failed folds: [0, 2, 3, 4, 5, 6, 7]; OOS Sharpe std 4.150 > 1.5 (불안정) |
-| narrow_range | 9 | -0.157 | -1.720 | 1.026 | FAIL | 저거래 fold 제외 (trades<3): [0, 2, 3, 4]; Failed folds: [5, 7, 8]; OOS Sharpe std 4.342 > 1.5 (불안정) |
-| value_area | 9 | -1.969 | -1.298 | 167.406 | FAIL | 저거래 fold 제외 (trades<3): [1, 4, 8]; Failed folds: [2, 3, 5, 7]; OOS Sharpe std 6.589 > 1.5 (불안정) |
+| narrow_range | 9 | -0.257 | -2.013 | 125.640 | FAIL | 저거래 fold 제외 (trades<2): [4]; Failed folds: [0, 2, 5, 7, 8]; OOS Sharpe std 5.134 > 1.5 (불안정) |
+| value_area | 9 | -1.443 | -0.825 | 222.888 | FAIL | Failed folds: [1, 2, 3, 5, 7]; OOS Sharpe std 6.152 > 1.5 (불안정) |
 
 **PASS: 0/5** (none)
 **FAIL: 5/5** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
@@ -93,7 +93,7 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | 7 | 0.244 | -1.368 | -5.607 | 0.777 | 3 | 3.80% | 2.51% | FAIL |
 | 8 | -1.369 | -3.210 | 0.000 | 0.527 | 4 | 3.80% | 2.57% | FAIL |
 
-**Fail reasons:** 저거래 fold 제외 (trades<3): [0, 2, 3, 4]; Failed folds: [5, 7, 8]; OOS Sharpe std 4.342 > 1.5 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<2): [4]; Failed folds: [0, 2, 5, 7, 8]; OOS Sharpe std 5.134 > 1.5 (불안정)
 
 ### value_area
 
@@ -109,4 +109,4 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | 7 | 2.656 | -5.864 | -2.208 | 0.141 | 3 | 6.18% | 2.49% | FAIL |
 | 8 | 1.506 | 5.993 | 3.979 | 999.990 | 2 | 3.86% | 0.09% | PASS |
 
-**Fail reasons:** 저거래 fold 제외 (trades<3): [1, 4, 8]; Failed folds: [2, 3, 5, 7]; OOS Sharpe std 6.589 > 1.5 (불안정)
+**Fail reasons:** Failed folds: [1, 2, 3, 5, 7]; OOS Sharpe std 6.152 > 1.5 (불안정)

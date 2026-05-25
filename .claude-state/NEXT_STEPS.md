@@ -1,51 +1,60 @@
 # Next Steps
 
-_Last updated: 2026-05-25 (Cycle 208 D+E+SIM+F 완료)_
+_Last updated: 2026-05-26 (Cycle 209 C(Data) 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 208 완료
-- 208 mod 5 = 3 → **D(ML) + E(실행) + F(리서치)** 패턴 (로컬 세션)
-- 다음 Cycle 209: **209 mod 5 = 4 → C(데이터) + B(리스크) + F(리서치)**
+### 로테이션: Cycle 209 SIM 분석 완료
+- 209 mod 5 = 4 → **C(데이터) + B(리스크) + F(리서치)** 패턴
+- 다음 Cycle 210: **210 mod 5 = 0 → A(전략 로직) + E(실행) + F(리서치)**
 
-### 🔥 Cycle 208 주요 성과 (로컬)
-- **ML 추론 벤치마크**: predict() 호출마다 latency 추적, benchmark_stats() p50/p95/p99
-- **OnChainFeatureStub**: exchange_netflow, sopr, defi_tvl 합성 폴백 인터페이스
-- **PaperTrader KellySizer 통합**: BUY→compute_dynamic(), SELL→record_trade() 자동
-- **Tiered Slippage**: BTC/ETH 0.05%, SOL/BNB 0.2%, 기타 1.0% (리서치 수치 반영)
-- **SIM 66개 전부 FAIL**: value_area ETH Sharpe 0.92 최근접
-- **리서치**: IS 승률 80%+는 과적합 신호, 파라미터 5개↑ OOS FAIL 필연
+### 🔥 Cycle 209 SIM 분석 결과
 
-### 🔥 Cycle 207 주요 성과 (리모트)
-- **B1**: config.yaml `max_consecutive_losses: 5 → 4`
-- **B2**: portfolio_optimizer VaR/CVaR scipy fallback
-- **D1**: FeatureBuilder.build_with_feature_selection() 추가
-- **F**: run_bundle_oos.py --min-trades CLI 옵션
-- **SIM**: narrow_range fold 1,6 PASS (ATR 완화 효과)
+#### Bundle OOS 재실행 (--min-trades 2, 합성 dry-run)
+- **5개 전략 모두 FAIL** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
+- narrow_range: fold 1,3,6 PASS (3/9), fold 4만 저거래 제외(trades<2)
+- value_area: fold 0,4,6,8 PASS (4/9), 저거래 제외 0개 (--min-trades 2 효과)
+- elder_impulse: fold 1만 PASS (OOS Sharpe=3.794, 3사이클 연속 동일)
 
-### 🎯 Cycle 209 권장 작업 (209 mod 5 = 4 → C(데이터) + B(리스크) + F(리서치))
+#### narrow_range PASS fold 특성 분석
+| Fold | OOS 구간 | OOS Sharpe | Trades | 특성 |
+|------|----------|-----------|--------|------|
+| 1 | 2022-09-26~11-24 | 1.422 | 4 | 횡보→소폭 하락 (레인지 축소 후 돌파 유효) |
+| 3 | 2023-01-24~03-24 | 5.980 | 2 | 극소수 거래, PF=999.99 (통계 무의미) |
+| 6 | 2023-07-23~09-20 | 2.809 | 4 | 여름 횡보장 (ATR 축소 빈번, NR 신호 유효) |
 
-#### C(데이터): Data & Infrastructure
-- DataFeed WebSocket 안정성 점검: recovery_timeout=300s 적용 후 확인
-- `src/data/` 모듈 전체 임포트 에러 없는지 확인 (ccxt 없는 환경에서도 graceful)
-- 합성 데이터 seed 다양화: paper_simulation.py 심볼별 seed(42) 동일 문제
+**핵심**: PASS fold는 모두 레인지/횡보 구간. fold 3은 2 trades with PF=999.99로 사실상 1건의 우연한 성공. **진짜 PASS는 fold 1,6 (총 8 trades)**만 의미 있음.
 
-#### B(리스크): Risk Management
-- DrawdownMonitor streak_recovery_grace_seconds live config 활성화 확인
-- CircuitBreaker max_consecutive_losses=4 동작 검증
-- VaR/CVaR scipy fallback 검증: scipy 없는 환경 시뮬레이션 테스트
+#### value_area OOS Sharpe std=6.152 원인 분석
+- OOS Sharpe 범위: -8.100 ~ +9.516 (극심한 양극화)
+- **PASS fold (0,4,6,8)**: trades 2~5건, PF 최대 999.99 → 극소 거래에서 우연 성공
+- **FAIL fold (1,2,3,5,7)**: trades 2~6건, 대부분 음수 Sharpe
+- **근본 원인**: OOS당 평균 3.3 trades → 통계적 유의성 없음. Sharpe가 1~2건 거래 결과에 좌우되어 std 폭등
+- **va_mult=0.7은 너무 좁은 VA 밴드** → 신호 자체가 희소, 발생 시 결과 분산 극대
 
-#### F(리서치): SIM 결과 기반
-- narrow_range 2 PASS fold 심층 분석 (fold 1,6 어떤 시장 환경?)
-- --min-trades 2 옵션으로 narrow_range 재검증
-- value_area OOS Sharpe std=6.589 대응 (va_mult 고정값 테스트)
+### 🎯 Cycle 210 권장 작업 (210 mod 5 = 0 → A(전략 로직) + E(실행) + F(리서치))
+
+#### A(전략 로직): narrow_range/value_area 개선
+- **narrow_range**: NR lookback 4→3 테스트로 신호 빈도 증가 검토 (현재 fold당 2~4 trades)
+- **value_area**: va_mult 0.7→1.0~1.2 확대로 VA 밴드 넓혀 신호 빈도 개선, min_breach 1.5→1.0 완화
+- 두 전략 모두 핵심 문제는 **거래 수 부족** (OOS 360봉에서 2~6 trades)
+
+#### E(실행): 실데이터 검증 인프라
+- SSL 문제 해결 후 Bybit/Binance 실데이터로 narrow_range/value_area 재검증
+- 실데이터에서 fold당 15+ trades 달성 가능한지 확인
+
+#### F(리서치): 과적합 감사
+- ~~합성 GBM seed(42) 동일 문제~~ **해결됨** (Cycle 209 C: 심볼 hash 기반 seed 분리 적용)
+- PASS fold의 PF=999.99는 통계적 artifact (1건 성공, 0건 손실) → PASS 기준에 min_trades 추가 필요
 
 ### ⚠️ 핵심 문제
 - 실데이터 PASS 전략 0개 — IS→OOS 괴리 심각
-- 합성 데이터 동일 seed(42) → 3심볼 사실상 동일 데이터
+- ~~합성 데이터 동일 seed(42) → 3심볼 사실상 동일 데이터~~ **해결됨**
 - IS 승률 80%+는 과적합 역신호 (리서치 확인)
+- **narrow_range/value_area: fold당 2~4 trades → 통계적 유의성 없음**
+- **PF=999.99 PASS는 의미 없음** (OOS 기준에 min_trades 15 추가 필요)
 
 ### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단 (원격 사이클에서는 합성 SIM만 가능)
@@ -62,7 +71,7 @@ _Last updated: 2026-05-25 (Cycle 208 D+E+SIM+F 완료)_
 | WFE (OOS/IS 수익 비율) | ≥ 0.50 | < 0.30 |
 | 주간 승률 | ≥ 45% | < 30% |
 
-### 📊 Strategy Performance Reference (Real Data — ⚠️ IS only, OOS 미검증)
+### 📊 Strategy Performance Reference (Real Data — IS only, OOS 미검증)
 
 | Strategy | Sharpe | Win% | PF | Trades | MDD | Regime |
 |----------|--------|------|-------|--------|-----|--------|
@@ -72,10 +81,19 @@ _Last updated: 2026-05-25 (Cycle 208 D+E+SIM+F 완료)_
 | elder_impulse | 6.29 | 63% | 2.70 | 16 | 3.5% | TREND |
 | value_area | 5.24 | 53% | 1.84 | 30 | 5.0% | RANGE |
 
-**⚠️ 위 수치는 IS(In-Sample) 성과. OOS 검증 시 전략 전부 FAIL.**
-**narrow_range: Cycle 207에서 fold 1,6 PASS (합성 4h) → 실데이터 검증 우선 후보 추가됨.**
+**narrow_range: fold 1,6 PASS는 레인지/횡보 구간 전용. 트렌드장에서는 FAIL.**
+**value_area: 4/9 PASS지만 trades 2~5건 → PF=999.99 artifact. 실질 무의미.**
 
 ---
 
-**상태**: Cycle 208 완료 → Cycle 209 C(데이터) + B(리스크) + F(리서치) 예정
-**최우선 과제**: narrow_range/value_area 실데이터 OOS 검증 + 과적합 감사
+**상태**: Cycle 209 C(Data) 완료 → Cycle 210 A(전략)+E(실행)+F(리서치) 예정
+**최우선 과제**: narrow_range/value_area 거래 빈도 개선 + 실데이터 OOS 검증
+
+### Cycle 209 C(Data) 완료 사항
+- `paper_simulation.py` 합성 데이터 seed 다양화: 심볼 hash 기반 seed 생성 (BTC/ETH/SOL 각각 다른 합성 데이터)
+- `src/data/` graceful import 확인: ccxt try/except 이미 적용됨 (feed.py, connector.py, __init__.py lazy loading)
+
+### Cycle 209 B(Risk) 완료 사항
+- VaR/CVaR scipy fallback 검증 테스트 7개 추가 (`TestScipyFallbackVarCvar`)
+- DrawdownMonitor streak_recovery_grace_seconds 통합 테스트 7개 추가 (`TestStreakRecoveryGraceSeconds`)
+- `to_dict()`에 `streak_recovery_grace_seconds` 직렬화 누락 수정

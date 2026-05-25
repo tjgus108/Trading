@@ -514,10 +514,12 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     data_source = f"Bybit {symbol} 1h (paginated)"
 
     if df is None:
-        print(f"[{symbol}][FALLBACK] Using synthetic data (Bybit API inaccessible)")
+        # 심볼별 다른 seed → 서로 다른 합성 데이터 생성
+        symbol_seed = hash(symbol) % (2**31)
+        print(f"[{symbol}][FALLBACK] Using synthetic data (seed={symbol_seed}, Bybit API inaccessible)")
         from scripts.quality_audit import make_synthetic_data
-        df = make_synthetic_data(8640)
-        data_source = f"Synthetic GBM x8640 ({symbol}-like)"
+        df = make_synthetic_data(8640, seed=symbol_seed)
+        data_source = f"Synthetic GBM x8640 ({symbol}-like, seed={symbol_seed})"
         # 합성 데이터에도 enrich_indicators 적용 — make_synthetic_data에 없는
         # ema20, donchian_high/low, vwap, vwap20 등의 지표를 추가
         df = enrich_indicators(df)
