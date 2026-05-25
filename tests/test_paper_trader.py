@@ -1237,3 +1237,280 @@ def test_vol_targeting_adjustment_count():
 
     summary = pt.get_summary()
     assert summary["vol_targeting_adjustments"] == 3
+
+
+# ── KellySizer 통합 테스트 (Cycle 195) ──────────────────────────────
+
+def test_kelly_sizer_none_no_adjustment():
+    """kelly_sizer=None이면 기존 동작과 동일 — 수량 조절 없음."""
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, kelly_sizer=None)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    assert result["requested_quantity"] == 5.0
+    assert result["actual_quantity"] == 5.0
+
+
+def test_kelly_sizer_summary_keys():
+    """get_summary()에 kelly_sizer 관련 키가 존재."""
+    from src.risk.kelly_sizer import KellySizer
+
+    ks = KellySizer()
+    pt_with = PaperTrader(kelly_sizer=ks)
+    pt_without = PaperTrader()
+
+    summary_with = pt_with.get_summary()
+    summary_without = pt_without.get_summary()
+
+    assert "kelly_sizer_active" in summary_with
+    assert "kelly_adjustments" in summary_with
+    assert summary_with["kelly_sizer_active"] is True
+    assert summary_without["kelly_sizer_active"] is False
+    assert summary_with["kelly_adjustments"] == 0
+    assert summary_without["kelly_adjustments"] == 0
+
+
+def test_kelly_sizer_adjusts_quantity_with_history():
+    """KellySizer에 충분한 거래 기록이 있으면 수량이 동적으로 조절됨."""
+    from src.risk.kelly_sizer import KellySizer
+
+    ks = KellySizer(rolling_window=20)
+    # 거래 기록 주입: 15건 (min_trades 기본값 10 초과)
+    for _ in range(10):
+        ks.record_trade(50.0)   # wins
+    for _ in range(5):
+        ks.record_trade(-30.0)  # losses
+
+    pt = PaperTrader(initial_balance=100000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     kelly_sizer=ks, fee_rate=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    # KellySizer가 compute_dynamic()으로 수량을 결정했으므로 원래 5.0과 다를 수 있음
+    assert result["actual_quantity"] > 0
+
+
+def test_kelly_sizer_records_sell_pnl():
+    """SELL 시 KellySizer에 PnL이 기록됨."""
+    from src.risk.kelly_sizer import KellySizer
+
+    ks = KellySizer(rolling_window=50)
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     kelly_sizer=ks, fee_rate=0.0)
+
+    # BUY → SELL 2라운드
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=10.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=110.0, quantity=10.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=10.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=90.0, quantity=10.0,
+                      strategy="s", confidence="H")
+
+    # KellySizer의 trade_history에 2건 기록됨
+    assert len(ks._trade_history) == 2
+    assert ks._trade_history[0] > 0   # 첫 거래: 수익
+    assert ks._trade_history[1] < 0   # 둘째 거래: 손실
+
+
+def test_kelly_sizer_min_fraction_fallback():
+    """거래 기록이 부족하면 KellySizer가 min_fraction * capital을 반환.
+
+    compute_dynamic() fallback: min_fraction * capital = 0.001 * 100000 = 100.0
+    (KellySizer fallback은 capital 기반 수량 반환)
+    """
+    from src.risk.kelly_sizer import KellySizer
+
+    ks = KellySizer(min_fraction=0.001)
+    pt = PaperTrader(initial_balance=100000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     kelly_sizer=ks, fee_rate=0.0)
+
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    # min_fraction * capital = 0.001 * 100000 = 100.0 (fallback qty)
+    # Kelly가 원래 quantity(5.0)와 다른 값으로 조절
+    assert abs(result["actual_quantity"] - 100.0) < 0.01
+    assert pt._kelly_adjustments == 1
+
+
+def test_kelly_vol_targeting_together():
+    """VolTargeting과 KellySizer를 동시에 사용할 때 둘 다 적용됨."""
+    from src.risk.kelly_sizer import KellySizer
+    from src.risk.vol_targeting import VolTargeting
+    import numpy as np
+
+    ks = KellySizer(min_fraction=0.01)
+    # 10건 거래 기록 주입
+    for _ in range(7):
+        ks.record_trade(30.0)
+    for _ in range(3):
+        ks.record_trade(-20.0)
+
+    vt = VolTargeting(target_vol=0.20, window=20, annualization=252 * 24)
+    df = _make_candle_df(n=30, base_price=100.0)
+
+    pt = PaperTrader(initial_balance=100000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     vol_targeting=vt, kelly_sizer=ks, fee_rate=0.0)
+
+    result = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=50.0,
+                               strategy="s", confidence="H", candle_df=df)
+    assert result["status"] == "filled"
+    # 둘 다 활성화
+    summary = pt.get_summary()
+    assert summary["vol_targeting_active"] is True
+    assert summary["kelly_sizer_active"] is True
+
+
+def test_kelly_sizer_reset_clears_adjustments():
+    """reset() 후 kelly_adjustments가 0으로 초기화."""
+    from src.risk.kelly_sizer import KellySizer
+
+    ks = KellySizer(min_fraction=0.001)
+    pt = PaperTrader(initial_balance=100000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     kelly_sizer=ks, fee_rate=0.0)
+
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=5.0,
+                      strategy="s", confidence="H")
+    assert pt._kelly_adjustments >= 1
+
+    pt.reset()
+    assert pt._kelly_adjustments == 0
+    assert pt._vol_targeting_adjustments == 0
+
+
+# ── Tiered Slippage 테스트 (Cycle 195) ─────────────────────────────
+
+def test_classify_symbol_tier():
+    """classify_symbol_tier가 올바른 티어를 반환."""
+    from src.exchange.paper_trader import classify_symbol_tier
+    assert classify_symbol_tier("BTC/USDT") == "large"
+    assert classify_symbol_tier("ETH/USDT") == "large"
+    assert classify_symbol_tier("SOL/USDT") == "mid"
+    assert classify_symbol_tier("ADA/USDT") == "mid"
+    assert classify_symbol_tier("SHIB/USDT") == "small"
+    assert classify_symbol_tier("PEPE/USDT") == "small"
+    # 대소문자 무관
+    assert classify_symbol_tier("btc/usdt") == "large"
+    assert classify_symbol_tier("sol/usdt") == "mid"
+
+
+def test_tiered_slippage_disabled_uses_default():
+    """use_tiered_slippage=False이면 기존 slippage_pct 사용."""
+    pt = PaperTrader(initial_balance=100000.0, slippage_pct=0.05,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     use_tiered_slippage=False)
+    # BTC와 소형 코인의 슬리피지 범위가 동일해야 함
+    results_btc = []
+    results_small = []
+    for _ in range(20):
+        r = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        results_btc.append(abs(r["slippage_bps"]))
+    pt2 = PaperTrader(initial_balance=100000.0, slippage_pct=0.05,
+                      partial_fill_prob=0.0, timeout_prob=0.0,
+                      use_tiered_slippage=False)
+    for _ in range(20):
+        r = pt2.execute_signal("UNKNOWN/USDT", "BUY", price=100.0, quantity=1.0,
+                               strategy="s", confidence="H")
+        results_small.append(abs(r["slippage_bps"]))
+    # 둘 다 같은 slippage_pct=0.05% → 동일 범위
+    assert max(results_btc) <= 10.0  # 0.05% = 5 bps max (with noise)
+    assert max(results_small) <= 10.0
+
+
+def test_tiered_slippage_btc_lower_than_small():
+    """use_tiered_slippage=True 시 BTC는 소형보다 슬리피지가 작음."""
+    # 결정론적으로 비교하기 위해 많은 횟수 시뮬레이션
+    import numpy as np
+    btc_slips = []
+    small_slips = []
+    n_trials = 200
+
+    for _ in range(n_trials):
+        pt = PaperTrader(initial_balance=1_000_000.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0,
+                         use_tiered_slippage=True, fee_rate=0.0)
+        r = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        btc_slips.append(abs(r["slippage_bps"]))
+
+    for _ in range(n_trials):
+        pt = PaperTrader(initial_balance=1_000_000.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0,
+                         use_tiered_slippage=True, fee_rate=0.0)
+        r = pt.execute_signal("PEPE/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        small_slips.append(abs(r["slippage_bps"]))
+
+    # BTC: 0.05% = 5bps, SMALL: 1.0% = 100bps
+    # 평균적으로 BTC slippage << SMALL slippage
+    assert np.mean(btc_slips) < np.mean(small_slips)
+    # BTC 슬리피지 < 10 bps 범위, SMALL 슬리피지 > 10 bps 평균
+    assert np.mean(btc_slips) < 10.0
+    assert np.mean(small_slips) > 10.0
+
+
+def test_tiered_slippage_mid_between_large_and_small():
+    """중형 심볼의 슬리피지는 대형과 소형 사이."""
+    import numpy as np
+    large_slips = []
+    mid_slips = []
+    small_slips = []
+    n = 200
+
+    for _ in range(n):
+        pt = PaperTrader(initial_balance=1_000_000.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0,
+                         use_tiered_slippage=True, fee_rate=0.0)
+        r = pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        large_slips.append(abs(r["slippage_bps"]))
+
+    for _ in range(n):
+        pt = PaperTrader(initial_balance=1_000_000.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0,
+                         use_tiered_slippage=True, fee_rate=0.0)
+        r = pt.execute_signal("SOL/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        mid_slips.append(abs(r["slippage_bps"]))
+
+    for _ in range(n):
+        pt = PaperTrader(initial_balance=1_000_000.0,
+                         partial_fill_prob=0.0, timeout_prob=0.0,
+                         use_tiered_slippage=True, fee_rate=0.0)
+        r = pt.execute_signal("PEPE/USDT", "BUY", price=100.0, quantity=1.0,
+                              strategy="s", confidence="H")
+        small_slips.append(abs(r["slippage_bps"]))
+
+    assert np.mean(large_slips) < np.mean(mid_slips) < np.mean(small_slips)
+
+
+def test_tiered_slippage_summary_key():
+    """get_summary()에 tiered_slippage_active 키 존재."""
+    pt_tiered = PaperTrader(use_tiered_slippage=True)
+    pt_default = PaperTrader(use_tiered_slippage=False)
+
+    assert pt_tiered.get_summary()["tiered_slippage_active"] is True
+    assert pt_default.get_summary()["tiered_slippage_active"] is False
+
+
+def test_tiered_slippage_sell_also_applies():
+    """SELL에서도 tiered slippage가 적용됨."""
+    pt = PaperTrader(initial_balance=100000.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0,
+                     use_tiered_slippage=True, fee_rate=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=10.0,
+                      strategy="s", confidence="H")
+    result = pt.execute_signal("BTC/USDT", "SELL", price=110.0, quantity=10.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    # BTC tier → 0.05% max slippage
+    assert abs(result["slippage_bps"]) <= 10.0  # with volume_impact=1.0

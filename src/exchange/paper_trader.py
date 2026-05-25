@@ -4,6 +4,8 @@ Paper Trading (모의거래) 모드.
 슬리피지, 부분체결, 타임아웃 시뮬레이션 포함.
 RegimeDetector 통합: 매 틱마다 레짐 감지 → 전략 라우팅 + CRISIS 포지션 스케일링.
 VolTargeting 통합: 변동성 기반 포지션 사이즈 자동 조절.
+KellySizer 통합: rolling 거래 기록 기반 동적 포지션 사이징.
+Tiered Slippage: 심볼별 유동성 티어에 따른 슬리피지 차등 적용.
 """
 from __future__ import annotations
 
@@ -16,6 +18,37 @@ import logging
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# ── Tiered Slippage: 리서치 결과 기반 (BTC 0.05%, 중형 0.2%, 소형 1.0%) ──
+SLIPPAGE_TIERS: dict = {
+    "large": 0.05,   # BTC, ETH 등 대형 — 0.05%
+    "mid":   0.20,   # 중형 (SOL, AVAX 등) — 0.2%
+    "small": 1.00,   # 소형 (DOGE, SHIB 등) — 1.0%
+}
+
+# 대형 심볼 목록 (기본값)
+_LARGE_CAP_SYMBOLS = frozenset([
+    "BTC/USDT", "ETH/USDT", "BTC/USDT:USDT", "ETH/USDT:USDT",
+    "BTC/USD", "ETH/USD",
+])
+
+# 중형 심볼 목록 (기본값)
+_MID_CAP_SYMBOLS = frozenset([
+    "SOL/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "AVAX/USDT",
+    "DOGE/USDT", "DOT/USDT", "LINK/USDT", "MATIC/USDT", "UNI/USDT",
+    "ATOM/USDT", "LTC/USDT", "NEAR/USDT", "ARB/USDT", "OP/USDT",
+    "SOL/USDT:USDT", "BNB/USDT:USDT", "XRP/USDT:USDT",
+])
+
+
+def classify_symbol_tier(symbol: str) -> str:
+    """심볼을 유동성 티어로 분류: large / mid / small."""
+    s = symbol.upper()
+    if s in _LARGE_CAP_SYMBOLS:
+        return "large"
+    if s in _MID_CAP_SYMBOLS:
+        return "mid"
+    return "small"
 
 
 @dataclass
@@ -59,13 +92,15 @@ class PaperTrader:
         self,
         initial_balance: float = 10000.0,
         fee_rate: float = 0.00055,    # Bybit taker 0.055%
-        slippage_pct: float = 0.05,   # 양방향 최대 0.05% (±)
+        slippage_pct: float = 0.05,   # 양방향 최대 0.05% (±) — tiered 모드 시 무시됨
         partial_fill_prob: float = 0.05,  # 부분체결 확률 5%
         timeout_prob: float = 0.01,  # 타임아웃 확률 1%
         regime_detector=None,         # src.ml.regime_detector.RegimeDetector (선택)
         regime_router=None,           # src.strategy.regime_router.RegimeStrategyRouter (선택)
         performance_monitor=None,     # src.risk.performance_tracker.PerformanceMonitor (선택)
         vol_targeting=None,           # src.risk.vol_targeting.VolTargeting (선택)
+        kelly_sizer=None,             # src.risk.kelly_sizer.KellySizer (선택)
+        use_tiered_slippage: bool = False,  # True이면 심볼별 슬리피지 티어 적용
     ):
         self.account = PaperAccount(
             initial_balance=initial_balance,
@@ -85,6 +120,13 @@ class PaperTrader:
         # ── VolTargeting integration ────────────────────────────────────────
         self._vol_targeting = vol_targeting
         self._vol_targeting_adjustments: int = 0
+
+        # ── KellySizer integration ──────────────────────────────────────────
+        self._kelly_sizer = kelly_sizer
+        self._kelly_adjustments: int = 0
+
+        # ── Tiered slippage ─────────────────────────────────────────────────
+        self._use_tiered_slippage = use_tiered_slippage
 
     # ── Regime interface ────────────────────────────────────────────────────
 
@@ -199,6 +241,22 @@ class PaperTrader:
             except Exception as exc:
                 logger.warning("vol_targeting.adjust failed: %s", exc)
 
+        # KellySizer-based dynamic position sizing (BUY만 적용)
+        if action == "BUY" and self._kelly_sizer is not None:
+            try:
+                kelly_qty = self._kelly_sizer.compute_dynamic(
+                    capital=self.account.balance,
+                    price=price,
+                )
+                if kelly_qty > 0 and kelly_qty != quantity:
+                    logger.debug(
+                        "KellySizer: quantity %.6f → %.6f", quantity, kelly_qty
+                    )
+                    quantity = kelly_qty
+                    self._kelly_adjustments += 1
+            except Exception as exc:
+                logger.warning("kelly_sizer.compute_dynamic failed: %s", exc)
+
         # Input validation
         if quantity <= 0:
             return {"status": "rejected", "reason": "quantity must be positive"}
@@ -230,9 +288,17 @@ class PaperTrader:
         # volume_impact: 주문 크기에 비례한 시장 충격 (√ 모델)
         #   - 주문 금액 $10k 기준 impact=1.0, 금액이 커질수록 √비례 증가
         #   - ex) $40k → impact=2.0, $90k → impact=3.0
+
+        # Tiered slippage: 심볼별 유동성에 따라 기본 슬리피지 차등 적용
+        if self._use_tiered_slippage:
+            tier = classify_symbol_tier(symbol)
+            base_slippage_pct = SLIPPAGE_TIERS[tier]
+        else:
+            base_slippage_pct = self.slippage_pct
+
         order_notional = price * actual_qty
         volume_impact = max(1.0, (order_notional / 10_000) ** 0.5)
-        effective_slip = self.slippage_pct * volume_impact
+        effective_slip = base_slippage_pct * volume_impact
         base_slip = effective_slip * 0.6  # 60%는 adverse 방향 고정
         noise = random.uniform(-effective_slip * 0.4, effective_slip * 0.4)
         if action == "BUY":
@@ -286,6 +352,13 @@ class PaperTrader:
             trade.pnl = pnl
             self.account.balance += proceeds
             self.account.total_pnl += pnl
+
+            # KellySizer: SELL 시 거래 결과를 rolling 기록에 추가
+            if self._kelly_sizer is not None:
+                try:
+                    self._kelly_sizer.record_trade(pnl)
+                except Exception as exc:
+                    logger.warning("kelly_sizer.record_trade failed: %s", exc)
             new_qty = held - sell_qty
             if new_qty < 1e-9:  # float precision guard
                 self.account.positions.pop(symbol, None)
@@ -352,6 +425,9 @@ class PaperTrader:
             ),
             "vol_targeting_active": self._vol_targeting is not None,
             "vol_targeting_adjustments": self._vol_targeting_adjustments,
+            "kelly_sizer_active": self._kelly_sizer is not None,
+            "kelly_adjustments": self._kelly_adjustments,
+            "tiered_slippage_active": self._use_tiered_slippage,
         }
 
     def _calculate_max_drawdown(self) -> float:
@@ -419,3 +495,5 @@ class PaperTrader:
             balance=self.account.initial_balance,
             equity_history=[],
         )
+        self._kelly_adjustments = 0
+        self._vol_targeting_adjustments = 0

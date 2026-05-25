@@ -695,3 +695,138 @@ class RegimeAwareFeatureBuilder:
         X_all = self._base.build_features_only(df)
         X = self._select(X_all, feed_regime, df)
         return X, feed_regime
+
+
+# ---------------------------------------------------------------------------
+# On-chain Feature Interface (Cycle 195)
+# Cycle 193 리서치 결과: Exchange Netflow, SOPR delta, DeFiLlama TVL
+# 실 API 미연동 — 메서드 시그니처 + 합성 데이터 폴백
+# ---------------------------------------------------------------------------
+
+class OnChainFeatureStub:
+    """
+    온체인 피처 인터페이스 (stub).
+
+    Cycle 193 리서치 기반 피처:
+      - exchange_netflow: 거래소 순유입 (BTC/ETH). 양수 = 매도 압력 증가.
+      - sopr_delta: SOPR 1봉 변화량. SOPR > 1 = 수익 실현 구간.
+      - defi_tvl_ratio: DeFiLlama TVL / 30일 평균 (체인 수요 프록시).
+
+    실 API 연동 시 override할 메서드:
+      - fetch_exchange_netflow(symbol, n)
+      - fetch_sopr(n)
+      - fetch_defi_tvl(chain, n)
+
+    폴백: 합성 0 시리즈 (실 데이터 없을 때 피처 파이프라인 유지용).
+    """
+
+    def __init__(self, use_synthetic: bool = True):
+        """
+        Args:
+            use_synthetic: True면 실 API 없이 0 기반 합성 폴백 반환.
+                           False면 fetch_* 메서드가 실 API 호출을 시도해야 함.
+        """
+        self.use_synthetic = use_synthetic
+
+    # ------------------------------------------------------------------
+    # Public API (FeatureBuilder와 동일한 반환 형식: pd.Series)
+    # ------------------------------------------------------------------
+
+    def fetch_exchange_netflow(self, symbol: str = "BTC", n: int = 500) -> pd.Series:
+        """
+        거래소 순유입 시계열 반환 (BTC/ETH 기준, 단위: 코인).
+
+        실 데이터 소스 (미연동):
+          - CryptoQuant Exchange Netflow API
+          - Glassnode Exchange Net Position Change
+
+        Returns:
+            pd.Series (name="exchange_netflow"), 합성 폴백 시 0.0 시리즈.
+        """
+        if self.use_synthetic:
+            return self._synthetic_series(n, "exchange_netflow")
+        raise NotImplementedError(
+            "실 API 연동 필요: CryptoQuant 또는 Glassnode exchange_netflow"
+        )
+
+    def fetch_sopr(self, n: int = 500) -> pd.Series:
+        """
+        SOPR (Spent Output Profit Ratio) 시계열 반환.
+
+        실 데이터 소스 (미연동):
+          - Glassnode SOPR API (/v1/metrics/indicators/sopr)
+          - LookIntoBitcoin SOPR
+
+        Returns:
+            pd.Series (name="sopr_delta"): SOPR 1봉 변화량.
+            합성 폴백 시 0.0 시리즈.
+        """
+        if self.use_synthetic:
+            return self._synthetic_series(n, "sopr_delta")
+        raise NotImplementedError(
+            "실 API 연동 필요: Glassnode SOPR (/v1/metrics/indicators/sopr)"
+        )
+
+    def fetch_defi_tvl(self, chain: str = "ethereum", n: int = 500) -> pd.Series:
+        """
+        DeFiLlama TVL / 30일 평균 비율 반환.
+
+        실 데이터 소스 (미연동):
+          - DeFiLlama /v2/chains API
+          - URL: https://api.llama.fi/v2/historicalChainTvl/{chain}
+
+        Returns:
+            pd.Series (name="defi_tvl_ratio"): TVL / 30d_mean 비율.
+            합성 폴백 시 1.0 시리즈 (중립값).
+        """
+        if self.use_synthetic:
+            idx = pd.RangeIndex(n)
+            return pd.Series(np.ones(n), index=idx, name="defi_tvl_ratio")
+        raise NotImplementedError(
+            "실 API 연동 필요: DeFiLlama /v2/historicalChainTvl/{chain}"
+        )
+
+    def enrich_df(self, df: pd.DataFrame, symbol: str = "BTC") -> pd.DataFrame:
+        """
+        기존 OHLCV DataFrame에 온체인 피처 컬럼을 추가 반환.
+
+        추가 컬럼:
+          - exchange_netflow: 거래소 순유입
+          - sopr_delta: SOPR 변화량
+          - defi_tvl_ratio: TVL 비율
+
+        실 데이터 미연동(use_synthetic=True) 시 합성 폴백으로 파이프라인 형태 유지.
+
+        Args:
+            df: OHLCV DataFrame (index가 DatetimeIndex 권장).
+            symbol: 온체인 데이터 심볼 (예: "BTC", "ETH").
+
+        Returns:
+            온체인 컬럼이 추가된 DataFrame (원본 복사본).
+        """
+        n = len(df)
+        out = df.copy()
+
+        netflow = self.fetch_exchange_netflow(symbol=symbol, n=n)
+        sopr = self.fetch_sopr(n=n)
+        tvl = self.fetch_defi_tvl(n=n)
+
+        # 인덱스 정렬 — 합성 폴백은 RangeIndex이므로 df 인덱스로 재할당
+        out["exchange_netflow"] = netflow.values[:n] if len(netflow) >= n else 0.0
+        out["sopr_delta"] = sopr.values[:n] if len(sopr) >= n else 0.0
+        out["defi_tvl_ratio"] = tvl.values[:n] if len(tvl) >= n else 1.0
+
+        logger.debug(
+            "OnChainFeatureStub.enrich_df: added 3 on-chain cols to df(len=%d), synthetic=%s",
+            n, self.use_synthetic,
+        )
+        return out
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _synthetic_series(n: int, name: str) -> pd.Series:
+        """합성 폴백: 0.0으로 채운 시리즈."""
+        return pd.Series(np.zeros(n), index=pd.RangeIndex(n), name=name)

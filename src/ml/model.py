@@ -15,7 +15,8 @@ alpha-agent와 호환 인터페이스:
 import logging
 import os
 import pickle
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -79,6 +80,8 @@ class MLSignalGenerator:
         self._class_order: Optional[List[int]] = None  # 모델의 class 순서
         self._feature_importances: Dict[str, float] = {}
         self._train_date: Optional[str] = None
+        # Inference latency tracking (벤치마크 유틸)
+        self._latency_ms: List[float] = []
 
     def load(self, path: str) -> bool:
         """모델 파일 로드. 실패 시 False 반환."""
@@ -116,51 +119,85 @@ class MLSignalGenerator:
         """
         마지막 완성 캔들 기준 신호 예측.
         모델 없으면 HOLD, confidence=0 반환.
+        추론 경과시간은 내부적으로 기록 (benchmark_stats()로 조회).
         """
-        if self._model is None:
-            return MLPrediction(
-                action="HOLD", confidence=0.0,
-                proba_buy=0.0, proba_sell=0.0, proba_hold=1.0,
-                model_name="no model trained",
-                note="모델 없음 — WalkForwardTrainer로 학습 필요",
-            )
-
+        _t0 = time.perf_counter()
         try:
-            feat_df = self.feature_builder.build_features_only(df)
-            if feat_df.empty:
-                return self._hold("피처 계산 실패")
+            if self._model is None:
+                result = MLPrediction(
+                    action="HOLD", confidence=0.0,
+                    proba_buy=0.0, proba_sell=0.0, proba_hold=1.0,
+                    model_name="no model trained",
+                    note="모델 없음 — WalkForwardTrainer로 학습 필요",
+                )
+            else:
+                feat_df = self.feature_builder.build_features_only(df)
+                if feat_df.empty:
+                    result = self._hold("피처 계산 실패")
+                elif len(feat_df) < 2:
+                    result = self._hold("피처 데이터 부족")
+                else:
+                    X = feat_df.iloc[[-2]]  # shape (1, n_features)
+                    proba = self._model.predict_proba(X)[0]
+                    classes = self._class_order or list(self._model.classes_)
 
-            # 마지막 완성 캔들 (-2번째)
-            if len(feat_df) < 2:
-                return self._hold("피처 데이터 부족")
+                    # class → proba 매핑
+                    proba_map = dict(zip(classes, proba))
+                    p_buy = proba_map.get(1, 0.0)
+                    p_sell = proba_map.get(-1, 0.0)
+                    p_hold = proba_map.get(0, 0.0)
 
-            X = feat_df.iloc[[-2]]  # shape (1, n_features)
-            proba = self._model.predict_proba(X)[0]
-            classes = self._class_order or list(self._model.classes_)
+                    # 가장 높은 확률의 클래스 선택
+                    pred_class = max(proba_map, key=proba_map.get)
+                    action = self._label_map.get(pred_class, "HOLD")
+                    confidence = float(proba_map[pred_class])
 
-            # class → proba 매핑
-            proba_map = dict(zip(classes, proba))
-            p_buy = proba_map.get(1, 0.0)
-            p_sell = proba_map.get(-1, 0.0)
-            p_hold = proba_map.get(0, 0.0)
-
-            # 가장 높은 확률의 클래스 선택
-            pred_class = max(proba_map, key=proba_map.get)
-            action = self._label_map.get(pred_class, "HOLD")
-            confidence = float(proba_map[pred_class])
-
-            return MLPrediction(
-                action=action,
-                confidence=confidence,
-                proba_buy=float(p_buy),
-                proba_sell=float(p_sell),
-                proba_hold=float(p_hold),
-                model_name=self._model_name,
-            )
-
+                    result = MLPrediction(
+                        action=action,
+                        confidence=confidence,
+                        proba_buy=float(p_buy),
+                        proba_sell=float(p_sell),
+                        proba_hold=float(p_hold),
+                        model_name=self._model_name,
+                    )
         except Exception as e:
             logger.error("ML predict error: %s", e)
-            return self._hold(f"예측 오류: {e}")
+            result = self._hold(f"예측 오류: {e}")
+        finally:
+            elapsed_ms = (time.perf_counter() - _t0) * 1000.0
+            self._latency_ms.append(elapsed_ms)
+            logger.debug("ML predict latency: %.2f ms (model=%s)", elapsed_ms, self._model_name)
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Inference benchmark utilities
+    # ------------------------------------------------------------------
+
+    def benchmark_stats(self) -> Dict[str, float]:
+        """
+        누적 추론 지연시간 통계 반환 (단위: ms).
+
+        Returns:
+            dict with keys: count, mean_ms, p50_ms, p95_ms, p99_ms, max_ms
+            샘플 없으면 모두 0.0.
+        """
+        if not self._latency_ms:
+            return {"count": 0, "mean_ms": 0.0, "p50_ms": 0.0,
+                    "p95_ms": 0.0, "p99_ms": 0.0, "max_ms": 0.0}
+        arr = np.array(self._latency_ms)
+        return {
+            "count": len(arr),
+            "mean_ms": float(np.mean(arr)),
+            "p50_ms": float(np.percentile(arr, 50)),
+            "p95_ms": float(np.percentile(arr, 95)),
+            "p99_ms": float(np.percentile(arr, 99)),
+            "max_ms": float(np.max(arr)),
+        }
+
+    def reset_benchmark(self) -> None:
+        """누적 추론 지연시간 기록 초기화."""
+        self._latency_ms = []
 
     def get_feature_importances(self, top_n: Optional[int] = None) -> List[tuple]:
         """
