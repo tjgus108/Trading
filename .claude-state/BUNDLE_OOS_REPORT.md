@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-26T10:29:16.773583Z_
+_Generated: 2026-05-26T15:23:28.403709Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -16,6 +16,18 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
 **PASS: 0/5** (none)
 **FAIL: 5/5** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
+
+## Composite Rank Score
+
+_점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consistency(10%) + Sharpe안정성(10%)_
+
+| Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
+|------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
+| 1 | value_area | 75.5 | p100 | -1.298 | 6.589 | 167.406 | 3.6 | 1.93% | 44% | FAIL |
+| 2 | narrow_range | 54.9 | p75 | -1.720 | 4.342 | 1.026 | 2.8 | 2.26% | 33% | FAIL |
+| 3 | wick_reversal | 36.6 | p50 | -3.443 | 4.150 | 0.872 | 25.3 | 11.56% | 22% | FAIL |
+| 4 | elder_impulse | 33.3 | p25 | -3.364 | 4.099 | 0.784 | 10.4 | 6.27% | 11% | FAIL |
+| 5 | cmf | 21.9 | p0 | -4.356 | 3.368 | 0.667 | 15.7 | 9.42% | 0% | FAIL |
 
 ## IS Sharpe 음수 진단
 

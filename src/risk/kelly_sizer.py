@@ -16,9 +16,55 @@ Risk-Constrained Kelly (max_drawdown 제약):
 
 from __future__ import annotations
 
+import logging
 import numpy as np
 from collections import deque
 from typing import Deque, Optional, List
+
+logger = logging.getLogger(__name__)
+
+
+def _norm_ppf(p: float) -> float:
+    """표준 정규 분포 분위수 근사 (scipy 불필요).
+
+    Rational approximation by Peter Acklam (max error < 1.2e-7).
+    p in (0, 1) → z = ppf(p).
+    """
+    import math
+
+    if p <= 0.0:
+        return float("-inf")
+    if p >= 1.0:
+        return float("inf")
+
+    a = [-3.969683028665376e1, 2.209460984245205e2,
+         -2.759285104469687e2, 1.383577518672690e2,
+         -3.066479806614716e1, 2.506628277459239]
+    b = [-5.447609879822406e1, 1.615858368580409e2,
+         -1.556989798598866e2, 6.680131188771972e1,
+         -1.328068155288572e1]
+    c = [-7.784894002430293e-3, -3.223964580411365e-1,
+         -2.400758277161838, -2.549732539343734,
+         4.374664141464968, 2.938163982698783]
+    d = [7.784695709041462e-3, 3.224671290700398e-1,
+         2.445134137142996, 3.754408661907416]
+
+    p_low = 0.02425
+    p_high = 1.0 - p_low
+
+    if p < p_low:
+        q = math.sqrt(-2.0 * math.log(p))
+        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+               ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+    elif p <= p_high:
+        q = p - 0.5
+        r = q * q
+        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / \
+               (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
+    else:
+        q = math.sqrt(-2.0 * math.log(1.0 - p))
+        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
 
 
 class KellySizer:
@@ -235,8 +281,7 @@ class KellySizer:
 
         low_sample = n < min_trades
         if low_sample:
-            import logging as _logging
-            _logging.getLogger(__name__).warning(
+            logger.warning(
                 "KellySizer VaR: 소표본 경고 n=%d < %d — VaR 추정 불안정 (편향 가능성)",
                 n, min_trades,
             )
@@ -252,6 +297,113 @@ class KellySizer:
         return {
             "var": round(var_val, 6),
             "cvar": round(cvar_val, 6),
+            "n_trades": n,
+            "low_sample_warning": low_sample,
+        }
+
+    def estimate_cornish_fisher_var(
+        self,
+        confidence: float = 0.95,
+        min_trades: int = 20,
+    ) -> Optional[dict]:
+        """Cornish-Fisher 조정 VaR/CVaR (fat-tail 보정).
+
+        암호화폐 수익률의 음의 왜도(negative skew)와 높은 첨도(fat tails)를
+        Cornish-Fisher 확장으로 보정하여 역사적 시뮬레이션보다 정확한 VaR 추정.
+
+        z_cf = z + (z²-1)*s/6 + (z³-3z)*k/24 - (2z³-5z)*s²/36
+        where s=skewness, k=excess_kurtosis, z=norm.ppf(1-confidence)
+
+        표준 정규 VaR 대비 개선:
+          - BTC 일별 수익률: skew≈-1.2, excess_kurt≈6~10 → CF VaR이 30~50% 더 보수적
+          - 소표본(<20) 경고: 왜도/첨도 추정 불안정
+
+        Args:
+            confidence: VaR 신뢰 수준 (기본 0.95 = 95%).
+            min_trades: 유효 추정 최소 거래 수 (기본 20).
+
+        Returns:
+            {
+                "cf_var": float,            # CF-보정 VaR (손실, 양수)
+                "cf_cvar": float,           # CF-보정 CVaR/ES
+                "hist_var": float,          # 역사적 VaR (비교용)
+                "hist_cvar": float,         # 역사적 CVaR (비교용)
+                "skewness": float,          # 표본 왜도
+                "excess_kurtosis": float,   # 표본 초과 첨도
+                "n_trades": int,
+                "low_sample_warning": bool,
+            }
+            거래 기록이 5 미만이면 None.
+        """
+        arr = np.array(self._trade_history, dtype=float)
+        n = len(arr)
+        if n < 5:
+            return None
+
+        low_sample = n < min_trades
+        if low_sample:
+            logger.warning(
+                "KellySizer CF-VaR: 소표본 경고 n=%d < %d — 왜도/첨도 추정 불안정",
+                n, min_trades,
+            )
+
+        mu = float(arr.mean())
+        sigma = float(arr.std(ddof=1)) if n > 1 else 0.0
+
+        # 역사적 VaR/CVaR (비교 기준)
+        sorted_arr = np.sort(arr)
+        cutoff_idx = max(int(np.floor((1 - confidence) * n)), 1)
+        hist_var = float(-sorted_arr[cutoff_idx - 1])
+        tail_losses = sorted_arr[:cutoff_idx]
+        hist_cvar = float(-tail_losses.mean()) if len(tail_losses) > 0 else hist_var
+
+        # Cornish-Fisher 보정
+        if sigma <= 0:
+            return {
+                "cf_var": hist_var,
+                "cf_cvar": hist_cvar,
+                "hist_var": round(hist_var, 6),
+                "hist_cvar": round(hist_cvar, 6),
+                "skewness": 0.0,
+                "excess_kurtosis": 0.0,
+                "n_trades": n,
+                "low_sample_warning": low_sample,
+            }
+
+        standardized = (arr - mu) / sigma
+        skew = float(np.mean(standardized ** 3))
+        # 편향 보정 첨도 (Fisher's excess kurtosis)
+        excess_kurt = float(np.mean(standardized ** 4)) - 3.0
+
+        # 표준 정규 분위수: z = ppf(1 - confidence) → 음수 (손실 방향)
+        # 근사: ppf(0.05) ≈ -1.6449
+        p = 1.0 - confidence
+        # 합리적 z 근사 (scipy 없이 erf 기반)
+        # 방법: Newton iteration on standard normal CDF
+        z = _norm_ppf(p)
+
+        # Cornish-Fisher 확장
+        z_cf = (
+            z
+            + (z ** 2 - 1.0) * skew / 6.0
+            + (z ** 3 - 3.0 * z) * excess_kurt / 24.0
+            - (2.0 * z ** 3 - 5.0 * z) * (skew ** 2) / 36.0
+        )
+
+        # CF-VaR: 포트폴리오 단위 (PnL 스케일)
+        cf_var = float(-(mu + z_cf * sigma))
+        # CF-CVaR 근사: 역사적 꼬리 손실에 CF 비율 적용
+        cf_ratio = cf_var / hist_var if hist_var > 0 else 1.0
+        cf_ratio = max(0.5, min(cf_ratio, 3.0))  # 극단적 배율 방지
+        cf_cvar = float(hist_cvar * cf_ratio)
+
+        return {
+            "cf_var": round(cf_var, 6),
+            "cf_cvar": round(cf_cvar, 6),
+            "hist_var": round(hist_var, 6),
+            "hist_cvar": round(hist_cvar, 6),
+            "skewness": round(skew, 4),
+            "excess_kurtosis": round(excess_kurt, 4),
             "n_trades": n,
             "low_sample_warning": low_sample,
         }

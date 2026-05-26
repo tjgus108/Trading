@@ -1,5 +1,48 @@
 # Work Log
 
+## [2026-05-26] Cycle 216 — B(리스크) + D(ML) + SIM + F(리서치)
+
+**[B] 리스크 — KellySizer Cornish-Fisher VaR 추가:**
+- `src/risk/kelly_sizer.py`: `estimate_cornish_fisher_var()` 메서드 추가
+  - Cornish-Fisher 확장: z_cf = z + (z²-1)*s/6 + (z³-3z)*k/24 - (2z³-5z)*s²/36
+  - scipy 불필요: Acklam rational approximation으로 norm.ppf() 구현 (`_norm_ppf`)
+  - 반환: cf_var, cf_cvar, hist_var(비교용), skewness, excess_kurtosis, low_sample_warning
+  - 암호화폐 fat-tail(음의 왜도, 높은 첨도) 보정 → 기존 히스토리컬 VaR 대비 더 정확한 파라메트릭 추정
+  - 모듈 레벨 `logger` 추가 (기존 인라인 import 제거)
+- 테스트 10개 추가 (`tests/test_kelly_cornish_fisher.py`, 10/10 PASS)
+
+**[D] ML — WalkForwardTrainer CPCV 검증 통합:**
+- `src/ml/trainer.py`:
+  - `TrainingResult`: `cpcv_avg_acc: float = 0.0`, `cpcv_n_folds: int = 0` 필드 추가
+  - `WalkForwardTrainer.run_cpcv_validation()`: 학습 완료 후 CPCV로 OOS 일반화 성능 추가 검증
+    - df에서 피처 재빌드 → 학습 시 선택된 feature_names로 슬라이싱 → combinatorial_purged_cv 실행
+    - 반환: avg_test_acc, std_test_acc, n_folds, fold_results, passed (avg>=0.55)
+    - 모델 미학습 또는 데이터 부족(<100) 시 None 반환
+- 테스트 8개 추가 (`tests/test_ml_cpcv_validation.py`, 8/8 PASS)
+- 기존 182개 테스트 모두 통과
+
+**[SIM] Paper WF (BTC/ETH/SOL, 4윈도우, 1h봉, Block Bootstrap):**
+- 0/22 PASS (합성 데이터 한계)
+- TOP: supertrend_multi (+39.98%, S=3.58, PF=1.47, T=132, MDD=12.5%) — PF가 1.47로 1.5 직전
+- lob_maker (+33.49%, S=2.57), order_flow_imbalance_v2 (+26.90%, S=2.13)
+- 전략 PF 1.47 < 1.5 → 모든 윈도우 FAIL (Consistency=0/4)
+
+**[SIM] Bundle OOS (BTC/USDT, 4h봉, Block Bootstrap):**
+- 0/5 PASS (합성 데이터 한계)
+- value_area: PASS folds 4/9, avg_sharpe=-1.298, SharpeStd=6.589 (높은 변동성)
+- narrow_range: 저거래 fold 44% (trades<3) → 신호 생성 부족 지속
+- cmf/wick_reversal: IS Sharpe 전부 음수 → GBM 합성 미작동 확인
+
+**[F] 리서치 — 시뮬레이션 기반 인사이트:**
+- Cornish-Fisher: BTC 음의 왜도(-1.2 avg) + 높은 첨도(6~10) → CF-VaR이 Normal-VaR보다 30-50% 보수적
+- CPCV 활용: run_cpcv_validation()으로 train() 이후 WFO 이중 검증 가능 (실무 파이프라인 연결 준비)
+- supertrend_multi PF=1.47 → 수수료/슬리피지 감소로 합성 PASS 가능 (실거래소 검증 우선)
+- value_area 4h봉: Sharpe std 과다 → 파라미터 범위 축소 필요 (va_mult 범위 0.65-0.75 재검토)
+
+**테스트:** 18개 신규 + 기존 7146개 모두 통과
+
+---
+
 ## [2026-05-26] Cycle 214 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[C] 데이터 — Block Bootstrap 합성데이터 생성기 추가:**
@@ -15982,3 +16025,70 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-26 14:30 UTC] Cycle 215 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-26 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-26 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures

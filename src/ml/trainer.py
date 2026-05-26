@@ -71,6 +71,9 @@ class TrainingResult:
     selected_features: Optional[List[str]] = None
     # 레짐 감지 결과 (regime_aware=True 시)
     detected_regime: Optional[str] = None
+    # CPCV 추가 검증 결과 (run_cpcv_validation() 호출 시 채워짐)
+    cpcv_avg_acc: float = 0.0
+    cpcv_n_folds: int = 0
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -547,6 +550,86 @@ class WalkForwardTrainer:
         logger.info(result.summary())
         logger.info(result.feature_importance_report())
         return result
+
+    def run_cpcv_validation(
+        self,
+        df: pd.DataFrame,
+        n_splits: int = 6,
+        purge_gap: int = 5,
+        embargo_pct: float = 0.01,
+    ) -> Optional[dict]:
+        """학습 완료 후 CPCV로 OOS 일반화 성능 추가 검증.
+
+        train()이 먼저 호출되어야 함. df에서 피처를 재빌드한 뒤
+        combinatorial_purged_cv로 k-fold OOS 정확도를 계산.
+
+        Args:
+            df: 학습에 사용한 것과 동일한 OHLCV DataFrame.
+            n_splits: CPCV fold 수 (기본 6).
+            purge_gap: train-test 경계 간 purge 샘플 수 (기본 5).
+            embargo_pct: 테스트 끝 이후 embargo 비율 (기본 1%).
+
+        Returns:
+            {
+                "avg_test_acc": float,   # fold 평균 test accuracy
+                "std_test_acc": float,   # fold 표준편차
+                "n_folds": int,
+                "fold_results": list,
+                "passed": bool,          # avg_test_acc >= MIN_ACCURACY
+            }
+            모델 미학습 또는 CPCV fold 결과 없으면 None.
+        """
+        if self._trained_model is None:
+            logger.warning("run_cpcv_validation: 모델 미학습 — train() 먼저 호출")
+            return None
+
+        # 피처 재빌드
+        try:
+            if self.regime_aware and isinstance(self.feature_builder, RegimeAwareFeatureBuilder):
+                X_all, y_all, _ = self.feature_builder.build_with_regime(df)
+            else:
+                X_all, y_all = self.feature_builder.build(df)
+            y_all = y_all.astype(int)
+        except Exception as e:
+            logger.warning("run_cpcv_validation: 피처 빌드 실패 — %s", e)
+            return None
+
+        # 학습 시 선택된 피처 컬럼만 사용
+        if self._feature_names:
+            cols = [c for c in self._feature_names if c in X_all.columns]
+            if cols:
+                X_all = X_all[cols]
+
+        if len(X_all) < 100:
+            logger.warning("run_cpcv_validation: 데이터 부족 (%d < 100)", len(X_all))
+            return None
+
+        fold_results = combinatorial_purged_cv(
+            X_all, y_all,
+            n_splits=n_splits,
+            purge_gap=purge_gap,
+            embargo_pct=embargo_pct,
+        )
+
+        if not fold_results:
+            return None
+
+        accs = [r["test_acc"] for r in fold_results]
+        avg_acc = float(np.mean(accs))
+        std_acc = float(np.std(accs))
+
+        logger.info(
+            "CPCV validation: %d folds, avg_test_acc=%.3f ± %.3f, passed=%s",
+            len(fold_results), avg_acc, std_acc, avg_acc >= MIN_ACCURACY,
+        )
+
+        return {
+            "avg_test_acc": round(avg_acc, 4),
+            "std_test_acc": round(std_acc, 4),
+            "n_folds": len(fold_results),
+            "fold_results": fold_results,
+            "passed": avg_acc >= MIN_ACCURACY,
+        }
 
     def get_feature_importances(self, top_n: Optional[int] = None) -> List[Tuple[str, float]]:
         """
