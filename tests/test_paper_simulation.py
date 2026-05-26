@@ -1,7 +1,9 @@
-"""tests/test_paper_simulation.py — paper_simulation 상대 순위 로직 테스트."""
+"""tests/test_paper_simulation.py — paper_simulation 상대 순위 + Block Bootstrap 토글 테스트."""
 import pytest
 import sys
+import os
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -129,3 +131,80 @@ class TestComputeRankScores:
         assert r["name"] == "check"
         assert r["avg_return"] == 0.05
         assert r["avg_sharpe"] == 1.5
+
+
+class TestBlockBootstrapToggle:
+    """paper_simulation의 Block Bootstrap 토글 로직 테스트."""
+
+    def test_use_block_bootstrap_default_true(self):
+        """기본값: USE_BLOCK_BOOTSTRAP = True (환경변수 미설정 시)."""
+        env = {k: v for k, v in os.environ.items() if k != "PAPER_SIM_BOOTSTRAP"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            # 모듈 재로드로 상수 재평가
+            import importlib
+            import scripts.paper_simulation as ps
+            importlib.reload(ps)
+            assert ps.USE_BLOCK_BOOTSTRAP is True
+
+    def test_use_block_bootstrap_disabled_by_env(self):
+        """환경변수 PAPER_SIM_BOOTSTRAP=0 → GBM 모드."""
+        with mock.patch.dict(os.environ, {"PAPER_SIM_BOOTSTRAP": "0"}):
+            import importlib
+            import scripts.paper_simulation as ps
+            importlib.reload(ps)
+            assert ps.USE_BLOCK_BOOTSTRAP is False
+
+    def test_block_size_from_env(self):
+        """환경변수 PAPER_SIM_BLOCK_SIZE로 블록 크기 변경."""
+        with mock.patch.dict(os.environ, {"PAPER_SIM_BLOCK_SIZE": "48"}):
+            import importlib
+            import scripts.paper_simulation as ps
+            importlib.reload(ps)
+            assert ps.BLOCK_BOOTSTRAP_BLOCK_SIZE == 48
+
+    def test_block_bootstrap_data_generation(self):
+        """Block Bootstrap fallback이 유효한 OHLCV DataFrame을 생성하는지."""
+        from scripts.quality_audit import make_synthetic_data, make_block_bootstrap_data
+        seed_df = make_synthetic_data(500, seed=99)
+        result = make_block_bootstrap_data(
+            seed_df, n=200, block_size=36, seed=99,
+            initial_price=float(seed_df["close"].iloc[0]),
+        )
+        assert len(result) == 200
+        # OHLCV 컬럼 존재
+        for col in ["open", "high", "low", "close", "volume"]:
+            assert col in result.columns
+        # 가격 양수
+        assert (result["close"] > 0).all()
+        assert (result["high"] >= result["low"]).all()
+
+    def test_block_bootstrap_vs_gbm_different_data(self):
+        """Block Bootstrap과 GBM은 서로 다른 데이터를 생성."""
+        from scripts.quality_audit import make_synthetic_data, make_block_bootstrap_data
+        gbm_df = make_synthetic_data(500, seed=42)
+        bb_df = make_block_bootstrap_data(
+            gbm_df, n=500, block_size=36, seed=42,
+            initial_price=float(gbm_df["close"].iloc[0]),
+        )
+        # 같은 seed라도 생성 방식이 다르므로 close가 다름
+        assert not gbm_df["close"].iloc[:500].equals(bb_df["close"])
+
+    def test_report_shows_data_source(self):
+        """리포트에 데이터 소스(BlockBootstrap/GBM)가 표시되는지."""
+        import scripts.paper_simulation as ps
+        import pandas as pd
+        import numpy as np
+        # 최소 DataFrame (리포트 생성용)
+        idx = pd.date_range("2024-01-01", periods=100, freq="h")
+        df = pd.DataFrame({"close": np.linspace(100, 110, 100)}, index=idx)
+        df["open"] = df["close"]
+        df["high"] = df["close"] * 1.01
+        df["low"] = df["close"] * 0.99
+        df["volume"] = 1000.0
+
+        results = [_make_result("test_strat")]
+        report = ps.generate_report(results, "Synthetic BlockBootstrap x8640 (BTC/USDT-like)", df, 3)
+        assert "BlockBootstrap" in report
+
+        report_gbm = ps.generate_report(results, "Synthetic GBM x8640 (BTC/USDT-like)", df, 3)
+        assert "GBM" in report_gbm

@@ -637,6 +637,19 @@ class LivePaperTrader:
             elif health.status == HealthStatus.DEGRADED:
                 logger.warning("DEGRADED — data may be stale, proceeding cautiously")
 
+            # PaperTrader 상태 모니터링
+            trader_health = self.health_checker.get_trader_health(self.paper)
+            if trader_health["warnings"]:
+                for w in trader_health["warnings"]:
+                    logger.warning("TraderHealth: %s", w)
+            else:
+                logger.debug(
+                    "TraderHealth OK: balance=$%.2f, equity=$%.2f, positions=%d",
+                    trader_health["balance"],
+                    trader_health["equity"],
+                    trader_health["open_positions"],
+                )
+
         self.state.tick_count += 1
         self.state.last_tick = datetime.utcnow().isoformat()
 
@@ -1205,9 +1218,110 @@ class LivePaperTrader:
                     f"${entry['pnl']:+7.2f} PnL"
                 )
 
+        # 주간/월간 성과 요약 (PerformanceTracker 기반, 전략 합산)
+        agg_weekly = self._aggregate_period_summary("weekly")
+        agg_monthly = self._aggregate_period_summary("monthly")
+        if agg_weekly["total_trades"] > 0:
+            ws = agg_weekly
+            sharpe_s = f"{ws['sharpe']:.2f}" if ws["sharpe"] is not None else "N/A"
+            pf_s = f"{ws['pf']:.2f}" if ws["pf"] is not None else "N/A"
+            lines.append(f"\nWeekly Summary (last 4 weeks):")
+            lines.append(
+                f"  Trades={ws['total_trades']}, PnL=${ws['total_pnl']:+.2f}, "
+                f"WR={ws['win_rate']:.1%}, PF={pf_s}, Sharpe={sharpe_s}, "
+                f"MDD={ws['mdd']:.1%}"
+            )
+        if agg_monthly["total_trades"] > 0:
+            ms = agg_monthly
+            sharpe_s = f"{ms['sharpe']:.2f}" if ms["sharpe"] is not None else "N/A"
+            pf_s = f"{ms['pf']:.2f}" if ms["pf"] is not None else "N/A"
+            lines.append(f"\nMonthly Summary (last 3 months):")
+            lines.append(
+                f"  Trades={ms['total_trades']}, PnL=${ms['total_pnl']:+.2f}, "
+                f"WR={ms['win_rate']:.1%}, PF={pf_s}, Sharpe={sharpe_s}, "
+                f"MDD={ms['mdd']:.1%}"
+            )
+
         lines.append("="*70 + "\n")
         summary_text = "\n".join(lines)
         logger.info(summary_text)
+
+    def _aggregate_period_summary(self, period: str = "weekly") -> dict:
+        """전략별 PerformanceTracker 데이터를 합산하여 주간/월간 요약 반환.
+
+        Args:
+            period: "weekly" 또는 "monthly"
+
+        Returns:
+            {total_trades, total_pnl, win_rate, pf, sharpe, mdd}
+        """
+        result = {"total_trades": 0, "total_pnl": 0.0, "win_rate": 0.0, "pf": None, "sharpe": None, "mdd": 0.0}
+        all_keys = set()
+        for sym_strats in self.state.active_strategies.values():
+            for s in sym_strats:
+                for symbol in SYMBOLS:
+                    all_keys.add(f"{symbol}:{s}")
+
+        total_trades = 0
+        total_pnl = 0.0
+        total_wins = 0
+        gross_profit = 0.0
+        gross_loss = 0.0
+        max_mdd = 0.0
+
+        for key in all_keys:
+            if period == "weekly":
+                summary = self._perf_tracker.get_weekly_summary(key, weeks=4)
+            else:
+                summary = self._perf_tracker.get_monthly_summary(key, months=3)
+
+            t = summary.get("total_trades", 0)
+            if t == 0:
+                continue
+            total_trades += t
+            total_pnl += summary.get("total_pnl", 0.0)
+            total_wins += int(summary.get("win_rate", 0.0) * t)
+            # PF 재계산용 gross profit/loss 합산
+            pnl_key = "weekly_pnl" if period == "weekly" else "monthly_pnl"
+            for p in summary.get(pnl_key, []):
+                if p > 0:
+                    gross_profit += p
+                elif p < 0:
+                    gross_loss += abs(p)
+            mdd = summary.get("mdd", 0.0)
+            if mdd > max_mdd:
+                max_mdd = mdd
+
+        if total_trades == 0:
+            return result
+
+        result["total_trades"] = total_trades
+        result["total_pnl"] = round(total_pnl, 2)
+        result["win_rate"] = total_wins / total_trades if total_trades > 0 else 0.0
+        if gross_loss > 1e-9:
+            result["pf"] = round(gross_profit / gross_loss, 2)
+        elif gross_profit > 0:
+            result["pf"] = float("inf")
+        result["mdd"] = round(max_mdd, 4)
+
+        # Sharpe: trade_log에서 직접 일간 PnL 계산 (합산 기준)
+        # 여기서는 개별 전략 sharpe 중 trade 가중 평균 사용
+        sharpe_sum = 0.0
+        sharpe_weight = 0
+        for key in all_keys:
+            if period == "weekly":
+                summary = self._perf_tracker.get_weekly_summary(key, weeks=4)
+            else:
+                summary = self._perf_tracker.get_monthly_summary(key, months=3)
+            s = summary.get("sharpe")
+            t = summary.get("total_trades", 0)
+            if s is not None and t > 0:
+                sharpe_sum += s * t
+                sharpe_weight += t
+        if sharpe_weight > 0:
+            result["sharpe"] = round(sharpe_sum / sharpe_weight, 2)
+
+        return result
 
     def _compute_go_nogo_judgment(self) -> dict:
         """
@@ -1370,6 +1484,27 @@ class LivePaperTrader:
                 lines.append(f"| `{name}` | {s['signals']} | {s['wins']} | {s['losses']} | "
                              f"{wr:.0%} | ${s['pnl']:+.2f} |")
             lines.append("")
+
+        # 일간 성과 요약 (PerformanceTracker 기반)
+        lines.append("## Daily Performance Summary\n")
+        daily_has_data = False
+        for symbol in SYMBOLS:
+            strats = self.state.active_strategies.get(symbol, [])
+            for s in strats:
+                key = f"{symbol}:{s}"
+                ds = self._perf_tracker.get_daily_summary(key, days=7)
+                if ds["total_trades"] > 0:
+                    daily_has_data = True
+                    sharpe_s = f"{ds['sharpe']:.2f}" if ds["sharpe"] is not None else "N/A"
+                    pf_s = f"{ds['profit_factor']:.2f}" if ds["profit_factor"] is not None and ds["profit_factor"] != float("inf") else ("inf" if ds["profit_factor"] == float("inf") else "N/A")
+                    lines.append(
+                        f"- `{key}`: {ds['total_trades']} trades, "
+                        f"${ds['total_pnl']:+.2f} PnL, "
+                        f"WR={ds['win_rate']:.0%}, PF={pf_s}, Sharpe={sharpe_s}"
+                    )
+        if not daily_has_data:
+            lines.append("_No trades in last 7 days_")
+        lines.append("")
 
         recent = self.state.trade_log[-20:]
         if recent:

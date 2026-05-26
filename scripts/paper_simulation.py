@@ -540,6 +540,13 @@ def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
 
 # ── 메인 ──────────────────────────────────────────────────
 
+# Block Bootstrap 데이터 생성 토글 (True: Block Bootstrap, False: 기존 GBM)
+# Block Bootstrap은 실제 변동성 군집(ARCH)과 자기상관을 보존하므로 GBM보다 현실적
+# 환경변수 PAPER_SIM_BOOTSTRAP=0 으로 GBM 모드 강제 가능
+import os as _os
+USE_BLOCK_BOOTSTRAP = _os.environ.get("PAPER_SIM_BOOTSTRAP", "1") != "0"
+BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "36"))
+
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
@@ -555,8 +562,19 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
         symbol_seed = hash(symbol) % (2**31)
         print(f"[{symbol}][FALLBACK] Using synthetic data (seed={symbol_seed}, Bybit API inaccessible)")
         from scripts.quality_audit import make_synthetic_data
-        df = make_synthetic_data(8640, seed=symbol_seed)
-        data_source = f"Synthetic GBM x8640 ({symbol}-like, seed={symbol_seed})"
+        if USE_BLOCK_BOOTSTRAP:
+            from scripts.quality_audit import make_block_bootstrap_data
+            seed_df = make_synthetic_data(8640, seed=symbol_seed)
+            df = make_block_bootstrap_data(
+                seed_df, n=8640, block_size=BLOCK_BOOTSTRAP_BLOCK_SIZE,
+                seed=symbol_seed, initial_price=float(seed_df["close"].iloc[0]),
+            )
+            data_source = (f"Synthetic BlockBootstrap x8640 ({symbol}-like, "
+                           f"seed={symbol_seed}, block={BLOCK_BOOTSTRAP_BLOCK_SIZE})")
+            print(f"[{symbol}][DATA] Block Bootstrap mode (block_size={BLOCK_BOOTSTRAP_BLOCK_SIZE})")
+        else:
+            df = make_synthetic_data(8640, seed=symbol_seed)
+            data_source = f"Synthetic GBM x8640 ({symbol}-like, seed={symbol_seed})"
         # 합성 데이터에도 enrich_indicators 적용 — make_synthetic_data에 없는
         # ema20, donchian_high/low, vwap, vwap20 등의 지표를 추가
         df = enrich_indicators(df)
@@ -662,6 +680,8 @@ def run_simulation():
             "initial_balance": 10_000,
             "fee_rate": 0.001,
             "slippage_pct": 0.0005,
+            "synthetic_data_mode": "BlockBootstrap" if USE_BLOCK_BOOTSTRAP else "GBM",
+            "block_bootstrap_block_size": BLOCK_BOOTSTRAP_BLOCK_SIZE if USE_BLOCK_BOOTSTRAP else None,
         }
         export_results_json(all_symbol_results, metadata)
         export_results_csv(all_symbol_results)

@@ -201,6 +201,76 @@ class HealthChecker:
         self.state.last_data_time = time.time()
         logger.info("HealthChecker reset — all states cleared")
 
+    def get_trader_health(self, paper_trader) -> dict:
+        """PaperTrader 상태 모니터링: 포지션, 미실현 PnL, equity 등.
+
+        Args:
+            paper_trader: PaperTrader 인스턴스
+
+        Returns:
+            {
+              "balance": float,
+              "equity": float,
+              "open_positions": int,
+              "unrealized_pnl": float,
+              "margin_usage_pct": float,
+              "warnings": list[str],
+            }
+        """
+        warnings_list = []
+        try:
+            pt_state = paper_trader.save_state()
+            balance = pt_state.get("balance", 0.0)
+            positions = pt_state.get("positions", {})
+            num_positions = len(positions)
+
+            # 미실현 PnL 추정 (포지션 qty * 0은 정보 부족 → PaperTrader에서 직접)
+            unrealized = 0.0
+            if hasattr(paper_trader, "unrealized_pnl"):
+                unrealized = paper_trader.unrealized_pnl()
+            equity = balance + unrealized
+
+            # 마진 사용률: 포지션 가치 / balance
+            margin_pct = 0.0
+            if balance > 0 and hasattr(paper_trader, "positions"):
+                total_pos_value = sum(
+                    abs(qty) for qty in paper_trader.positions.values()
+                )
+                # 대략적 마진 (포지션 수량만으로는 부정확, 가격 필요)
+                margin_pct = 0.0  # 정확한 계산은 가격 정보 필요
+
+            # 경고 조건
+            if num_positions == 0 and balance <= 0:
+                warnings_list.append("ZERO_BALANCE: balance <= 0 with no positions")
+            if equity < balance * 0.85:
+                warnings_list.append(
+                    f"HIGH_UNREALIZED_LOSS: equity ${equity:.2f} < 85% of balance ${balance:.2f}"
+                )
+            if num_positions >= 5:
+                warnings_list.append(
+                    f"MAX_POSITIONS: {num_positions} positions open (limit=5)"
+                )
+
+        except Exception as exc:
+            logger.warning("get_trader_health failed: %s", str(exc)[:100])
+            return {
+                "balance": 0.0,
+                "equity": 0.0,
+                "open_positions": 0,
+                "unrealized_pnl": 0.0,
+                "margin_usage_pct": 0.0,
+                "warnings": [f"ERROR: {str(exc)[:80]}"],
+            }
+
+        return {
+            "balance": round(balance, 2),
+            "equity": round(equity, 2),
+            "open_positions": num_positions,
+            "unrealized_pnl": round(unrealized, 2),
+            "margin_usage_pct": round(margin_pct, 4),
+            "warnings": warnings_list,
+        }
+
     def summary(self) -> dict:
         """현재 상태 요약."""
         return self.state.to_dict()
