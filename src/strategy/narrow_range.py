@@ -1,12 +1,15 @@
 """
-NarrowRangeStrategy (개선): NR7 + ATR 축소 + 거래량 확인
+NarrowRangeStrategy (개선 Cycle 219): NR + ATR 축소 + 거래량 확인
 
-- NR7: 최근 7봉 중 최소 range 감지
+- NR 감지: 최근 nr_lookback 봉 중 최소 range 감지
+- NR 윈도우: 최근 NR_SCAN_WINDOW 봉 내 NR 발생 여부 확인 (지연 돌파 포착)
 - ATR 필터: NR 기간 ATR이 평균보다 수축 (20봉 평균 기준)
-- 돌파 거래량: 진정 거래량이 20봉 평균의 1.2x 이상
-- Breakout: prev가 NR7 AND ATR 축소 AND close 돌파 AND volume spike
-- confidence: NR4+NR7 AND volume>1.5x → HIGH, 아니면 MEDIUM
+- 돌파 거래량: 거래량이 20봉 평균의 VOL_SPIKE_MULT 이상
+- Breakout: 스캔 윈도우 내 NR 감지 AND ATR 축소 AND close 돌파
+- confidence: NR4+NR AND volume spike → HIGH, 아니면 MEDIUM
 """
+
+from typing import Dict, Optional
 
 import pandas as pd
 
@@ -19,7 +22,8 @@ class NarrowRangeStrategy(BaseStrategy):
     ATR_LOOKBACK = 20
     VOL_LOOKBACK = 20
     VOL_SPIKE_MULT = 1.0   # 완화: 1.2→1.0 (4h봉 거래 수 증가 목적, Cycle 206)
-    ATR_THRESHOLD = 0.90   # 완화: 0.85→0.90 (더 여유로운 ATR 수축 조건, Cycle 206)
+    ATR_THRESHOLD = 0.95   # 완화: 0.90→0.95 (Cycle 219: 저거래 해결)
+    NR_SCAN_WINDOW = 3     # NR 발생 후 최대 3봉 내 돌파 허용 (Cycle 219)
 
     def __init__(self, nr_lookback: int = 5, **kwargs):
         """
@@ -35,38 +39,49 @@ class NarrowRangeStrategy(BaseStrategy):
         window = ranges.iloc[idx - n + 1: idx + 1]
         return float(ranges.iloc[idx]) <= float(window.min())
 
+    def _find_recent_nr(self, ranges: pd.Series, curr_idx: int) -> Optional[Dict]:
+        """최근 NR_SCAN_WINDOW 봉 내에서 가장 최근 NR 봉을 찾아 반환."""
+        scan_start = max(self.nr_lookback - 1, curr_idx - self.NR_SCAN_WINDOW)
+        for offset in range(1, self.NR_SCAN_WINDOW + 1):
+            check_idx = curr_idx - offset
+            if check_idx < scan_start:
+                break
+            if self._is_nr(ranges, check_idx, self.nr_lookback):
+                is_nr4 = self._is_nr(ranges, check_idx, 4)
+                return {"idx": check_idx, "is_nr4": is_nr4, "offset": offset}
+        return None
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < self.MIN_ROWS:
             return self._hold(df, f"데이터 부족: {len(df)} < {self.MIN_ROWS}")
 
         # current = 마지막 완성봉 (iloc[-2])
-        # prev    = 그 이전 봉 (iloc[-3]) → NR 후보
         curr_idx = len(df) - 2  # 완성봉
-        prev_idx = curr_idx - 1  # NR 후보봉
 
-        if prev_idx < self.nr_lookback - 1:
+        if curr_idx < self.nr_lookback + self.NR_SCAN_WINDOW:
             return self._hold(df, f"NR{self.nr_lookback} 판단에 필요한 이전 봉 부족")
 
         ranges = df["high"] - df["low"]
 
-        # prev봉이 NR(lookback), NR4 확인
-        is_nr7 = self._is_nr(ranges, prev_idx, self.nr_lookback)
-        is_nr4 = self._is_nr(ranges, prev_idx, 4)
+        # 최근 NR_SCAN_WINDOW 봉 내에서 NR 봉 탐색 (지연 돌파 포착)
+        nr_info = self._find_recent_nr(ranges, curr_idx)
 
-        if not is_nr7:
+        if nr_info is None:
             return self._hold(
                 df,
-                f"NR{self.nr_lookback} 조건 미충족: prev_range={float(ranges.iloc[prev_idx]):.4f}",
+                f"NR{self.nr_lookback} 최근 {self.NR_SCAN_WINDOW}봉 내 미감지",
             )
 
-        # ATR 축소 확인 (NR 기간 ATR이 평균보다 작은지)
+        nr_idx = nr_info["idx"]
+        is_nr4 = nr_info["is_nr4"]
+
+        # ATR 축소 확인 (NR 봉 기준)
         atr_series = df["atr14"]
-        nr_atr = float(atr_series.iloc[prev_idx])
-        avg_atr = float(atr_series.iloc[prev_idx - self.ATR_LOOKBACK : prev_idx].mean())
-        
-        # ATR이 평균의 85% 이하 → 축소 상태
+        nr_atr = float(atr_series.iloc[nr_idx])
+        avg_atr = float(atr_series.iloc[nr_idx - self.ATR_LOOKBACK : nr_idx].mean())
+
         atr_shrunk = nr_atr <= avg_atr * self.ATR_THRESHOLD
-        
+
         if not atr_shrunk:
             return self._hold(
                 df,
@@ -76,63 +91,66 @@ class NarrowRangeStrategy(BaseStrategy):
         # 거래량 확인 (현재 봉)
         vol_current = float(df["volume"].iloc[curr_idx])
         avg_vol = float(df["volume"].iloc[curr_idx - self.VOL_LOOKBACK : curr_idx].mean())
-        
+
         vol_spike = vol_current >= avg_vol * self.VOL_SPIKE_MULT
-        
+
         close_curr = float(df["close"].iloc[curr_idx])
-        high_prev = float(df["high"].iloc[prev_idx])
-        low_prev = float(df["low"].iloc[prev_idx])
-        prev_range = float(ranges.iloc[prev_idx])
+        high_nr = float(df["high"].iloc[nr_idx])
+        low_nr = float(df["low"].iloc[nr_idx])
 
-        # confidence: NR4+NR7 AND volume spike → HIGH
-        conf = Confidence.HIGH if (is_nr4 and is_nr7 and vol_spike) else Confidence.MEDIUM
+        # confidence: NR4+NR AND volume spike → HIGH
+        conf = Confidence.HIGH if (is_nr4 and vol_spike) else Confidence.MEDIUM
 
+        nr_label = f"NR{self.nr_lookback}"
         bull_case = (
-            f"NR7={'Y'} NR4={'Y' if is_nr4 else 'N'} ATR_shrink={'Y'} "
+            f"{nr_label}={'Y'} NR4={'Y' if is_nr4 else 'N'} ATR_shrink={'Y'} "
             f"vol_spike={'Y' if vol_spike else 'N'}, "
-            f"close={close_curr:.4f} > prev_high={high_prev:.4f}"
+            f"close={close_curr:.4f} > nr_high={high_nr:.4f}"
         )
         bear_case = (
-            f"NR7={'Y'} NR4={'Y' if is_nr4 else 'N'} ATR_shrink={'Y'} "
+            f"{nr_label}={'Y'} NR4={'Y' if is_nr4 else 'N'} ATR_shrink={'Y'} "
             f"vol_spike={'Y' if vol_spike else 'N'}, "
-            f"close={close_curr:.4f} < prev_low={low_prev:.4f}"
+            f"close={close_curr:.4f} < nr_low={low_nr:.4f}"
         )
 
-        # 상향 돌파
-        if close_curr > high_prev:
+        # 상향 돌파 (NR 봉의 high 기준)
+        if close_curr > high_nr:
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close_curr,
                 reasoning=(
-                    f"NR7 상향 돌파: close({close_curr:.4f})>high({high_prev:.4f}), "
-                    f"ATR={nr_atr:.4f} < avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f}), vol_spike={vol_spike}"
+                    f"{nr_label} 상향돌파(off={nr_info['offset']}): "
+                    f"close({close_curr:.4f})>high({high_nr:.4f}), "
+                    f"ATR={nr_atr:.4f}<avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f})"
                 ),
-                invalidation=f"close < prev_high({high_prev:.4f}) 복귀 시 무효",
+                invalidation=f"close < nr_high({high_nr:.4f}) 복귀 시 무효",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        # 하향 돌파
-        if close_curr < low_prev:
+        # 하향 돌파 (NR 봉의 low 기준)
+        if close_curr < low_nr:
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close_curr,
                 reasoning=(
-                    f"NR7 하향 돌파: close({close_curr:.4f})<low({low_prev:.4f}), "
-                    f"ATR={nr_atr:.4f} < avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f}), vol_spike={vol_spike}"
+                    f"{nr_label} 하향돌파(off={nr_info['offset']}): "
+                    f"close({close_curr:.4f})<low({low_nr:.4f}), "
+                    f"ATR={nr_atr:.4f}<avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f})"
                 ),
-                invalidation=f"close > prev_low({low_prev:.4f}) 복귀 시 무효",
+                invalidation=f"close > nr_low({low_nr:.4f}) 복귀 시 무효",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
         return self._hold(
             df,
-            f"NR7+ATR 축소 감지됐으나 돌파 없음: close={close_curr:.4f} in [{low_prev:.4f}, {high_prev:.4f}]",
+            f"{nr_label}+ATR축소 감지(off={nr_info['offset']})됐으나 돌파 없음: "
+            f"close={close_curr:.4f} in [{low_nr:.4f}, {high_nr:.4f}]",
         )
 
     def _hold(self, df: pd.DataFrame, reason: str) -> Signal:

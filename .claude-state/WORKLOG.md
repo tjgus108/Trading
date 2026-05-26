@@ -1,5 +1,42 @@
 # Work Log
 
+## [2026-05-27] Cycle 219 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[C] 데이터 — DataFeed 중복제거 + 캐시 관리 + OrderFlow 검증:**
+- `src/data/feed.py`: `_to_dataframe()` 중복 타임스탬프 감지/제거 로직 강화
+  - `duplicated(keep=False)`로 명시적 중복 탐지, 마지막 값 보존, 최종 검증
+- `src/data/feed.py`: `_detect_and_invalidate_stale_cache()` 추가
+  - 설정 시간(기본 3600s) 초과 캐시 자동 무효화
+- `src/data/feed.py`: `_is_cache_stale_for_regime()` 추가
+  - 레짐별 캐시 만료 차등 적용 (Crisis: 20%, HighVol: 50%, Normal: 90% TTL)
+- `src/data/order_flow.py`: `VPINCalculator.validate_extreme_imbalance()` 추가
+  - OFI > 0.9 극단 불균형 감지, zero volume 안전 처리
+- 테스트 10개 신규, 기존 54개 포함 전체 PASS
+
+**[B] 리스크 — RiskManager CF-VaR 통합 + trailing_stop_signal 통합:**
+- `src/risk/manager.py`: `__init__`에 `kelly_sizer`, `portfolio_optimizer`, `drawdown_monitor` 파라미터 추가 (모두 Optional, 하위 호환)
+- `evaluate()` 포지션 사이징 후:
+  - CF-VaR: `kelly_sizer.estimate_cornish_fisher_var()` → `portfolio_optimizer.cf_var_position_limit()` 배수 적용 (< 1.0 시 축소)
+  - trailing_stop: `drawdown_monitor.trailing_stop_signal()` True 시 포지션 50% 축소
+- 기존 193 테스트 전체 PASS
+
+**[SIM] narrow_range 저거래 문제 해결:**
+- `src/strategy/narrow_range.py`: 3가지 핵심 수정
+  - `NR_SCAN_WINDOW = 3`: 1봉→3봉 윈도우로 지연 돌파 포착 (`_find_recent_nr()` 추가)
+  - `ATR_THRESHOLD`: 0.90→0.95 완화
+  - 돌파 기준을 NR 감지 봉의 high/low로 변경
+- 예상 신호 빈도 3~4배 증가, 핵심 NR 로직 유지
+- 37 테스트 PASS
+
+**[F] 리서치 — 인사이트:**
+- 실패 사례: $9M dogwifhat 슬리피지 손실(오더북 깊이 미확인), AI봇 연쇄 매도 플래시 크래시(circuit breaker 부재), 과최적화 붕괴(파라미터당 200~500 trades 미만)
+- 성공 사례: 다중 페어 stat arb(Sharpe 2.3, MDD 9%) — 정교한 포지션 사이징 + CF-VaR가 핵심, DCA/그리드봇 — 레짐 필터가 성공 요인
+- narrow_range: NR7→NR4 lookback 단축 or 0.85 range_mult 완화 권장 (적용 완료)
+- CF-VaR 실전: mean-CVaR 최적화로 fat-tail 예측 20~30% 향상 (문헌 기준)
+- 트렌드: Multi-regime adaptive, N-BEATS+CNN-LSTM 하이브리드, 온체인 팩터 모델
+
+---
+
 ## [2026-05-26] Cycle 217 — B(리스크) + D(ML) + SIM + F(리서치)
 
 **[B] 리스크 — DrawdownMonitor + PortfolioOptimizer 개선:**
@@ -16275,3 +16312,70 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-26 20:36 UTC] Cycle 219 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-26 20:47 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-26 20:47 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 20:47 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures

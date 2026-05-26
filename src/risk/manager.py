@@ -116,6 +116,9 @@ class RiskManager:
         jitter_pct: float = 0.0,  # ±jitter_pct 랜덤 노이즈 (0~0.05)
         session_filter: bool = False,  # True 시 세션별 포지션 축소 활성화
         max_total_exposure: float = 0.30,  # 다중 포지션 총 노출 한도 (계좌 대비 30%)
+        kelly_sizer: Optional[object] = None,   # KellySizer — CF-VaR 포지션 한도용
+        drawdown_monitor: Optional[object] = None,  # DrawdownMonitor — trailing stop 신호용
+        portfolio_optimizer: Optional[object] = None,  # PortfolioOptimizer — CF-VaR 한도 계산용
     ):
         if not (0 < risk_per_trade <= 1.0):
             raise ValueError(f"risk_per_trade must be in (0, 1.0], got {risk_per_trade}")
@@ -135,6 +138,9 @@ class RiskManager:
         self.jitter_pct = max(0.0, min(jitter_pct, 0.05))  # 상한 5%
         self.session_filter = session_filter
         self.max_total_exposure = max_total_exposure
+        self.kelly_sizer = kelly_sizer
+        self.drawdown_monitor = drawdown_monitor
+        self.portfolio_optimizer = portfolio_optimizer
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
@@ -307,6 +313,33 @@ class RiskManager:
         # 최대 포지션 한도 클램프
         max_size = (account_balance * self.max_position_size) / entry_price
         position_size = min(position_size, max_size)
+
+        # CF-VaR 포지션 한도 적용 (KellySizer + PortfolioOptimizer 모두 있을 때)
+        if self.kelly_sizer is not None and self.portfolio_optimizer is not None:
+            cf_result = self.kelly_sizer.estimate_cornish_fisher_var()
+            if cf_result is not None:
+                cf_var = cf_result["cf_var"]
+                hist_var = cf_result["hist_var"]
+                cf_mult = self.portfolio_optimizer.cf_var_position_limit(
+                    cf_var=cf_var,
+                    normal_var=hist_var,
+                )
+                if cf_mult < 1.0:
+                    logger.info(
+                        "CF-VaR position limit: cf_var=%.4f hist_var=%.4f multiplier=%.2f",
+                        cf_var, hist_var, cf_mult,
+                    )
+                    position_size *= cf_mult
+                    max_size *= cf_mult  # 후속 클램프 기준도 동기화
+
+        # trailing_stop_signal: 낙폭 가속 감지 시 포지션 50% 축소
+        if self.drawdown_monitor is not None:
+            if self.drawdown_monitor.trailing_stop_signal():
+                logger.warning(
+                    "DrawdownMonitor trailing_stop_signal triggered — position_size halved"
+                )
+                position_size *= 0.5
+                max_size *= 0.5  # 후속 클램프 기준도 동기화
 
         # ATR이 매우 커서 포지션 사이즈가 사실상 0인 경우 BLOCK (< 1e-8 단위)
         if position_size < 1e-8:
