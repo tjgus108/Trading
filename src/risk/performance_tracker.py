@@ -259,6 +259,205 @@ class LivePerformanceTracker:
             "sharpe": round(sharpe, 4) if sharpe is not None else None,
         }
 
+    def get_weekly_pnl(self, strategy: str, weeks: int = 4) -> list:
+        """최근 N주간의 주별 합산 PnL 리스트 반환.
+
+        Returns:
+            길이 weeks인 list. index 0 = 가장 오래된 주,
+            index -1 = 이번 주. 거래 없는 주는 0.0.
+        """
+        now = time.time()
+        bucket_seconds = 7 * 86400.0  # 1주 = 7일
+        cutoff = now - weeks * bucket_seconds
+        buckets = [0.0] * weeks
+
+        for t in self._trades[strategy]:
+            ts = t.get("timestamp", 0.0)
+            if ts < cutoff:
+                continue
+            age_seconds = now - ts
+            bucket_idx = weeks - 1 - int(age_seconds // bucket_seconds)
+            if 0 <= bucket_idx < weeks:
+                buckets[bucket_idx] += t["pnl"]
+
+        return buckets
+
+    def get_monthly_pnl(self, strategy: str, months: int = 3) -> list:
+        """최근 N개월간의 월별 합산 PnL 리스트 반환.
+
+        달력월이 아닌 30일 단위 근사.
+
+        Returns:
+            길이 months인 list. index 0 = 가장 오래된 월,
+            index -1 = 이번 달. 거래 없는 달은 0.0.
+        """
+        now = time.time()
+        bucket_seconds = 30 * 86400.0  # 1개월 ≈ 30일
+        cutoff = now - months * bucket_seconds
+        buckets = [0.0] * months
+
+        for t in self._trades[strategy]:
+            ts = t.get("timestamp", 0.0)
+            if ts < cutoff:
+                continue
+            age_seconds = now - ts
+            bucket_idx = months - 1 - int(age_seconds // bucket_seconds)
+            if 0 <= bucket_idx < months:
+                buckets[bucket_idx] += t["pnl"]
+
+        return buckets
+
+    def _compute_period_summary(
+        self,
+        strategy: str,
+        period_days: int,
+        period_pnl: list,
+        annualization_factor: float,
+    ) -> dict:
+        """기간별 성과 요약 공통 로직.
+
+        Args:
+            strategy: 전략 이름
+            period_days: 기간 (일수)
+            period_pnl: 기간별 PnL 버킷 리스트
+            annualization_factor: Sharpe 연환산 계수 (ex. sqrt(52) for weekly)
+
+        Returns:
+            {periods, total_trades, total_pnl, period_pnl, win_rate, profit_factor, sharpe, mdd}
+        """
+        now = time.time()
+        cutoff = now - period_days * 86400.0
+
+        trades_in_window = [
+            t for t in self._trades[strategy]
+            if t.get("timestamp", 0.0) >= cutoff
+        ]
+
+        total_trades = len(trades_in_window)
+        pnls = [t["pnl"] for t in trades_in_window]
+        total_pnl = sum(pnls)
+
+        # 승률
+        wins = sum(1 for p in pnls if p > 0)
+        win_rate = wins / total_trades if total_trades > 0 else 0.0
+
+        # Profit Factor
+        gross_profit = sum(p for p in pnls if p > 0)
+        gross_loss = abs(sum(p for p in pnls if p <= 0))
+        if gross_loss < 1e-9:
+            pf = float("inf") if gross_profit > 0 else None
+        else:
+            pf = gross_profit / gross_loss
+
+        # 기간별 PnL → Sharpe (연환산)
+        non_zero = [d for d in period_pnl if d != 0.0]
+        if len(non_zero) >= 2:
+            n = len(period_pnl)
+            mean_d = sum(period_pnl) / n
+            variance = sum((d - mean_d) ** 2 for d in period_pnl) / n
+            std_d = variance ** 0.5
+            if std_d > 0:
+                sharpe = (mean_d / std_d) * annualization_factor
+            else:
+                sharpe = None
+        else:
+            sharpe = None
+
+        # MDD (기간 내 equity curve 기반)
+        equity = 0.0
+        peak = 0.0
+        max_dd = 0.0
+        for t in trades_in_window:
+            equity += t["pnl"]
+            if equity > peak:
+                peak = equity
+            if peak > 0:
+                dd = (peak - equity) / peak
+                max_dd = max(max_dd, dd)
+            elif equity < 0:
+                max_dd = max(max_dd, 1.0)
+
+        return {
+            "periods": len(period_pnl),
+            "total_trades": total_trades,
+            "total_pnl": round(total_pnl, 8),
+            "period_pnl": period_pnl,
+            "win_rate": round(win_rate, 4),
+            "profit_factor": round(pf, 4) if pf is not None and pf != float("inf") else pf,
+            "sharpe": round(sharpe, 4) if sharpe is not None else None,
+            "mdd": round(max_dd, 4),
+        }
+
+    def get_weekly_summary(self, strategy: str, weeks: int = 4) -> dict:
+        """주간 기준 성과 요약: 승률, PF, Sharpe, MDD.
+
+        최근 weeks주간의 거래를 기반으로 계산.
+
+        Returns:
+            {
+              "weeks": int,
+              "total_trades": int,
+              "total_pnl": float,
+              "weekly_pnl": list[float],
+              "win_rate": float,
+              "profit_factor": float | None,
+              "sharpe": float | None,
+              "mdd": float,
+            }
+        """
+        weekly_pnl = self.get_weekly_pnl(strategy, weeks=weeks)
+        result = self._compute_period_summary(
+            strategy=strategy,
+            period_days=weeks * 7,
+            period_pnl=weekly_pnl,
+            annualization_factor=sqrt(52),
+        )
+        return {
+            "weeks": weeks,
+            "total_trades": result["total_trades"],
+            "total_pnl": result["total_pnl"],
+            "weekly_pnl": result["period_pnl"],
+            "win_rate": result["win_rate"],
+            "profit_factor": result["profit_factor"],
+            "sharpe": result["sharpe"],
+            "mdd": result["mdd"],
+        }
+
+    def get_monthly_summary(self, strategy: str, months: int = 3) -> dict:
+        """월간 기준 성과 요약: 승률, PF, Sharpe, MDD.
+
+        최근 months개월간의 거래를 기반으로 계산 (30일/월 근사).
+
+        Returns:
+            {
+              "months": int,
+              "total_trades": int,
+              "total_pnl": float,
+              "monthly_pnl": list[float],
+              "win_rate": float,
+              "profit_factor": float | None,
+              "sharpe": float | None,
+              "mdd": float,
+            }
+        """
+        monthly_pnl = self.get_monthly_pnl(strategy, months=months)
+        result = self._compute_period_summary(
+            strategy=strategy,
+            period_days=months * 30,
+            period_pnl=monthly_pnl,
+            annualization_factor=sqrt(12),
+        )
+        return {
+            "months": months,
+            "total_trades": result["total_trades"],
+            "total_pnl": result["total_pnl"],
+            "monthly_pnl": result["period_pnl"],
+            "win_rate": result["win_rate"],
+            "profit_factor": result["profit_factor"],
+            "sharpe": result["sharpe"],
+            "mdd": result["mdd"],
+        }
+
     def get_summary(self, strategy: str) -> dict:
         """전략별 요약 반환."""
         trades = self._trades[strategy]

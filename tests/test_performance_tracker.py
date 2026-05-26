@@ -366,3 +366,235 @@ def test_get_daily_summary_excludes_old_trades():
     summary = t.get_daily_summary("strat", days=7)
     assert summary["total_trades"] == 1  # 10일 전 거래 제외
     assert summary["total_pnl"] == pytest.approx(50.0)
+
+
+# --- get_weekly_pnl 테스트 ---
+
+def test_get_weekly_pnl_returns_correct_length():
+    """get_weekly_pnl이 weeks 길이의 리스트를 반환."""
+    t = make_tracker()
+    result = t.get_weekly_pnl("strat", weeks=4)
+    assert isinstance(result, list)
+    assert len(result) == 4
+
+
+def test_get_weekly_pnl_empty_strategy():
+    """거래 없으면 모두 0.0."""
+    t = make_tracker()
+    result = t.get_weekly_pnl("no_strat", weeks=4)
+    assert result == [0.0] * 4
+
+
+def test_get_weekly_pnl_recent_trade_in_last_bucket():
+    """방금 기록한 거래는 마지막 버킷(index -1)에 합산."""
+    import time
+    t = make_tracker()
+    t.record_trade("strat", 200.0, 100.0, 300.0, timestamp=time.time())
+    result = t.get_weekly_pnl("strat", weeks=4)
+    assert result[-1] == pytest.approx(200.0)
+    assert sum(result[:-1]) == pytest.approx(0.0)
+
+
+def test_get_weekly_pnl_old_trade_excluded():
+    """cutoff 이전 거래는 집계에서 제외."""
+    import time
+    t = make_tracker()
+    old_ts = time.time() - 5 * 7 * 86400  # 5주 전
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=old_ts)
+    result = t.get_weekly_pnl("strat", weeks=4)
+    assert sum(result) == pytest.approx(0.0)
+
+
+def test_get_weekly_pnl_trades_across_weeks():
+    """여러 주에 걸친 거래가 올바른 버킷에 분류."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)  # 이번 주
+    t.record_trade("strat", -50.0, 200.0, 150.0, timestamp=now - 7 * 86400)  # 저번 주
+    t.record_trade("strat", 75.0, 150.0, 225.0, timestamp=now - 14 * 86400)  # 2주 전
+    result = t.get_weekly_pnl("strat", weeks=4)
+    assert result[-1] == pytest.approx(100.0)   # 이번 주
+    assert result[-2] == pytest.approx(-50.0)    # 저번 주
+    assert result[-3] == pytest.approx(75.0)     # 2주 전
+
+
+# --- get_monthly_pnl 테스트 ---
+
+def test_get_monthly_pnl_returns_correct_length():
+    """get_monthly_pnl이 months 길이의 리스트를 반환."""
+    t = make_tracker()
+    result = t.get_monthly_pnl("strat", months=3)
+    assert isinstance(result, list)
+    assert len(result) == 3
+
+
+def test_get_monthly_pnl_empty_strategy():
+    """거래 없으면 모두 0.0."""
+    t = make_tracker()
+    result = t.get_monthly_pnl("no_strat", months=3)
+    assert result == [0.0] * 3
+
+
+def test_get_monthly_pnl_recent_trade_in_last_bucket():
+    """방금 기록한 거래는 마지막 버킷에 합산."""
+    import time
+    t = make_tracker()
+    t.record_trade("strat", 500.0, 100.0, 600.0, timestamp=time.time())
+    result = t.get_monthly_pnl("strat", months=3)
+    assert result[-1] == pytest.approx(500.0)
+    assert sum(result[:-1]) == pytest.approx(0.0)
+
+
+def test_get_monthly_pnl_old_trade_excluded():
+    """cutoff 이전 거래는 집계에서 제외 (4개월 전 → 3개월 윈도우 밖)."""
+    import time
+    t = make_tracker()
+    old_ts = time.time() - 4 * 30 * 86400  # 약 4개월 전
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=old_ts)
+    result = t.get_monthly_pnl("strat", months=3)
+    assert sum(result) == pytest.approx(0.0)
+
+
+# --- get_weekly_summary 테스트 ---
+
+def test_get_weekly_summary_empty():
+    """거래 없는 전략의 weekly summary."""
+    t = make_tracker()
+    summary = t.get_weekly_summary("no_strat", weeks=4)
+    assert summary["weeks"] == 4
+    assert summary["total_trades"] == 0
+    assert summary["total_pnl"] == 0.0
+    assert summary["win_rate"] == 0.0
+    assert summary["profit_factor"] is None
+    assert summary["sharpe"] is None
+    assert summary["mdd"] == 0.0
+
+
+def test_get_weekly_summary_with_trades():
+    """거래가 있는 전략의 weekly summary 기본 키 확인."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)
+    t.record_trade("strat", -30.0, 200.0, 170.0, timestamp=now - 7 * 86400)
+    t.record_trade("strat", 50.0, 170.0, 220.0, timestamp=now - 14 * 86400)
+
+    summary = t.get_weekly_summary("strat", weeks=4)
+    assert summary["total_trades"] == 3
+    assert summary["total_pnl"] == pytest.approx(120.0)
+    assert "weekly_pnl" in summary
+    assert len(summary["weekly_pnl"]) == 4
+    assert summary["win_rate"] == pytest.approx(2 / 3, abs=0.01)
+
+
+def test_get_weekly_summary_profit_factor():
+    """주간 PF 계산 정확성 검증."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    # wins: 100, 50 (total=150), losses: -30, -20 (total=50)
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now)
+    t.record_trade("strat", 50.0, 200.0, 250.0, timestamp=now - 100)
+    t.record_trade("strat", -30.0, 250.0, 220.0, timestamp=now - 200)
+    t.record_trade("strat", -20.0, 220.0, 200.0, timestamp=now - 300)
+
+    summary = t.get_weekly_summary("strat", weeks=4)
+    assert summary["profit_factor"] == pytest.approx(150.0 / 50.0, abs=0.01)
+
+
+def test_get_weekly_summary_mdd():
+    """MDD 계산: 연속 손실 후 드로다운 반영."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now - 300)
+    t.record_trade("strat", -60.0, 200.0, 140.0, timestamp=now - 200)
+    t.record_trade("strat", -20.0, 140.0, 120.0, timestamp=now - 100)
+
+    summary = t.get_weekly_summary("strat", weeks=4)
+    # peak=100, equity after losses=100-60-20=20, dd=(100-20)/100=0.8
+    assert summary["mdd"] == pytest.approx(0.8, abs=0.01)
+
+
+def test_get_weekly_summary_excludes_old_trades():
+    """window 밖의 거래는 summary에서 제외."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=now - 35 * 86400)  # 5주 전
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=now)  # 오늘
+
+    summary = t.get_weekly_summary("strat", weeks=4)
+    assert summary["total_trades"] == 1
+    assert summary["total_pnl"] == pytest.approx(50.0)
+
+
+# --- get_monthly_summary 테스트 ---
+
+def test_get_monthly_summary_empty():
+    """거래 없는 전략의 monthly summary."""
+    t = make_tracker()
+    summary = t.get_monthly_summary("no_strat", months=3)
+    assert summary["months"] == 3
+    assert summary["total_trades"] == 0
+    assert summary["total_pnl"] == 0.0
+    assert summary["win_rate"] == 0.0
+    assert summary["profit_factor"] is None
+    assert summary["sharpe"] is None
+    assert summary["mdd"] == 0.0
+
+
+def test_get_monthly_summary_with_trades():
+    """거래가 있는 전략의 monthly summary 기본 키 확인."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 200.0, 100.0, 300.0, timestamp=now)
+    t.record_trade("strat", -80.0, 300.0, 220.0, timestamp=now - 30 * 86400)
+
+    summary = t.get_monthly_summary("strat", months=3)
+    assert summary["total_trades"] == 2
+    assert summary["total_pnl"] == pytest.approx(120.0)
+    assert "monthly_pnl" in summary
+    assert len(summary["monthly_pnl"]) == 3
+
+
+def test_get_monthly_summary_profit_factor():
+    """월간 PF 계산 정확성 검증."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 300.0, 100.0, 400.0, timestamp=now)
+    t.record_trade("strat", -100.0, 400.0, 300.0, timestamp=now - 100)
+
+    summary = t.get_monthly_summary("strat", months=3)
+    assert summary["profit_factor"] == pytest.approx(300.0 / 100.0, abs=0.01)
+
+
+def test_get_monthly_summary_excludes_old_trades():
+    """window 밖의 거래는 summary에서 제외."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 999.0, 100.0, 1099.0, timestamp=now - 4 * 30 * 86400)  # 4개월 전
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=now)
+
+    summary = t.get_monthly_summary("strat", months=3)
+    assert summary["total_trades"] == 1
+    assert summary["total_pnl"] == pytest.approx(50.0)
+
+
+def test_get_monthly_summary_sharpe_with_multiple_months():
+    """여러 달에 걸친 거래에서 Sharpe 계산."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    t.record_trade("strat", 200.0, 100.0, 300.0, timestamp=now)
+    t.record_trade("strat", -50.0, 300.0, 250.0, timestamp=now - 30 * 86400)
+    t.record_trade("strat", 100.0, 250.0, 350.0, timestamp=now - 60 * 86400)
+
+    summary = t.get_monthly_summary("strat", months=3)
+    # 3개월간 비제로 거래 → Sharpe 계산 가능
+    assert summary["sharpe"] is not None
+    assert isinstance(summary["sharpe"], float)

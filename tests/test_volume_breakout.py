@@ -83,13 +83,14 @@ class TestVolumeBreakoutStrategy:
         sig = self.strategy.generate(df)
         assert sig.action == Action.HOLD
 
-    # 6. HOLD: 추세 필터 실패 (uptrend 필요한데 downtrend)
-    def test_hold_wrong_trend(self):
-        # BUY 조건인데 ema20(90) < ema50(95) = downtrend → HOLD
+    # 6. BUY with wrong trend → BUY but MEDIUM confidence (추세는 confidence에만 영향)
+    def test_buy_wrong_trend_medium_confidence(self):
+        # BUY 조건 충족 + downtrend → BUY(MEDIUM)
         df = _make_df(close=105.0, open_=99.0, volume=900.0, avg_volume=500.0,
                       ema20=90.0, ema50=95.0, atr14=1.5)
         sig = self.strategy.generate(df)
-        assert sig.action == Action.HOLD
+        assert sig.action == Action.BUY
+        assert sig.confidence == Confidence.MEDIUM
 
     # 7. HOLD: ATR 필터 실패 (너무 낮음, < 0.1)
     def test_hold_atr_too_low(self):

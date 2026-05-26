@@ -350,6 +350,9 @@ def evaluate_strategy_walk_forward(
     avg_trades = np.mean([wr["trades"] for wr in valid]) if valid else 0
     avg_wr = np.mean([wr["win_rate"] for wr in valid]) if valid else 0
 
+    # 윈도우 간 Sharpe 표준편차 (일관성 보조 지표)
+    sharpe_std = float(np.std([wr["sharpe"] for wr in valid])) if len(valid) > 1 else 0.0
+
     return {
         "name": name,
         "window_results": window_results,
@@ -364,7 +367,79 @@ def evaluate_strategy_walk_forward(
         "avg_trades": avg_trades,
         "avg_win_rate": avg_wr,
         "avg_final_balance": 10_000 * (1 + avg_return),
+        "sharpe_std": sharpe_std,
     }
+
+
+# ── 상대 순위 (Composite Rank Score) ──────────────────────────
+
+
+def compute_rank_scores(results: List[dict]) -> List[dict]:
+    """전략 결과에 composite rank_score(0~100)와 percentile 부여.
+
+    점수 구성 (가중 합):
+      - OOS Sharpe 평균 (30%): 높을수록 좋음
+      - Profit Factor 평균 (20%): 높을수록 좋음
+      - 거래 수 (15%): 충분해야 통계 신뢰
+      - MDD 역수 (15%): 낮을수록 좋음 (역순 정규화)
+      - Consistency (10%): 통과 윈도우 비율
+      - Sharpe 안정성 (10%): sharpe_std가 낮을수록 좋음 (역순 정규화)
+
+    모든 지표는 min-max 정규화 후 가중 합산. 전략 1개면 score=50.
+    """
+    if not results:
+        return results
+
+    if len(results) == 1:
+        results[0]["rank_score"] = 50.0
+        results[0]["percentile"] = "p50"
+        return results
+
+    # 지표 추출
+    sharpes = np.array([r["avg_sharpe"] for r in results])
+    pfs = np.array([r["avg_profit_factor"] for r in results])
+    trades = np.array([r["avg_trades"] for r in results])
+    mdds = np.array([r["avg_max_dd"] for r in results])
+    consistencies = np.array([r["consistency_score"] for r in results])
+    sharpe_stds = np.array([r.get("sharpe_std", 0.0) for r in results])
+
+    def _minmax(arr: np.ndarray, invert: bool = False) -> np.ndarray:
+        """Min-max를 [0, 1]로 정규화. invert=True면 작을수록 1."""
+        mn, mx = arr.min(), arr.max()
+        if mx - mn < 1e-12:
+            return np.full_like(arr, 0.5)
+        norm = (arr - mn) / (mx - mn)
+        return 1.0 - norm if invert else norm
+
+    n_sharpe = _minmax(sharpes)
+    n_pf = _minmax(pfs)
+    n_trades = _minmax(trades)
+    n_mdd = _minmax(mdds, invert=True)       # 낮은 MDD가 좋음
+    n_consist = _minmax(consistencies)
+    n_stability = _minmax(sharpe_stds, invert=True)  # 낮은 std가 좋음
+
+    # 가중 합산
+    scores = (
+        0.30 * n_sharpe
+        + 0.20 * n_pf
+        + 0.15 * n_trades
+        + 0.15 * n_mdd
+        + 0.10 * n_consist
+        + 0.10 * n_stability
+    ) * 100.0
+
+    # 순위 산출: score 내림차순 인덱스
+    n = len(results)
+    rank_order = sorted(range(n), key=lambda j: -scores[j])
+    rank_map = {idx: pos for pos, idx in enumerate(rank_order)}
+
+    for i, r in enumerate(results):
+        r["rank_score"] = round(float(scores[i]), 1)
+        pos = rank_map[i]
+        pct = int(100 * (1 - pos / max(n - 1, 1)))
+        r["percentile"] = f"p{pct}"
+
+    return results
 
 
 # ── 리포트 ──────────────────────────────────────────────────
@@ -411,6 +486,25 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
             f"{r['avg_max_dd']:.1%} | {r['passed_windows']}/{r['total_windows']} | {p} |"
         )
     lines.append("")
+
+    # 상대 순위 (Composite Rank Score)
+    has_scores = any("rank_score" in r for r in results)
+    if has_scores:
+        ranked = sorted(results, key=lambda x: x.get("rank_score", 0), reverse=True)
+        lines.append("## 상대 순위 (Composite Rank Score)\n")
+        lines.append("_점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consistency(10%) + Sharpe안정성(10%)_")
+        lines.append("_0/N PASS 상황에서도 전략 간 상대 우위를 파악할 수 있는 보조 지표_\n")
+        lines.append("| Rank | Name | Score | Pctl | AvgSharpe | SharpeStd | AvgPF | AvgTrades | AvgMDD | Consist | Pass |")
+        lines.append("|------|------|-------|------|-----------|-----------|-------|-----------|--------|---------|------|")
+        for i, r in enumerate(ranked[:15], 1):
+            p = "PASS" if r["overall_passed"] else "FAIL"
+            lines.append(
+                f"| {i} | `{r['name']}` | {r.get('rank_score', 0):.1f} | {r.get('percentile', '?')} | "
+                f"{r['avg_sharpe']:.2f} | {r.get('sharpe_std', 0):.2f} | "
+                f"{r['avg_profit_factor']:.2f} | {r['avg_trades']:.0f} | "
+                f"{r['avg_max_dd']:.1%} | {r['passed_windows']}/{r['total_windows']} | {p} |"
+            )
+        lines.append("")
 
     # 전체 결과
     lines.append("## 전체 결과\n")
@@ -468,6 +562,9 @@ def export_results_json(all_symbol_results: Dict[str, List[dict]], metadata: dic
                 "avg_trades": round(r["avg_trades"], 1),
                 "avg_win_rate": round(r["avg_win_rate"], 4),
                 "avg_final_balance": round(r["avg_final_balance"], 2),
+                "sharpe_std": round(r.get("sharpe_std", 0.0), 4),
+                "rank_score": r.get("rank_score", 0.0),
+                "percentile": r.get("percentile", ""),
                 "window_results": r["window_results"],
             }
             symbol_data.append(entry)
@@ -496,6 +593,9 @@ def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
                 "avg_trades": round(r["avg_trades"], 1),
                 "avg_win_rate": round(r["avg_win_rate"], 4),
                 "avg_final_balance": round(r["avg_final_balance"], 2),
+                "sharpe_std": round(r.get("sharpe_std", 0.0), 4),
+                "rank_score": r.get("rank_score", 0.0),
+                "percentile": r.get("percentile", ""),
             })
 
     if rows:
@@ -554,11 +654,22 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
         print(f"[{symbol}][WARN] load_failures={load_failures}, eval_errors={eval_errors} "
               f"(of {len(pass_list)} total)")
 
+    # 상대 순위 계산 (0/N PASS 상황에서도 전략 간 우위 파악 가능)
+    compute_rank_scores(results)
+
     passed = [r for r in results if r["overall_passed"]]
     print(f"[{symbol}][SUMMARY] {len(passed)}/{len(results)} PASSED (consistency >= {PASS_RATIO:.0%})")
     for r in sorted(passed, key=lambda x: x["avg_return"], reverse=True)[:5]:
         print(f"  {r['name']:<30} avg_return={r['avg_return']:+.2%} "
               f"sharpe={r['avg_sharpe']:.2f} consistency={r['passed_windows']}/{r['total_windows']}")
+    # 상위 5개 전략 rank_score 출력 (PASS 여부와 무관)
+    top_ranked = sorted(results, key=lambda x: x.get("rank_score", 0), reverse=True)[:5]
+    if top_ranked and not passed:
+        print(f"[{symbol}][RANK] Top 5 by composite score (all FAIL, relative ranking):")
+        for r in top_ranked:
+            print(f"  {r['name']:<30} score={r.get('rank_score', 0):.1f} "
+                  f"sharpe={r['avg_sharpe']:.2f} trades={r['avg_trades']:.0f} "
+                  f"pctl={r.get('percentile', '?')}")
 
     report = generate_report(results, data_source, df, len(windows), symbol=symbol)
     return report, results

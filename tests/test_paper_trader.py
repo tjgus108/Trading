@@ -1756,3 +1756,128 @@ class TestPaperTraderIntegration:
         # equity는 양수
         for eq in pt.account.equity_history:
             assert eq > 0
+
+
+# ── save_state / load_state 테스트 (Cycle 213) ─────────────────────
+
+def test_save_state_returns_dict():
+    """save_state()가 dict를 반환."""
+    pt = PaperTrader(initial_balance=10000.0)
+    state = pt.save_state()
+    assert isinstance(state, dict)
+    assert "initial_balance" in state
+    assert "balance" in state
+    assert "positions" in state
+    assert "avg_entry" in state
+    assert "total_pnl" in state
+    assert "equity_history" in state
+
+
+def test_save_state_captures_positions():
+    """BUY 후 save_state()가 포지션 정보를 포함."""
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=5.0,
+                      strategy="s", confidence="H")
+    state = pt.save_state()
+    assert "BTC/USDT" in state["positions"]
+    assert state["positions"]["BTC/USDT"] == 5.0
+    assert state["avg_entry"]["BTC/USDT"] == pytest.approx(1000.0)
+    assert state["balance"] < 50000.0
+
+
+def test_load_state_restores_positions():
+    """load_state()로 포지션이 정상 복원."""
+    pt1 = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                      partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0)
+    pt1.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=5.0,
+                       strategy="s", confidence="H")
+    pt1.execute_signal("ETH/USDT", "BUY", price=200.0, quantity=10.0,
+                       strategy="s", confidence="H")
+    state = pt1.save_state()
+
+    # 새 PaperTrader에 복원
+    pt2 = PaperTrader(initial_balance=10000.0)
+    pt2.load_state(state)
+
+    assert pt2.account.balance == pt1.account.balance
+    assert pt2.account.positions == pt1.account.positions
+    assert pt2.account.avg_entry == pt1.account.avg_entry
+    assert pt2.account.total_pnl == pt1.account.total_pnl
+    assert pt2.account.initial_balance == pt1.account.initial_balance
+
+
+def test_load_state_allows_sell_after_restore():
+    """복원 후 기존 포지션에 대해 SELL 가능."""
+    pt1 = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                      partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0)
+    pt1.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=5.0,
+                       strategy="s", confidence="H")
+    state = pt1.save_state()
+
+    pt2 = PaperTrader(initial_balance=10000.0, slippage_pct=0.0,
+                      partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0)
+    pt2.load_state(state)
+
+    # 복원된 포지션에 대해 SELL
+    result = pt2.execute_signal("BTC/USDT", "SELL", price=1200.0, quantity=5.0,
+                                strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    assert result["pnl"] == pytest.approx(1000.0)  # (1200-1000)*5
+    assert pt2.account.positions.get("BTC/USDT", 0) < 1e-9
+
+
+def test_save_load_state_roundtrip_empty():
+    """포지션 없는 상태의 save/load 라운드트립."""
+    pt1 = PaperTrader(initial_balance=25000.0)
+    state = pt1.save_state()
+
+    pt2 = PaperTrader(initial_balance=10000.0)
+    pt2.load_state(state)
+
+    assert pt2.account.balance == 25000.0
+    assert pt2.account.positions == {}
+    assert pt2.account.avg_entry == {}
+
+
+def test_load_state_empty_dict_noop():
+    """빈 dict로 load_state 호출 시 아무것도 변경하지 않음."""
+    pt = PaperTrader(initial_balance=10000.0)
+    original_balance = pt.account.balance
+    pt.load_state({})
+    assert pt.account.balance == original_balance
+
+
+def test_load_state_none_noop():
+    """None으로 load_state 호출 시 아무것도 변경하지 않음."""
+    pt = PaperTrader(initial_balance=10000.0)
+    original_balance = pt.account.balance
+    pt.load_state(None)
+    assert pt.account.balance == original_balance
+
+
+def test_save_state_json_serializable():
+    """save_state() 결과가 JSON 직렬화 가능."""
+    import json
+    pt = PaperTrader(initial_balance=50000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=3.0,
+                      strategy="s", confidence="H")
+    state = pt.save_state()
+    # JSON serialize/deserialize 라운드트립
+    json_str = json.dumps(state)
+    restored = json.loads(json_str)
+    assert restored["positions"]["BTC/USDT"] == state["positions"]["BTC/USDT"]
+
+
+def test_save_state_equity_history_truncated():
+    """equity_history가 500개로 truncate."""
+    pt = PaperTrader(initial_balance=1_000_000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0)
+    # 600건 거래 → equity_history 600개
+    for i in range(600):
+        pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=0.01,
+                          strategy="s", confidence="H")
+    assert len(pt.account.equity_history) == 600
+    state = pt.save_state()
+    assert len(state["equity_history"]) == 500  # 최근 500개만

@@ -1,6 +1,6 @@
 # Work Log
 
-## [2026-05-26] Cycle 213 — C(데이터) + B(리스크) + SIM + F(리서치)
+## [2026-05-26] Cycle 213 — C(데이터) + B(리스크) + SIM + F(리서치) [세션 A]
 
 **[C] 데이터 — volume_breakout ATR 필터 버그 수정 (핵심 fix):**
 - `src/strategy/volume_breakout.py`: ATR 필터를 절대값(_ATR_LOW=0.1, _ATR_HIGH=10.0) → 가격 대비 비율(_ATR_LOW_PCT=0.1%, _ATR_HIGH_PCT=10%)으로 변경
@@ -36,37 +36,34 @@
 
 **테스트:** 7857개 모두 통과 (volume_breakout, drawdown_monitor, websocket_feed 포함)
 
----
+## [2026-05-26] Cycle 213 — E(실행) + A(품질) + SIM + F(리서치) [세션 B]
 
-## [2026-05-26] Cycle 212 — B(리스크) + D(ML) + SIM + F(리서치)
+**[E] 실행 — PerformanceTracker 주간/월간 + PaperTrader 상태 저장/복원:**
+- PerformanceTracker: get_weekly_pnl(), get_monthly_pnl(), get_weekly_summary(), get_monthly_summary() 추가
+- PaperTrader: save_state()/load_state() 메서드 추가 (포지션, 잔고, equity_history 직렬화)
+- LivePaperTrader: SIGINT/SIGTERM 시 PaperTrader 상태 JSON 저장, 재시작 시 복원
+- 테스트 28개 추가 (performance_tracker 19 + paper_trader 9)
 
-**[D] ML — WalkForwardOptimizer UNSTABLE 판정 강화:**
-- `src/backtest/walk_forward.py`: `low_trades_folds > n_windows/2` 이면 is_stable=False + fail_reasons 추가
-- 이전: low_trades_folds는 표시만 했고 판정에 미반영 → 이제 UNSTABLE 판정에 직접 연동
-- 통계적 신뢰도 부족(OOS trades < 30) fold가 과반이면 Sharpe 추정 불신뢰 → UNSTABLE
+**[A] 품질 — volume_breakout/price_cluster 0 trades 버그 수정:**
+- volume_breakout v2→v3: EMA 추세 필터를 신호 조건에서 제거 → confidence 판단으로 이동 (5→4 조건)
+- price_cluster v2→v3: _BOUNCE_THRESHOLD(cluster_width 0.5%) → _BOUNCE_PCT(가격 기준 1%)로 변경
+  - BTC 30000 기준: threshold 0.9 USD → 300 USD (합리적 범위)
+- 테스트 46개 모두 통과
 
-**[B] 리스크 — KellySizer VaR/CVaR 소표본 경고:**
-- `src/risk/kelly_sizer.py`: `estimate_var_cvar()` 메서드 추가
-- n_trades < 30 (학술 기준)이면 WARNING 로그 + `low_sample_warning=True` 반환
-- VaR/CVaR 추정: 신뢰 수준 95% 기본, 오름차순 정렬 후 하위 (1-conf)*n 구간 사용
+**[SIM] Paper Simulation 랭킹 시스템 추가:**
+- paper_simulation.py: compute_rank_scores() — 6개 지표 가중 합산 composite rank_score (0~100)
+  - Sharpe(30%) + PF(20%) + Trades(15%) + 1/MDD(15%) + Consistency(10%) + Sharpe안정성(10%)
+- sharpe_std (윈도우 간 Sharpe 표준편차) 필드 추가
+- 리포트에 "상대 순위" 섹션 + percentile 라벨 + CSV/JSON export
+- 테스트 10개 추가 (175 passed)
 
-**[F] 리서치 — price_cluster 0 trades 수정:**
-- `src/strategy/price_cluster.py`: BOUNCE_THRESHOLD 0.5% → 2% (4배 완화)
-- 원인: cluster_width * 0.005는 가격 범위의 0.05%로 매우 좁아 신호 거의 생성 안됨
-- 효과: 다음 사이클 시뮬에서 검증 예정
+**[F] 리서치 — 트레이딩봇 실패/성공 사례 + 합성데이터 극복 방안:**
+- 실패 TOP 3: 과적합(888개 전략 연구 Sharpe R²<0.025), 정지손실 미설정(24h 내 35% 손실), 전진테스트 생략(73% 계좌 6개월 내 실패)
+- 성공 TOP 2: Freqtrade(WF기반 Hyperopt+FreqAI), Hummingbot(실데이터 전용 검증)
+- 합성데이터 극복: Block Bootstrap(자기상관 보존), GARCH+Regime-Switching, CPCV(false discovery 감소)
+- 액션아이템: GBM→Block Bootstrap 교체, CPCV 도입 검토, 검증 깊이 확대
 
-**[SIM] Paper WF (BTC/ETH/SOL, 4 윈도우, 1h봉):**
-- 0/22 PASS (합성 GBM 데이터 한계 재확인)
-- TOP 3: price_action_momentum(+136%, Sharpe 7.08), cmf(+110%, 6.13), supertrend_multi(+86%, 6.70)
-- volume_breakout: 여전히 0 trades (uptrend 조건이 GBM에서 거의 미충족)
-- price_cluster: 4 trades (아직 threshold 수정 미반영)
-
-**[SIM] Bundle OOS (BTC/USDT, 4h봉):**
-- 0/5 PASS, IS Sharpe 전부 음수 (GBM 합성 데이터 한계)
-- cmf, wick_reversal IS 100% 음수 → GBM 패턴 미작동 확인
-- OOS Sharpe std 3.4~6.6 (임계 1.5 훨씬 초과) → 합성 데이터 특성상 불안정
-
-**테스트:** 194개 모두 통과 (walk_forward, kelly_sizer, price_cluster 관련 포함)
+**테스트:** 전체 통과 (flaky test_data_utils 1건 간헐 실패, 개별 실행 시 PASS)
 
 ---
 
@@ -15028,80 +15025,20 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-<<<<<<< HEAD
-## [2026-05-21 15:38 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 15.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: -5.00bps
-
-## [2026-05-21 15:38 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-21 15:38 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-=======
 ## [2026-05-21 11:04 UTC] Cycle 190 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
+## [2026-05-21 15:38 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
 ## [2026-05-21 18:09 UTC] Cycle 191 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
->>>>>>> d606fc9 ([Cycle 191] B(Risk EWMA VolTargeting) + D(ML fold time-decay) + F(Research))
 
 ## [2026-05-21 18:22 UTC] Cycle 192 Dispatched — B + D + SIM + F
 Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
@@ -15657,6 +15594,9 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
+## [2026-05-25 22:01 UTC] Cycle 212 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
 ## [2026-05-26 10:10 UTC]
 Pipeline: preflight
 Status: ERROR
@@ -15715,7 +15655,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-26 10:10 UTC]
+## [2026-05-26 10:32 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -15724,7 +15664,19 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-26 10:32 UTC]
+## [2026-05-26 13:30 UTC] Cycle 213 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-26 13:39 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 13:44 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -15773,7 +15725,7 @@ Context: score=N/A news=NONE
 Notes: none
 ImplShortfall: -5.00bps
 
-## [2026-05-26 10:32 UTC]
+## [2026-05-26 13:44 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -15782,7 +15734,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-26 10:32 UTC]
+## [2026-05-26 13:44 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -1,8 +1,9 @@
 """
-Volume Breakout 전략 (개선 v2):
+Volume Breakout 전략 (개선 v3):
 - ATR 필터: 극단적 변동성만 필터 (범위 확대)
-- 추세 필터: EMA20 > EMA50 (상승) / EMA20 < EMA50 (하강)
-- Volume Spike: 1.5x (더 공격적, 거래 빈도 증가)
+- 추세 필터: EMA 추세는 confidence에만 영향 (신호 조건에서 제외 → 거래 빈도 증가)
+- Volume Spike: 1.5x (공격적)
+- 핵심 조건: spike + 양봉/음봉 + close vs ema20 + ATR 유효 (4조건)
 """
 
 import pandas as pd
@@ -39,41 +40,52 @@ class VolumeBreakoutStrategy(BaseStrategy):
         bear_candle = close < open_
         above_ema = close > ema20
         below_ema = close < ema20
-        
+
         # ATR 필터: 가격 대비 비율로 체크 (고가 자산 호환)
         atr_pct = atr14 / close if close > 0 else 0
         atr_valid = _ATR_LOW_PCT <= atr_pct <= _ATR_HIGH_PCT
-        
-        # 추세 필터
+
+        # 추세 필터: confidence 판단에만 사용 (신호 조건에서 제외)
         uptrend = ema20 > ema50
         downtrend = ema20 < ema50
 
         bull_case = f"close={close:.2f} open={open_:.2f} ema20={ema20:.2f} ema50={ema50:.2f} vol={volume:.0f} atr={atr14:.2f}"
         bear_case = bull_case
 
-        # BUY: spike + 양봉 + close>ema20 + ATR 유효 + 상승 추세
-        if spike and bull_candle and above_ema and atr_valid and uptrend:
-            confidence = Confidence.HIGH if volume > avg_vol * _HIGH_CONF_MULT else Confidence.MEDIUM
+        # BUY: spike + 양봉 + close>ema20 + ATR 유효 (4조건)
+        # 추세 일치 시 confidence 상승
+        if spike and bull_candle and above_ema and atr_valid:
+            if volume > avg_vol * _HIGH_CONF_MULT and uptrend:
+                confidence = Confidence.HIGH
+            elif uptrend:
+                confidence = Confidence.MEDIUM
+            else:
+                confidence = Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"Volume breakout 상승: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 양봉, close({close:.2f})>ema20({ema20:.2f}), uptrend, atr={atr14:.2f}",
+                reasoning=f"Vol breakout BUY: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 양봉, close({close:.2f})>ema20({ema20:.2f}), atr={atr14:.2f}",
                 invalidation=f"Close below EMA20 ({ema20:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
 
-        # SELL: spike + 음봉 + close<ema20 + ATR 유효 + 하락 추세
-        if spike and bear_candle and below_ema and atr_valid and downtrend:
-            confidence = Confidence.HIGH if volume > avg_vol * _HIGH_CONF_MULT else Confidence.MEDIUM
+        # SELL: spike + 음봉 + close<ema20 + ATR 유효 (4조건)
+        if spike and bear_candle and below_ema and atr_valid:
+            if volume > avg_vol * _HIGH_CONF_MULT and downtrend:
+                confidence = Confidence.HIGH
+            elif downtrend:
+                confidence = Confidence.MEDIUM
+            else:
+                confidence = Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close,
-                reasoning=f"Volume breakout 하락: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 음봉, close({close:.2f})<ema20({ema20:.2f}), downtrend, atr={atr14:.2f}",
+                reasoning=f"Vol breakout SELL: vol={volume:.0f}>avg*{_SPIKE_MULT}({avg_vol*_SPIKE_MULT:.0f}), 음봉, close({close:.2f})<ema20({ema20:.2f}), atr={atr14:.2f}",
                 invalidation=f"Close above EMA20 ({ema20:.2f})",
                 bull_case=bull_case,
                 bear_case=bear_case,

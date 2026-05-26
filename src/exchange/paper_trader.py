@@ -488,6 +488,41 @@ class PaperTrader:
             "status": result.get("status"),
         }
 
+    def save_state(self) -> dict:
+        """현재 계좌 상태를 dict로 직렬화 (graceful shutdown 시 저장용).
+
+        Returns:
+            JSON 직렬화 가능한 dict. load_state()로 복원 가능.
+        """
+        return {
+            "initial_balance": self.account.initial_balance,
+            "balance": self.account.balance,
+            "positions": dict(self.account.positions),
+            "avg_entry": dict(self.account.avg_entry),
+            "total_pnl": self.account.total_pnl,
+            "trade_count": len(self.account.trades),
+            "equity_history": self.account.equity_history[-500:],
+            "kelly_adjustments": self._kelly_adjustments,
+            "vol_targeting_adjustments": self._vol_targeting_adjustments,
+        }
+
+    def load_state(self, state: dict) -> None:
+        """저장된 상태를 복원 (재시작 시 사용).
+
+        Args:
+            state: save_state()가 반환한 dict
+        """
+        if not state:
+            return
+        self.account.initial_balance = state.get("initial_balance", self.account.initial_balance)
+        self.account.balance = state.get("balance", self.account.balance)
+        self.account.positions = dict(state.get("positions", {}))
+        self.account.avg_entry = dict(state.get("avg_entry", {}))
+        self.account.total_pnl = state.get("total_pnl", 0.0)
+        self.account.equity_history = list(state.get("equity_history", []))
+        self._kelly_adjustments = state.get("kelly_adjustments", 0)
+        self._vol_targeting_adjustments = state.get("vol_targeting_adjustments", 0)
+
     def reset(self) -> None:
         """계좌 초기화 (테스트용)"""
         self.account = PaperAccount(

@@ -300,6 +300,7 @@ class LiveState:
         self.daily_pnl_log: list[dict] = []
         self.last_daily_summary_date: str = ""
         self.bayesian_kelly_state: dict = {}  # BayesianKelly posterior 상태 저장
+        self.paper_trader_state: dict = {}  # PaperTrader account 상태 저장
 
     def save(self):
         data = {
@@ -320,6 +321,7 @@ class LiveState:
             "daily_pnl_log": self.daily_pnl_log[-365:],  # 최근 1년(365일)
             "last_daily_summary_date": self.last_daily_summary_date,
             "bayesian_kelly_state": self.bayesian_kelly_state,
+            "paper_trader_state": self.paper_trader_state,
         }
         LIVE_STATE_PATH.write_text(json.dumps(data, indent=2, default=str))
 
@@ -422,12 +424,50 @@ class LivePaperTrader:
         # 데이터 페치 실패 연속 카운터 (심볼별) — 지수 백오프용
         self._fetch_fail_count: dict[str, int] = {}
 
+        # PaperTrader 상태 복원 (이전 세션의 포지션/잔고)
+        self._restore_paper_trader_state()
+
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
 
+    def _restore_paper_trader_state(self):
+        """이전 세션의 PaperTrader account 상태 복원."""
+        pt_state = self.state.paper_trader_state
+        if not pt_state:
+            return
+        try:
+            self.paper.load_state(pt_state)
+            positions = pt_state.get("positions", {})
+            if positions:
+                logger.info(
+                    "PaperTrader state restored: balance=$%.2f, %d open positions (%s)",
+                    pt_state.get("balance", 0.0),
+                    len(positions),
+                    ", ".join(f"{sym}={qty:.6f}" for sym, qty in positions.items()),
+                )
+            else:
+                logger.info(
+                    "PaperTrader state restored: balance=$%.2f, no open positions",
+                    pt_state.get("balance", 0.0),
+                )
+        except Exception as e:
+            logger.warning("PaperTrader state restore failed: %s. Using fresh state.", e)
+
+    def _save_paper_trader_state(self) -> dict:
+        """PaperTrader 상태를 dict로 반환 (LiveState.save에 포함)."""
+        return self.paper.save_state()
+
     def _handle_shutdown(self, signum, frame):
-        logger.info("Shutdown signal received. Saving state...")
+        logger.info("Shutdown signal received (sig=%s). Saving state...", signum)
         self.running = False
+        # Graceful shutdown: 즉시 상태 저장 (PaperTrader 포지션 포함)
+        try:
+            self.state.paper_trader_state = self._save_paper_trader_state()
+            self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
+            self.state.save()
+            logger.info("State saved successfully on shutdown.")
+        except Exception as e:
+            logger.error("Failed to save state on shutdown: %s", e)
 
     def _health_check_fn(self) -> dict:
         """Health check용 거래소 연결 확인 (ccxt ping)."""
@@ -640,8 +680,9 @@ class LivePaperTrader:
             self._daily_start_balance = self.state.portfolio_balance
             self.state.last_report_time = now
 
-        # BayesianKelly 상태를 LiveState에 동기화 후 저장
+        # BayesianKelly + PaperTrader 상태를 LiveState에 동기화 후 저장
         self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
+        self.state.paper_trader_state = self._save_paper_trader_state()
         self.state.save()
 
     def _tick_symbol(self, symbol: str):
@@ -1394,6 +1435,7 @@ class LivePaperTrader:
         judgment = self._compute_go_nogo_judgment()
         self._print_go_nogo_summary(judgment)
         self.state.bayesian_kelly_state = self._save_bayesian_kelly_state()
+        self.state.paper_trader_state = self._save_paper_trader_state()
         self.state.save()
         ret = (self.state.portfolio_balance - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         logger.info("Final balance: $%.2f (return: %+.2f%%)",

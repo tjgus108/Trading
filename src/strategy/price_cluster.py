@@ -1,11 +1,12 @@
 """
-PriceClusterStrategy v2:
+PriceClusterStrategy v3:
 - 최근 50봉의 close 가격을 5개 bin으로 나누기
 - 가장 많이 방문한 bin = price cluster
 - BUY: close가 cluster_low 아래에서 (threshold 내)에서 복귀
 - SELL: close가 cluster_high 위에서 (threshold 내)에서 복귀
 - confidence: 빈도 > 평균의 1.5배 이상 → HIGH (PF 개선)
 - 최소 데이터: 55행
+- v3 수정: threshold를 cluster 가격 기준 비율로 계산 (0 trades 버그 수정)
 """
 
 from typing import Optional, Tuple
@@ -19,7 +20,7 @@ _MIN_ROWS = 55
 _CLOSE_WINDOW = 50
 _N_BINS = 5
 _HIGH_CONF_FREQ_MULT = 1.5  # 1.5배 이상 (이전 2.0에서 낮춤)
-_BOUNCE_THRESHOLD = 0.02  # cluster_low 아래 최대 2% 범위에서 신호 (0.5%→2%: 0 trades 완화)
+_BOUNCE_PCT = 0.01  # cluster 경계 가격 기준 1% 범위 (v3: cluster_width 비율→가격 기준, 원격 2% 대비 보수적)
 
 
 def _find_cluster(
@@ -88,9 +89,8 @@ class PriceClusterStrategy(BaseStrategy):
         
         confidence = Confidence.HIGH if is_high_confidence else Confidence.MEDIUM
 
-        # Threshold 계산: cluster 너비의 0.2%
-        cluster_width = cluster_high - cluster_low
-        threshold = max(cluster_width * _BOUNCE_THRESHOLD, 0.001)
+        # Threshold 계산: cluster 경계 가격 기준 1% (가격 스케일에 비례)
+        threshold = max(cluster_low * _BOUNCE_PCT, 0.001)
 
         # BUY: 이전 봉이 cluster_low 아래 (threshold 내), 현재 봉이 cluster_low 이상
         if (prev_close < cluster_low and 
