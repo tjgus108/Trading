@@ -21,17 +21,21 @@ _HIGH_CONF_MULT = 0.3
 _EMA_SHORT = 20
 _EMA_LONG = 50
 _MIN_BREACH = 1.5  # 최소 breach width: std * 1.5
+_STD_FLOOR_PCT = 0.005  # std 하한: close의 0.5% — 횡보장 과잉신호 방지
+_VOL_FILTER_MULT = 0.8  # 거래량 필터: vol_ma * 0.8 이상 (기존 1.0 → 완화)
 
 
 class ValueAreaStrategy(BaseStrategy):
     name = "value_area"
 
-    def __init__(self, va_period: int = 20, va_mult: float = 0.7, ema_short: int = 20, ema_long: int = 50, min_breach: float = 1.5, **kwargs):
+    def __init__(self, va_period: int = 20, va_mult: float = 0.7, ema_short: int = 20, ema_long: int = 50, min_breach: float = 1.5, std_floor_pct: float = _STD_FLOOR_PCT, vol_filter_mult: float = _VOL_FILTER_MULT, **kwargs):
         self.va_period = va_period
         self.va_mult = va_mult
         self.ema_short = ema_short
         self.ema_long = ema_long
         self.min_breach = min_breach
+        self.std_floor_pct = std_floor_pct
+        self.vol_filter_mult = vol_filter_mult
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 55:
@@ -42,7 +46,10 @@ class ValueAreaStrategy(BaseStrategy):
 
         # VWAP + Value Area
         vwap = (close * volume).rolling(self.va_period).sum() / volume.rolling(self.va_period).sum()
-        std = close.rolling(self.va_period).std()
+        raw_std = close.rolling(self.va_period).std()
+        # std floor: 횡보장에서 밴드가 지나치게 좁아지는 것 방지
+        std_floor = close * self.std_floor_pct
+        std = raw_std.clip(lower=std_floor)
         va_high = vwap + std * self.va_mult
         va_low = vwap - std * self.va_mult
 
@@ -88,8 +95,8 @@ class ValueAreaStrategy(BaseStrategy):
         trend_up = curr_ema20 > curr_ema50
         trend_down = curr_ema20 < curr_ema50
         
-        # Volume confirmation
-        volume_ok = curr_vol > curr_vol_ma
+        # Volume confirmation (완화: vol_ma * 0.8 이상 → 저거래 fold 감소)
+        volume_ok = curr_vol > curr_vol_ma * self.vol_filter_mult
 
         # Breach gap: how much price breached VA
         buy_breach_gap = curr_close - curr_va_low

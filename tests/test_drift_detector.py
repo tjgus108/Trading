@@ -701,3 +701,148 @@ class TestDualGateADWINBatchCounterFix:
         mon.update_feature("rsi", 0.5)
         mon.update_feature("ema", 1.02)
         assert mon._samples_since_retrain == 2
+
+
+# ── [D2] Cycle 220: should_retrain_by_ewma + get_model_health ────────────────
+
+class TestShouldRetrainByEWMA:
+    """DualGateADWINMonitor.should_retrain_by_ewma() — 연속 경보 기반 재학습 권고."""
+
+    def test_no_retrain_below_threshold(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(warning_threshold=5)
+        # 20개 warm-up 후 연속 경보 4회 미만
+        # warm-up: 20번 정답 (EWMA → 1.0 수준, warning 안 뜸)
+        for _ in range(20):
+            mon.update_accuracy(1.0)
+        # 이후 4번 오답 (EWMA 서서히 하락, 하지만 0.50 미만으로 떨어지려면 많이 필요)
+        for _ in range(4):
+            mon.update_accuracy(0.0)
+        # 5회 미만이므로 should_retrain_by_ewma=False (EWMA가 아직 0.50 위)
+        assert not mon.should_retrain_by_ewma()
+
+    def test_retrain_triggered_after_consecutive_warnings(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        # warning_threshold=3, EWMA alpha=0.05 → 수렴 느려서 시뮬레이션 필요
+        # _ewma_acc 직접 조작해 ewma_early_warning=True 강제 유도
+        mon = DualGateADWINMonitor(warning_threshold=3)
+        mon._ewma_n = 25          # warm-up 충족
+        mon._ewma_acc = 0.45      # ewma_early_warning=True 조건 충족
+
+        # 3번 update_accuracy(0.0) → consecutive_warnings 3 이상
+        for _ in range(3):
+            mon.update_accuracy(0.0)
+
+        assert mon.should_retrain_by_ewma()
+        assert mon.consecutive_warnings >= 3
+
+    def test_consecutive_warnings_resets_on_good_accuracy(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(warning_threshold=5)
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.45
+
+        # 경보 2회
+        for _ in range(2):
+            mon.update_accuracy(0.0)
+        assert mon.consecutive_warnings == 2
+
+        # 정답 업데이트 → EWMA 상승 → warning 해제 → 카운터 0
+        for _ in range(50):
+            mon.update_accuracy(1.0)
+        assert mon.consecutive_warnings == 0
+
+    def test_reset_clears_consecutive_warnings(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(warning_threshold=3)
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.45
+        for _ in range(3):
+            mon.update_accuracy(0.0)
+        assert mon.should_retrain_by_ewma()
+
+        mon.reset()
+        assert mon.consecutive_warnings == 0
+        assert not mon.should_retrain_by_ewma()
+
+    def test_hard_reset_clears_consecutive_warnings(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(warning_threshold=3)
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.45
+        for _ in range(3):
+            mon.update_accuracy(0.0)
+
+        mon.hard_reset()
+        assert mon.consecutive_warnings == 0
+        assert mon._ewma_n == 0
+        assert not mon.should_retrain_by_ewma()
+
+
+class TestGetModelHealth:
+    """DualGateADWINMonitor.get_model_health() 반환값 검증."""
+
+    def test_initial_health_keys(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        health = mon.get_model_health()
+        required_keys = {
+            "accuracy", "ewma_accuracy", "ewma_n", "ewma_trend",
+            "ewma_early_warning", "consecutive_warnings",
+            "should_retrain_by_ewma", "drift_detected",
+            "feature_drift", "output_drift", "retrain_count", "should_retrain",
+        }
+        assert required_keys.issubset(health.keys())
+
+    def test_initial_health_values(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        health = mon.get_model_health()
+        assert health["ewma_n"] == 0
+        assert health["ewma_trend"] == "unknown"
+        assert not health["drift_detected"]
+        assert not health["should_retrain"]
+        assert health["retrain_count"] == 0
+
+    def test_trend_degrading(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.45
+        health = mon.get_model_health()
+        assert health["ewma_trend"] == "degrading"
+        assert health["ewma_early_warning"] is True
+
+    def test_trend_improving(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.75
+        health = mon.get_model_health()
+        assert health["ewma_trend"] == "improving"
+        assert health["ewma_early_warning"] is False
+
+    def test_trend_stable(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        mon._ewma_n = 25
+        mon._ewma_acc = 0.55
+        health = mon.get_model_health()
+        assert health["ewma_trend"] == "stable"
+
+    def test_trend_unknown_before_warmup(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        mon._ewma_n = 10   # < 20
+        health = mon.get_model_health()
+        assert health["ewma_trend"] == "unknown"
+
+    def test_feature_drift_reflected(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor()
+        # 수동으로 드리프트 플래그 설정
+        mon._feature_detectors["rsi"] = mon._output_detector.__class__(delta=0.05)
+        mon._feature_detectors["rsi"].drift_detected = True
+        health = mon.get_model_health()
+        assert health["feature_drift"]["rsi"] is True
+        assert health["drift_detected"] is True

@@ -796,6 +796,7 @@ class DualGateADWINMonitor:
         min_window: int = 32,
         grace_period: int = 30,
         retrain_cooldown: int = 50,
+        warning_threshold: int = 5,
     ):
         self.delta = delta
         self.min_window = min_window
@@ -825,6 +826,10 @@ class DualGateADWINMonitor:
         self._ewma_alpha: float = 0.05
         self._ewma_acc: float = 1.0   # 초기값 1.0 (정확도 100%)
         self._ewma_n: int = 0         # EWMA 업데이트 횟수
+
+        # 자동 재학습 트리거: EWMA early_warning 연속 발생 카운터
+        self._consecutive_warnings: int = 0
+        self._warning_threshold: int = warning_threshold
 
     def update_feature(self, feature_name: str, value: float) -> bool:
         """
@@ -859,6 +864,7 @@ class DualGateADWINMonitor:
 
         ADWIN이 드리프트를 선언하기 전에 EWMA로 accuracy 하락 추세를 조기 감지.
         직접 재학습 트리거는 하지 않고, ewma_early_warning 프로퍼티로 노출.
+        연속 경보 카운터(_consecutive_warnings)를 갱신하여 should_retrain_by_ewma()에서 활용.
 
         Args:
             correct: 1.0=정답, 0.0=오답.
@@ -870,6 +876,18 @@ class DualGateADWINMonitor:
         else:
             self._ewma_acc = self._ewma_alpha * float(correct) + (1 - self._ewma_alpha) * self._ewma_acc
 
+        # 연속 경보 카운터 갱신
+        if self.ewma_early_warning:
+            self._consecutive_warnings += 1
+            if self._consecutive_warnings >= self._warning_threshold:
+                logger.warning(
+                    "DualGateADWIN: EWMA early_warning %d회 연속 — retrain 권고 "
+                    "(ewma_acc=%.4f, threshold=%d)",
+                    self._consecutive_warnings, self._ewma_acc, self._warning_threshold,
+                )
+        else:
+            self._consecutive_warnings = 0
+
     @property
     def ewma_accuracy(self) -> float:
         """EWMA 스무딩 정확도 (0~1). 샘플 없으면 1.0."""
@@ -879,6 +897,74 @@ class DualGateADWINMonitor:
     def ewma_early_warning(self) -> bool:
         """EWMA 정확도가 0.50 미만이면 True — ADWIN 전 조기 경보."""
         return self._ewma_n >= 20 and self._ewma_acc < 0.50
+
+    @property
+    def consecutive_warnings(self) -> int:
+        """현재 연속 ewma_early_warning 발생 횟수."""
+        return self._consecutive_warnings
+
+    def should_retrain_by_ewma(self) -> bool:
+        """
+        EWMA 기반 재학습 권고 여부.
+
+        ewma_early_warning이 warning_threshold회 이상 연속 발생하면 True 반환.
+        ADWIN 드리프트 감지보다 빠른 조기 재학습 트리거 역할.
+
+        Returns:
+            bool: 연속 경보가 임계값 이상이면 True.
+        """
+        return self._consecutive_warnings >= self._warning_threshold
+
+    def get_model_health(self) -> dict:
+        """
+        현재 모델 건강 상태 요약 딕셔너리 반환.
+
+        Returns:
+            dict with keys:
+              - accuracy: EWMA 스무딩 정확도 (0~1)
+              - ewma_accuracy: EWMA 값 (accuracy와 동일, 호환용)
+              - ewma_n: EWMA 업데이트 횟수
+              - ewma_trend: "improving" | "degrading" | "stable" | "unknown"
+                  * improving: ewma_acc > 0.60
+                  * degrading: ewma_acc < 0.50 (early_warning 수준)
+                  * stable: 그 사이
+                  * unknown: ewma_n < 20 (warm-up 미완료)
+              - ewma_early_warning: EWMA 기반 조기 경보 여부
+              - consecutive_warnings: 연속 경보 횟수
+              - should_retrain_by_ewma: EWMA 기반 재학습 권고 여부
+              - drift_detected: ADWIN 게이트(피처/출력) 중 하나라도 드리프트 감지 여부
+              - feature_drift: 각 피처별 ADWIN 드리프트 상태 dict
+              - output_drift: 모델 출력 ADWIN 드리프트 여부
+              - retrain_count: 누적 재학습 트리거 횟수
+              - should_retrain: ADWIN 기반 재학습 플래그
+        """
+        # ewma_trend 판정
+        if self._ewma_n < 20:
+            trend = "unknown"
+        elif self._ewma_acc > 0.60:
+            trend = "improving"
+        elif self._ewma_acc < 0.50:
+            trend = "degrading"
+        else:
+            trend = "stable"
+
+        feature_drift_status = self.feature_drift_status
+        any_drift = self.should_retrain or any(feature_drift_status.values()) or self._output_detector.drift_detected
+
+        return {
+            "accuracy": round(self._ewma_acc, 4),
+            "ewma_accuracy": round(self._ewma_acc, 4),
+            "ewma_n": self._ewma_n,
+            "ewma_trend": trend,
+            "ewma_early_warning": self.ewma_early_warning,
+            "consecutive_warnings": self._consecutive_warnings,
+            "should_retrain_by_ewma": self.should_retrain_by_ewma(),
+            "drift_detected": any_drift,
+            "feature_drift": feature_drift_status,
+            "output_drift": self._output_detector.drift_detected,
+            "retrain_count": self._retrain_count,
+            "should_retrain": self.should_retrain,
+        }
 
     def update_model_output(self, proba: float) -> bool:
         """
@@ -961,6 +1047,7 @@ class DualGateADWINMonitor:
         """
         self.should_retrain = False
         self._samples_since_retrain = 0
+        self._consecutive_warnings = 0
         # 개별 ADWIN의 drift_detected 플래그만 클리어
         for det in self._feature_detectors.values():
             det.drift_detected = False
@@ -983,6 +1070,7 @@ class DualGateADWINMonitor:
         self._last_drift_gate = ""
         self._ewma_acc = 1.0
         self._ewma_n = 0
+        self._consecutive_warnings = 0
         logger.info("DualGateADWIN: hard_reset — all windows cleared")
 
     @property

@@ -62,19 +62,28 @@ class CircuitBreaker:
         max_drawdown: float,
         max_consecutive_losses: int = 5,
         flash_crash_pct: float = 0.10,
+        flash_crash_window: int = 15,  # 15 minutes window for flash crash detection
     ):
         self.max_daily_loss = max_daily_loss
         self.max_drawdown = max_drawdown
         self.max_consecutive_losses = max_consecutive_losses
         self.flash_crash_pct = flash_crash_pct
+        self.flash_crash_window = flash_crash_window  # minutes
         self._daily_loss: float = 0.0
         self._peak_balance: float = 0.0
         self._consecutive_losses: int = 0
+        
+        # Flash crash protection: track price history over 15min window
+        self._price_history: list = []  # [(timestamp, price), ...]
+        self._flash_crash_triggered: bool = False
+        self._flash_crash_cooldown: int = 0  # Blocks new entries for N candles after crash
 
     def check(
         self,
         current_balance: float,
         last_candle_pct_change: float,
+        current_price: Optional[float] = None,
+        timestamp: Optional[float] = None,
     ) -> Optional[str]:
         """위반 시 사유 문자열 반환, 정상이면 None."""
         if self._peak_balance <= 0:
@@ -89,9 +98,56 @@ class CircuitBreaker:
             return f"drawdown {drawdown:.2%} >= limit {self.max_drawdown:.2%}"
         if self._consecutive_losses >= self.max_consecutive_losses:
             return f"consecutive_losses {self._consecutive_losses} >= {self.max_consecutive_losses}"
+        # Single-candle flash crash (immediate detection)
         if last_candle_pct_change <= -self.flash_crash_pct:
+            self._flash_crash_triggered = True
+            self._flash_crash_cooldown = 60  # Block new entries for 60 candles
             return f"flash crash detected: {last_candle_pct_change:.2%} move"
+        
+        # 15-minute window flash crash detection
+        if current_price is not None and timestamp is not None:
+            self._update_price_history(timestamp, current_price)
+            window_pct = self._calculate_window_decline()
+            if window_pct <= -self.flash_crash_pct:
+                self._flash_crash_triggered = True
+                self._flash_crash_cooldown = 60
+                return f"flash crash in {self.flash_crash_window}min window: {window_pct:.2%} decline"
+        
+        # Cooldown countdown
+        if self._flash_crash_cooldown > 0:
+            self._flash_crash_cooldown -= 1
+            if self._flash_crash_cooldown == 0:
+                self._flash_crash_triggered = False
+        
         return None
+    
+    def _update_price_history(self, timestamp: float, price: float) -> None:
+        """Track price history for 15-minute window."""
+        import time
+        current_time = time.time() if timestamp == 0 else timestamp
+        window_seconds = self.flash_crash_window * 60
+        
+        # Add new price
+        self._price_history.append((current_time, price))
+        
+        # Remove old prices outside window
+        self._price_history = [
+            (t, p) for t, p in self._price_history
+            if current_time - t <= window_seconds
+        ]
+    
+    def _calculate_window_decline(self) -> float:
+        """Calculate max % decline over flash crash window."""
+        if len(self._price_history) < 2:
+            return 0.0
+        
+        highest = max(p for _, p in self._price_history)
+        lowest = min(p for _, p in self._price_history)
+        
+        if highest <= 0:
+            return 0.0
+        
+        return (lowest - highest) / highest
 
     def record_trade_result(self, pnl: float, account_balance: float) -> None:
         if pnl < 0:

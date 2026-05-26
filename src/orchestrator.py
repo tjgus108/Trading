@@ -30,6 +30,9 @@ from src.notifier import TelegramNotifier
 from src.pipeline.runner import PipelineResult, TradingPipeline
 from src.position_tracker import Position, PositionTracker
 from src.risk.manager import CircuitBreaker, RiskManager
+from src.risk.kelly_sizer import KellySizer
+from src.risk.drawdown_monitor import DrawdownMonitor
+from src.risk.portfolio_optimizer import PortfolioOptimizer
 from src.scheduler import CandleScheduler
 from src.strategy.base import Action, BaseStrategy
 from src.strategy.wick_analysis import WickAnalysisStrategy
@@ -1145,19 +1148,60 @@ class BotOrchestrator:
         self._data_feed = DataFeed(self._connector)
 
     def _build_risk(self) -> None:
+        # Initialize CircuitBreaker with flash crash detection
         cb = CircuitBreaker(
             max_daily_loss=self.cfg.risk.max_daily_loss,
             max_drawdown=self.cfg.risk.max_drawdown,
             max_consecutive_losses=self.cfg.risk.max_consecutive_losses,
             flash_crash_pct=self.cfg.risk.flash_crash_pct,
         )
+        
+        # Initialize KellySizer for dynamic position sizing based on win rate
+        kelly_sizer = None
+        try:
+            kelly_sizer = KellySizer(
+                kelly_fraction=0.25,  # 75% of Kelly for conservative sizing
+                min_trades_history=10,
+            )
+            logger.info("KellySizer initialized with kelly_fraction=0.25")
+        except Exception as e:
+            logger.warning("KellySizer initialization failed: %s", e)
+        
+        # Initialize DrawdownMonitor for trailing stop signals
+        drawdown_monitor = None
+        try:
+            drawdown_monitor = DrawdownMonitor(
+                lookback_window=50,
+                drawdown_threshold=0.08,  # 8% drawdown triggers trailing stop
+                recovery_threshold=0.02,   # 2% recovery to reset
+            )
+            logger.info("DrawdownMonitor initialized with drawdown_threshold=8%")
+        except Exception as e:
+            logger.warning("DrawdownMonitor initialization failed: %s", e)
+        
+        # Initialize PortfolioOptimizer for multi-position optimization
+        portfolio_optimizer = None
+        try:
+            portfolio_optimizer = PortfolioOptimizer(
+                max_portfolio_var=0.05,  # 5% portfolio VaR limit
+                rebalance_frequency=30,  # Rebalance every 30 candles
+            )
+            logger.info("PortfolioOptimizer initialized with max_portfolio_var=5%")
+        except Exception as e:
+            logger.warning("PortfolioOptimizer initialization failed: %s", e)
+        
+        # Create RiskManager with new CF-VaR components
         self._risk_manager = RiskManager(
             risk_per_trade=self.cfg.risk.risk_per_trade,
             atr_multiplier_sl=self.cfg.risk.stop_loss_atr_multiplier,
             atr_multiplier_tp=self.cfg.risk.take_profit_atr_multiplier,
             max_position_size=self.cfg.trading.max_position_size,
             circuit_breaker=cb,
+            kelly_sizer=kelly_sizer,
+            drawdown_monitor=drawdown_monitor,
+            portfolio_optimizer=portfolio_optimizer,
         )
+        logger.info("RiskManager initialized with CF-VaR components")
 
     def _load_strategy(self) -> None:
         strategy_cls = STRATEGY_REGISTRY.get(self.cfg.strategy)
