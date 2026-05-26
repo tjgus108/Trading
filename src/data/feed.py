@@ -264,6 +264,98 @@ class DataFeed:
         
         return None
 
+    def _detect_and_invalidate_stale_cache(self, max_age_seconds: int = 3600) -> int:
+        """
+        Detect stale cache entries (older than max_age_seconds) and remove them.
+        
+        Args:
+            max_age_seconds: Maximum age (default 3600s = 1 hour) before cache is stale
+        
+        Returns:
+            Number of invalidated cache entries
+        
+        Notes:
+            - Stale cache older than 1 hour is typically expired and should not be served
+            - Called periodically to prevent serving very old cached data
+            - Keeps memory footprint under control by removing unused entries
+        """
+        now = time.time()
+        invalidated = 0
+        
+        # Check stale cache for old entries
+        keys_to_remove = []
+        for key, (summary, ts) in list(self._stale_cache.items()):
+            age = now - ts
+            if age > max_age_seconds:
+                keys_to_remove.append(key)
+        
+        for key in keys_to_remove:
+            del self._stale_cache[key]
+            invalidated += 1
+        
+        if invalidated > 0:
+            logger.info(
+                "Stale cache cleanup: removed %d entries older than %.0f seconds",
+                invalidated, max_age_seconds
+            )
+        
+        return invalidated
+    
+    def _is_cache_stale_for_regime(self, key: tuple, symbol: str) -> bool:
+        """
+        Check if a cached entry is considered stale for the current market regime.
+        
+        Args:
+            key: Cache key (symbol, timeframe, limit)
+            symbol: Trading symbol
+        
+        Returns:
+            True if cache should be refreshed due to regime change
+        
+        Notes:
+            - Crisis regime: stale if age > 0.2 * effective_ttl
+            - High volatility: stale if age > 0.5 * effective_ttl
+            - Normal regimes: stale if age > 0.9 * effective_ttl
+            - Prevents serving outdated data during regime changes
+        """
+        if key not in self._cache:
+            return False
+        
+        summary, ts = self._cache[key]
+        age = time.time() - ts
+        effective_ttl = self._effective_ttl(symbol)
+        regime = self.get_cached_regime(symbol)
+        
+        # Crisis regime: stricter staleness check (20% of TTL)
+        if regime == "crisis":
+            is_stale = age > effective_ttl * 0.2
+            if is_stale:
+                logger.debug(
+                    "Cache stale for crisis regime: %s (age=%.1fs, ttl=%.1fs)",
+                    key, age, effective_ttl
+                )
+            return is_stale
+        
+        # High volatility: medium strictness (50% of TTL)
+        if regime == "high_volatility":
+            is_stale = age > effective_ttl * 0.5
+            if is_stale:
+                logger.debug(
+                    "Cache stale for high_volatility regime: %s (age=%.1fs, ttl=%.1fs)",
+                    key, age, effective_ttl
+                )
+            return is_stale
+        
+        # Normal: standard check (90% of TTL)
+        is_stale = age > effective_ttl * 0.9
+        if is_stale and regime:
+            logger.debug(
+                "Cache stale for %s regime: %s (age=%.1fs, ttl=%.1fs)",
+                regime, key, age, effective_ttl
+            )
+        return is_stale
+
+
     def fetch(self, symbol: str, timeframe: str, limit: int = 500) -> DataSummary:
         # Circuit breaker check: reject if too many cascading failures
         if not self._circuit_breaker.can_attempt():
@@ -747,10 +839,36 @@ class DataFeed:
     # ------------------------------------------------------------------
 
     def _to_dataframe(self, raw: list) -> pd.DataFrame:
+        """Convert raw OHLCV data to DataFrame with duplicate timestamp validation.
+        
+        Enhancements (Cycle 219):
+        - Explicit duplicate timestamp detection and removal
+        - Validation that final DataFrame has no duplicate indices
+        - Logging of removed duplicates for debugging
+        """
         df = pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+        
+        # Detect duplicates before indexing (for logging)
+        dup_mask = df.duplicated(subset=["timestamp"], keep=False)
+        if dup_mask.any():
+            dup_count = dup_mask.sum()
+            logger.warning(
+                "_to_dataframe: %d duplicate timestamp entries detected, removing (keep last)",
+                dup_count // 2  # each pair counted twice in keep=False mode
+            )
+        
+        # Remove duplicates: keep last occurrence (most recent/complete data)
+        df = df.drop_duplicates(subset=["timestamp"], keep="last")
+        
         df.set_index("timestamp", inplace=True)
         df = df.astype(float)
+        
+        # Final validation: ensure no duplicate indices
+        if df.index.duplicated().any():
+            logger.error("_to_dataframe: CRITICAL — DataFrame still has duplicate timestamps after cleaning")
+            raise ValueError("Duplicate timestamps remain after cleaning")
+        
         return df
 
 

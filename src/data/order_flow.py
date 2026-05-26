@@ -234,5 +234,74 @@ class VPINCalculator:
         
         # 유효: 최소 n_buckets개 행 + 0이 아닌 거래량 존재
         is_valid = len(df) >= self.n_buckets and total_vol > 0
-        
+
         return is_valid, stats
+        
+
+    def validate_extreme_imbalance(self, df: pd.DataFrame, ofi_threshold: float = 0.9) -> dict:
+        """
+        Detect and validate extreme order flow imbalances (potential anomalies).
+        
+        Args:
+            df: OHLCV DataFrame
+            ofi_threshold: OFI threshold for extreme imbalance (default 0.9 = 90%)
+        
+        Returns:
+            {
+                'has_extreme': bool,
+                'extreme_count': int,
+                'max_imbalance': float,
+                'issue': str or None
+            }
+        
+        Notes (Cycle 219):
+        - Extreme imbalances (OFI > 0.9 or < -0.9) may indicate:
+          * Data feed anomalies or errors
+          * One-sided orderbook capture (snapshot timing issue)
+          * Highly illiquid pairs
+        - Returns warning but does not reject data
+        """
+        if df.empty:
+            return {'has_extreme': False, 'extreme_count': 0, 'max_imbalance': 0.0, 'issue': None}
+        
+        # Compute OFI for each candle
+        volume = df["volume"].fillna(0.0).clip(lower=0.0)
+        if volume.sum() == 0:
+            return {'has_extreme': False, 'extreme_count': 0, 'max_imbalance': 0.0, 'issue': 'zero_total_vol'}
+        
+        # Buy vs Sell classification
+        buy_frac = pd.Series(0.5, index=df.index, dtype=float)
+        buy_frac[df["close"] > df["open"]] = 1.0
+        buy_frac[df["close"] < df["open"]] = 0.0
+        buy_frac[volume == 0] = 0.5
+        
+        bid_vol = volume * buy_frac
+        ask_vol = volume * (1 - buy_frac)
+        total = bid_vol + ask_vol
+        
+        # OFI with safety check for division
+        ofi_series = (bid_vol - ask_vol) / total.replace(0, float('nan'))
+        ofi_series = ofi_series.fillna(0.5)
+        ofi_abs = ofi_series.abs()
+        
+        # Count extreme imbalances
+        extreme_mask = ofi_abs > ofi_threshold
+        extreme_count = extreme_mask.sum()
+        
+        # Issue categorization
+        issue = None
+        if extreme_count > 0:
+            extreme_ratio = extreme_count / len(df)
+            if extreme_ratio > 0.5:
+                issue = f"excessive_extreme_imbalances ({extreme_ratio*100:.1f}% of candles)"
+            else:
+                issue = f"extreme_imbalances_detected ({extreme_count} candles)"
+        
+        return {
+            'has_extreme': extreme_count > 0,
+            'extreme_count': int(extreme_count),
+            'max_imbalance': float(ofi_abs.max()),
+            'issue': issue
+        }
+
+
