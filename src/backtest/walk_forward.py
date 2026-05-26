@@ -391,6 +391,17 @@ class WalkForwardOptimizer:
         if avg_oos < 0.5:
             fail_reasons.append(f"OOS 평균 Sharpe 낮음: {avg_oos:.3f} < 0.5")
             is_stable = False
+        # low_trades_folds > n_windows/2 → 통계적 신뢰도 부족 → UNSTABLE 판정
+        if low_trades_folds > len(windows) / 2:
+            fail_reasons.append(
+                f"저거래 fold 과다: low_trades_folds={low_trades_folds}/{len(windows)} "
+                f"> n_windows/2 (OOS Sharpe 신뢰 불가)"
+            )
+            is_stable = False
+            logger.warning(
+                "[%s] low_trades_folds=%d > n_windows/2=%.1f → UNSTABLE",
+                self.strategy_name, low_trades_folds, len(windows) / 2,
+            )
         # IS Sharpe 전체 음수 진단: GBM 합성 데이터나 전략 미작동 신호
         if all_is_sharpes:
             if avg_is_sharpe < -0.5:

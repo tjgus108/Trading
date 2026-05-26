@@ -19,7 +19,7 @@ _MIN_ROWS = 55
 _CLOSE_WINDOW = 50
 _N_BINS = 5
 _HIGH_CONF_FREQ_MULT = 1.5  # 1.5배 이상 (이전 2.0에서 낮춤)
-_BOUNCE_THRESHOLD = 0.005  # cluster_low 아래 최대 0.5% 범위에서만 신호 (0.2%→0.5%)
+_BOUNCE_THRESHOLD = 0.02  # cluster_low 아래 최대 2% 범위에서 신호 (0.5%→2%: 0 trades 완화)
 
 
 def _find_cluster(

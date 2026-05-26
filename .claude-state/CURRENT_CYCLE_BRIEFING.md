@@ -1,35 +1,29 @@
 ======================================================================
-🔄 CYCLE 211 완료 — 2026-05-25T20:44:55Z
+🔄 CYCLE 212 완료 — 2026-05-26T00:20:00Z
 ======================================================================
 
-## 이번 사이클 카테고리: A(품질) + C(데이터) + F(리서치)
+## 이번 사이클 카테고리: B(리스크) + D(ML) + F(리서치)
 
-### [A] Quality Assurance — 완료
-- OOS trades < 30 WARNING 추가 (WalkForwardOptimizer)
-- WalkForwardResult.low_trades_folds 필드 + summary() 표시
-- walk_forward 54 tests 모두 통과
+### 코드 개선 3건
 
-### [C] Data Infrastructure — 완료
-- paper_simulation.py: TRAIN_HOURS 120→210일, TEST_HOURS 30→60일
-- 결과: 3 윈도우 → 4 윈도우 (통계 신뢰도 향상)
-- SSL 타임아웃 20000→5000ms (빠른 fallback)
-- 중간 결과 저장 로직 추가 (타임아웃 내성)
+1. **D(ML) — WalkForwardOptimizer UNSTABLE 강화** (`src/backtest/walk_forward.py`)
+   - low_trades_folds > n_windows/2 → is_stable=False + fail_reasons 추가
 
-### [F] Research — 완료
-- 1h 타임프레임 이미 사용 중 확인
-- 단순 전략(1-2 param) = fold 30 trades 달성 가장 현실적
-- OOS trades < 30 저신뢰도 fold 집계 제외 → Cycle 212에 구현 검토
+2. **B(리스크) — KellySizer VaR/CVaR 소표본 경고** (`src/risk/kelly_sizer.py`)
+   - estimate_var_cvar() 메서드 추가: n < 30이면 WARNING 로그
 
-## 시뮬레이션 결과
-- Paper WF: BTC/ETH/SOL 0/22 PASS (합성 GBM 한계)
-- Bundle OOS: 0/5 PASS (IS Sharpe 전부 음수 = GBM 한계)
-- 유망 전략: cmf, price_action_momentum, momentum_quality, htf_ema (3심볼 top 5)
-- 문제 전략: volume_breakout, price_cluster (0 trades 완전 실패)
+3. **F(리서치) — price_cluster 0 trades 수정** (`src/strategy/price_cluster.py`)
+   - _BOUNCE_THRESHOLD 0.5% → 2% (GBM에서 신호 생성 가능하도록)
 
-## 전체 테스트
-- 7857 passed, 23 skipped (신규 추가 0건)
+### 시뮬 결과 요약
+- WF 1h: 0/22 PASS | TOP: price_action_momentum(Sharpe 7.08), cmf(6.13)
+- Bundle OOS 4h: 0/5 PASS | 전부 합성 GBM 한계
 
-## 다음 사이클
-- Cycle 212: B(리스크) + D(ML) + F(리서치)
-- 우선: volume_breakout/price_cluster 0 trades 조사 + OOS trades 필터
-======================================================================
+### 테스트: 194개 모두 통과
+
+---
+
+## 다음 사이클 (213): C(데이터) + B(리스크) + F(리서치)
+- volume_breakout uptrend 조건 단순화 (0 trades 해결)
+- price_cluster 2% 효과 검증
+- DataFeed 안정성 + CircuitBreaker 임계값 검토

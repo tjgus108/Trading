@@ -211,6 +211,51 @@ class KellySizer:
             "n_trades": n,
         }
 
+    def estimate_var_cvar(
+        self,
+        confidence: float = 0.95,
+        min_trades: int = 30,
+    ) -> Optional[dict]:
+        """Rolling 거래 기록에서 VaR/CVaR 추정.
+
+        소표본(< min_trades) 경고: 30 미만이면 VaR 추정이 통계적으로 불안정.
+
+        Args:
+            confidence: 신뢰 수준 (기본 0.95 = 95%).
+            min_trades: VaR 신뢰도 최소 거래 수 (학술 기준 30).
+
+        Returns:
+            {"var": float, "cvar": float, "n_trades": int, "low_sample_warning": bool}
+            거래 기록이 5 미만이면 None.
+        """
+        arr = np.array(self._trade_history, dtype=float)
+        n = len(arr)
+        if n < 5:
+            return None
+
+        low_sample = n < min_trades
+        if low_sample:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "KellySizer VaR: 소표본 경고 n=%d < %d — VaR 추정 불안정 (편향 가능성)",
+                n, min_trades,
+            )
+
+        sorted_arr = np.sort(arr)
+        cutoff_idx = int(np.floor((1 - confidence) * n))
+        cutoff_idx = max(cutoff_idx, 1)
+
+        var_val = float(-sorted_arr[cutoff_idx - 1])
+        tail_losses = sorted_arr[:cutoff_idx]
+        cvar_val = float(-tail_losses.mean()) if len(tail_losses) > 0 else var_val
+
+        return {
+            "var": round(var_val, 6),
+            "cvar": round(cvar_val, 6),
+            "n_trades": n,
+            "low_sample_warning": low_sample,
+        }
+
     def compute_dynamic(self, capital: float, price: float = 1.0, min_trades: int = 10) -> float:
         """Rolling 거래 기록으로 자동 포지션 사이즈 계산.
 

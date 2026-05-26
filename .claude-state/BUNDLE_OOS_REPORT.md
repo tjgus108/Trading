@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-25T20:34:18.336843Z_
+_Generated: 2026-05-26T00:15:43.650189Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 

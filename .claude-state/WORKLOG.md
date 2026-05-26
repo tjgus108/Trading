@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-26] Cycle 212 — B(리스크) + D(ML) + SIM + F(리서치)
+
+**[D] ML — WalkForwardOptimizer UNSTABLE 판정 강화:**
+- `src/backtest/walk_forward.py`: `low_trades_folds > n_windows/2` 이면 is_stable=False + fail_reasons 추가
+- 이전: low_trades_folds는 표시만 했고 판정에 미반영 → 이제 UNSTABLE 판정에 직접 연동
+- 통계적 신뢰도 부족(OOS trades < 30) fold가 과반이면 Sharpe 추정 불신뢰 → UNSTABLE
+
+**[B] 리스크 — KellySizer VaR/CVaR 소표본 경고:**
+- `src/risk/kelly_sizer.py`: `estimate_var_cvar()` 메서드 추가
+- n_trades < 30 (학술 기준)이면 WARNING 로그 + `low_sample_warning=True` 반환
+- VaR/CVaR 추정: 신뢰 수준 95% 기본, 오름차순 정렬 후 하위 (1-conf)*n 구간 사용
+
+**[F] 리서치 — price_cluster 0 trades 수정:**
+- `src/strategy/price_cluster.py`: BOUNCE_THRESHOLD 0.5% → 2% (4배 완화)
+- 원인: cluster_width * 0.005는 가격 범위의 0.05%로 매우 좁아 신호 거의 생성 안됨
+- 효과: 다음 사이클 시뮬에서 검증 예정
+
+**[SIM] Paper WF (BTC/ETH/SOL, 4 윈도우, 1h봉):**
+- 0/22 PASS (합성 GBM 데이터 한계 재확인)
+- TOP 3: price_action_momentum(+136%, Sharpe 7.08), cmf(+110%, 6.13), supertrend_multi(+86%, 6.70)
+- volume_breakout: 여전히 0 trades (uptrend 조건이 GBM에서 거의 미충족)
+- price_cluster: 4 trades (아직 threshold 수정 미반영)
+
+**[SIM] Bundle OOS (BTC/USDT, 4h봉):**
+- 0/5 PASS, IS Sharpe 전부 음수 (GBM 합성 데이터 한계)
+- cmf, wick_reversal IS 100% 음수 → GBM 패턴 미작동 확인
+- OOS Sharpe std 3.4~6.6 (임계 1.5 훨씬 초과) → 합성 데이터 특성상 불안정
+
+**테스트:** 194개 모두 통과 (walk_forward, kelly_sizer, price_cluster 관련 포함)
+
+---
+
 ## [2026-05-25] Cycle 211 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] 품질 — WalkForwardOptimizer OOS trades 신뢰도 경고:**
