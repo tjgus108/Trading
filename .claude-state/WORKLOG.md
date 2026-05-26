@@ -1,5 +1,35 @@
 # Work Log
 
+## [2026-05-26] Cycle 213 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[C] 데이터 — volume_breakout ATR 필터 버그 수정** (`src/strategy/volume_breakout.py`):
+- 근본 원인 발견: `_ATR_HIGH = 10.0`이 절대값($10)이었으나 BTC ATR은 ~$600 → 항상 거부
+- 수정: atr14 절대값 → 퍼센트 ATR(atr14/close*100)으로 변경 (0.1%~10% 범위)
+- 효과: 이전 Cycle 0 trades → Cycle 213 평균 72 trades (WF 1h 시뮬 기준)
+
+**[B] 리스크 — DrawdownMonitor.compare_rolling_mdd() 추가** (`src/risk/drawdown_monitor.py`):
+- 단기(50봉) vs 장기 롤링 MDD 비교 메서드 신설
+- ratio > 1.5 & short_mdd > 5%이면 deteriorating=True → 성과 악화 조기 감지
+
+**[F] 리서치 — GBM uptrend 출현 분석**:
+- ema20 > ema50 uptrend: GBM 2400봉 중 57.6% 출현 → uptrend 조건이 0 trades 원인 아님
+- 실제 원인은 ATR 절대값 필터 버그 (위 수정으로 해결)
+- volume spike (>1.5x avg): 15.2%, uptrend+spike 결합: 9.2% → 충분한 신호 빈도
+
+**시뮬 결과 (WF 1h BTC/USDT Synthetic GBM)**:
+- 0/22 PASS (합성 GBM 한계, WF 일관성 0/4)
+- TOP: price_action_momentum(Sharpe 7.62, +155%), cmf(5.62, +98%), **volume_breakout(6.09, +78%, 72 trades — 0 trades 버그 수정 효과)**
+- volume_breakout: Sharpe 6.09, PF 2.31, MDD 6.9% → 지표 건전
+
+**시뮬 결과 (Bundle OOS 4h BTC/USDT Synthetic GBM)**:
+- 0/5 PASS (합성 GBM 한계)
+- cmf IS Sharpe 100% 음수: GBM 합성에서 단방향 추세 의존 전략 불리
+- narrow_range: 저거래 fold 44% > 40% → 4h 신호 부족 구조적 문제 지속
+
+**테스트**: 140개 모두 통과
+
+---
+
 ## [2026-05-26] Cycle 212 — B(리스크) + D(ML) + SIM + F(리서치)
 
 **[D] ML — WalkForwardOptimizer UNSTABLE 판정 강화:**
