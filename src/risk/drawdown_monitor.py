@@ -388,6 +388,26 @@ class DrawdownMonitor:
         level = self.get_mdd_level()
         return level in (MddLevel.LIQUIDATE, MddLevel.FULL_HALT)
 
+    def trailing_stop_signal(self, accel_threshold: float = 1.5) -> bool:
+        """단기 MDD 속도가 장기 MDD 속도보다 accel_threshold배 이상이면 True.
+
+        (short_mdd / 20봉) vs (long_mdd / 50봉) 비교.
+        최근 낙폭 속도가 장기 평균보다 빠르면 trailing stop 강화 신호.
+        초기(데이터 부족)에는 항상 False.
+
+        Args:
+            accel_threshold: 단기/장기 MDD 속도 비율 임계값 (기본 1.5).
+        """
+        long_window = self._rolling_window
+        short_window = min(20, long_window // 2)
+        long_mdd = self.rolling_mdd()
+        short_mdd = self.rolling_mdd(window=short_window)
+        if long_mdd <= 0 or long_window <= 0:
+            return False
+        short_rate = short_mdd / short_window
+        long_rate = long_mdd / long_window
+        return short_rate >= long_rate * accel_threshold
+
     def rolling_mdd(self, window: Optional[int] = None) -> float:
         """롤링 윈도우 내 MDD 계산.
 

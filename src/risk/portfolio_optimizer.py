@@ -278,6 +278,40 @@ class PortfolioOptimizer:
         p_cvar = -(mu - sigma * _norm_pdf(z) / (1.0 - confidence))
         return max(0.0, p_var), max(0.0, p_cvar)
 
+    def cf_var_position_limit(
+        self,
+        cf_var: float,
+        normal_var: float,
+        var_threshold: float = 0.03,
+        min_multiplier: float = 0.25,
+    ) -> float:
+        """CF-VaR 기반 포지션 한도 배수 반환 (0.25~1.0).
+
+        CF-VaR가 normal_var보다 클수록 fat-tail 위험이 높음 → 포지션 축소.
+        CF-VaR 자체가 var_threshold를 초과하면 추가 축소.
+
+        Args:
+            cf_var:          Cornish-Fisher VaR (양수, 손실).
+            normal_var:      정규분포 VaR (양수, 손실). 0이면 fat-tail 비율 무시.
+            var_threshold:   CF-VaR 절대 임계값 (기본 3%). 초과 시 축소 시작.
+            min_multiplier:  최소 배수 (기본 0.25 = 25%).
+
+        Returns:
+            float: 포지션 한도 배수 (min_multiplier ~ 1.0).
+        """
+        if cf_var <= 0:
+            return 1.0
+
+        # fat-tail 비율 요소: CF-VaR / Normal-VaR 기준 (1.0 이상이면 축소)
+        fat_tail_ratio = (cf_var / normal_var) if normal_var > 0 else 1.0
+        fat_tail_mult = min(1.0, 1.0 / max(fat_tail_ratio, 1.0))
+
+        # 절대 VaR 요소: var_threshold 대비 CF-VaR 비율
+        abs_mult = min(1.0, var_threshold / cf_var) if cf_var > var_threshold else 1.0
+
+        multiplier = fat_tail_mult * abs_mult
+        return float(max(min_multiplier, min(1.0, multiplier)))
+
     def _apply_constraints(self, weights: np.ndarray) -> np.ndarray:
         """min/max 제약을 유지하면서 합=1.0 보장 (iterative projection).
         

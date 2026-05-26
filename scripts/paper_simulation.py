@@ -371,6 +371,26 @@ def evaluate_strategy_walk_forward(
     }
 
 
+# ── CPCV 글로벌 정확도 (ML 예측 가능성 지표) ─────────────────
+
+def run_cpcv_global(df: pd.DataFrame, symbol: str = "BTC/USDT") -> Optional[dict]:
+    """전체 데이터셋에서 WalkForwardTrainer CPCV 검증 실행 (1회).
+
+    ML 기반 시장 예측 가능성 지표: avg_test_acc >= 0.55이면 신호 신뢰도 높음.
+    실패 시 None 반환 (silent).
+    """
+    try:
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol=symbol, n_estimators=50, max_depth=4)
+        result = trainer.train(df)
+        if result is None or not result.passed:
+            return None
+        cpcv = trainer.run_cpcv_validation(df, n_splits=5)
+        return cpcv
+    except Exception:
+        return None
+
+
 # ── 상대 순위 (Composite Rank Score) ──────────────────────────
 # 공유 모듈에서 import (run_bundle_oos.py에서도 동일 함수 사용)
 from src.backtest.report import compute_rank_scores  # noqa: E402
@@ -378,7 +398,7 @@ from src.backtest.report import compute_rank_scores  # noqa: E402
 
 # ── 리포트 ──────────────────────────────────────────────────
 
-def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT") -> str:
+def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT", cpcv_result: Optional[dict] = None) -> str:
     results.sort(key=lambda x: x["avg_return"], reverse=True)
     lines = []
     lines.append(f"# Paper Trading 시뮬레이션 리포트 — {symbol} (Walk-Forward)\n")
@@ -391,6 +411,17 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={TRAIN_HOURS}h, test={TEST_HOURS}h)_")
     lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.1% | Slippage: 0.05%_")
     lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_\n")
+
+    # CPCV 글로벌 ML 정확도 섹션
+    if cpcv_result:
+        cpcv_status = "PASS" if cpcv_result["passed"] else "FAIL"
+        lines.append("## ML 예측 가능성 (CPCV)\n")
+        lines.append(f"| 항목 | 값 |")
+        lines.append(f"|------|-----|")
+        lines.append(f"| CPCV avg_test_acc | {cpcv_result['avg_test_acc']:.3f} ± {cpcv_result['std_test_acc']:.3f} |")
+        lines.append(f"| CPCV folds | {cpcv_result['n_folds']} |")
+        lines.append(f"| CPCV 판정 (≥0.55) | {cpcv_status} |")
+        lines.append("")
 
     # 요약
     passed_count = sum(1 for r in results if r["overall_passed"])
@@ -623,7 +654,18 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
                   f"sharpe={r['avg_sharpe']:.2f} trades={r['avg_trades']:.0f} "
                   f"pctl={r.get('percentile', '?')}")
 
-    report = generate_report(results, data_source, df, len(windows), symbol=symbol)
+    # CPCV 글로벌 정확도 (ML 예측 가능성 지표, 선택 실행)
+    cpcv_result = run_cpcv_global(df, symbol=symbol)
+    if cpcv_result:
+        print(f"[{symbol}][CPCV] avg_test_acc={cpcv_result['avg_test_acc']:.3f} "
+              f"± {cpcv_result['std_test_acc']:.3f} "
+              f"({'PASS' if cpcv_result['passed'] else 'FAIL'}, {cpcv_result['n_folds']} folds)",
+              flush=True)
+    else:
+        print(f"[{symbol}][CPCV] N/A (데이터 부족 또는 ML 학습 실패)", flush=True)
+
+    report = generate_report(results, data_source, df, len(windows), symbol=symbol,
+                             cpcv_result=cpcv_result)
     return report, results
 
 

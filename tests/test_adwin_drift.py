@@ -482,3 +482,45 @@ class TestDualGateRetainCooldownTuning:
         if mon.retrain_count > 0:
             # 트리거 후 쿨다운 카운터가 리셋됨 (0에서 다시 시작)
             assert mon._samples_since_retrain < 200
+
+
+class TestDualGateEWMAAccuracy:
+    """DualGateADWINMonitor.update_accuracy() EWMA trend."""
+
+    def test_ewma_starts_at_one(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05)
+        assert mon.ewma_accuracy == 1.0
+        assert mon.ewma_early_warning is False
+
+    def test_ewma_decreases_on_errors(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05)
+        # 30번 오답 → EWMA 크게 하락
+        for _ in range(30):
+            mon.update_accuracy(0.0)
+        assert mon.ewma_accuracy < 0.5
+
+    def test_ewma_early_warning_fires(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05)
+        # 20번 이상 오답 → early warning True
+        for _ in range(25):
+            mon.update_accuracy(0.0)
+        assert mon.ewma_early_warning is True
+
+    def test_ewma_no_warning_on_correct(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05)
+        for _ in range(30):
+            mon.update_accuracy(1.0)
+        assert mon.ewma_early_warning is False
+
+    def test_hard_reset_clears_ewma(self):
+        from src.ml.drift_detector import DualGateADWINMonitor
+        mon = DualGateADWINMonitor(delta=0.05)
+        for _ in range(30):
+            mon.update_accuracy(0.0)
+        mon.hard_reset()
+        assert mon.ewma_accuracy == 1.0
+        assert mon._ewma_n == 0

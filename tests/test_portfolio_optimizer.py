@@ -734,3 +734,33 @@ def test_summary_no_warning_when_false():
     opt = PortfolioOptimizer(method="equal_weight")
     result = opt.optimize(make_returns(n_periods=500))
     assert "LOW_SAMPLE_WARNING" not in result.summary()
+
+
+class TestCFVarPositionLimit:
+    """PortfolioOptimizer.cf_var_position_limit() — CF-VaR 기반 포지션 한도."""
+
+    def test_no_limit_when_cf_var_zero(self):
+        from src.risk.portfolio_optimizer import PortfolioOptimizer
+        opt = PortfolioOptimizer()
+        assert opt.cf_var_position_limit(cf_var=0.0, normal_var=0.02) == 1.0
+
+    def test_full_multiplier_when_cf_below_threshold(self):
+        from src.risk.portfolio_optimizer import PortfolioOptimizer
+        opt = PortfolioOptimizer()
+        # CF-VaR = normal_var = 0.02 (fat-tail ratio=1.0), threshold=0.03 → no reduction
+        mult = opt.cf_var_position_limit(cf_var=0.02, normal_var=0.02, var_threshold=0.03)
+        assert mult == 1.0
+
+    def test_reduced_when_fat_tail_high(self):
+        from src.risk.portfolio_optimizer import PortfolioOptimizer
+        opt = PortfolioOptimizer()
+        # CF-VaR = 0.04 (fat-tail ratio=2.0), threshold=0.03 → 절대+비율 감소
+        mult = opt.cf_var_position_limit(cf_var=0.04, normal_var=0.02, var_threshold=0.03)
+        assert mult < 1.0
+
+    def test_min_multiplier_enforced(self):
+        from src.risk.portfolio_optimizer import PortfolioOptimizer
+        opt = PortfolioOptimizer()
+        # 극단적 CF-VaR → min_multiplier=0.25 이하로 안 떨어짐
+        mult = opt.cf_var_position_limit(cf_var=0.5, normal_var=0.01, var_threshold=0.03, min_multiplier=0.25)
+        assert mult >= 0.25

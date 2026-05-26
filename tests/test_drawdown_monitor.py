@@ -709,3 +709,40 @@ class TestStreakRecoveryGraceSeconds:
         d = m.to_dict()
         m2 = DrawdownMonitor.from_dict(d)
         assert m2.streak_recovery_grace_seconds == 14400.0
+
+
+class TestTrailingStopSignal:
+    """trailing_stop_signal() — 단기/장기 rolling MDD 가속 감지."""
+
+    def test_no_signal_on_empty_history(self):
+        """이력 없으면 항상 False."""
+        m = DrawdownMonitor(rolling_window=50)
+        assert m.trailing_stop_signal() is False
+
+    def test_no_signal_when_flat(self):
+        """equity가 일정하면 short/long MDD 둘 다 0 → False."""
+        m = DrawdownMonitor(rolling_window=50)
+        for _ in range(60):
+            m.update(10000)
+        assert m.trailing_stop_signal() is False
+
+    def test_signal_when_short_mdd_accelerates(self):
+        """안정 후 급락: 단기 낙폭 속도(short_mdd/20) >> 장기 속도(long_mdd/50) → True."""
+        m = DrawdownMonitor(rolling_window=50)
+        # 처음 30봉: 완전 안정 (long MDD 기반 분모)
+        for _ in range(30):
+            m.update(10000)
+        # 이후 20봉: 급락 (단기에서만 낙폭 발생)
+        for i in range(20):
+            m.update(10000 - (i + 1) * 250)  # 5000까지 하락 (50% 단기 낙폭)
+        # short_rate = 50%/20 = 2.5%, long_rate = 50%/50 = 1.0% → ratio=2.5 > 1.5
+        assert m.trailing_stop_signal(accel_threshold=1.5) is True
+
+    def test_no_signal_when_gradual_decline(self):
+        """균일 하락: short_rate ≈ long_rate → accel_threshold=2.0 기준 미달."""
+        m = DrawdownMonitor(rolling_window=50)
+        # 50봉 균일 하락 (전체 구간에서 동일한 속도)
+        for i in range(50):
+            m.update(10000 - i * 20)
+        # short_rate / long_rate ≈ 1.0 < 2.0 → 신호 없음
+        assert m.trailing_stop_signal(accel_threshold=2.0) is False

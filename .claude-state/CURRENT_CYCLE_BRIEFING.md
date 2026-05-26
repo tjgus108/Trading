@@ -1,37 +1,53 @@
 # Current Cycle Briefing
 
-_사이클: 216 | 카테고리: B(리스크) + D(ML) + F(리서치)_
+_사이클: 217 | 카테고리: B(리스크) + D(ML) + F(리서치)_
 _업데이트: 2026-05-26_
 
 ## 이번 사이클 완료 내용
 
 ### [B] 리스크
-- **KellySizer.estimate_cornish_fisher_var()**: Cornish-Fisher 확장 VaR/CVaR 추가
-  - 파일: `src/risk/kelly_sizer.py`
-  - CF formula: z_cf = z + (z²-1)*s/6 + (z³-3z)*k/24 - (2z³-5z)*s²/36
-  - 반환: cf_var, cf_cvar, hist_var, skewness, excess_kurtosis, low_sample_warning
-  - 내부 헬퍼: `_norm_ppf()` (Acklam 근사, scipy 불필요)
-  - 테스트: `tests/test_kelly_cornish_fisher.py` (10개)
+- **DrawdownMonitor.trailing_stop_signal()**: 낙폭 가속 조기 경보
+  - 파일: `src/risk/drawdown_monitor.py`
+  - 단기(20봉) MDD 속도 / 장기(50봉) MDD 속도 비율 >= accel_threshold(1.5)이면 True
+  - 테스트: `TestTrailingStopSignal` 4개 추가
+
+- **PortfolioOptimizer.cf_var_position_limit()**: CF-VaR 기반 포지션 한도
+  - 파일: `src/risk/portfolio_optimizer.py`
+  - CF-VaR/Normal-VaR 비율 + 절대값 기반 포지션 배수 계산 (0.25~1.0)
+  - 테스트: `TestCFVarPositionLimit` 4개 추가
 
 ### [D] ML
-- **WalkForwardTrainer.run_cpcv_validation()**: CPCV 기반 OOS 검증 메서드 추가
-  - 파일: `src/ml/trainer.py`
-  - TrainingResult에 `cpcv_avg_acc`, `cpcv_n_folds` 필드 추가
-  - df 입력 → 피처 재빌드 → feature_names 슬라이스 → combinatorial_purged_cv 실행
-  - 반환: avg_test_acc, std_test_acc, n_folds, fold_results, passed
-  - 테스트: `tests/test_ml_cpcv_validation.py` (8개)
+- **DualGateADWINMonitor.update_accuracy()**: EWMA 정확도 trend
+  - 파일: `src/ml/drift_detector.py`
+  - alpha=0.05 EWMA → `ewma_accuracy` property
+  - `ewma_early_warning`: n≥20 + EWMA < 0.50 → True (ADWIN 전 조기 경보)
+  - `hard_reset()`에 EWMA 초기화 포함
+  - 테스트: `TestDualGateEWMAAccuracy` 5개 추가
+
+- **paper_simulation CPCV 섹션**: ML 예측 가능성 지표
+  - 파일: `scripts/paper_simulation.py`
+  - `run_cpcv_global()`: WalkForwardTrainer 1회 실행 → avg_test_acc
+  - 리포트에 "ML 예측 가능성 (CPCV)" 섹션 추가
+  - 현재 환경(SSL 차단): N/A 출력
 
 ### [SIM] 시뮬레이션 결과
-- Paper WF (1h, Block Bootstrap): 0/22 PASS
-  - TOP: supertrend_multi(PF=1.47, 1.5 직전), lob_maker, order_flow_imbalance_v2
-- Bundle OOS (4h): 0/5 PASS
-  - 최우수: value_area (PASS fold 4/9, SharpeStd=6.589)
+- **Paper WF (1h, Block Bootstrap)**: 0/22 PASS
+  - TOP by rank: narrow_range(76.1, PF=1.61), elder_impulse(73.6), momentum_quality(73.0)
+  - CPCV: N/A (합성 데이터)
+- **Bundle OOS (4h)**: 0/5 PASS
+  - narrow_range: 저거래 44% (trades<3) 지속
+  - value_area: SharpeStd=6.589 (불안정)
 
 ### [F] 리서치
-- CF-VaR 이론 검증: 음의 왜도+높은 첨도 환경에서 Normal-VaR 대비 30~50% 보수적
-- CPCV 활용: WFO + CPCV 이중 검증으로 과적합 방어 강화
-- 시뮬레이션 기반 개선 방향: value_area va_mult 범위 축소, supertrend_multi 실거래소 검증
+- CF-VaR + EWMA early warning 통합: 리스크 모듈 조기 경보 체계 완성
+- narrow_range 저거래 문제 → 신호 조건 완화 또는 파라미터 조정 필요
+- 다음 사이클: RiskManager CF-VaR 통합 + DataFeed 개선
 
-## 현재 상태
-- 테스트: 7164개 전체 PASS (18개 신규 추가)
-- 다음 사이클: 217 (217 mod 5 = 2 → B + D + F)
+## 변경 파일
+- `src/risk/drawdown_monitor.py` — trailing_stop_signal()
+- `src/risk/portfolio_optimizer.py` — cf_var_position_limit()
+- `src/ml/drift_detector.py` — update_accuracy(), ewma_accuracy, ewma_early_warning
+- `scripts/paper_simulation.py` — run_cpcv_global(), CPCV 섹션
+- `tests/test_drawdown_monitor.py` — TestTrailingStopSignal (4개)
+- `tests/test_adwin_drift.py` — TestDualGateEWMAAccuracy (5개)
+- `tests/test_portfolio_optimizer.py` — TestCFVarPositionLimit (4개)

@@ -821,6 +821,11 @@ class DualGateADWINMonitor:
         self._last_drift_gate: str = ""    # "feature:<name>" or "output"
         self._last_drift_feature: str = ""
 
+        # EWMA accuracy trend (alpha=0.05): ADWIN 감지 전 조기 경보용
+        self._ewma_alpha: float = 0.05
+        self._ewma_acc: float = 1.0   # 초기값 1.0 (정확도 100%)
+        self._ewma_n: int = 0         # EWMA 업데이트 횟수
+
     def update_feature(self, feature_name: str, value: float) -> bool:
         """
         피처 게이트 업데이트.
@@ -848,6 +853,32 @@ class DualGateADWINMonitor:
             return True
 
         return False
+
+    def update_accuracy(self, correct: float) -> None:
+        """EWMA accuracy trend 업데이트 (0=오답, 1=정답).
+
+        ADWIN이 드리프트를 선언하기 전에 EWMA로 accuracy 하락 추세를 조기 감지.
+        직접 재학습 트리거는 하지 않고, ewma_early_warning 프로퍼티로 노출.
+
+        Args:
+            correct: 1.0=정답, 0.0=오답.
+        """
+        self._ewma_n += 1
+        # 첫 샘플이면 초기화 (warm-up 없이 즉시 수렴 시작)
+        if self._ewma_n == 1:
+            self._ewma_acc = float(correct)
+        else:
+            self._ewma_acc = self._ewma_alpha * float(correct) + (1 - self._ewma_alpha) * self._ewma_acc
+
+    @property
+    def ewma_accuracy(self) -> float:
+        """EWMA 스무딩 정확도 (0~1). 샘플 없으면 1.0."""
+        return self._ewma_acc
+
+    @property
+    def ewma_early_warning(self) -> bool:
+        """EWMA 정확도가 0.50 미만이면 True — ADWIN 전 조기 경보."""
+        return self._ewma_n >= 20 and self._ewma_acc < 0.50
 
     def update_model_output(self, proba: float) -> bool:
         """
@@ -950,6 +981,8 @@ class DualGateADWINMonitor:
         self.should_retrain = False
         self._samples_since_retrain = 0
         self._last_drift_gate = ""
+        self._ewma_acc = 1.0
+        self._ewma_n = 0
         logger.info("DualGateADWIN: hard_reset — all windows cleared")
 
     @property
