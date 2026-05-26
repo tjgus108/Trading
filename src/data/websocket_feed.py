@@ -142,6 +142,7 @@ class BinanceWebSocketFeed:
         self._connected = False
         self._last_obi: Optional[OrderBookImbalance] = None
         self._retry_count = 0
+        self._last_candle_timestamp_ms: Optional[int] = None  # 중복 캔들 방지
 
         # Health monitor
         self._health_monitor = ConnectionHealthMonitor()
@@ -376,8 +377,14 @@ class BinanceWebSocketFeed:
         if not is_closed:
             return  # 미완성 캔들 무시
 
+        ts_ms = int(k["t"])
+        # 재연결 시 동일 타임스탬프 중복 캔들 방지
+        if self._last_candle_timestamp_ms is not None and ts_ms <= self._last_candle_timestamp_ms:
+            logger.debug("Duplicate candle skipped: ts=%d (last=%d)", ts_ms, self._last_candle_timestamp_ms)
+            return
+
         bar = CandleBar(
-            timestamp=int(k["t"]),
+            timestamp=ts_ms,
             open=float(k["o"]),
             high=float(k["h"]),
             low=float(k["l"]),
@@ -386,6 +393,7 @@ class BinanceWebSocketFeed:
         )
         with self._lock:
             self._candles.append(bar)
+            self._last_candle_timestamp_ms = ts_ms
             self._last_candle_ts = time.time()
             self._total_candles_received += 1
         self._health_monitor.record_candle()

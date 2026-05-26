@@ -13,8 +13,9 @@ _MIN_ROWS = 50  # EMA50 필요
 _VOL_LOOKBACK = 20
 _SPIKE_MULT = 1.5  # 1.8 → 1.5 (더 공격적)
 _HIGH_CONF_MULT = 2.2  # 2.5 → 2.2
-_ATR_LOW = 0.1  # ATR 최소 (0.3→0.1: 거래 빈도 증가)
-_ATR_HIGH = 10.0  # ATR 최대 (5.0→10.0: 고변동성 구간 포함)
+# ATR 필터: 절대값 대신 가격 대비 비율 사용 (BTC 등 고가 자산 호환)
+_ATR_LOW_PCT = 0.001   # ATR/price 최소 0.1% (극저변동성 제외)
+_ATR_HIGH_PCT = 0.10   # ATR/price 최대 10% (극고변동성 제외)
 
 
 class VolumeBreakoutStrategy(BaseStrategy):
@@ -39,8 +40,9 @@ class VolumeBreakoutStrategy(BaseStrategy):
         above_ema = close > ema20
         below_ema = close < ema20
         
-        # ATR 필터: 매우 극단적인 경우만 필터
-        atr_valid = _ATR_LOW <= atr14 <= _ATR_HIGH
+        # ATR 필터: 가격 대비 비율로 체크 (고가 자산 호환)
+        atr_pct = atr14 / close if close > 0 else 0
+        atr_valid = _ATR_LOW_PCT <= atr_pct <= _ATR_HIGH_PCT
         
         # 추세 필터
         uptrend = ema20 > ema50

@@ -73,7 +73,8 @@ class DrawdownStatus:
     cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
     mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
-    rolling_mdd_pct: float = 0.0   # 롤링 윈도우 내 MDD (별도 트래킹)
+    rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
+    rolling_mdd_short_pct: float = 0.0  # 단기 롤링(20봉) MDD — 장기 대비 조기 경보용
 
 
 class DrawdownMonitor:
@@ -518,6 +519,7 @@ class DrawdownMonitor:
             mdd_level=cur_mdd_level,
             mdd_size_multiplier=cur_mdd_size_mult,
             rolling_mdd_pct=self.rolling_mdd(),
+            rolling_mdd_short_pct=self.rolling_mdd(window=20),
         )
 
     def _check_tiered(
