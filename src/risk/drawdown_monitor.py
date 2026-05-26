@@ -415,6 +415,30 @@ class DrawdownMonitor:
                     max_dd = dd
         return max_dd
 
+    def compare_rolling_mdd(
+        self, short_window: int = 50, long_window: Optional[int] = None
+    ) -> dict:
+        """단기 vs 장기 롤링 MDD 비교.
+
+        단기 MDD가 장기 MDD보다 유의미하게 크면 최근 성과가 악화 중임을 나타냄.
+
+        Returns:
+            dict with short_mdd, long_mdd, ratio (short/long), deteriorating (bool).
+        """
+        short_mdd = self.rolling_mdd(window=short_window)
+        long_mdd = self.rolling_mdd(window=long_window)
+        ratio = (short_mdd / long_mdd) if long_mdd > 0 else 1.0
+        # ratio > 1.5: 단기 MDD가 장기 MDD의 1.5배 이상 → 성과 악화 신호
+        deteriorating = ratio > 1.5 and short_mdd > 0.05
+        return {
+            "short_mdd": round(short_mdd, 6),
+            "long_mdd": round(long_mdd, 6),
+            "ratio": round(ratio, 4),
+            "deteriorating": deteriorating,
+            "short_window": short_window,
+            "long_window": long_window or self._rolling_window,
+        }
+
     @property
     def mdd_level(self) -> MddLevel:
         """현재 MDD 단계 (프로퍼티)."""
