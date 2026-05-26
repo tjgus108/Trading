@@ -13,10 +13,13 @@ G3. 멀티에셋 포트폴리오 최적화기.
   weights = opt.optimize(returns_dict)  # {"BTC": 0.4, "ETH": 0.35, "SOL": 0.25}
 """
 
+import logging
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 try:
     from typing import Literal
 except ImportError:
@@ -32,9 +35,11 @@ class OptimizationResult:
     sharpe_ratio: float
     var_95: float = 0.0             # 일간 95% VaR (손실, 양수)
     cvar_95: float = 0.0            # 일간 95% CVaR / Expected Shortfall
+    low_sample_warning: bool = False  # VaR/CVaR 소표본 경고 (T < 30)
 
     def summary(self) -> str:
         w_str = ", ".join(f"{s}: {v:.4f}" for s, v in self.weights.items())
+        warn_str = " | LOW_SAMPLE_WARNING" if self.low_sample_warning else ""
         return (
             f"Method: {self.method} | "
             f"Weights: {{{w_str}}} | "
@@ -43,6 +48,7 @@ class OptimizationResult:
             f"Sharpe: {self.sharpe_ratio:.4f} | "
             f"VaR95: {self.var_95:.4f} | "
             f"CVaR95: {self.cvar_95:.4f}"
+            f"{warn_str}"
         )
 
 
@@ -85,7 +91,7 @@ class PortfolioOptimizer:
             ann_r = float(r.mean()) * self.annualization
             ann_v = float(r.std()) * np.sqrt(self.annualization)
             sharpe = (ann_r - self.risk_free_rate) / ann_v if ann_v > 0 else 0.0
-            var_95, cvar_95 = self._compute_var_cvar(r) if len(r) >= 2 else (0.0, 0.0)
+            var_95, cvar_95, low_warn = self._compute_var_cvar(r) if len(r) >= 2 else (0.0, 0.0, False)
             return OptimizationResult(
                 weights={sym: 1.0},
                 method="equal_weight",
@@ -94,6 +100,7 @@ class PortfolioOptimizer:
                 sharpe_ratio=sharpe,
                 var_95=var_95,
                 cvar_95=cvar_95,
+                low_sample_warning=low_warn,
             )
 
         # 공통 인덱스로 수익률 행렬 구성
@@ -128,7 +135,7 @@ class PortfolioOptimizer:
         sharpe = (ann_r - self.risk_free_rate) / ann_v if ann_v > 0 else 0.0
 
         # VaR / CVaR (95%, 일간, 손실은 양수)
-        var_95, cvar_95 = self._compute_var_cvar(port_returns, confidence=0.95)
+        var_95, cvar_95, low_warn = self._compute_var_cvar(port_returns, confidence=0.95)
 
         weights_dict = {sym: float(w) for sym, w in zip(symbols, weights_arr)}
 
@@ -140,7 +147,11 @@ class PortfolioOptimizer:
             sharpe_ratio=sharpe,
             var_95=var_95,
             cvar_95=cvar_95,
+            low_sample_warning=low_warn,
         )
+
+    # 소표본 경고 임계값: 30 미만 샘플의 VaR는 통계적 신뢰도가 낮음 (학술 기준)
+    LOW_SAMPLE_THRESHOLD: int = 30
 
     @staticmethod
     def _compute_var_cvar(
@@ -154,18 +165,31 @@ class PortfolioOptimizer:
         95% confidence에서 tail 샘플 수 = T * 0.05. CVaR 안정성을 위해
         최소 5개 tail 샘플이 필요하므로 T >= 100이 요구됨.
 
+        소표본 경고: T < 30이면 VaR/CVaR 추정이 통계적으로 불안정 (편향 가능성).
+
         Args:
             port_returns: 포트폴리오 수익률 배열
             confidence: 신뢰 수준 (0.95 = 95%)
 
         Returns:
-            (var, cvar) — 양수 (손실)
+            (var, cvar, low_sample_warning) — var/cvar는 양수 (손실),
+            low_sample_warning은 T < 30일 때 True
         """
         MIN_SAMPLES = 100  # 95% VaR CVaR 안정성 최소 데이터 포인트
         if len(port_returns) == 0:
-            return 0.0, 0.0
+            return 0.0, 0.0, False
         sorted_r = np.sort(port_returns)
         T = len(sorted_r)
+
+        # 소표본 경고: 30 미만 샘플은 통계적 신뢰도 낮음
+        low_sample = T < PortfolioOptimizer.LOW_SAMPLE_THRESHOLD
+        if low_sample:
+            logger.warning(
+                "PortfolioOptimizer VaR/CVaR: 소표본 경고 T=%d < %d — "
+                "VaR/CVaR 추정 불안정 (편향 가능성)",
+                T, PortfolioOptimizer.LOW_SAMPLE_THRESHOLD,
+            )
+
         # 하위 (1-confidence) 분위수 인덱스
         cutoff_idx = max(1, int(T * (1 - confidence)))
         # VaR: 5번째 퍼센타일 (cutoff_idx - 1번째 값)
@@ -184,7 +208,7 @@ class PortfolioOptimizer:
             var = max(var, param_var)
             cvar = max(cvar, param_cvar)
 
-        return var, cvar
+        return var, cvar, low_sample
 
     @staticmethod
     def _parametric_var_cvar(

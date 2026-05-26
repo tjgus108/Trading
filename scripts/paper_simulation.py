@@ -372,74 +372,8 @@ def evaluate_strategy_walk_forward(
 
 
 # ── 상대 순위 (Composite Rank Score) ──────────────────────────
-
-
-def compute_rank_scores(results: List[dict]) -> List[dict]:
-    """전략 결과에 composite rank_score(0~100)와 percentile 부여.
-
-    점수 구성 (가중 합):
-      - OOS Sharpe 평균 (30%): 높을수록 좋음
-      - Profit Factor 평균 (20%): 높을수록 좋음
-      - 거래 수 (15%): 충분해야 통계 신뢰
-      - MDD 역수 (15%): 낮을수록 좋음 (역순 정규화)
-      - Consistency (10%): 통과 윈도우 비율
-      - Sharpe 안정성 (10%): sharpe_std가 낮을수록 좋음 (역순 정규화)
-
-    모든 지표는 min-max 정규화 후 가중 합산. 전략 1개면 score=50.
-    """
-    if not results:
-        return results
-
-    if len(results) == 1:
-        results[0]["rank_score"] = 50.0
-        results[0]["percentile"] = "p50"
-        return results
-
-    # 지표 추출
-    sharpes = np.array([r["avg_sharpe"] for r in results])
-    pfs = np.array([r["avg_profit_factor"] for r in results])
-    trades = np.array([r["avg_trades"] for r in results])
-    mdds = np.array([r["avg_max_dd"] for r in results])
-    consistencies = np.array([r["consistency_score"] for r in results])
-    sharpe_stds = np.array([r.get("sharpe_std", 0.0) for r in results])
-
-    def _minmax(arr: np.ndarray, invert: bool = False) -> np.ndarray:
-        """Min-max를 [0, 1]로 정규화. invert=True면 작을수록 1."""
-        mn, mx = arr.min(), arr.max()
-        if mx - mn < 1e-12:
-            return np.full_like(arr, 0.5)
-        norm = (arr - mn) / (mx - mn)
-        return 1.0 - norm if invert else norm
-
-    n_sharpe = _minmax(sharpes)
-    n_pf = _minmax(pfs)
-    n_trades = _minmax(trades)
-    n_mdd = _minmax(mdds, invert=True)       # 낮은 MDD가 좋음
-    n_consist = _minmax(consistencies)
-    n_stability = _minmax(sharpe_stds, invert=True)  # 낮은 std가 좋음
-
-    # 가중 합산
-    scores = (
-        0.30 * n_sharpe
-        + 0.20 * n_pf
-        + 0.15 * n_trades
-        + 0.15 * n_mdd
-        + 0.10 * n_consist
-        + 0.10 * n_stability
-    ) * 100.0
-
-    # 순위 산출: score 내림차순 인덱스
-    n = len(results)
-    rank_order = sorted(range(n), key=lambda j: -scores[j])
-    rank_map = {idx: pos for pos, idx in enumerate(rank_order)}
-
-    for i, r in enumerate(results):
-        r["rank_score"] = round(float(scores[i]), 1)
-        pos = rank_map[i]
-        pct = int(100 * (1 - pos / max(n - 1, 1)))
-        r["percentile"] = f"p{pct}"
-
-    return results
+# 공유 모듈에서 import (run_bundle_oos.py에서도 동일 함수 사용)
+from src.backtest.report import compute_rank_scores  # noqa: E402
 
 
 # ── 리포트 ──────────────────────────────────────────────────

@@ -20,6 +20,11 @@ risk:
   max_consecutive_losses: 4
   flash_crash_pct: 0.10     # 단일 캔들 10% 이상 변동 시 서킷 브레이커
   streak_recovery_grace_seconds: 14400  # 연속 손실 후 4시간 무손실 시 자동 복원
+  # CircuitBreaker 추가 파라미터 (Bybit BTC/USDT 1h 검증 기준)
+  atr_surge_multiplier: 2.0              # ATR 급등 배수 (1.5~3.0)
+  rapid_decline_pct: 0.05                # 급속 하락 임계 (0.03~0.07)
+  rapid_decline_window: 5                # 급속 하락 감지 캔들 수 (3~10)
+  rapid_decline_cooldown_periods: 30     # 급속 하락 후 쿨다운 캔들 수 (10~60)
 
 logging:
   level: INFO

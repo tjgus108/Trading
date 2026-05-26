@@ -192,6 +192,147 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
     return df
 
 
+def make_block_bootstrap_data(
+    seed_df: pd.DataFrame,
+    n: int = 1000,
+    block_size: int = 36,
+    seed: int = 42,
+    initial_price: float = 50000.0,
+) -> pd.DataFrame:
+    """
+    Block Bootstrap 방식 합성 OHLCV 데이터 생성.
+
+    실제 수익률 시계열에서 연속된 블록을 무작위로 뽑아 이어붙이므로,
+    GBM과 달리 변동성 군집(ARCH 효과)과 자기상관이 보존됨.
+
+    Args:
+        seed_df: 시드 OHLCV DataFrame (최소 columns: open, high, low, close, volume).
+                 make_synthetic_data() 결과 또는 실제 거래소 데이터 모두 가능.
+        n: 생성할 캔들 수.
+        block_size: 블록 크기 (연속 봉 수). 24~48 권장.
+                    작으면 자기상관 보존 약화, 크면 다양성 감소.
+        seed: 난수 시드 (재현성).
+        initial_price: 생성 시계열의 시작 가격.
+
+    Returns:
+        make_synthetic_data()와 동일한 형태의 OHLCV + 지표 DataFrame.
+
+    Notes:
+        - seed_df에 최소 block_size 이상의 행이 필요.
+        - 블록 경계에서 가격 점프가 발생할 수 있으나, 수익률 기반 재구성이므로
+          상대적 변동 패턴(군집, 자기상관)은 그대로 보존됨.
+        - GBM 대비 장점: kurtosis(fat tail)와 volatility clustering이 원본 데이터 수준으로 유지.
+    """
+    rng = np.random.RandomState(seed)
+
+    # ── 1. seed_df에서 수익률/상대비율 계산 ──
+    close_arr = seed_df["close"].values.astype(float)
+    if len(close_arr) < block_size:
+        raise ValueError(
+            f"seed_df has {len(close_arr)} rows, need at least block_size={block_size}"
+        )
+
+    # 로그 수익률 (close-to-close)
+    log_returns = np.diff(np.log(close_arr))  # length = len(close_arr) - 1
+
+    # High/Low/Open의 Close 대비 비율 (OHLC 관계 보존)
+    high_ratio = (seed_df["high"].values / seed_df["close"].values)[1:]  # skip first
+    low_ratio = (seed_df["low"].values / seed_df["close"].values)[1:]
+    open_ratio = (seed_df["open"].values / seed_df["close"].values)[1:]
+
+    # 볼륨 로그값 (절대 수준 보존)
+    vol_arr = seed_df["volume"].values.astype(float)[1:]
+    log_vol = np.log(vol_arr + 1e-10)
+
+    total_seed = len(log_returns)  # seed 수익률 개수
+
+    # ── 2. Block Bootstrap: 블록 무작위 추출 + 이어붙이기 ──
+    bootstrapped_returns = []
+    bootstrapped_high_ratio = []
+    bootstrapped_low_ratio = []
+    bootstrapped_open_ratio = []
+    bootstrapped_log_vol = []
+
+    remaining = n
+    while remaining > 0:
+        # 블록 시작점을 무작위로 선택 (블록이 seed 범위를 벗어나지 않도록)
+        max_start = total_seed - block_size
+        if max_start < 0:
+            max_start = 0
+        start_idx = rng.randint(0, max(max_start, 1))
+        end_idx = min(start_idx + block_size, total_seed)
+        actual_size = min(end_idx - start_idx, remaining)
+
+        bootstrapped_returns.append(log_returns[start_idx:start_idx + actual_size])
+        bootstrapped_high_ratio.append(high_ratio[start_idx:start_idx + actual_size])
+        bootstrapped_low_ratio.append(low_ratio[start_idx:start_idx + actual_size])
+        bootstrapped_open_ratio.append(open_ratio[start_idx:start_idx + actual_size])
+        bootstrapped_log_vol.append(log_vol[start_idx:start_idx + actual_size])
+
+        remaining -= actual_size
+
+    # 이어붙이기
+    all_returns = np.concatenate(bootstrapped_returns)[:n]
+    all_high_ratio = np.concatenate(bootstrapped_high_ratio)[:n]
+    all_low_ratio = np.concatenate(bootstrapped_low_ratio)[:n]
+    all_open_ratio = np.concatenate(bootstrapped_open_ratio)[:n]
+    all_log_vol = np.concatenate(bootstrapped_log_vol)[:n]
+
+    # ── 3. 가격/OHLCV 시계열 재구성 ──
+    log_prices = np.zeros(n + 1)
+    log_prices[0] = np.log(initial_price)
+    log_prices[1:] = log_prices[0] + np.cumsum(all_returns)
+    close = np.exp(log_prices[1:])
+
+    high = close * all_high_ratio
+    low = close * all_low_ratio
+    open_ = close * all_open_ratio
+    volume = np.exp(all_log_vol)
+
+    # OHLC 관계 강제 보정 (high >= max(open, close), low <= min(open, close))
+    high = np.maximum(high, np.maximum(open_, close))
+    low = np.minimum(low, np.minimum(open_, close))
+
+    df = pd.DataFrame({
+        "open": open_,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": volume,
+    })
+
+    # ── 4. 지표 계산 (make_synthetic_data와 동일) ──
+    df["atr14"] = _atr(df, 14)
+    df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
+    df["rsi14"] = _rsi(df["close"], 14)
+    df["sma20"] = df["close"].rolling(20, min_periods=1).mean()
+    df["sma50"] = df["close"].rolling(50, min_periods=1).mean()
+    df["bb_upper"] = df["sma20"] + 2 * df["close"].rolling(20, min_periods=1).std()
+    df["bb_lower"] = df["sma20"] - 2 * df["close"].rolling(20, min_periods=1).std()
+    df["macd"] = (
+        df["close"].ewm(span=12, adjust=False).mean()
+        - df["close"].ewm(span=26, adjust=False).mean()
+    )
+    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+    df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
+    df["return_5"] = df["close"].pct_change(5)
+
+    df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
+    df["donchian_high"] = df["high"].rolling(20, min_periods=1).max()
+    df["donchian_low"] = df["low"].rolling(20, min_periods=1).min()
+
+    typical_price = (df["high"] + df["low"] + df["close"]) / 3
+    cum_vol = df["volume"].cumsum()
+    cum_tp_vol = (typical_price * df["volume"]).cumsum()
+    df["vwap"] = cum_tp_vol / cum_vol.replace(0, np.nan)
+    df["vwap20"] = (
+        (typical_price * df["volume"]).rolling(20, min_periods=1).sum()
+        / df["volume"].rolling(20, min_periods=1).sum()
+    )
+
+    return df
+
+
 def _atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     hl = df["high"] - df["low"]
     hc = (df["high"] - df["close"].shift(1)).abs()

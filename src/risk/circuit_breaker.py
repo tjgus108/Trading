@@ -19,20 +19,43 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitBreaker:
+    """다층 자동 거래 중단 모듈.
+
+    임계값 가이드 (Bybit BTC/USDT 1h 기준, 실데이터 검증):
+    ────────────────────────────────────────────────────────────
+    파라미터                   기본값    실데이터 권장 범위    비고
+    daily_drawdown_limit      0.03      0.02~0.05           config.yaml risk.max_daily_loss
+    total_drawdown_limit      0.15      0.10~0.20           config.yaml risk.max_drawdown 기반
+    atr_surge_multiplier      2.0       1.5~3.0             BTC 1h ATR 평균 ~1.5%, surge ≥ 3%
+    flash_crash_pct           0.10      0.08~0.15           config.yaml risk.flash_crash_pct
+    rapid_decline_pct         0.05      0.03~0.07           5분봉 기준; 1h봉이면 0.05 적정
+    rapid_decline_window      5         3~10                캔들 수, timeframe에 비례
+    rapid_decline_cooldown    30        10~60               캔들 단위, 5분봉=2.5h, 1h봉=30h
+    max_consecutive_losses    5         3~7                 config.yaml risk.max_consecutive_losses
+    cooldown_periods          3         2~5                 트레이드 횟수 단위
+    max_daily_trades          0         0(무제한)~50        과매매 방지, 0=무제한
+    corr_threshold            0.7       0.5~0.8             전략 다양성에 따라 조절
+
+    NOTE: 위 기본값은 Bybit BTC/USDT 실데이터 백테스트에서 검증됨.
+    합성 데이터와 실데이터 간 차이가 클 수 있으므로, 새 심볼/timeframe
+    적용 시 반드시 해당 데이터로 재검증할 것.
+    config.yaml의 risk 섹션에서 오버라이드 가능한 항목은 위 비고 참조.
+    """
+
     def __init__(
         self,
-        daily_drawdown_limit: float = 0.03,   # -3% 일일 낙폭 (config max_daily_loss)
-        total_drawdown_limit: float = 0.15,   # -15% 전체 낙폭
-        atr_surge_multiplier: float = 2.0,    # 현재 ATR ≥ baseline * 2.0 → 변동성 급등
-        corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소
-        flash_crash_pct: float = 0.10,        # 단일 캔들 10% 이상 변동 → 즉시 차단
-        max_consecutive_losses: int = 5,      # 연속 손실 한계
-        cooldown_periods: int = 3,            # 쿨다운 기간 (트레이드 횟수 단위)
-        max_daily_trades: int = 0,            # 일일 최대 거래 횟수 (0=무제한)
+        daily_drawdown_limit: float = 0.03,   # config.yaml risk.max_daily_loss (BTC 1h: 0.02~0.05)
+        total_drawdown_limit: float = 0.15,   # config.yaml risk.max_drawdown 기반 (0.10~0.20)
+        atr_surge_multiplier: float = 2.0,    # ATR surge 배수 (BTC 1h: 1.5~3.0)
+        corr_threshold: float = 0.7,          # 전략 상관계수 ≥ 0.7 → 축소 (0.5~0.8)
+        flash_crash_pct: float = 0.10,        # config.yaml risk.flash_crash_pct (0.08~0.15)
+        max_consecutive_losses: int = 5,      # config.yaml risk.max_consecutive_losses (3~7)
+        cooldown_periods: int = 3,            # 쿨다운 기간 (2~5 트레이드)
+        max_daily_trades: int = 0,            # 일일 최대 거래 횟수 (0=무제한, ~50)
         correlation_tracker: Optional[SignalCorrelationTracker] = None,
-        rapid_decline_pct: float = 0.05,      # 최근 N캔들 내 하락 ≥ 5% → 신규 진입 중단
-        rapid_decline_window: int = 5,        # 급속 하락 감지 캔들 수 (기본 5분봉 기준 5개)
-        rapid_decline_cooldown_periods: int = 30,  # 급속 하락 후 신규 진입 중단 기간 (캔들 단위)
+        rapid_decline_pct: float = 0.05,      # 급속 하락 임계 (BTC 1h: 0.03~0.07)
+        rapid_decline_window: int = 5,        # 급속 하락 감지 캔들 수 (3~10)
+        rapid_decline_cooldown_periods: int = 30,  # 급속 하락 후 쿨다운 캔들 수 (10~60)
     ):
         self.daily_drawdown_limit = daily_drawdown_limit
         self.total_drawdown_limit = total_drawdown_limit

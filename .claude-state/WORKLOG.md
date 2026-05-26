@@ -1,5 +1,38 @@
 # Work Log
 
+## [2026-05-26] Cycle 214 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[C] 데이터 — Block Bootstrap 합성데이터 생성기 추가:**
+- `scripts/quality_audit.py`: `make_block_bootstrap_data()` 함수 추가 (~120줄)
+- seed_df에서 로그수익률+OHLC비율+볼륨을 블록 단위로 무작위 추출하여 이어붙임
+- 변동성 군집(ARCH 효과)과 자기상관 보존 (GBM 대비 실데이터 특성 모사 우월)
+- 기존 `make_synthetic_data()` (GBM)과 동일 출력 형태, 병행 사용 가능
+- 테스트 14개 추가 (14/14 PASS)
+
+**[B] 리스크 — VaR 소표본 경고 + CircuitBreaker config 확장:**
+- PortfolioOptimizer: `_compute_var_cvar()` 3-tuple 반환 (var, cvar, low_sample_warning)
+  - T < 30 시 WARNING 로그 + OptimizationResult에 low_sample_warning 필드
+- CircuitBreaker: atr_surge_multiplier, rapid_decline_pct/window/cooldown 4개 파라미터를 config.yaml에서 조정 가능하도록 추가
+- 임계값 권장 범위 docstring 문서화 (합성/실데이터 차이 주의사항 포함)
+- 테스트 7개 추가 (302 risk 테스트 전체 PASS)
+
+**[SIM] run_bundle_oos.py Rank Score 통합:**
+- `src/backtest/report.py`: compute_rank_scores() 공유 모듈로 추출
+- paper_simulation.py: 로컬 함수 → report.py import로 리팩토링
+- run_bundle_oos.py: bundle_results_to_rank_dicts() + compute_bundle_rank_scores() 추가
+  - 리포트에 "Composite Rank Score" 섹션 추가, 콘솔에 Score/Percentile 표시
+- 테스트 6개 추가 (31 SIM 테스트 전체 PASS)
+
+**[F] 리서치 — CPCV + Block Bootstrap 벤치마크 + 전략 선별:**
+- CPCV 구현 가이드: N=6,k=2 → 15개 경로, PBO 측정 가능, embargo 필수
+  - 우리 WalkForwardOptimizer에 run_cpcv() 추가 가능 (200~300줄, mlfinlab 불필요)
+- Block Bootstrap vs GBM: 자기상관+ARCH+fat tail 보존, 블록 크기 1h BTC: 20~50 candles
+  - Politis-White 자동 선택법 또는 N^(1/3) 규칙
+- 전략 선별: BH(Benjamini-Hochberg) 보정으로 FDR 5% 제어, Harvey-Liu Haircut Sharpe 적용 시 N=355에서 Sharpe≥1.3 필요
+- 액션아이템: CPCV 구현, BH 보정 스크리닝, Stationary Block Bootstrap
+
+---
+
 ## [2026-05-26] Cycle 213 — C(데이터) + B(리스크) + SIM + F(리서치) [세션 A]
 
 **[C] 데이터 — volume_breakout ATR 필터 버그 수정 (핵심 fix):**
@@ -15735,6 +15768,210 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-26 13:44 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 13:50 UTC] Cycle 214 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-26 13:54 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-26 13:54 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 13:54 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 14:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-26 14:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 14:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 14:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-26 14:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-26 14:24 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

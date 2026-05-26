@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 
 from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+from src.backtest.report import compute_rank_scores
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,6 +207,51 @@ def load_strategy(module_name: str, class_name: str):
     return cls()
 
 
+def bundle_results_to_rank_dicts(
+    results: list[tuple[str, BundleOOSResult]],
+) -> list[dict]:
+    """BundleOOSResult 리스트를 compute_rank_scores()가 받는 dict 리스트로 변환.
+
+    매핑:
+      avg_sharpe       <- avg_oos_sharpe
+      avg_profit_factor <- avg_oos_pf
+      avg_trades       <- fold별 oos_trades 평균
+      avg_max_dd       <- fold별 oos_mdd 평균
+      consistency_score <- passed fold 비율
+      sharpe_std       <- oos_sharpe_std
+    """
+    dicts: list[dict] = []
+    for name, r in results:
+        if r.folds:
+            avg_trades = sum(f.oos_trades for f in r.folds) / len(r.folds)
+            avg_mdd = sum(f.oos_mdd for f in r.folds) / len(r.folds)
+            consistency = sum(1 for f in r.folds if f.passed) / len(r.folds)
+        else:
+            avg_trades = 0.0
+            avg_mdd = 0.0
+            consistency = 0.0
+        dicts.append({
+            "name": name,
+            "avg_sharpe": r.avg_oos_sharpe,
+            "avg_profit_factor": r.avg_oos_pf,
+            "avg_trades": avg_trades,
+            "avg_max_dd": avg_mdd,
+            "consistency_score": consistency,
+            "sharpe_std": r.oos_sharpe_std,
+            # 원본 참조용
+            "_bundle_result": r,
+        })
+    return dicts
+
+
+def compute_bundle_rank_scores(
+    results: list[tuple[str, BundleOOSResult]],
+) -> list[dict]:
+    """Bundle OOS 결과에 rank_score/percentile 부여 후 dict 리스트 반환."""
+    dicts = bundle_results_to_rank_dicts(results)
+    return compute_rank_scores(dicts)
+
+
 def format_summary_table(results: list[tuple[str, BundleOOSResult]]) -> str:
     """결과를 Markdown 테이블로 포맷."""
     header = (
@@ -370,6 +416,35 @@ def generate_report(
     lines.append(f"\n**PASS: {len(passed)}/5** ({', '.join(passed) if passed else 'none'})")
     lines.append(f"**FAIL: {len(failed)}/5** ({', '.join(failed) if failed else 'none'})\n")
 
+    # 상대 순위 (Composite Rank Score)
+    if len(results) >= 2:
+        ranked = compute_bundle_rank_scores(results)
+        ranked.sort(key=lambda x: x.get("rank_score", 0), reverse=True)
+        lines.append("## Composite Rank Score\n")
+        lines.append(
+            "_점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) "
+            "+ Consistency(10%) + Sharpe안정성(10%)_\n"
+        )
+        lines.append(
+            "| Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | "
+            "OOS PF | Avg Trades | Avg MDD | Consist | Pass |"
+        )
+        lines.append(
+            "|------|----------|-------|------|------------|-----------|"
+            "-------|------------|---------|---------|------|"
+        )
+        for i, rd in enumerate(ranked, 1):
+            br = rd["_bundle_result"]
+            p = "PASS" if br.all_passed else "FAIL"
+            lines.append(
+                f"| {i} | {rd['name']} | {rd.get('rank_score', 0):.1f} | "
+                f"{rd.get('percentile', '?')} | {rd['avg_sharpe']:.3f} | "
+                f"{rd.get('sharpe_std', 0):.3f} | {rd['avg_profit_factor']:.3f} | "
+                f"{rd['avg_trades']:.1f} | {rd['avg_max_dd']:.2%} | "
+                f"{rd['consistency_score']:.0%} | {p} |"
+            )
+        lines.append("")
+
     # IS 음수 진단 섹션
     lines.append(format_is_diagnosis(results))
 
@@ -413,9 +488,15 @@ def main():
     print(format_summary_table(results))
     print()
 
+    # Rank score 계산
+    ranked = compute_bundle_rank_scores(results) if len(results) >= 2 else []
+    rank_map = {rd["name"]: rd for rd in ranked}
+
     for name, r in results:
         verdict = "PASS" if r.all_passed else "FAIL"
-        print(f"  {name:20s} — {verdict} (WFE={r.avg_wfe:.3f}, Sharpe={r.avg_oos_sharpe:.3f})")
+        rd = rank_map.get(name, {})
+        score_str = f", Score={rd.get('rank_score', 0):.1f} ({rd.get('percentile', '?')})" if rd else ""
+        print(f"  {name:20s} — {verdict} (WFE={r.avg_wfe:.3f}, Sharpe={r.avg_oos_sharpe:.3f}{score_str})")
     print()
 
     passed_count = sum(1 for _, r in results if r.all_passed)

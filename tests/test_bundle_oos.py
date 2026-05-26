@@ -288,7 +288,133 @@ def test_run_bundle_oos_imports():
         format_summary_table,
         format_fold_detail,
         generate_report,
+        compute_bundle_rank_scores,
+        bundle_results_to_rank_dicts,
     )
 
     assert len(BUNDLE_STRATEGIES) == 5
     assert BUNDLE_STRATEGIES[0] == ("cmf", "CMFStrategy")
+
+
+# ── Bundle Rank Score 테스트 ──────────────────────────────────
+
+
+def _make_fold(fold_id=0, is_sharpe=1.0, oos_sharpe=0.8, wfe=0.6,
+               oos_pf=1.5, oos_trades=10, is_mdd=0.05, oos_mdd=0.08,
+               passed=True):
+    return OOSFoldResult(
+        fold_id=fold_id, is_sharpe=is_sharpe, oos_sharpe=oos_sharpe,
+        is_mdd=is_mdd, oos_mdd=oos_mdd, wfe=wfe, oos_pf=oos_pf,
+        oos_trades=oos_trades, passed=passed, fail_reasons=[],
+    )
+
+
+def test_bundle_results_to_rank_dicts_mapping():
+    """BundleOOSResult -> dict 변환이 올바른 키를 포함."""
+    from scripts.run_bundle_oos import bundle_results_to_rank_dicts
+
+    folds = [_make_fold(0, oos_trades=10, oos_mdd=0.05, passed=True),
+             _make_fold(1, oos_trades=20, oos_mdd=0.10, passed=False)]
+    r = BundleOOSResult(
+        strategy_name="test", folds=folds, avg_wfe=0.6,
+        avg_oos_sharpe=1.2, avg_oos_pf=1.8,
+        all_passed=False, fail_reasons=[], oos_sharpe_std=0.15,
+    )
+    dicts = bundle_results_to_rank_dicts([("test", r)])
+    assert len(dicts) == 1
+    d = dicts[0]
+    assert d["name"] == "test"
+    assert d["avg_sharpe"] == 1.2
+    assert d["avg_profit_factor"] == 1.8
+    assert d["avg_trades"] == 15.0  # (10+20)/2
+    assert abs(d["avg_max_dd"] - 0.075) < 1e-9  # (0.05+0.10)/2
+    assert d["consistency_score"] == 0.5  # 1/2 passed
+    assert d["sharpe_std"] == 0.15
+
+
+def test_bundle_results_to_rank_dicts_empty_folds():
+    """fold가 없는 경우 기본값 0."""
+    from scripts.run_bundle_oos import bundle_results_to_rank_dicts
+
+    r = BundleOOSResult(
+        strategy_name="empty", folds=[], avg_wfe=0.0,
+        avg_oos_sharpe=0.0, avg_oos_pf=0.0,
+        all_passed=False, fail_reasons=["데이터 부족"],
+    )
+    dicts = bundle_results_to_rank_dicts([("empty", r)])
+    assert dicts[0]["avg_trades"] == 0.0
+    assert dicts[0]["avg_max_dd"] == 0.0
+    assert dicts[0]["consistency_score"] == 0.0
+
+
+def test_compute_bundle_rank_scores_two_strategies():
+    """두 전략의 rank_score가 올바르게 계산."""
+    from scripts.run_bundle_oos import compute_bundle_rank_scores
+
+    good_folds = [_make_fold(0, oos_sharpe=2.0, oos_pf=3.0, oos_trades=50,
+                             oos_mdd=0.03, passed=True)]
+    bad_folds = [_make_fold(0, oos_sharpe=-0.5, oos_pf=0.5, oos_trades=5,
+                            oos_mdd=0.30, passed=False)]
+    good = BundleOOSResult(
+        strategy_name="good", folds=good_folds, avg_wfe=0.8,
+        avg_oos_sharpe=2.0, avg_oos_pf=3.0,
+        all_passed=True, fail_reasons=[], oos_sharpe_std=0.1,
+    )
+    bad = BundleOOSResult(
+        strategy_name="bad", folds=bad_folds, avg_wfe=0.2,
+        avg_oos_sharpe=-0.5, avg_oos_pf=0.5,
+        all_passed=False, fail_reasons=["low WFE"], oos_sharpe_std=1.5,
+    )
+    ranked = compute_bundle_rank_scores([("good", good), ("bad", bad)])
+    assert len(ranked) == 2
+
+    good_d = next(d for d in ranked if d["name"] == "good")
+    bad_d = next(d for d in ranked if d["name"] == "bad")
+    assert good_d["rank_score"] > bad_d["rank_score"]
+    assert 0 <= good_d["rank_score"] <= 100
+    assert 0 <= bad_d["rank_score"] <= 100
+    assert "percentile" in good_d
+    assert "percentile" in bad_d
+
+
+def test_compute_bundle_rank_scores_single():
+    """전략 1개면 score=50."""
+    from scripts.run_bundle_oos import compute_bundle_rank_scores
+
+    folds = [_make_fold(0)]
+    r = BundleOOSResult(
+        strategy_name="solo", folds=folds, avg_wfe=0.5,
+        avg_oos_sharpe=1.0, avg_oos_pf=1.5,
+        all_passed=True, fail_reasons=[],
+    )
+    ranked = compute_bundle_rank_scores([("solo", r)])
+    assert len(ranked) == 1
+    assert ranked[0]["rank_score"] == 50.0
+    assert ranked[0]["percentile"] == "p50"
+
+
+def test_generate_report_includes_rank_section():
+    """리포트에 Composite Rank Score 섹션이 포함."""
+    from scripts.run_bundle_oos import generate_report
+
+    folds_a = [_make_fold(0, oos_sharpe=1.5, oos_pf=2.0)]
+    folds_b = [_make_fold(0, oos_sharpe=0.5, oos_pf=1.0)]
+    results = [
+        ("strat_a", BundleOOSResult(
+            strategy_name="strat_a", folds=folds_a, avg_wfe=0.7,
+            avg_oos_sharpe=1.5, avg_oos_pf=2.0,
+            all_passed=True, fail_reasons=[], oos_sharpe_std=0.1,
+        )),
+        ("strat_b", BundleOOSResult(
+            strategy_name="strat_b", folds=folds_b, avg_wfe=0.3,
+            avg_oos_sharpe=0.5, avg_oos_pf=1.0,
+            all_passed=False, fail_reasons=["low WFE"], oos_sharpe_std=0.5,
+        )),
+    ]
+    report = generate_report(results, "BTC/USDT", "4h")
+    assert "Composite Rank Score" in report
+    assert "strat_a" in report
+    assert "strat_b" in report
+    # 점수가 포함되어야 함
+    assert "Score" in report
+    assert "Pctl" in report

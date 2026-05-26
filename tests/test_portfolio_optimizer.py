@@ -187,13 +187,15 @@ def test_var_cvar_small_sample_boundary():
     """
     rng = np.random.default_rng(7)
     r = rng.normal(0.0, 0.01, 20)
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    var, cvar, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
     # 경계에서 CVaR >= VaR 관계 유지
     assert cvar >= var - 1e-12
     # VaR은 실제 최솟값의 음수여야 함 (cutoff_idx=1 → sorted_r[0])
     sorted_r = np.sort(r)
     expected_var = max(0.0, -float(sorted_r[0]))
     assert abs(var - expected_var) < 1e-12
+    # T=20 < 30 → 소표본 경고
+    assert low_warn is True
 
 
 def test_var_cvar_all_positive_returns():
@@ -202,18 +204,20 @@ def test_var_cvar_all_positive_returns():
     T>=30이면 historical만 사용 → VaR=0."""
     # T=50 (>=30): parametric 보정 미적용 → historical VaR=0
     r_large = np.linspace(0.003, 0.02, 50)
-    var_l, cvar_l = PortfolioOptimizer._compute_var_cvar(r_large, confidence=0.95)
+    var_l, cvar_l, low_warn_l = PortfolioOptimizer._compute_var_cvar(r_large, confidence=0.95)
     assert var_l == 0.0
     assert cvar_l == 0.0
+    assert low_warn_l is False  # T=50 >= 30
 
     # T=20 (<30): parametric 보정 적용 → VaR >= 0 (보수적)
     r_small = np.array([0.01, 0.02, 0.03, 0.005, 0.015, 0.008, 0.012, 0.007,
                         0.011, 0.009, 0.014, 0.006, 0.013, 0.016, 0.004,
                         0.018, 0.019, 0.003, 0.017, 0.010])
-    var_s, cvar_s = PortfolioOptimizer._compute_var_cvar(r_small, confidence=0.95)
+    var_s, cvar_s, low_warn_s = PortfolioOptimizer._compute_var_cvar(r_small, confidence=0.95)
     assert var_s >= 0.0
     assert cvar_s >= 0.0
     assert cvar_s >= var_s - 1e-12  # CVaR >= VaR 유지
+    assert low_warn_s is True  # T=20 < 30
 
 
 # ── Boundary: zero correlation, all-NaN, single data point ───────────────────
@@ -294,13 +298,14 @@ def test_var_cvar_minimum_data_boundary():
     경계 조건: 데이터 2개일 때 VaR >= historical VaR, CVaR >= VaR 유지.
     """
     r = np.array([-0.05, 0.03])  # 손실 -5%, 수익 +3%
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    var, cvar, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
     # historical: sorted_r = [-0.05, 0.03], cutoff_idx=1
     # hist_VaR = 0.05, hist_CVaR = 0.05
     # parametric 보정: sigma가 크므로 parametric VaR > 0.05 가능
     assert var >= 0.05 - 1e-12, f"VaR should be >= historical 0.05, got {var}"
     assert cvar >= var - 1e-12, f"CVaR should be >= VaR"
     assert cvar >= 0.05 - 1e-12, f"CVaR should be >= historical 0.05, got {cvar}"
+    assert low_warn is True  # T=2 < 30
 
 
 def test_var_cvar_extreme_loss_tail():
@@ -315,7 +320,8 @@ def test_var_cvar_extreme_loss_tail():
     gains = np.full(95, 0.002)  # 나머지 95개는 소폭 수익
     r = np.concatenate([losses, gains])
 
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    var, cvar, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    assert low_warn is False  # T=100 >= 30
 
     # cutoff_idx = max(1, int(100 * 0.05)) = 5
     # sorted_r[:5] = [-0.10, -0.09, -0.08, -0.07, -0.06]
@@ -350,7 +356,8 @@ def test_small_sample_uses_conservative_var():
     """T < 30: parametric 보정으로 historical보다 보수적(크거나 같은) VaR 산출."""
     rng = np.random.default_rng(7)
     r = rng.normal(-0.005, 0.02, 15)  # 작은 표본, 약간의 손실 경향
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    var, cvar, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    assert low_warn is True  # T=15 < 30
 
     # historical만으로 계산
     sorted_r = np.sort(r)
@@ -366,7 +373,8 @@ def test_large_sample_no_parametric_override():
     rng = np.random.default_rng(42)
     r = rng.normal(0.001, 0.01, 500)
 
-    var, cvar = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    var, cvar, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+    assert low_warn is False  # T=500 >= 30
 
     # 직접 historical 계산
     sorted_r = np.sort(r)
@@ -394,7 +402,7 @@ class TestVaRBacktestValidation:
         total = 0
         for i in range(lookback, n):
             window = returns[i - lookback:i]
-            var, _ = PortfolioOptimizer._compute_var_cvar(window, confidence=confidence)
+            var, _, _ = PortfolioOptimizer._compute_var_cvar(window, confidence=confidence)
             actual_loss = -returns[i]  # 음수 수익률 → 양수 손실
             if actual_loss > var:
                 exceedances += 1
@@ -463,7 +471,7 @@ class TestVaRBacktestValidation:
         """
         rng = np.random.default_rng(0)
         r = rng.normal(0.0, 0.01, 200)
-        var, _ = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+        var, _, _ = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
 
         # in-sample 초과: 실제 손실(-r) > var
         losses = -r
@@ -642,7 +650,7 @@ class TestScipyFallbackVarCvar:
         r = rng.normal(-0.005, 0.02, 30)
 
         # scipy 경로 (기본)
-        var_scipy, cvar_scipy = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+        var_scipy, cvar_scipy, _ = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
 
         # numpy fallback: historical 부분은 동일, parametric 부분만 다름
         # parametric 차이 확인
@@ -662,3 +670,67 @@ class TestScipyFallbackVarCvar:
             assert cvar >= var - 1e-12, (
                 f"seed={seed}: CVaR {cvar:.6f} < VaR {var:.6f} in numpy fallback"
             )
+
+
+# ── VaR/CVaR 소표본 경고 (low_sample_warning) 테스트 ─────────────────────────
+
+def test_low_sample_warning_true_below_30():
+    """T < 30 → low_sample_warning=True."""
+    rng = np.random.default_rng(42)
+    for t in [5, 10, 20, 29]:
+        r = rng.normal(0.0, 0.01, t)
+        _, _, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+        assert low_warn is True, f"T={t}: expected low_sample_warning=True"
+
+
+def test_low_sample_warning_false_at_30():
+    """T >= 30 → low_sample_warning=False."""
+    rng = np.random.default_rng(42)
+    for t in [30, 50, 100, 500]:
+        r = rng.normal(0.0, 0.01, t)
+        _, _, low_warn = PortfolioOptimizer._compute_var_cvar(r, confidence=0.95)
+        assert low_warn is False, f"T={t}: expected low_sample_warning=False"
+
+
+def test_low_sample_warning_empty_returns():
+    """빈 배열 → low_sample_warning=False (데이터 없음)."""
+    _, _, low_warn = PortfolioOptimizer._compute_var_cvar(np.array([]), confidence=0.95)
+    assert low_warn is False
+
+
+def test_optimization_result_low_sample_warning_small_data():
+    """OptimizationResult.low_sample_warning: 소표본 데이터 시 True."""
+    rng = np.random.default_rng(42)
+    data = {
+        "BTC": pd.Series(rng.normal(0.001, 0.01, 20)),
+        "ETH": pd.Series(rng.normal(0.001, 0.015, 20)),
+    }
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(data)
+    assert result.low_sample_warning is True
+
+
+def test_optimization_result_low_sample_warning_large_data():
+    """OptimizationResult.low_sample_warning: 충분한 데이터 시 False."""
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(make_returns(n_periods=500))
+    assert result.low_sample_warning is False
+
+
+def test_summary_contains_low_sample_warning_when_true():
+    """low_sample_warning=True일 때 summary()에 경고 문자열 포함."""
+    rng = np.random.default_rng(42)
+    data = {
+        "BTC": pd.Series(rng.normal(0.001, 0.01, 20)),
+        "ETH": pd.Series(rng.normal(0.001, 0.015, 20)),
+    }
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(data)
+    assert "LOW_SAMPLE_WARNING" in result.summary()
+
+
+def test_summary_no_warning_when_false():
+    """low_sample_warning=False일 때 summary()에 경고 문자열 미포함."""
+    opt = PortfolioOptimizer(method="equal_weight")
+    result = opt.optimize(make_returns(n_periods=500))
+    assert "LOW_SAMPLE_WARNING" not in result.summary()
