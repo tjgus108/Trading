@@ -1,5 +1,39 @@
 # Work Log
 
+## [2026-05-28] Cycle 222 — B(리스크) + D(ML) + SIM + F(리서치)
+
+**[B] 리스크 — FullCircuitBreakerAdapter orchestrator 주입:**
+- `src/orchestrator.py`: `_build_risk()`에 `FullCircuitBreakerAdapter` 주입
+  - circuit_breaker.py 풀버전(rapid_decline, ATR surge, correlation throttle, 연속손실 cooldown, 일일거래제한)을 레거시 인터페이스로 어댑트
+  - try-except fallback: 초기화 실패 시 레거시 CB 자동 전환
+- DrawdownMonitor trailing_stop + KellySizer 연계 검증 → 이미 올바르게 구현됨
+  - CF-VaR 한도 → trailing_stop 50% 축소 순차 적용 (의도된 설계)
+- 테스트: orchestrator 23 + risk_manager 103 + circuit_breaker 120 = 전체 PASS
+
+**[D] ML — paper_simulation fail_reasons + ADWIN 모델 헬스 리포팅:**
+- `scripts/paper_simulation.py`: "FAIL 원인 분석" 섹션 추가
+  - 윈도우별 `fail_reasons` Counter 집계 → 전략별 상위 실패 원인 표시
+  - 전체 FAIL 원인 빈도 상위 10 집계 테이블
+- `scripts/paper_simulation.py`: "ML 모델 건강 상태 (ADWIN)" 섹션 추가
+  - DualGateADWINMonitor로 rsi14, ema_ratio, volatility 드리프트 스냅샷
+  - EWMA Accuracy, Trend, Drift Detection, Retrain 권고 상태 표시
+- 테스트: paper_simulation 16 + drift_detector 72 = 88/88 PASS
+
+**[SIM] 시뮬레이션 결과 (합성 데이터):**
+- 22전략 전부 FAIL (0/4 consistency) — 이전과 동일 패턴
+- 상위: price_action_momentum (Sharpe 6.03, PF 1.75, 154 trades), momentum_quality (Sharpe 5.28, PF 1.74)
+- value_area 파라미터 조정: va_mult 0.7→0.6, vol_filter_mult 0.8→0.7 (trades 부족 해결)
+- narrow_range: MC permutation test에서 탈락 (기본 4항목은 PASS) — 합성데이터 편향 의심
+
+**[F] 리서치 — 트레이딩봇 실패/성공 사례:**
+- 73% 자동화 봇 6개월 내 실패 — 과최적화가 주원인
+- 합성 데이터는 스트레스 테스트용, 실거래소 데이터 없이 전략 판단 불가 (CFA Institute 2025)
+- WFO도 메타-과적합 가능: 여러 fitness function 시도로 좋은 결과 골라내는 행위 자체
+- RegimeGuardedStrategy는 선택 아닌 필수 — 레짐 없는 전략은 플래시크래시에 취약
+- CB 실전 표준: 일 손실 -3~5%, peak 대비 -20% 도달 시 즉시 정지
+
+---
+
 ## [2026-05-27] Cycle 221 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] 품질 — Flaky 테스트 수정 + FullCircuitBreakerAdapter 통합:**
@@ -16916,6 +16950,76 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-27 00:33 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 03:03 UTC] Cycle 222 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-27 14:35 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-27 14:35 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 14:35 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -29,7 +29,7 @@ from src.exchange.connector import ExchangeConnector
 from src.notifier import TelegramNotifier
 from src.pipeline.runner import PipelineResult, TradingPipeline
 from src.position_tracker import Position, PositionTracker
-from src.risk.manager import CircuitBreaker, RiskManager
+from src.risk.manager import CircuitBreaker, FullCircuitBreakerAdapter, RiskManager
 from src.risk.kelly_sizer import KellySizer
 from src.risk.drawdown_monitor import DrawdownMonitor
 from src.risk.portfolio_optimizer import PortfolioOptimizer
@@ -1148,13 +1148,27 @@ class BotOrchestrator:
         self._data_feed = DataFeed(self._connector)
 
     def _build_risk(self) -> None:
-        # Initialize CircuitBreaker with flash crash detection
-        cb = CircuitBreaker(
-            max_daily_loss=self.cfg.risk.max_daily_loss,
-            max_drawdown=self.cfg.risk.max_drawdown,
-            max_consecutive_losses=self.cfg.risk.max_consecutive_losses,
-            flash_crash_pct=self.cfg.risk.flash_crash_pct,
-        )
+        # FullCircuitBreakerAdapter (풀버전 CB → 레거시 인터페이스) 우선 시도,
+        # 실패 시 레거시 CircuitBreaker로 fallback
+        cb = None
+        try:
+            from src.risk.circuit_breaker import CircuitBreaker as FullCB
+            full_cb = FullCB(
+                daily_drawdown_limit=self.cfg.risk.max_daily_loss,
+                total_drawdown_limit=self.cfg.risk.max_drawdown,
+                max_consecutive_losses=self.cfg.risk.max_consecutive_losses,
+                flash_crash_pct=self.cfg.risk.flash_crash_pct,
+            )
+            cb = FullCircuitBreakerAdapter(full_cb, initial_balance=10_000)
+            logger.info("FullCircuitBreakerAdapter initialized (full CB with rapid_decline, ATR surge, correlation throttle)")
+        except Exception as e:
+            logger.warning("FullCircuitBreakerAdapter init failed, falling back to legacy CB: %s", e)
+            cb = CircuitBreaker(
+                max_daily_loss=self.cfg.risk.max_daily_loss,
+                max_drawdown=self.cfg.risk.max_drawdown,
+                max_consecutive_losses=self.cfg.risk.max_consecutive_losses,
+                flash_crash_pct=self.cfg.risk.flash_crash_pct,
+            )
         
         # Initialize KellySizer for dynamic position sizing based on win rate
         kelly_sizer = None

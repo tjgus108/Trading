@@ -328,6 +328,7 @@ def evaluate_strategy_walk_forward(
                 "trades": bt.total_trades,
                 "win_rate": bt.win_rate,
                 "passed": bt.passed,
+                "fail_reasons": list(bt.fail_reasons) if bt.fail_reasons else [],
                 "final_balance": 10_000 * (1 + bt.total_return),
             })
         except Exception as e:
@@ -353,6 +354,16 @@ def evaluate_strategy_walk_forward(
     # 윈도우 간 Sharpe 표준편차 (일관성 보조 지표)
     sharpe_std = float(np.std([wr["sharpe"] for wr in valid])) if len(valid) > 1 else 0.0
 
+    # fail_reasons 집계: 윈도우별 실패 이유를 카운트하여 빈도순 정렬
+    from collections import Counter
+    fail_counter: Counter = Counter()
+    for wr in window_results:
+        for reason in wr.get("fail_reasons", []):
+            # 수치 부분 제거하여 카테고리로 집계 (e.g. "sharpe 0.50 < 1.0" → "sharpe < 1.0")
+            fail_counter[reason] += 1
+    # 빈도순 정렬된 리스트: [(reason, count), ...]
+    top_fail_reasons = fail_counter.most_common()
+
     return {
         "name": name,
         "window_results": window_results,
@@ -368,6 +379,7 @@ def evaluate_strategy_walk_forward(
         "avg_win_rate": avg_wr,
         "avg_final_balance": 10_000 * (1 + avg_return),
         "sharpe_std": sharpe_std,
+        "top_fail_reasons": top_fail_reasons,
     }
 
 
@@ -398,7 +410,7 @@ from src.backtest.report import compute_rank_scores  # noqa: E402
 
 # ── 리포트 ──────────────────────────────────────────────────
 
-def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT", cpcv_result: Optional[dict] = None) -> str:
+def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, windows_count: int, symbol: str = "BTC/USDT", cpcv_result: Optional[dict] = None, model_health: Optional[dict] = None) -> str:
     results.sort(key=lambda x: x["avg_return"], reverse=True)
     lines = []
     lines.append(f"# Paper Trading 시뮬레이션 리포트 — {symbol} (Walk-Forward)\n")
@@ -421,6 +433,30 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
         lines.append(f"| CPCV avg_test_acc | {cpcv_result['avg_test_acc']:.3f} ± {cpcv_result['std_test_acc']:.3f} |")
         lines.append(f"| CPCV folds | {cpcv_result['n_folds']} |")
         lines.append(f"| CPCV 판정 (≥0.55) | {cpcv_status} |")
+        lines.append("")
+
+    # Model Health (ADWIN Drift Monitor)
+    if model_health:
+        trend_emoji = {"improving": "UP", "degrading": "DOWN", "stable": "FLAT", "unknown": "N/A"}
+        trend_str = trend_emoji.get(model_health.get("ewma_trend", "unknown"), "N/A")
+        lines.append("## ML 모델 건강 상태 (ADWIN)\n")
+        lines.append("| 항목 | 값 |")
+        lines.append("|------|-----|")
+        lines.append(f"| EWMA Accuracy | {model_health.get('ewma_accuracy', 0):.4f} |")
+        lines.append(f"| EWMA Trend | {trend_str} ({model_health.get('ewma_trend', 'unknown')}) |")
+        lines.append(f"| EWMA Samples | {model_health.get('ewma_n', 0)} |")
+        lines.append(f"| Drift Detected | {'YES' if model_health.get('drift_detected') else 'NO'} |")
+        lines.append(f"| Output Drift | {'YES' if model_health.get('output_drift') else 'NO'} |")
+        lines.append(f"| Retrain Recommended (EWMA) | {'YES' if model_health.get('should_retrain_by_ewma') else 'NO'} |")
+        lines.append(f"| Retrain Recommended (ADWIN) | {'YES' if model_health.get('should_retrain') else 'NO'} |")
+        lines.append(f"| Retrain Count | {model_health.get('retrain_count', 0)} |")
+        # Feature drift details
+        feat_drift = model_health.get("feature_drift", {})
+        if feat_drift:
+            drifted = [k for k, v in feat_drift.items() if v]
+            lines.append(f"| Feature Drift | {len(drifted)}/{len(feat_drift)} features drifted |")
+            if drifted:
+                lines.append(f"| Drifted Features | {', '.join(drifted[:10])} |")
         lines.append("")
 
     # 요약
@@ -484,6 +520,33 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
         )
     lines.append("")
 
+    # FAIL 원인 분석
+    failed_results = [r for r in results if not r["overall_passed"] and r.get("top_fail_reasons")]
+    if failed_results:
+        lines.append("## FAIL 원인 분석\n")
+        lines.append("| Strategy | Top Fail Reasons (reason x count) |")
+        lines.append("|----------|-----------------------------------|")
+        for r in failed_results[:20]:  # 상위 20개만 표시
+            reasons_str = ", ".join(
+                f"{reason} (x{cnt})" for reason, cnt in r["top_fail_reasons"][:3]
+            )
+            lines.append(f"| `{r['name']}` | {reasons_str} |")
+        lines.append("")
+
+        # 전체 FAIL 전략의 공통 실패 원인 집계
+        from collections import Counter as _Counter
+        global_fail_counter: _Counter = _Counter()
+        for r in results:
+            for reason, cnt in r.get("top_fail_reasons", []):
+                global_fail_counter[reason] += cnt
+        if global_fail_counter:
+            lines.append("### 전체 FAIL 원인 빈도 (상위 10)\n")
+            lines.append("| Fail Reason | Total Count |")
+            lines.append("|-------------|-------------|")
+            for reason, cnt in global_fail_counter.most_common(10):
+                lines.append(f"| {reason} | {cnt} |")
+            lines.append("")
+
     # 포트폴리오
     if results:
         passed_strats = [r for r in results if r["overall_passed"]]
@@ -530,6 +593,7 @@ def export_results_json(all_symbol_results: Dict[str, List[dict]], metadata: dic
                 "sharpe_std": round(r.get("sharpe_std", 0.0), 4),
                 "rank_score": r.get("rank_score", 0.0),
                 "percentile": r.get("percentile", ""),
+                "top_fail_reasons": r.get("top_fail_reasons", []),
                 "window_results": r["window_results"],
             }
             symbol_data.append(entry)
@@ -664,8 +728,33 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     else:
         print(f"[{symbol}][CPCV] N/A (데이터 부족 또는 ML 학습 실패)", flush=True)
 
+    # Model Health (ADWIN drift monitor) — DualGateADWINMonitor로 피처 드리프트 스냅샷
+    model_health = None
+    try:
+        from src.ml.drift_detector import DualGateADWINMonitor
+        monitor = DualGateADWINMonitor(delta=0.05, feature_names=["rsi14", "ema_ratio", "volatility"])
+        # 최근 데이터로 피처 값 주입 (마지막 200봉)
+        tail = df.tail(200)
+        for _, row in tail.iterrows():
+            feats = {}
+            if "rsi14" in row and not np.isnan(row["rsi14"]):
+                feats["rsi14"] = float(row["rsi14"])
+            if "ema20" in row and "ema50" in row and row["ema50"] != 0:
+                feats["ema_ratio"] = float(row["ema20"] / row["ema50"])
+            if "atr14" in row and "close" in row and row["close"] != 0:
+                feats["volatility"] = float(row["atr14"] / row["close"])
+            if feats:
+                monitor.update(feature_values=feats)
+        model_health = monitor.get_model_health()
+        trend = model_health.get("ewma_trend", "unknown")
+        drift = model_health.get("drift_detected", False)
+        print(f"[{symbol}][MODEL_HEALTH] trend={trend}, drift={'YES' if drift else 'NO'}, "
+              f"ewma_acc={model_health.get('ewma_accuracy', 0):.4f}", flush=True)
+    except Exception as e:
+        print(f"[{symbol}][MODEL_HEALTH] N/A ({type(e).__name__}: {str(e)[:60]})", flush=True)
+
     report = generate_report(results, data_source, df, len(windows), symbol=symbol,
-                             cpcv_result=cpcv_result)
+                             cpcv_result=cpcv_result, model_health=model_health)
     return report, results
 
 

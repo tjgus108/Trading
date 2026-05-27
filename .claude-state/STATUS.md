@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-05-27 (Cycle 220)_
+_Last updated: 2026-05-28 (Cycle 222)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -18,20 +18,21 @@ _Last updated: 2026-05-27 (Cycle 220)_
 - **OOS 인프라**: run_bundle_oos.py — 5-Bundle Rolling OOS + **Rank Score** 리포트
 - **SIM 랭킹**: Composite Rank Score (6지표 가중합산) — paper_simulation + **bundle_oos** 양쪽 적용
 
-## 최근 작업 (Cycle 220)
+## 최근 작업 (Cycle 222)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
-| D (ML) | ✅ | should_retrain_by_ewma() + get_model_health() (재학습 트리거 + 모델 상태 요약) |
-| E (실행) | ✅ | orchestrator CF-VaR 주입 + 15분 윈도우 Flash Crash Detection (60캔들 cooldown) |
-| SIM | ✅ | value_area std_floor 도입 + vol_filter 완화 → SharpeStd 안정화 |
-| F (리서치) | ✅ | 레짐 필터 래퍼 패턴, 플래시크래시 단계적 축소, circuit_breaker.py 미연결 발견 |
+| B (리스크) | ✅ | orchestrator에 FullCircuitBreakerAdapter 주입 (레거시 fallback), trailing_stop+Kelly 연계 검증 OK |
+| D (ML) | ✅ | paper_simulation fail_reasons 리포트 + ADWIN 모델 헬스 섹션 추가 |
+| SIM | ✅ | 22전략 FAIL 유지, value_area va_mult 0.6+vol_filter 0.7 조정, narrow_range MC편향 발견 |
+| F (리서치) | ✅ | 73% 봇 6개월 실패, 합성데이터 한계(CFA 2025), RegimeGuardedStrategy 필수 |
 
 ## 주요 리스크/이슈
 - ⚠️ 실데이터 PASS 전략 0개
 - ✅ RiskManager CF-VaR 체인 완성 + orchestrator 주입 완료
 - ✅ Flash Crash 15분 윈도우 보호 추가
 - ✅ value_area SharpeStd 안정화 + narrow_range 신호 빈도 개선
-- ⚠️ circuit_breaker.py 강화 버전 → RiskManager 미연결 (통합 필요)
+- ✅ circuit_breaker.py 강화 버전 → orchestrator FullCircuitBreakerAdapter 주입 완료
 - ⚠️ 볼륨 단위 불일치: Binance(base) vs Bybit(quote)
 - ⚠️ Paper→Live 갭: BTC 0.05%, 중형 0.2%, 소형 1.0% 슬리피지
-- 🆕 다음: RegimeGuardedStrategy 래퍼, circuit_breaker.py 통합, 실데이터 검증
+- ⚠️ MC permutation test 합성데이터 편향 의심 (narrow_range 기본항목 PASS → MC FAIL)
+- 🆕 다음: RegimeGuardedStrategy 래퍼, 실데이터 검증 파이프라인, MC test 편향 조사

@@ -16,13 +16,13 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _MIN_ROWS = 55
 _VA_PERIOD = 20
-_VA_MULT = 0.7
+_VA_MULT = 0.6  # 0.7→0.6: VA 밴드 약간 좁힘 → 이탈/재진입 빈도 증가 (trades 14→15+ 목표)
 _HIGH_CONF_MULT = 0.3
 _EMA_SHORT = 20
 _EMA_LONG = 50
 _MIN_BREACH = 1.5  # 최소 breach width: std * 1.5
 _STD_FLOOR_PCT = 0.005  # std 하한: close의 0.5% — 횡보장 과잉신호 방지
-_VOL_FILTER_MULT = 0.8  # 거래량 필터: vol_ma * 0.8 이상 (기존 1.0 → 완화)
+_VOL_FILTER_MULT = 0.7  # 거래량 필터: vol_ma * 0.7 이상 (1.0→0.8→0.7: trades 부족 추가 완화)
 
 
 class ValueAreaStrategy(BaseStrategy):
