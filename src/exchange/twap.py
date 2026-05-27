@@ -111,6 +111,8 @@ class TWAPExecutor:
         slice_times: List[float] = []
         start_time = time.time()
 
+        unfilled_qty = 0.0  # 이전 슬라이스에서 체결되지 않은 수량
+        
         for i in range(self.n_slices):
             _slice_t0 = time.time()
             # 타임아웃 체크
@@ -124,6 +126,10 @@ class TWAPExecutor:
                     )
                     timeout_occurred = True
                     break
+            
+            # 이번 슬라이스의 주문량: 계획된 slice_qty + 이전 미체결량
+            current_slice_qty = slice_qty + unfilled_qty
+            unfilled_qty = 0.0  # 초기화 (fill 후에 계산)
 
             if self.dry_run:
                 # 시뮬레이션: price_limit 기준으로 소폭 랜덤 변동
@@ -133,12 +139,14 @@ class TWAPExecutor:
                 filled_prices.append(simulated_price)
                 # 부분 체결 시뮬레이션 (20% 확률)
                 fill_ratio = 1.0 if np.random.random() > 0.2 else np.random.uniform(0.5, 0.99)
-                filled_qty = slice_qty * fill_ratio
+                filled_qty = current_slice_qty * fill_ratio
                 filled_quantities.append(filled_qty)
+                unfilled_qty = current_slice_qty - filled_qty  # 미체결량 저장
+                
                 if fill_ratio < 1.0:
                     partial_fills += 1
                     logger.debug(
-                        "[dry_run] slice %d/%d: PARTIAL %s %s %.6f @ %.4f (%.1f%% filled)",
+                        "[dry_run] slice %d/%d: PARTIAL %s %s %.6f @ %.4f (%.1f%% filled, %.6f unfilled)",
                         i + 1,
                         self.n_slices,
                         side,
@@ -146,6 +154,7 @@ class TWAPExecutor:
                         filled_qty,
                         simulated_price,
                         fill_ratio * 100,
+                        unfilled_qty,
                     )
                 else:
                     logger.debug(
@@ -165,7 +174,7 @@ class TWAPExecutor:
                         result = connector.place_order(
                             symbol=symbol,
                             side=side,
-                            qty=slice_qty,
+                            qty=current_slice_qty,  # 이전 미체결 포함
                             price=price_limit,
                         )
                         if result is None:
@@ -177,27 +186,33 @@ class TWAPExecutor:
                                 i + 1, self.n_slices, filled_price,
                             )
                             filled_price = price_limit or 0.0
-                        filled_qty = result.get("filled", slice_qty)  # 부분 체결 반영
+                        filled_qty = result.get("filled", current_slice_qty)  # 부분 체결 반영
                         filled_prices.append(filled_price)
                         filled_quantities.append(filled_qty)
-
-                        if filled_qty < slice_qty - 1e-8:
+                        
+                        # 미체결량 계산 (다음 슬라이스로 넘길 수량)
+                        unfilled_qty = current_slice_qty - filled_qty
+                        if unfilled_qty > 1e-8:
                             partial_fills += 1
                             logger.warning(
-                                "slice %d/%d PARTIAL: %s @ %.4f (%.1f%% filled)",
+                                "slice %d/%d PARTIAL: %s @ %.4f "
+                                "(requested=%.6f, filled=%.6f, unfilled=%.6f)",
                                 i + 1,
                                 self.n_slices,
                                 symbol,
                                 filled_price,
-                                (filled_qty / slice_qty) * 100,
+                                current_slice_qty,
+                                filled_qty,
+                                unfilled_qty,
                             )
                         else:
                             logger.info(
-                                "slice %d/%d filled: %s @ %.4f",
+                                "slice %d/%d filled: %s @ %.4f (qty=%.6f)",
                                 i + 1,
                                 self.n_slices,
                                 symbol,
                                 filled_price,
+                                filled_qty,
                             )
 
                         # 슬라이스별 타임아웃 체크
@@ -224,13 +239,14 @@ class TWAPExecutor:
                 if not slice_success:
                     errors += 1
                     logger.error(
-                        "slice %d/%d FAILED after %d retries — skipping",
+                        "slice %d/%d FAILED after %d retries — skipping unfilled qty",
                         i + 1, self.n_slices, self.max_retries_per_slice,
                     )
-                    # 실패한 슬라이스는 filled_qty = 0으로 기록
+                    # 실패한 슬라이스는 filled_qty = 0으로 기록, unfilled는 누적
                     if not filled_prices:  # 이번 슬라이스에서 처음 실패
                         filled_prices.append(0.0)
                         filled_quantities.append(0.0)
+                    unfilled_qty = current_slice_qty  # 주문한 수량 전부 미체결로 간주
                 if timeout_occurred:
                     break
 
@@ -238,6 +254,14 @@ class TWAPExecutor:
             # 마지막 슬라이스 후에는 대기 없음
             if i < self.n_slices - 1 and not self.dry_run:
                 time.sleep(self.interval_seconds)
+        
+        # 마지막 슬라이스 후에도 미체결량이 남아있으면 경고
+        if unfilled_qty > 1e-8:
+            logger.warning(
+                "TWAP execution complete but %.6f qty remains unfilled "
+                "(%.2f%% of total %f)",
+                unfilled_qty, (unfilled_qty / total_qty) * 100, total_qty
+            )
 
         # 결과 계산: 수량 가중 평균 가격 (부분 체결 반영)
         if filled_prices and filled_quantities:

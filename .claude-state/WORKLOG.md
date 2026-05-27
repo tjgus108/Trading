@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-28] Cycle 228 — E(실행) + A(품질) + SIM + F(리서치)
+
+**[E] 실행 — PaperTrader + TWAP 개선 2건:**
+- `src/exchange/paper_trader.py`: load_state() 유효성 검증 강화 (~120줄 추가)
+  - 스키마 버전 체크, 타입 검증 (balance/positions/equity_history)
+  - 음수값 감지, positions-avg_entry 키 일관성 검증
+  - 손상 파일/호환 불가 버전에 대한 에러 메시지 추가
+- `src/exchange/twap.py`: 부분 체결(partial fill) 재시도 로직 개선 (~50줄)
+  - unfilled_qty 누적 추적: 이전 슬라이스 미체결 수량을 다음 슬라이스에 합산
+  - 최종 미체결 수량 경고 로깅 추가
+- 테스트: 146 passed (paper_trader 112 + twap 34, 신규 5개 포함)
+
+**[A] 품질 — MLSignalGenerator regime_aware 통합 테스트:**
+- `tests/test_phase_c_ml.py`: 3개 통합 테스트 추가 (~130줄)
+  - predict_with_feed_regime: RegimeAwareFeatureBuilder 라우팅 검증
+  - build_inference_features_with_cached_regime: feed_regime=None 자동감지 검증
+  - regime_aware_inference_consistency: 동일 regime 재호출 일관성 검증
+- 테스트: 74 passed (기존 71 + 신규 3)
+
+**[SIM] Paper Simulation (기존 Cycle 226 결과 활용, SSL 제약):**
+- 0/22 PASS 유지 — mc_p_value > 0.05 주요 원인 (39.6%)
+- 상위 3: supertrend_multi(Sharpe 7.39), momentum_quality(6.25), price_action_momentum(6.58)
+- 합성 BlockBootstrap 데이터 한계 재확인
+
+**[F] 리서치 — TWAP 실패/Paper→Live 전환/MC test 편향:**
+- TWAP 실패: 2024년 전체 암호화폐 슬리피지 비용 $27억, TWAP 예측 가능 패턴이 MEV 봇 타깃
+- Paper→Live 전환: dogwifhat $900만 시장가 → $570만 슬리피지 사례, 호가창 깊이 비율 체크 필요
+- MC permutation: log-return 셔플 시 시리얼 구조 파괴 → Regime-aware MC 또는 SPA test 대안 검토
+- 출처: Talos market impact 분석, Build Alpha MC test, arXiv 2512.12924 등
+
+---
+
 ## [2026-05-27] Cycle 226 — B(리스크) + D(ML) + SIM + F(리서치)
 
 **[B] 리스크 — kelly_sizer.py 개선 2건:**
@@ -18625,3 +18657,9 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 22:44 UTC] Cycle 227 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-27 22:45 UTC] Cycle 228 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

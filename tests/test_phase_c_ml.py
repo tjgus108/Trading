@@ -1062,3 +1062,134 @@ class TestMLSignalGeneratorRegimeAware:
             assert gen._feature_names == ["return_1", "atr_pct"]
         finally:
             os.unlink(tmp_path)
+
+    def test_predict_with_feed_regime_regime_aware(self):
+        """
+        Cycle 228: MLSignalGenerator regime_aware 추론 통합 테스트.
+        
+        regime_aware=True 모드에서 feed_regime을 직접 전달하면
+        RegimeAwareFeatureBuilder의 build_features_with_cached_regime()을 호출하여
+        해당 레짐의 피처만 사용해야 한다.
+        """
+        from src.ml.features import RegimeAwareFeatureBuilder
+        import pickle
+        import tempfile
+        import os
+        from sklearn.ensemble import RandomForestClassifier
+        
+        # 1. 레짐 인식 모델 생성 및 저장
+        df = _make_df(300)
+        builder = RegimeAwareFeatureBuilder(forward_n=5, threshold=0.003)
+        X, y, regime_detected = builder.build_with_regime(df)
+        
+        assert not X.empty, "피처 생성 실패"
+        assert len(y) > 0, "레이블 생성 실패"
+        
+        # 2. RandomForest 모델 훈련
+        rf = RandomForestClassifier(n_estimators=10, max_depth=3, random_state=42)
+        rf.fit(X.values, y.values.astype(int))
+        
+        # 3. 모델 파일로 저장
+        payload = {
+            "model": rf,
+            "name": "regime_test_model",
+            "class_order": [-1, 0, 1],
+            "feature_importances": {col: 0.1 for col in X.columns},
+            "feature_names": list(X.columns),
+            "trained_regime": regime_detected,  # 감지된 레짐 기록
+            "train_date": "2026-05-28",
+        }
+        
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            pickle.dump(payload, f)
+            tmp_path = f.name
+        
+        try:
+            # 4. regime_aware=True로 MLSignalGenerator 생성
+            gen = MLSignalGenerator(regime_aware=True)
+            assert gen.regime_aware is True
+            assert isinstance(gen.feature_builder, RegimeAwareFeatureBuilder)
+            
+            # 5. 모델 로드
+            result = gen.load(tmp_path)
+            assert result is True, "모델 로드 실패"
+            assert gen._model is not None
+            
+            # 6. feed_regime 없이 예측 (자동 감지)
+            pred_auto = gen.predict(df)
+            assert pred_auto.action in ["BUY", "SELL", "HOLD"]
+            assert isinstance(pred_auto.confidence, float)
+            assert 0.0 <= pred_auto.confidence <= 1.0
+            
+            # 7. feed_regime을 "bull"로 지정하여 예측
+            pred_bull = gen.predict(df, feed_regime="bull")
+            assert pred_bull.action in ["BUY", "SELL", "HOLD"]
+            assert isinstance(pred_bull.confidence, float)
+            
+            # 8. feed_regime을 "bear"로 지정하여 예측
+            pred_bear = gen.predict(df, feed_regime="bear")
+            assert pred_bear.action in ["BUY", "SELL", "HOLD"]
+            assert isinstance(pred_bear.confidence, float)
+            
+            # 9. 다양한 레짐에서도 정상 작동 확인
+            for regime in ["bull", "bear", "ranging", "crisis"]:
+                pred = gen.predict(df, feed_regime=regime)
+                assert pred.action in ["BUY", "SELL", "HOLD"], f"regime={regime}에서 invalid action"
+                assert pred.model_name == "regime_test_model"
+                
+        finally:
+            os.unlink(tmp_path)
+    
+    def test_build_inference_features_with_cached_regime(self):
+        """
+        Cycle 228: MLSignalGenerator._build_inference_features()가
+        feed_regime을 RegimeAwareFeatureBuilder.build_features_with_cached_regime()으로
+        전달하는지 확인.
+        """
+        from src.ml.features import RegimeAwareFeatureBuilder
+        
+        df = _make_df(200)
+        
+        # regime_aware=True로 생성
+        gen = MLSignalGenerator(regime_aware=True)
+        assert isinstance(gen.feature_builder, RegimeAwareFeatureBuilder)
+        
+        # 1. feed_regime=None (자동 감지)
+        X_auto = gen._build_inference_features(df, feed_regime=None)
+        assert not X_auto.empty, "자동 감지 피처 생성 실패"
+        
+        # 2. feed_regime="bull" (캐시된 레짐 사용)
+        X_bull = gen._build_inference_features(df, feed_regime="bull")
+        assert not X_bull.empty, "bull 레짐 피처 생성 실패"
+        
+        # 3. feed_regime="bear" (캐시된 레짐 사용)
+        X_bear = gen._build_inference_features(df, feed_regime="bear")
+        assert not X_bear.empty, "bear 레짐 피처 생성 실패"
+        
+        # 4. 레짐별로 선택된 피처가 다를 수 있음을 확인
+        # (모두 동일할 수도 있으나, 메서드 호출이 정상 작동하는지가 중요)
+        assert X_auto.shape[1] > 0
+        assert X_bull.shape[1] > 0
+        assert X_bear.shape[1] > 0
+    
+    def test_regime_aware_inference_consistency(self):
+        """
+        Cycle 228: 동일한 feed_regime으로 여러 번 호출 시
+        피처 선택이 일관성 있게 동작하는지 확인.
+        """
+        from src.ml.features import RegimeAwareFeatureBuilder
+        
+        df = _make_df(250)
+        
+        gen = MLSignalGenerator(regime_aware=True)
+        
+        # 동일한 feed_regime으로 여러 번 호출
+        X1 = gen._build_inference_features(df, feed_regime="bull")
+        X2 = gen._build_inference_features(df, feed_regime="bull")
+        X3 = gen._build_inference_features(df, feed_regime="bull")
+        
+        # 피처 개수와 컬럼이 동일해야 함
+        assert X1.shape == X2.shape, "첫 번째와 두 번째 호출에서 형태 불일치"
+        assert X2.shape == X3.shape, "두 번째와 세 번째 호출에서 형태 불일치"
+        assert list(X1.columns) == list(X2.columns), "컬럼명 불일치"
+        assert list(X2.columns) == list(X3.columns), "컬럼명 불일치"

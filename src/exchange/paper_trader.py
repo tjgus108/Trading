@@ -508,20 +508,107 @@ class PaperTrader:
 
     def load_state(self, state: dict) -> None:
         """저장된 상태를 복원 (재시작 시 사용).
+        
+        저장된 상태 파일이 손상되었거나 스키마가 변경된 경우를 처리:
+        - 빈 dict: 무시
+        - 필수 키 검증: initial_balance, balance는 float 타입 체크
+        - 포지션/avg_entry: dict 타입 체크
+        - 역향 호환성: 누락된 키는 기본값 사용
 
         Args:
             state: save_state()가 반환한 dict
+            
+        Raises:
+            ValueError: 스키마 검증 실패 시 (critical field corruption)
         """
         if not state:
             return
-        self.account.initial_balance = state.get("initial_balance", self.account.initial_balance)
-        self.account.balance = state.get("balance", self.account.balance)
-        self.account.positions = dict(state.get("positions", {}))
-        self.account.avg_entry = dict(state.get("avg_entry", {}))
-        self.account.total_pnl = state.get("total_pnl", 0.0)
-        self.account.equity_history = list(state.get("equity_history", []))
-        self._kelly_adjustments = state.get("kelly_adjustments", 0)
-        self._vol_targeting_adjustments = state.get("vol_targeting_adjustments", 0)
+        
+        # 스키마 버전 체크 (향후 버전 관리용)
+        schema_version = state.get("schema_version", 1)
+        if schema_version > 1:
+            logger.warning(
+                "load_state: schema_version %d not fully supported (current=1), "
+                "attempting best-effort restore", schema_version
+            )
+        
+        # 필수 필드 타입 검증
+        try:
+            initial_balance = state.get("initial_balance", self.account.initial_balance)
+            if not isinstance(initial_balance, (int, float)) or initial_balance < 0:
+                raise ValueError(
+                    f"invalid initial_balance: {initial_balance} "
+                    "(must be non-negative number)"
+                )
+            
+            balance = state.get("balance", self.account.balance)
+            if not isinstance(balance, (int, float)) or balance < 0:
+                raise ValueError(
+                    f"invalid balance: {balance} (must be non-negative number)"
+                )
+            
+            total_pnl = state.get("total_pnl", 0.0)
+            if not isinstance(total_pnl, (int, float)):
+                raise ValueError(
+                    f"invalid total_pnl: {total_pnl} (must be number)"
+                )
+            
+            # 포지션/avg_entry 타입 체크
+            positions_raw = state.get("positions", {})
+            if not isinstance(positions_raw, dict):
+                raise ValueError(
+                    f"invalid positions: expected dict, got {type(positions_raw).__name__}"
+                )
+            
+            avg_entry_raw = state.get("avg_entry", {})
+            if not isinstance(avg_entry_raw, dict):
+                raise ValueError(
+                    f"invalid avg_entry: expected dict, got {type(avg_entry_raw).__name__}"
+                )
+            
+            # equity_history 타입 체크
+            equity_history_raw = state.get("equity_history", [])
+            if not isinstance(equity_history_raw, list):
+                raise ValueError(
+                    f"invalid equity_history: expected list, got {type(equity_history_raw).__name__}"
+                )
+            
+            # 포지션 데이터 일관성 체크: positions와 avg_entry의 심볼이 일치해야 함
+            positions_symbols = set(positions_raw.keys())
+            avg_entry_symbols = set(avg_entry_raw.keys())
+            if positions_symbols != avg_entry_symbols:
+                logger.warning(
+                    "load_state: position/avg_entry symbol mismatch: "
+                    "positions=%s, avg_entry=%s. Using union of both.",
+                    positions_symbols, avg_entry_symbols
+                )
+                # 두 집합의 합집합 사용 (한쪽에만 있는 것도 포함)
+                all_symbols = positions_symbols | avg_entry_symbols
+                positions_raw = {s: positions_raw.get(s, 0.0) for s in all_symbols}
+                avg_entry_raw = {s: avg_entry_raw.get(s, 0.0) for s in all_symbols}
+            
+            # 안전하게 적용
+            self.account.initial_balance = float(initial_balance)
+            self.account.balance = float(balance)
+            self.account.positions = dict(positions_raw)
+            self.account.avg_entry = dict(avg_entry_raw)
+            self.account.total_pnl = float(total_pnl)
+            self.account.equity_history = list(equity_history_raw)
+            self._kelly_adjustments = int(state.get("kelly_adjustments", 0))
+            self._vol_targeting_adjustments = int(state.get("vol_targeting_adjustments", 0))
+            
+            logger.info(
+                "load_state: restored balance=%.2f, positions=%d, "
+                "avg_entry=%d, equity_history=%d",
+                self.account.balance, len(self.account.positions),
+                len(self.account.avg_entry), len(self.account.equity_history)
+            )
+            
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"load_state validation failed: {str(exc)}. "
+                "State file may be corrupted or incompatible."
+            ) from exc
 
     def reset(self) -> None:
         """계좌 초기화 (테스트용)"""
