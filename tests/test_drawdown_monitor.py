@@ -746,3 +746,47 @@ class TestTrailingStopSignal:
             m.update(10000 - i * 20)
         # short_rate / long_rate ≈ 1.0 < 2.0 → 신호 없음
         assert m.trailing_stop_signal(accel_threshold=2.0) is False
+
+
+# ── reset_weekly / reset_monthly 테스트 ───────────────────────
+
+
+def test_reset_weekly_clears_halt():
+    """reset_weekly() 호출 시 HALT 레벨 해제 + weekly_start 갱신."""
+    m = DrawdownMonitor(weekly_limit=0.05)
+    m.set_weekly_start(10000)
+    m.update(9400)  # 6% 주간 낙폭 → HALT
+    assert m.is_halted() is True
+    assert m.alert_level() == AlertLevel.HALT
+
+    m.reset_weekly(9400)
+    assert m.is_halted() is False
+    assert m.alert_level() == AlertLevel.NONE
+
+
+def test_reset_weekly_does_not_clear_force_liquidate():
+    """reset_weekly()는 FORCE_LIQUIDATE 상태를 해제하지 않는다."""
+    m = DrawdownMonitor(monthly_limit=0.10)
+    m.set_monthly_start(10000)
+    m.update(8900)  # 11% 월간 낙폭 → FORCE_LIQUIDATE
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+    m.reset_weekly(8900)  # 주간 리셋 시도
+    assert m.is_halted() is True
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+
+def test_reset_monthly_updates_start_only():
+    """reset_monthly()는 monthly_start만 갱신, FORCE_LIQUIDATE는 유지."""
+    m = DrawdownMonitor(monthly_limit=0.10)
+    m.set_monthly_start(10000)
+    m.update(8900)  # FORCE_LIQUIDATE 트리거
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+    m.reset_monthly(8900)  # 자동 해제 안 됨
+    assert m.is_halted() is True
+    assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
+
+    # force_resume으로만 해제 가능
+    m.force_resume()
+    assert m.is_halted() is False

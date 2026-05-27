@@ -1,5 +1,45 @@
 # Work Log
 
+## [2026-05-27] Cycle 222 — B(리스크) + D(ML) + SIM + F(리서치)
+
+**[B] 리스크 — DrawdownMonitor + RiskManager 개선:**
+- `src/risk/drawdown_monitor.py`: `reset_weekly()` / `reset_monthly()` 추가
+  - `reset_weekly(equity)`: 새 주 시작 시 weekly_start 갱신 + HALT 해제
+  - `reset_monthly(equity)`: 새 월 시작 시 monthly_start 갱신 (FORCE_LIQUIDATE는 자동 해제 안 함)
+  - 기존 `reset_daily()` 패턴과 일관된 시리즈 완성
+- `src/risk/manager.py`: `adaptive_stop_multiplier()` + `evaluate()` 개선
+  - `_REGIME_STOP_BOUNDS` 테이블: CRISIS≥2.5, TREND_DOWN≥2.0, TREND_UP≤1.5
+  - `regime` 파라미터 추가: 레짐별 ATR SL 배수 floor/ceiling 적용
+  - `evaluate()`에 `regime` 파라미터 연결
+
+**[D] ML — paper_simulation.py fail_reasons 개선:**
+- `scripts/paper_simulation.py`: 윈도우별 `fail_reasons` 수집 (`bt.fail_reasons` 활용)
+  - exception 발생 시 `fail_reasons: [exception: ...]` 추가 (디버깅 용이)
+  - 리포트에 "FAIL 진단" 섹션 추가: 상위 FAIL 전략의 fail_reasons 집계
+  - low_pf / low_sharpe / high_mdd / low_trades / overfit_wfe / exception 분류
+
+**[SIM] 시뮬레이션 결과 (합성 데이터, SSL 차단으로 실거래소 불가):**
+- Paper Sim (1h Walk-Forward, BTC/ETH/SOL):
+  - 3심볼 모두 0/22 PASS (합성 데이터 한계)
+  - **BTC 1위**: `momentum_quality` (Sharpe 6.66, PF 2.05, Trades 108)
+  - **ETH 1위**: `price_action_momentum` (Sharpe 4.61, PF 1.61, Trades 146)
+  - **SOL 1위**: `supertrend_multi` (Sharpe 2.37, PF 1.32, Trades 111)
+  - FAIL 주원인: `low_pf` (PF < 1.5 미달이 가장 많음)
+- Bundle OOS (4h, BTC/USDT):
+  - 5전략 전부 FAIL, `value_area` 최우선 (4/9 fold PASS, avg trades 3.6 낮음)
+  - OOS Sharpe std 3.4~6.4 → 높은 불안정성 (GBM 합성 데이터 한계)
+
+**[F] 리서치 인사이트:**
+- `momentum_quality`/`price_action_momentum`: BTC/ETH 공통 상위권 → 실거래소 검증 1순위
+- FAIL 진단: `low_pf`가 가장 빈번한 원인 → 다음 사이클 PF 임계값 조정 또는 전략 필터 검토
+- `adaptive_stop_multiplier` + regime 연결: CRISIS/HIGH_VOL에서 stop이 너무 타이트해지는 문제 방지
+
+**테스트:**
+- 신규 테스트 3개 추가 (`test_reset_weekly_clears_halt`, `test_reset_weekly_does_not_clear_force_liquidate`, `test_reset_monthly_updates_start_only`)
+- 전체 테스트 PASS (기존 테스트 깨진 것 없음)
+
+---
+
 ## [2026-05-27] Cycle 221 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] 품질 — Flaky 테스트 수정 + FullCircuitBreakerAdapter 통합:**
@@ -16916,6 +16956,73 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-27 00:33 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 05:27 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-27 05:27 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 05:27 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

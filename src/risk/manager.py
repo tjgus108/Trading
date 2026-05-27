@@ -248,6 +248,17 @@ class RiskManager:
 
     # ── 변동성 체제(regime)별 ATR multiplier ─────────────────────────────────
 
+    # 레짐별 stop multiplier 하한/상한 테이블
+    _REGIME_STOP_BOUNDS: dict = {
+        # (floor, ceiling)  — None = no bound
+        "TREND_UP":   (None, 1.5),   # 상승 추세: 최대 1.5 (타이트)
+        "BULL":       (None, 1.5),
+        "TREND_DOWN": (2.0,  None),  # 하락 추세: 최소 2.0 (잡음 흡수)
+        "BEAR":       (2.0,  None),
+        "CRISIS":     (2.5,  None),  # 위기: 최소 2.5 (큰 움직임 허용)
+        "HIGH_VOL":   (2.0,  None),
+    }
+
     @staticmethod
     def adaptive_stop_multiplier(
         df: Optional[pd.DataFrame],
@@ -255,6 +266,7 @@ class RiskManager:
         annualization: int = 252 * 24,  # 1h 기준
         low_vol_threshold: float = 0.3,
         high_vol_threshold: float = 0.6,
+        regime: Optional[str] = None,
     ) -> float:
         """최근 realized_vol 기반으로 ATR SL multiplier를 자동 조정.
 
@@ -263,6 +275,11 @@ class RiskManager:
         - vol < low_vol_threshold  → 1.2  (저변동: 타이트)
         - low <= vol < high        → 1.5  (중변동: 기본)
         - vol >= high_vol_threshold → 2.5  (고변동: 넓게)
+
+        regime이 주어지면 레짐별 floor/ceiling 적용:
+        - CRISIS/HIGH_VOL → 최소 2.5/2.0 (하한)
+        - TREND_UP/BULL   → 최대 1.5 (상한)
+        - TREND_DOWN/BEAR → 최소 2.0 (하한)
 
         df가 None이거나 캔들 수 부족 시 기본값 1.5 반환.
         """
@@ -284,9 +301,19 @@ class RiskManager:
         else:
             mult = 2.5
 
+        # 레짐 기반 floor/ceiling 적용
+        if regime is not None:
+            bounds = RiskManager._REGIME_STOP_BOUNDS.get(regime.upper())
+            if bounds is not None:
+                floor_val, ceil_val = bounds
+                if floor_val is not None:
+                    mult = max(mult, floor_val)
+                if ceil_val is not None:
+                    mult = min(mult, ceil_val)
+
         logger.debug(
-            "adaptive_stop_multiplier: realized_vol=%.4f → multiplier=%.1f",
-            realized_vol, mult,
+            "adaptive_stop_multiplier: realized_vol=%.4f regime=%s → multiplier=%.1f",
+            realized_vol, regime, mult,
         )
         return mult
 
@@ -323,6 +350,7 @@ class RiskManager:
         timestamp: Union[datetime, None] = None,  # 세션 필터용 UTC 시각
         open_positions: Optional[list] = None,  # 다중 포지션 total exposure 체크용
         confidence: str = "MEDIUM",  # 전략 신뢰도 → 포지션 사이징 반영
+        regime: Optional[str] = None,  # 레짐 → adaptive_stop_multiplier 조정
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -406,7 +434,7 @@ class RiskManager:
 
         # 포지션 사이징 (candle_df 있으면 adaptive multiplier, 없으면 config 값 사용)
         if candle_df is not None:
-            sl_mult = self.adaptive_stop_multiplier(candle_df)
+            sl_mult = self.adaptive_stop_multiplier(candle_df, regime=regime)
         else:
             sl_mult = self.atr_multiplier_sl
         sl_distance = atr * sl_mult

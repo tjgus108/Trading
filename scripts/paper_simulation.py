@@ -329,12 +329,14 @@ def evaluate_strategy_walk_forward(
                 "win_rate": bt.win_rate,
                 "passed": bt.passed,
                 "final_balance": 10_000 * (1 + bt.total_return),
+                "fail_reasons": bt.fail_reasons,
             })
         except Exception as e:
             window_results.append({
                 "window": i + 1, "sharpe": 0, "total_return": 0, "max_dd": 0,
                 "profit_factor": 0, "trades": 0, "win_rate": 0, "passed": False,
-                "final_balance": 10_000, "error": str(e)[:80],
+                "final_balance": 10_000, "error": str(e)[:100],
+                "fail_reasons": [f"exception: {str(e)[:80]}"],
             })
 
     # 일관성 점수: 통과한 윈도우 비율
@@ -483,6 +485,37 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
             f"{r['passed_windows']}/{r['total_windows']} | {p} |"
         )
     lines.append("")
+
+    # FAIL 진단: 상위 10개 FAIL 전략의 공통 실패 원인 집계
+    top_fail = [r for r in results[:20] if not r["overall_passed"]][:10]
+    if top_fail:
+        from collections import Counter
+        all_fail_reasons: list = []
+        for r in top_fail:
+            for wr in r.get("window_results", []):
+                all_fail_reasons.extend(wr.get("fail_reasons", []))
+        if all_fail_reasons:
+            # 실패 원인 키워드 추출 (sharpe/pf/trades/mdd)
+            def _categorize(reason: str) -> str:
+                if "sharpe" in reason:
+                    return "low_sharpe"
+                if "profit_factor" in reason:
+                    return "low_pf"
+                if "trades" in reason:
+                    return "low_trades"
+                if "drawdown" in reason:
+                    return "high_mdd"
+                if "wfe" in reason:
+                    return "overfit_wfe"
+                if "exception" in reason:
+                    return "exception"
+                return "other"
+            counts = Counter(_categorize(r) for r in all_fail_reasons)
+            lines.append("## FAIL 진단 (상위 FAIL 전략 fail_reasons 집계)\n")
+            lines.append("_다음 사이클 개선 방향 파악용: FAIL 주원인 분포_\n")
+            for cat, cnt in counts.most_common():
+                lines.append(f"- `{cat}`: {cnt}건")
+            lines.append("")
 
     # 포트폴리오
     if results:

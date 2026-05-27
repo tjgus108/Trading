@@ -1,30 +1,30 @@
 # Current Cycle Briefing
 
-_Cycle 221 — A(품질) + C(데이터) + F(리서치)_
+_Cycle 222 — B(리스크) + D(ML) + F(리서치)_
 _완료: 2026-05-27_
 
-## 이번 사이클 수행 내역
+## 수행 내용
 
-### 수정된 파일
-1. `scripts/quality_audit.py` — 모듈 레벨 로깅 억제 → run_audit() 내부로 이동 (flaky test fix)
-2. `src/risk/manager.py` — FullCircuitBreakerAdapter 클래스 추가
-3. `src/data/websocket_feed.py` — ConnectionHealthMonitor: deque 전환 + reconnection_rate/is_flapping 추가
-4. `src/backtest/walk_forward.py` — WalkForwardValidator window result에 fail_reasons/profit_factor 추가
-5. `tests/test_risk_manager.py` — FullCircuitBreakerAdapter 테스트 3건 추가
+### B(리스크)
+- `DrawdownMonitor.reset_weekly(equity)`: 주간 CB 해제 + weekly_start 갱신
+- `DrawdownMonitor.reset_monthly(equity)`: monthly_start 갱신 (FORCE_LIQUIDATE는 수동 해제)
+- `RiskManager.adaptive_stop_multiplier()`: `regime` 파라미터 + `_REGIME_STOP_BOUNDS` 테이블
+  - CRISIS≥2.5, HIGH_VOL/TREND_DOWN≥2.0, TREND_UP≤1.5
+- `RiskManager.evaluate()`: `regime` 파라미터 → `adaptive_stop_multiplier` 전달
 
-## 시뮬레이션 결과
+### D(ML)
+- `paper_simulation.py`: 윈도우별 `fail_reasons` 수집 + FAIL 진단 섹션
 
-| 항목 | 결과 |
-|------|------|
-| Paper Sim (1h) | 22전략 PASS 0개 |
-| Bundle OOS (4h) | 5전략 PASS 0개 |
-| 최우선 전략 | price_action_momentum (Sharpe 6.68) |
-| 공통 실패 원인 | OOS Sharpe std > 1.5 (합성 데이터 특성) |
+### 테스트
+- 신규 3건 추가 (reset_weekly/reset_monthly 테스트)
+- 전체 7987개 PASS
 
-## 테스트 상태
-- 전체 8000+ 테스트 PASS (이전 flaky 2건 해소)
-- 새 테스트 3건 추가 (FullCircuitBreakerAdapter)
+## 시뮬레이션
+- Paper Sim: BTC/ETH/SOL 모두 0/22 PASS (low_pf 주원인)
+- Bundle OOS: 5전략 FAIL, value_area 최우선 (4/9 fold PASS)
+- 실거래소 검증 1순위: momentum_quality, price_action_momentum
 
-## 다음 사이클 (222)
-- 222 mod 5 = 2 → E(실행) + A(품질) + F(리서치)
-- 최우선: RegimeGuardedStrategy 래퍼 구현
+## 다음 사이클 (223)
+- 223 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)**
+- orchestrator.py에 regime 전달 연결
+- FullCircuitBreakerAdapter orchestrator 주입
