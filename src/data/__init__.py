@@ -14,6 +14,10 @@ __all__ = [
     "HistoricalDataDownloader",
     "DataValidationReport",
     "download_multi_timeframe",
+    "OFICalculator",
+    "VPINCalculator",
+    "OrderFlowFetcher",
+    "OrderFlowData",
 ]
 
 
@@ -31,4 +35,16 @@ def __getattr__(name: str):
     elif name == "download_multi_timeframe":
         from .data_utils import download_multi_timeframe
         return download_multi_timeframe
+    elif name == "OFICalculator":
+        from .order_flow import OFICalculator
+        return OFICalculator
+    elif name == "VPINCalculator":
+        from .order_flow import VPINCalculator
+        return VPINCalculator
+    elif name == "OrderFlowFetcher":
+        from .order_flow import OrderFlowFetcher
+        return OrderFlowFetcher
+    elif name == "OrderFlowData":
+        from .order_flow import OrderFlowData
+        return OrderFlowData
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

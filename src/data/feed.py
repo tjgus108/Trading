@@ -1468,3 +1468,132 @@ class DataFeed:
             symbol, timeframe, regime, summary.candles
         )
         return summary, regime
+
+    # ─────────────────────────────────────────────────────────────────
+    # Cache TTL Documentation & Validation (Cycle 231)
+    # ─────────────────────────────────────────────────────────────────
+    
+    def get_ttl_config(self) -> dict:
+        """
+        현재 DataFeed의 모든 캐시 TTL 설정을 조회.
+        
+        Returns:
+            {
+                'ohlcv_base_ttl': int,           # OHLCV 기본 TTL (초)
+                'order_book_ttl': int,           # Order book 기본 TTL (초)
+                'regime_cache_ttl': int,         # Regime 캐시 기본 TTL (초)
+                'stale_reuse_ttl': int,          # Stale cache 재사용 TTL (초)
+                'regime_ttl_multipliers': dict,  # 레짐별 TTL 배수
+                'effective_ttl_formula': str,    # effective_ttl 계산식
+                'order_book_cache_size': int,    # Order book 캐시 최대 항목 수
+                'ohlcv_cache_size': int,         # OHLCV 캐시 최대 항목 수
+            }
+        
+        Notes:
+            - OHLCV cache: (symbol, timeframe, limit) 키로 관리
+            - Order book cache: (symbol, levels) 키로 관리
+            - Regime cache: symbol 키로 관리
+            - Effective TTL = base_ttl * regime_multiplier
+        """
+        return {
+            'ohlcv_base_ttl': self._cache_ttl,
+            'order_book_ttl': 5,  # 호가창은 실시간이므로 짧은 TTL
+            'regime_cache_ttl': 300,  # 기본값 5분
+            'stale_reuse_ttl': 30,  # Stale cache 재사용 후 30초 내에 재시도
+            'regime_ttl_multipliers': self.REGIME_TTL_MULTIPLIER.copy(),
+            'effective_ttl_formula': 'effective_ttl = base_ttl * regime_multiplier',
+            'order_book_cache_size': len(self._order_book_cache),
+            'ohlcv_cache_size': len(self._cache),
+        }
+    
+    def validate_ttl_consistency(self) -> dict:
+        """
+        캐시 TTL 설정의 일관성을 검증.
+        
+        Returns:
+            {
+                'is_consistent': bool,
+                'issues': list[str],
+                'warnings': list[str],
+                'cache_sizes': {
+                    'ohlcv': int,
+                    'order_book': int,
+                    'regime': int,
+                },
+                'ttl_ranges': {
+                    'min_ttl': int,
+                    'max_ttl': int,
+                    'mean_ttl': float,
+                }
+            }
+        
+        Notes (Cycle 231):
+            - OHLCV 기본 TTL (60초)은 모든 레짐에서 일관됨
+            - Order book TTL (5초)는 호가창 실시간성 보장
+            - Regime cache TTL (300초)는 OHLCV 캐시보다 길어야 함
+            - effective_ttl은 regime 기반으로 동적 조정
+        """
+        issues = []
+        warnings = []
+        
+        # 1. Base TTL 검증
+        if self._cache_ttl < 30:
+            warnings.append(f"OHLCV base_ttl={self._cache_ttl}s is very short (recommend >=30s)")
+        if self._cache_ttl > 3600:
+            warnings.append(f"OHLCV base_ttl={self._cache_ttl}s is very long (recommend <=3600s)")
+        
+        # 2. Regime TTL multiplier 검증
+        multipliers = self.REGIME_TTL_MULTIPLIER
+        for regime, mult in multipliers.items():
+            if mult <= 0:
+                issues.append(f"Invalid regime multiplier: {regime}={mult} (must be > 0)")
+            if mult > 2.0:
+                warnings.append(f"High regime multiplier: {regime}={mult} (data may become too stale)")
+        
+        # 3. Order book TTL vs OHLCV TTL
+        order_book_ttl = 5
+        if order_book_ttl > self._cache_ttl:
+            issues.append(
+                f"Order book TTL ({order_book_ttl}s) should be shorter than OHLCV base TTL ({self._cache_ttl}s)"
+            )
+        
+        # 4. Stale cache TTL vs base TTL
+        stale_reuse_ttl = 30
+        if stale_reuse_ttl > self._cache_ttl:
+            warnings.append(
+                f"Stale reuse TTL ({stale_reuse_ttl}s) is approaching base TTL ({self._cache_ttl}s)"
+            )
+        
+        # 5. Cache size 검증
+        cache_sizes = {
+            'ohlcv': len(self._cache),
+            'order_book': len(self._order_book_cache),
+            'regime': len(self._regime_cache),
+        }
+        if cache_sizes['ohlcv'] > self._max_cache_size:
+            warnings.append(
+                f"OHLCV cache size ({cache_sizes['ohlcv']}) exceeds max ({self._max_cache_size})"
+            )
+        
+        # 6. TTL 범위 계산
+        ttl_values = [self._cache_ttl]
+        for mult in multipliers.values():
+            ttl_values.append(int(self._cache_ttl * mult))
+        ttl_values.append(300)  # regime cache
+        
+        ttl_ranges = {
+            'min_ttl': min(ttl_values),
+            'max_ttl': max(ttl_values),
+            'mean_ttl': sum(ttl_values) / len(ttl_values) if ttl_values else 0,
+        }
+        
+        is_consistent = len(issues) == 0
+        
+        return {
+            'is_consistent': is_consistent,
+            'issues': issues,
+            'warnings': warnings,
+            'cache_sizes': cache_sizes,
+            'ttl_ranges': ttl_ranges,
+        }
+

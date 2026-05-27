@@ -305,3 +305,126 @@ class VPINCalculator:
         }
 
 
+
+class OFICalculator:
+    """
+    OFI (Order Flow Imbalance) 계산기.
+    
+    데이터 스트림에서 호가창 기반 주문 흐름 불균형을 계산.
+    - 입력: 시간별 bid/ask 물량 변화
+    - 출력: [-1, +1] 범위의 OFI 지수
+    
+    사용 사례:
+    - VPIN과 통합하여 매수/매도 압력 감지
+    - 극단적 불균형(OFI < -0.9 또는 > +0.9) 감지 시 실행 지연
+    """
+    
+    def __init__(self):
+        pass
+    
+    def compute_from_orderbook(self, 
+                              bid_depth: float, 
+                              ask_depth: float) -> float:
+        """
+        호가창 물량으로부터 OFI 계산.
+        
+        Args:
+            bid_depth: 누적 매수 호가 물량 (bid side)
+            ask_depth: 누적 매도 호가 물량 (ask side)
+        
+        Returns:
+            ofi: [-1, +1] OFI 값
+            - ofi > +0.5: 강한 매수 압력
+            - ofi < -0.5: 강한 매도 압력
+            - ofi ≈ 0: 중립
+            
+        Notes:
+            - bid_depth + ask_depth = 0 시 0.0 반환 (호가창 미수집)
+        """
+        total = bid_depth + ask_depth
+        if total == 0:
+            return 0.0
+        
+        ofi = (bid_depth - ask_depth) / total
+        return max(-1.0, min(1.0, ofi))
+    
+    def compute_from_time_series(self, 
+                                 bid_volumes: pd.Series, 
+                                 ask_volumes: pd.Series) -> pd.Series:
+        """
+        시계열 호가 물량으로부터 OFI 시리즈 계산.
+        
+        Args:
+            bid_volumes: 시간별 bid 물량 Series
+            ask_volumes: 시간별 ask 물량 Series
+        
+        Returns:
+            ofi_series: 시간별 OFI [-1, +1]
+            
+        Edge cases:
+            - bid + ask = 0: OFI = 0.0 (호가창 데이터 부족)
+            - 길이 불일치: min(len(bid), len(ask))로 정렬
+        """
+        if bid_volumes.empty or ask_volumes.empty:
+            return pd.Series([], dtype=float)
+        
+        # 길이 맞추기
+        min_len = min(len(bid_volumes), len(ask_volumes))
+        bid = bid_volumes.iloc[:min_len].fillna(0.0)
+        ask = ask_volumes.iloc[:min_len].fillna(0.0)
+        
+        total = bid + ask
+        # 안전한 나눗셈: total == 0 → 0.0
+        ofi = (bid - ask) / total.replace(0, float('nan'))
+        ofi = ofi.fillna(0.0)
+        
+        # [-1, +1] 범위로 클리핑
+        ofi = ofi.clip(-1.0, 1.0)
+        
+        return ofi
+    
+    def detect_extreme_ofi(self, 
+                          ofi_series: pd.Series, 
+                          threshold: float = 0.8) -> dict:
+        """
+        극단적 OFI 불균형 감지.
+        
+        Args:
+            ofi_series: OFI 시리즈
+            threshold: 극단 판정 임계값 (기본 0.8 = 80%)
+        
+        Returns:
+            {
+                'has_extreme': bool,
+                'extreme_count': int,
+                'extreme_indices': list,
+                'max_ofi': float,
+                'min_ofi': float,
+            }
+            
+        Notes:
+            - 매도 폭주 (OFI < -threshold): 실행 회피 또는 지연 신호
+            - 매수 폭주 (OFI > +threshold): 슬리피지 주의
+        """
+        if ofi_series.empty:
+            return {
+                'has_extreme': False,
+                'extreme_count': 0,
+                'extreme_indices': [],
+                'max_ofi': 0.0,
+                'min_ofi': 0.0,
+            }
+        
+        # 극단값 찾기
+        ofi_abs = ofi_series.abs()
+        extreme_mask = ofi_abs > threshold
+        extreme_indices = ofi_series[extreme_mask].index.tolist()
+        
+        return {
+            'has_extreme': extreme_mask.any(),
+            'extreme_count': int(extreme_mask.sum()),
+            'extreme_indices': extreme_indices,
+            'max_ofi': float(ofi_series.max()),
+            'min_ofi': float(ofi_series.min()),
+        }
+

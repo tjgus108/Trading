@@ -508,3 +508,96 @@ class TestVPINEmptyInputs(unittest.TestCase):
         df = pd.DataFrame()
         latest = calc.get_latest(df)
         self.assertEqual(latest, 0.5)
+
+
+class TestOFICalculator(unittest.TestCase):
+    def setUp(self):
+        from src.data.order_flow import OFICalculator
+        self.calc = OFICalculator()
+    
+    def test_ofi_equal_bid_ask(self):
+        """bid == ask → ofi = 0.0"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=100.0, ask_depth=100.0)
+        self.assertAlmostEqual(ofi, 0.0)
+    
+    def test_ofi_more_bid(self):
+        """bid > ask → ofi > 0.0 (매수 압력)"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=150.0, ask_depth=50.0)
+        self.assertGreater(ofi, 0.0)
+        self.assertAlmostEqual(ofi, 0.5)  # (150-50)/(150+50) = 100/200 = 0.5
+    
+    def test_ofi_more_ask(self):
+        """ask > bid → ofi < 0.0 (매도 압력)"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=50.0, ask_depth=150.0)
+        self.assertLess(ofi, 0.0)
+        self.assertAlmostEqual(ofi, -0.5)  # (50-150)/(50+150) = -100/200 = -0.5
+    
+    def test_ofi_zero_volume(self):
+        """bid + ask = 0 → ofi = 0.0"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=0.0, ask_depth=0.0)
+        self.assertEqual(ofi, 0.0)
+    
+    def test_ofi_clamped_positive(self):
+        """ofi > 1.0은 1.0으로 클리핑"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=1000.0, ask_depth=0.01)
+        self.assertLessEqual(ofi, 1.0)
+    
+    def test_ofi_clamped_negative(self):
+        """ofi < -1.0은 -1.0으로 클리핑"""
+        ofi = self.calc.compute_from_orderbook(bid_depth=0.01, ask_depth=1000.0)
+        self.assertGreaterEqual(ofi, -1.0)
+    
+    def test_ofi_timeseries_basic(self):
+        """시계열 OFI 계산"""
+        import pandas as pd
+        bid_vols = pd.Series([100.0, 150.0, 50.0])
+        ask_vols = pd.Series([100.0, 50.0, 150.0])
+        
+        ofi_series = self.calc.compute_from_time_series(bid_vols, ask_vols)
+        
+        self.assertEqual(len(ofi_series), 3)
+        self.assertAlmostEqual(ofi_series.iloc[0], 0.0)
+        self.assertGreater(ofi_series.iloc[1], 0.0)
+        self.assertLess(ofi_series.iloc[2], 0.0)
+    
+    def test_ofi_timeseries_empty(self):
+        """빈 Series → 빈 OFI Series"""
+        import pandas as pd
+        bid_vols = pd.Series([], dtype=float)
+        ask_vols = pd.Series([], dtype=float)
+        
+        ofi_series = self.calc.compute_from_time_series(bid_vols, ask_vols)
+        self.assertTrue(ofi_series.empty)
+    
+    def test_detect_extreme_ofi_high(self):
+        """극단 높은 OFI (매수 폭주)"""
+        import pandas as pd
+        ofi_series = pd.Series([0.1, 0.85, 0.2, 0.95])
+        
+        result = self.calc.detect_extreme_ofi(ofi_series, threshold=0.8)
+        
+        self.assertTrue(result['has_extreme'])
+        self.assertEqual(result['extreme_count'], 2)
+        self.assertAlmostEqual(result['max_ofi'], 0.95)
+    
+    def test_detect_extreme_ofi_low(self):
+        """극단 낮은 OFI (매도 폭주)"""
+        import pandas as pd
+        ofi_series = pd.Series([0.1, -0.85, 0.2, -0.95])
+        
+        result = self.calc.detect_extreme_ofi(ofi_series, threshold=0.8)
+        
+        self.assertTrue(result['has_extreme'])
+        self.assertEqual(result['extreme_count'], 2)
+        self.assertAlmostEqual(result['min_ofi'], -0.95)
+    
+    def test_detect_extreme_ofi_none(self):
+        """극단값 없음"""
+        import pandas as pd
+        ofi_series = pd.Series([0.1, 0.3, 0.2, 0.15])
+        
+        result = self.calc.detect_extreme_ofi(ofi_series, threshold=0.8)
+        
+        self.assertFalse(result['has_extreme'])
+        self.assertEqual(result['extreme_count'], 0)
+

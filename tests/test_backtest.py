@@ -260,3 +260,94 @@ def test_from_json_preserves_dict_equality():
             assert orig_val == rest_val, f"Mismatch for {key}: {orig_val} vs {rest_val}"
     
     print("✓ Dict equality test passed")
+
+
+def test_mc_permutation_test_block_size_1():
+    """Test MC permutation with block_size=1 (original behavior: sign randomization)."""
+    engine = BacktestEngine(initial_balance=10_000)
+    
+    # Create sample trades
+    trades = [0.01, -0.005, 0.015, 0.008, -0.003, 0.012, 0.002, -0.007, 0.011, 0.005]
+    
+    # Compute original Sharpe
+    arr = np.array(trades, dtype=float)
+    mean_r = arr.mean()
+    std_r = arr.std()
+    original_sharpe = (mean_r / std_r * np.sqrt(8760)) if std_r > 1e-10 else 0.0
+    
+    # Test with block_size=1 (should use sign randomization)
+    p_value = engine._mc_permutation_test(trades, original_sharpe, block_size=1)
+    
+    assert isinstance(p_value, float), "p_value should be float"
+    assert 0.0 <= p_value <= 1.0, f"p_value should be in [0, 1], got {p_value}"
+
+
+def test_mc_permutation_test_block_size_5():
+    """Test MC permutation with block_size=5 (block shuffling)."""
+    engine = BacktestEngine(initial_balance=10_000)
+    
+    # Create sample trades
+    trades = [0.01, -0.005, 0.015, 0.008, -0.003, 0.012, 0.002, -0.007, 0.011, 0.005,
+              0.009, -0.004, 0.014, 0.007, -0.002]
+    
+    # Compute original Sharpe
+    arr = np.array(trades, dtype=float)
+    mean_r = arr.mean()
+    std_r = arr.std()
+    original_sharpe = (mean_r / std_r * np.sqrt(8760)) if std_r > 1e-10 else 0.0
+    
+    # Test with block_size=5 (should use block shuffling)
+    p_value = engine._mc_permutation_test(trades, original_sharpe, block_size=5)
+    
+    assert isinstance(p_value, float), "p_value should be float"
+    assert 0.0 <= p_value <= 1.0, f"p_value should be in [0, 1], got {p_value}"
+
+
+def test_mc_permutation_test_default_block_size():
+    """Test MC permutation with default block_size (should default to 1)."""
+    engine = BacktestEngine(initial_balance=10_000)
+    
+    # Create sample trades
+    trades = [0.01, -0.005, 0.015, 0.008, -0.003]
+    
+    # Compute original Sharpe
+    arr = np.array(trades, dtype=float)
+    mean_r = arr.mean()
+    std_r = arr.std()
+    original_sharpe = (mean_r / std_r * np.sqrt(8760)) if std_r > 1e-10 else 0.0
+    
+    # Test without specifying block_size (should default to 1)
+    p_value = engine._mc_permutation_test(trades, original_sharpe)
+    
+    assert isinstance(p_value, float), "p_value should be float"
+    assert 0.0 <= p_value <= 1.0, f"p_value should be in [0, 1], got {p_value}"
+
+
+def test_mc_permutation_test_consistency():
+    """Test that p-values are in valid range for both block_size strategies."""
+    engine = BacktestEngine(initial_balance=10_000)
+    
+    # Create sample trades with clear structure
+    np.random.seed(123)
+    trades = list(np.random.randn(50) * 0.01)  # 50 trades
+    
+    # Compute original Sharpe
+    arr = np.array(trades, dtype=float)
+    mean_r = arr.mean()
+    std_r = arr.std()
+    original_sharpe = (mean_r / std_r * np.sqrt(8760)) if std_r > 1e-10 else 0.0
+    
+    # Test block_size=1 (sign randomization)
+    p1 = engine._mc_permutation_test(trades, original_sharpe, block_size=1)
+    
+    # Test block_size=10 (block shuffling)
+    p5 = engine._mc_permutation_test(trades, original_sharpe, block_size=10)
+    
+    # Both should be valid p-values
+    assert 0.0 <= p1 <= 1.0, f"p1 out of range: {p1}"
+    assert 0.0 <= p5 <= 1.0, f"p5 out of range: {p5}"
+    
+    # They may differ due to different randomization strategies
+    # (block shuffling vs sign randomization)
+    print(f"p_value (block_size=1): {p1:.4f}")
+    print(f"p_value (block_size=10): {p5:.4f}")

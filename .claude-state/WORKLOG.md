@@ -1,5 +1,40 @@
 # Work Log
 
+## [2026-05-28] Cycle 231 — A(품질) + C(데이터) + SIM + F(리서치)
+
+**[A] 품질 — 테스트 커버리지 대폭 보강 (32개 추가):**
+- `tests/test_twap.py`: TWAP _calculate_dynamic_slice_qty() 엣지 케이스 17개 테스트 추가
+  - 빈 호가창, depth=0, side 대소문자, threshold 경계값, 큰/작은 slice_qty, connector 예외
+- `tests/test_trainer.py`: compare_feature_importance() 15개 테스트 추가
+  - 반환 구조, top_n 제한, 값 범위(0-1), 빈 df, 샘플 부족, 학습 실패 복원력
+- 테스트: 119 passed (3 skipped)
+
+**[C] 데이터 — OFICalculator + Cache TTL 검증:**
+- `src/data/order_flow.py`: OFICalculator 클래스 추가 (~122줄)
+  - compute_from_orderbook(): bid/ask 물량 → OFI [-1, +1] 계산
+  - compute_from_time_series(): 시계열 bid/ask → OFI 시리즈
+  - detect_extreme_ofi(threshold=0.8): 극단 불균형 감지 (매수/매도 압력 경고)
+- `src/data/feed.py`: get_ttl_config() + validate_ttl_consistency() 추가 (~130줄)
+  - OHLCV(60s), OrderBook(5s), Regime(300s) TTL 일관성 검증
+  - 레짐별 TTL 배율: crisis=0.2, high_vol=0.33, low_vol=1.5, trending=0.5
+- 테스트: 23 passed (OFI 11 + TTL 12)
+
+**[SIM] MC Permutation Test Block Shuffling:**
+- `src/backtest/engine.py`: _mc_permutation_test()에 block_size 파라미터 추가
+  - block_size=1: 기존 부호 무작위화 (하위 호환)
+  - block_size>1: 블록 단위 셔플 (시리얼 구조 보존)
+- `tests/test_backtest.py`: 4개 테스트 추가 (block_size=1/5, 기본값, 일관성)
+- 테스트: 16 passed (기존 12 + 신규 4)
+
+**[F] 리서치 — Fractional Kelly + Bootstrap + 성공 사례:**
+- Fractional Kelly: Quarter-Kelly(25%) 실무 표준, Risk-Constrained Kelly(drawdown 제약 결합)
+- Bootstrap: Stationary Bootstrap이 블록 크기 오명세에 더 강인, Politis-White 자동 블록 크기 선택
+- 성공 사례: Freqtrade(Hyperopt+multi-timeframe), Hummingbot(시장조성+차익거래)
+  - Grid/DCA/아비트라지 = 횡보장 강점, 방향성 전략은 레짐 변화에 취약
+- 출처: arxiv 1603.06183, Politis-White 2004, Freqtrade/Hummingbot 공식 등
+
+---
+
 ## [2026-05-28] Cycle 230 — D(ML) + E(실행) + SIM + F(리서치)
 
 **[D] ML — bid_ask_depth_imbalance 피처 + compare_feature_importance:**
@@ -18736,3 +18771,6 @@ Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-27 23:00 UTC] Cycle 230 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-27 23:06 UTC] Cycle 231 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

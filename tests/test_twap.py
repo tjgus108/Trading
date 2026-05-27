@@ -382,3 +382,331 @@ class TestEstimateSlippageEdgeCases:
         slip_with_spread = ex.estimate_slippage(qty=1.0, price=50_000.0, daily_volume=1_000_000, spread_bps=20.0)
         expected_half = (20.0 / 10000.0) / 2.0  # 0.001
         assert abs((slip_with_spread - slip_no_spread) - expected_half) < 1e-10
+
+
+# ── 7. _calculate_dynamic_slice_qty 엣지 케이스 ──────────────────────────────
+
+class TestCalculateDynamicSliceQtyEdgeCases:
+    """_calculate_dynamic_slice_qty의 엣지 케이스 검증."""
+
+    def test_connector_none_returns_base_qty(self):
+        """connector=None → base_slice_qty 반환."""
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_connector_without_fetch_order_book_returns_base_qty(self):
+        """connector에 fetch_order_book 메서드 없음 → base_slice_qty 반환."""
+        class MinimalConnector:
+            pass
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=MinimalConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_empty_order_book_returns_base_qty(self):
+        """order_book이 비어있음 (None/empty dict) → base_slice_qty 반환."""
+        class EmptyOrderBookConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return None
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=EmptyOrderBookConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_order_book_missing_bids_asks_returns_base_qty(self):
+        """order_book에 'bids' 또는 'asks' 키 누락 → base_slice_qty 반환."""
+        class InvalidOrderBookConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {"bids": []}  # 'asks' 키 없음
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=InvalidOrderBookConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_empty_bids_empty_asks_returns_base_qty(self):
+        """bids와 asks 모두 빈 리스트 (depth=0) → base_slice_qty 반환."""
+        class ZeroDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {"bids": [], "asks": []}
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=ZeroDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_buy_side_uses_ask_depth(self):
+        """buy 주문 → ask depth를 사용 (bid depth는 무시)."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],  # bid volume 1000 (무시됨)
+                    "asks": [[50001, 100]],   # ask volume 100 (사용됨)
+                }
+
+        ex = _executor()
+        # base_slice_qty=150, ask_depth=100
+        # depth_ratio = 150/100 = 1.5 > 0.10 (threshold)
+        # → adjusted = 100 * 0.10 = 10
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=150.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 10.0
+
+    def test_sell_side_uses_bid_depth(self):
+        """sell 주문 → bid depth를 사용 (ask depth는 무시)."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 100]],   # bid volume 100 (사용됨)
+                    "asks": [[50001, 1000]],  # ask volume 1000 (무시됨)
+                }
+
+        ex = _executor()
+        # base_slice_qty=150, bid_depth=100
+        # depth_ratio = 150/100 = 1.5 > 0.10
+        # → adjusted = 100 * 0.10 = 10
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="sell",
+            base_slice_qty=150.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 10.0
+
+    def test_slice_qty_below_threshold_returns_base_qty(self):
+        """slice_qty가 호가창 깊이의 threshold 이하 → base_slice_qty 그대로 반환."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],
+                    "asks": [[50001, 1000]],
+                }
+
+        ex = _executor()
+        # base_slice_qty=50, ask_depth=1000
+        # depth_ratio = 50/1000 = 0.05 < 0.10 (threshold)
+        # → 조정 없음, base_slice_qty 반환
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=50.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 50.0
+
+    def test_slice_qty_exactly_at_threshold_returns_base_qty(self):
+        """slice_qty가 depth_ratio_threshold와 정확히 일치 → 조정 없음."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],
+                    "asks": [[50001, 1000]],
+                }
+
+        ex = _executor()
+        # base_slice_qty=100, ask_depth=1000
+        # depth_ratio = 100/1000 = 0.10 (threshold와 동일)
+        # → depth_ratio > threshold 조건 false, base_slice_qty 반환
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 100.0
+
+    def test_multiple_depth_levels_summed(self):
+        """상위 5호가 깊이를 누적 합산."""
+        class MultiLevelConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 100], [49998, 200], [49997, 300]],
+                    "asks": [[50001, 150], [50002, 250]],
+                }
+
+        ex = _executor()
+        # buy: ask_depth = 150 + 250 = 400
+        # base_slice_qty=500
+        # depth_ratio = 500/400 = 1.25 > 0.10
+        # → adjusted = 400 * 0.10 = 40
+        result = ex._calculate_dynamic_slice_qty(
+            connector=MultiLevelConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=500.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 40.0
+
+    def test_custom_threshold_parameter(self):
+        """depth_ratio_threshold 커스텀 값 적용."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],
+                    "asks": [[50001, 1000]],
+                }
+
+        ex = _executor()
+        # base_slice_qty=200, ask_depth=1000
+        # depth_ratio = 200/1000 = 0.20
+        # threshold=0.15이므로 depth_ratio > threshold
+        # → adjusted = 1000 * 0.15 = 150
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=200.0,
+            depth_ratio_threshold=0.15,
+        )
+        assert result == 150.0
+
+    def test_fetch_order_book_exception_returns_base_qty(self):
+        """fetch_order_book 중 예외 발생 → base_slice_qty 반환."""
+        class ErrorConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                raise RuntimeError("Network error")
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=ErrorConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=100.0,
+        )
+        assert result == 100.0
+
+    def test_side_case_insensitive(self):
+        """side가 대소문자 혼합 ("BUY", "Buy") → 정상 처리."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 100]],
+                    "asks": [[50001, 100]],
+                }
+
+        ex = _executor()
+        # side="BUY" → 소문자로 변환 후 ask_depth 사용
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="BUY",
+            base_slice_qty=150.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 10.0
+
+    def test_zero_base_qty_returns_zero(self):
+        """base_slice_qty=0 → 0 반환 (호가창 조회 없이)."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],
+                    "asks": [[50001, 1000]],
+                }
+
+        ex = _executor()
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=0.0,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 0.0
+
+    def test_very_small_slice_below_threshold(self):
+        """base_slice_qty=0.0001, ask_depth=1000 → 깊이 충분, base_qty 반환."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 1000]],
+                    "asks": [[50001, 1000]],
+                }
+
+        ex = _executor()
+        # depth_ratio = 0.0001/1000 = 0.0000001 << 0.10
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=0.0001,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 0.0001
+
+    def test_very_large_base_qty_aggressive_adjustment(self):
+        """base_slice_qty=1e6, ask_depth=100 → depth_ratio>>threshold, 대폭 축소."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 100]],
+                    "asks": [[50001, 100]],
+                }
+
+        ex = _executor()
+        # depth_ratio = 1e6/100 = 10000 >> 0.10
+        # → adjusted = 100 * 0.10 = 10
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            base_slice_qty=1e6,
+            depth_ratio_threshold=0.10,
+        )
+        assert result == 10.0
+
+    def test_invalid_side_value_returns_base_qty(self):
+        """side가 "buy"/"sell"이 아님 → side.lower() 처리 후도 문제없음."""
+        class FixedDepthConnector:
+            def fetch_order_book(self, symbol, limit=5):
+                return {
+                    "bids": [[49999, 100]],
+                    "asks": [[50001, 100]],
+                }
+
+        ex = _executor()
+        # side="long" → side.lower()=="long", buy/sell 둘 다 아님
+        # → market_depth는 bid_depth 할당 (else 분기)
+        result = ex._calculate_dynamic_slice_qty(
+            connector=FixedDepthConnector(),
+            symbol="BTC/USDT",
+            side="long",
+            base_slice_qty=150.0,
+            depth_ratio_threshold=0.10,
+        )
+        # "long" is not "buy", so default to bid_depth=100
+        # depth_ratio = 150/100 = 1.5 > 0.10 → adjusted=10
+        assert result == 10.0

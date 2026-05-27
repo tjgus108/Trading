@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-05-28 (Cycle 230)_
+_Last updated: 2026-05-28 (Cycle 231)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -12,19 +12,19 @@ _Last updated: 2026-05-28 (Cycle 230)_
 - **테스트**: 7,800+ passed (기존 flaky 45건 제외)
 - **리스크**: **Kelly(rolling win_rate+quarter-cap+레짐+MDD+스무딩+stress)** + BayesianKelly + VaR(CF+backtest+scipy_fallback+소표본경고) + DrawdownMonitor(4단계+cooldown+streak_grace+trailing_stop_signal) + VolTargeting(simple+EWMA) + CircuitBreaker(일일제한+급속하락+config확장+**15분윈도우FlashCrash**) + **RiskManager CF-VaR 통합+trailing_stop 통합+orchestrator 주입 완료**
 - **실행**: TWAP(76테스트+**unfilled_qty누적재시도+orderbook동적슬라이스**) + ML필터 + 레짐필터 + PaperTrader(VolTargeting+KellySizer+TieredSlippage+save_state/load_state+**load_state스키마검증**) + CB + HealthChecker + Notifier + Telegram + BayesianKelly live + RegimeDetector + PerformanceTracker(시간별+주간/월간PnL) + **orchestrator CF-VaR/DrawdownMonitor/PortfolioOptimizer 주입**
-- **데이터**: 실데이터+GARCH합성+BlockBootstrap합성+레짐캐시(동적TTL+레짐별 차등만료)+갭감지+DataFeed CB+FR/OI+0.055%+adaptive슬리피지+VPIN(극단불균형감지)+WebSocket(ConnectionHealthMonitor+**동적타임아웃+validate_timeout**)+RegimeFeature E2E+중복타임스탬프제거+스테일캐시자동무효화+**get_order_book_depth(5초TTL)**
+- **데이터**: 실데이터+GARCH합성+BlockBootstrap합성+레짐캐시(동적TTL+레짐별 차등만료)+갭감지+DataFeed CB+FR/OI+0.055%+adaptive슬리피지+VPIN(극단불균형감지)+WebSocket(ConnectionHealthMonitor+**동적타임아웃+validate_timeout**)+RegimeFeature E2E+중복타임스탬프제거+스테일캐시자동무효화+**get_order_book_depth(5초TTL)+OFICalculator(극단감지)+TTL일관성검증**
 - **드리프트 감지**: ADWINDriftDetector(delta=0.05) + DualGateADWINMonitor(피처+모델출력 이중게이트+EWMA accuracy+**should_retrain+model_health**)
 - **라이브**: live_paper_trader **100% 준비** (graceful shutdown+상태복원 포함)
 - **OOS 인프라**: run_bundle_oos.py — 5-Bundle Rolling OOS + **Rank Score** 리포트
 - **SIM 랭킹**: Composite Rank Score (6지표 가중합산) — paper_simulation + **bundle_oos** 양쪽 적용
 
-## 최근 작업 (Cycle 230)
+## 최근 작업 (Cycle 231)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
-| D (ML) | ✅ | bid_ask_depth_imbalance 피처 + compare_feature_importance() 메서드 |
-| E (실행) | ✅ | TWAP order book depth 기반 동적 슬라이스 (76 tests) |
-| SIM | ✅ | FAIL 원인 분석 심화, 파라미터 민감도(3/6/9개) 분석 |
-| F (리서치) | ✅ | Regime-aware MC, SPA test(arch), Paper→Live 73% 실패율/Sharpe 40-60% 감소 |
+| A (품질) | ✅ | TWAP 엣지케이스 17개 + compare_feature_importance 15개 테스트 (총 32개 추가) |
+| C (데이터) | ✅ | OFICalculator(극단감지) + Cache TTL 일관성 검증 (23 tests) |
+| SIM | ✅ | MC permutation block_size 파라미터 추가 (블록 셔플, 16 tests) |
+| F (리서치) | ✅ | Quarter-Kelly 권장, Stationary Bootstrap, Freqtrade/Hummingbot 성공 사례 |
 
 ## 주요 리스크/이슈
 - ⚠️ 실데이터 PASS 전략 0개
