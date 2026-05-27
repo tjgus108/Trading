@@ -1,30 +1,48 @@
-# Current Cycle Briefing
+======================================================================
+🔄 CYCLE 182 — 2026-05-20
+======================================================================
 
-_Cycle 223 — C(데이터) + B(리스크) + F(리서치)_
+_Cycle 224 — D(ML) + E(실행) + F(리서치)_
 _완료: 2026-05-27_
 
-## 수행 내용
+### [B] Risk Management
+- **Agent**: risk-agent
+- **Focus**: CircuitBreaker/DrawdownMonitor 로직 검증, Kelly Sizer 튜닝, VaR/CVaR 정확도
 
-### B(리스크) — orchestrator ↔ pipeline regime 연결
-- `src/pipeline/runner.py`: `TradingPipeline.current_regime: Optional[str] = None` 추가
-  - `_run_inner()` → `risk_manager.evaluate(..., regime=self.current_regime)` 전달
-- `src/orchestrator.py`: `run_once()` 내 `self._pipeline.current_regime = regime` 주입
-- Cycle 222에서 추가한 `adaptive_stop_multiplier(regime=...)` 이제 실제 파이프라인에서 작동
+### D(ML) — MLSignalGenerator feature_names 버그 수정
+- **파일**: `src/ml/model.py`
+- **버그**: `MLSignalGenerator.load()`가 `feature_names`/`trained_regime`을 로드하지 않음
+  - WalkForwardTrainer로 학습한 regime-aware 모델을 MLSignalGenerator로 로드하면 피처 불일치 발생
+  - `predict()` 시 sklearn이 feature count mismatch로 예외 → HOLD로 silently fallback
+- **수정**: `load()`에서 `feature_names`, `trained_regime` 로드, `predict()`에서 reindex 필터링 추가
+  - 누락 피처: `fill_value=0.0`, warning 로그 출력
 
-### C(데이터) — SSL/cert 에러 transient 분류
-- `src/data/feed.py`: `_is_transient_error()` SSL/cert string 감지 추가
-  - `ssl.SSLError` 등 ccxt 비래핑 SSL 에러도 transient 분류
-  - 이미 `_fetch_public_ohlcv`에 있는 SSL 처리 로직과 일관성 확보
+### E(실행) — TWAP price_limit 미전달 수정
+- **파일**: `src/pipeline/runner.py`
+- **버그**: `twap_executor.execute()` 호출 시 `price_limit` 미전달
+  - live mode에서 `filled_price = result.get("price", price_limit or 0.0)` → `price_limit=None`이면 fallback 0.0
+  - `impl_shortfall_bps` 오계산 → `(0.0 - entry_price) / entry_price * 10000` = -10000bps
+- **수정**: `price_limit=signal.entry_price` 전달 → 정확한 슬리피지 추정
 
-### 테스트
-- 7991 passed, 23 skipped ✅ (기존 테스트 깨진 것 없음)
+### FullCircuitBreakerAdapter — 이미 완료 확인
+- `orchestrator._build_risk()`: FullCB → FullCircuitBreakerAdapter 주입 정상 확인 (Cycle 221)
 
-## 시뮬레이션
-- Paper Sim (1h WF, BTC): 0/22 PASS. Top: `momentum_quality`(3.96), `supertrend_multi`(3.58)
-- Bundle OOS (4h, BTC): 0/5 PASS. `value_area` 상대 1위 (trades 희소)
+## 시뮬레이션 결과
 
-## 다음 사이클 (224)
-- 224 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)**
-- FullCircuitBreakerAdapter orchestrator 주입
-- TWAP 실행기 검증
-- value_area 신호 빈도 개선 검토
+### Paper Simulation (1h, Walk-Forward, BTC/USDT)
+- PASS: 0/22 (합성 데이터 구조적 한계)
+- TOP 3: `price_action_momentum` (Sharpe 6.59, PF 1.81), `momentum_quality` (Sharpe 6.63, PF 1.97), `cmf` (Sharpe 5.56)
+- `momentum_quality`: 최고 Sharpe (6.63) — 실거래소 검증 최우선
+
+### Bundle OOS (4h, 5-fold, BTC/USDT)
+- PASS: 0/5 (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
+- cmf, wick_reversal: IS Sharpe 100% 음수 → GBM 합성 부적합
+- `value_area`: avg trades 3.9 (저거래 지속)
+- OOS Sharpe std 3.4~6.4 → 불안정
+
+## 테스트 결과
+- 전체: 7991 passed, 23 skipped (변경 전후 동일)
+- ML 관련: 41 passed
+- TWAP/pipeline: 151 passed, 2 skipped
+
+## 다음 Cycle 225: A(품질) + C(데이터) + F(리서치)
