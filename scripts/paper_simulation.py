@@ -330,12 +330,14 @@ def evaluate_strategy_walk_forward(
                 "passed": bt.passed,
                 "fail_reasons": list(bt.fail_reasons) if bt.fail_reasons else [],
                 "final_balance": 10_000 * (1 + bt.total_return),
+                "fail_reasons": bt.fail_reasons,
             })
         except Exception as e:
             window_results.append({
                 "window": i + 1, "sharpe": 0, "total_return": 0, "max_dd": 0,
                 "profit_factor": 0, "trades": 0, "win_rate": 0, "passed": False,
-                "final_balance": 10_000, "error": str(e)[:80],
+                "final_balance": 10_000, "error": str(e)[:100],
+                "fail_reasons": [f"exception: {str(e)[:80]}"],
             })
 
     # 일관성 점수: 통과한 윈도우 비율
@@ -526,14 +528,13 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
         lines.append("## FAIL 원인 분석\n")
         lines.append("| Strategy | Top Fail Reasons (reason x count) |")
         lines.append("|----------|-----------------------------------|")
-        for r in failed_results[:20]:  # 상위 20개만 표시
+        for r in failed_results[:20]:
             reasons_str = ", ".join(
                 f"{reason} (x{cnt})" for reason, cnt in r["top_fail_reasons"][:3]
             )
             lines.append(f"| `{r['name']}` | {reasons_str} |")
         lines.append("")
 
-        # 전체 FAIL 전략의 공통 실패 원인 집계
         from collections import Counter as _Counter
         global_fail_counter: _Counter = _Counter()
         for r in results:

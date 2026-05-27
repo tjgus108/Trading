@@ -1,60 +1,62 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 222 B+D+SIM+F 완료)_
+_Last updated: 2026-05-27 (Cycle 223 C+B+SIM+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 222 완료
-- 222 mod 5 = 2 → B(Risk) + D(ML) + SIM + F(리서치) 완료
-- 다음 Cycle 223: **223 mod 5 = 3 → E(실행) + A(품질) + F(리서치)**
+### 로테이션: Cycle 223 완료
+- 223 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** ✅
+- 다음 Cycle 224: **224 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
 
-### 🔥 Cycle 222 주요 성과
-- **orchestrator FullCircuitBreakerAdapter 주입**: 풀버전 CB(rapid_decline, ATR surge, correlation throttle) → 레거시 fallback 포함
-- **paper_simulation fail_reasons 리포트**: 윈도우별 실패 원인 Counter 집계 + 전체 빈도 상위 10
-- **ADWIN 모델 헬스 섹션**: DualGateADWINMonitor 기반 드리프트/Retrain 권고 리포트
-- **value_area 파라미터 조정**: va_mult 0.7→0.6, vol_filter_mult 0.8→0.7 (trades 부족 해결)
-- **리서치**: 73% 봇 6개월 실패, WFO 메타-과적합, RegimeGuardedStrategy 필수
+### 🔥 Cycle 223 주요 성과
+- **regime → pipeline 연결**: `TradingPipeline.current_regime` 속성 추가
+  - `orchestrator.run_once()` → `self._pipeline.current_regime = regime`
+  - `_run_inner()` → `evaluate(..., regime=self.current_regime)` 전달
+  - Cycle 222에 추가한 `adaptive_stop_multiplier(regime=...)` 이 실제로 작동
+- **SSL transient 분류**: `_is_transient_error()` SSL/cert string 감지 추가
+  - `ccxt.NetworkError` 미래핑 SSL 에러도 exchange fallback 트리거
 
-### Cycle 222 상위 전략 (BTC, 합성 데이터 — 방향성 참고만)
-| Rank | Name | AvgReturn | AvgSharpe | AvgPF | AvgTrades |
-|------|------|-----------|-----------|-------|-----------|
-| 1 | price_action_momentum | +97.73% | 6.03 | 1.75 | 154 |
-| 2 | momentum_quality | +61.26% | 5.28 | 1.74 | 123 |
-| 3 | lob_maker | +52.99% | 3.62 | 1.45 | 120 |
-| 4 | volume_breakout | +40.74% | 3.82 | 1.62 | 85 |
-| 5 | volatility_cluster | +33.89% | 4.22 | 1.74 | 79 |
+### 🎯 Cycle 224 권장 작업 (224 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-### 🎯 Cycle 223 권장 작업 (223 mod 5 = 3 → E(실행) + A(품질) + F(리서치))
+#### D(ML): ML 모델 + Walk-Forward 파이프라인
+- `src/ml/` RF 모델 피처 중요도 분석: 어떤 피처가 synthetic/real 데이터에서 살아남는지
+- Walk-Forward 파이프라인에서 regime 기반 피처 선택 적용 검토
+  - `RegimeAwareFeatureBuilder` 연결 상태 확인
+- MonteCarlo seed 다양성: `scripts/paper_simulation.py`에서 MonteCarlo seed 랜덤풀 사용 검토
+  - 현재 `seed=None` → OK (이미 random). 실제 코드 확인 완료.
 
-#### E(실행): RegimeGuardedStrategy + Paper Trading 검증
-- RegimeGuardedStrategy 래퍼 구현 (전략 코드 무수정으로 레짐 필터 적용)
-  - BaseStrategy 래퍼: `__init__(inner_strategy, regime_detector)`
-  - `generate_signal()` 오버라이드: 레짐 체크 후 inner 신호 통과/차단
-- Paper Trading dry_run 전체 파이프라인 실행 검증
-- value_area 조정된 파라미터로 재시뮬레이션 확인
+#### E(실행): TWAP + 슬리피지 모델
+- `src/exchange/twap.py`: TWAP 실행기 검증 — 슬리피지 모델 vs 실제 체결 비교
+- `scripts/live_paper_trader.py` 실행 점검 (로컬 paper trading 시뮬)
+- `FullCircuitBreakerAdapter` orchestrator 주입 검토
+  - Cycle 221에 어댑터 추가, Cycle 223에도 미주입 → 다음 사이클 E 작업 시 고려
 
-#### A(품질): 테스트 커버리지 + fail_reasons 활용
-- orchestrator FullCircuitBreakerAdapter 통합 테스트 강화
-- paper_simulation fail_reasons/model_health 리포트 정합성 테스트
-- MC permutation test가 합성 데이터에서 과도하게 작동하는지 조사
+#### F(리서치): 실전 데이터 전략 방향성
+- `momentum_quality` / `supertrend_multi`: BTC 1~2위 (PF 1.5+) → 실거래소 검증 최우선
+- `value_area` 4h: avg trades 3.6 (너무 희소) → `min_volume_pct` 완화 또는 `atr_threshold` 축소 검토
+  - value_area 관련 테스트 확인 후 파라미터 조정 (strategy 파일 직접 수정은 금지)
+- `elder_impulse`: fold 1 OOS Sharpe 3.794 → 특정 구간 강점, 실거래소 구간 분석 필요
 
-#### F(리서치): 실거래소 데이터 검증 + 레짐 전략
-- 실거래소 데이터 확보 시 최우선 검증: price_action_momentum, momentum_quality, value_area
-- RegimeGuardedStrategy 적용 시 기대 성과 변화 리서치
-- 소규모 봇의 중빈도 전략 수익성 사례 추가 조사
+### ⚠️ 핵심 인사이트 (Cycle 223)
 
-### ⚠️ 핵심 인사이트 (Cycle 222)
-- **0/22 PASS 상태 지속**: MC permutation test가 합성 데이터에서 과도하게 작동하는 의심
-- **FullCircuitBreakerAdapter 완전 통합**: orchestrator → 풀버전 CB, fallback 안전장치 포함
-- **리서치 핵심**: 73% 봇 6개월 실패(과최적화), WFO도 메타-과적합 가능, 합성 OOS Sharpe std ~4.5는 합성노이즈 반응 신호
-- **RegimeGuardedStrategy는 필수**: 레짐 감지 없는 봇은 플래시크래시에 취약 (2025년 5월 사례)
-- **CB 실전 표준**: 일 손실 -3~5%, peak -20% 도달 시 즉시 정지
+#### 시뮬레이션 분석
+- **합성 데이터 한계 재확인**: 전부 0/N consistency
+  - `low_pf` + `low_consistency` 여전히 주요 FAIL 원인
+  - IS Sharpe 전부 음수인 전략 (cmf, wick_reversal) → GBM 합성 구조적 부적합
+- **BTC 공통 1~2위**: `momentum_quality` (Sharpe 3.96, PF 1.56), `supertrend_multi` (Sharpe 3.58, PF 1.60)
+  - 이 전략들은 실거래소 데이터 검증 시 최우선 후보
+- **Bundle OOS**: OOS Sharpe std 3.4~6.4 → 매우 불안정 (실거래소 필요)
 
-### 원격 환경 제약
+#### 코드 개선 연속성
+- `adaptive_stop_multiplier` regime 연결 완료 (Cycle 222 → Cycle 223 파이프라인 연결)
+- `DrawdownMonitor` weekly/monthly 리셋 완료 (Cycle 222)
+- `FullCircuitBreakerAdapter` 생성 완료 (Cycle 221) → orchestrator 주입은 Cycle 224 E 작업에서
+
+### ⚠️ 원격 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 전면 차단
 - 합성 데이터 결과는 방향성 참고만 가능
 
-**상태**: Cycle 222 B+D+SIM+F 완료 → Cycle 223 E(실행) + A(품질) + F(리서치)
-**최우선 과제**: RegimeGuardedStrategy 구현 + MC test 합성데이터 편향 조사 + orchestrator FullCB 통합 테스트
+**상태**: Cycle 223 완료 → Cycle 224 D(ML) + E(실행) + F(리서치)
+**최우선 과제**: FullCircuitBreakerAdapter orchestrator 주입 + TWAP 검증

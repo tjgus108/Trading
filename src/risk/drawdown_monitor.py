@@ -609,6 +609,28 @@ class DrawdownMonitor:
             self._halt_reason = ""
             logger.info("DrawdownMonitor: daily reset — WARNING cleared")
 
+    def reset_weekly(self, equity: float) -> None:
+        """주간 기준 잔고 리셋. HALT 레벨 해제.
+
+        새 주 시작 시 호출. weekly_start를 갱신하고, 주간 DD 초과로 인한
+        HALT 상태를 해제한다. FORCE_LIQUIDATE(월간)는 해제하지 않는다.
+        """
+        self._weekly_start = equity
+        if self._halted and self._alert_level == AlertLevel.HALT:
+            self._halted = False
+            self._alert_level = AlertLevel.NONE
+            self._halt_reason = ""
+            logger.info("DrawdownMonitor: weekly reset — HALT cleared")
+
+    def reset_monthly(self, equity: float) -> None:
+        """월간 기준 잔고 리셋. monthly_start 갱신만 수행.
+
+        새 월 시작 시 호출. FORCE_LIQUIDATE는 자동 해제하지 않는다.
+        월간 DD로 인한 FORCE_LIQUIDATE 해제는 force_resume()을 사용할 것.
+        """
+        self._monthly_start = equity
+        logger.info("DrawdownMonitor: monthly reset — monthly_start=%.2f", equity)
+
     # ── 수동 제어 ──────────────────────────────────────────────
 
     def force_halt(self, reason: str = "Manual halt") -> None:

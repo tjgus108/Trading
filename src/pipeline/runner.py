@@ -95,6 +95,7 @@ class TradingPipeline:
         self.twap_executor: Optional[TWAPExecutor] = None   # H4: TWAP order execution
         self.vol_targeting: Optional[VolTargeting] = None   # I3: Vol-targeted sizing
         self._trade_history: List[dict] = []               # H1: 거래 기록 (kelly 계산용)
+        self.current_regime: Optional[str] = None          # 오케스트레이터가 매 사이클 주입
         # 세무/감사 대비: 모든 체결을 append-only CSV에 기록
         self.trade_logger: Optional[TradeLogger] = (
             None if dry_run else TradeLogger("logs/trades.csv")
@@ -315,6 +316,7 @@ class TradingPipeline:
                 last_candle_pct_change=last_candle_pct,
                 candle_df=summary.df,
                 confidence=str(signal.confidence.name) if hasattr(signal.confidence, 'name') else str(signal.confidence),
+                regime=self.current_regime,
             )
             result.risk = risk_result
             result.pipeline_step = "risk"

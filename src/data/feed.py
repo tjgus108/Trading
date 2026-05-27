@@ -107,10 +107,13 @@ class CircuitBreaker:
 
 # Error classification
 def _is_transient_error(error: Exception) -> bool:
-    """네트워크/속도 제한 에러는 재시도 가능."""
+    """네트워크/속도 제한 에러는 재시도 가능. SSL/cert 에러도 포함 (환경 인터셉션 대응)."""
     if ccxt is None:
-        return isinstance(error, (TimeoutError, ConnectionError))
-    
+        if isinstance(error, (TimeoutError, ConnectionError)):
+            return True
+        err_str = str(error).lower()
+        return "ssl" in err_str or "certificate" in err_str
+
     transient_types = (
         ccxt.NetworkError,
         ccxt.RequestTimeout,
@@ -118,7 +121,11 @@ def _is_transient_error(error: Exception) -> bool:
         TimeoutError,
         ConnectionError,
     )
-    return isinstance(error, transient_types)
+    if isinstance(error, transient_types):
+        return True
+    # SSL/certificate errors (e.g. ssl.SSLError) not wrapped by ccxt
+    err_str = str(error).lower()
+    return "ssl" in err_str or "certificate" in err_str
 
 
 def _is_fatal_error(error: Exception) -> bool:

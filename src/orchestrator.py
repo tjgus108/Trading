@@ -919,6 +919,7 @@ class BotOrchestrator:
             )
             regime = SimpleRegimeDetector.detect(_summary.df)
             self._last_regime = regime
+            self._pipeline.current_regime = regime
             logger.info("Market regime: %s", regime)
         except Exception as _e:
             logger.debug("Regime detection failed (non-fatal): %s", _e)
