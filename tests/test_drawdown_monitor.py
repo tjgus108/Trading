@@ -589,7 +589,7 @@ class TestStreakRecoveryGraceSeconds:
             streak_recovery_grace_seconds=14400.0,  # 4시간
         )
         # 연속 손실 3회
-        base_time = time.monotonic()
+        base_time = 100000.0  # fixed value avoids float precision loss with large monotonic values
         with patch("time.monotonic", return_value=base_time):
             for i in range(3):
                 m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
@@ -617,7 +617,7 @@ class TestStreakRecoveryGraceSeconds:
             streak_recovery_grace_seconds=14400.0,
         )
         # 연속 손실 2회 (threshold 미만)
-        base_time = time.monotonic()
+        base_time = 100000.0  # fixed value avoids float precision loss with large monotonic values
         with patch("time.monotonic", return_value=base_time):
             m.record_trade_result(pnl=-100, equity=9900)
             m.record_trade_result(pnl=-100, equity=9800)
@@ -637,7 +637,7 @@ class TestStreakRecoveryGraceSeconds:
             loss_streak_threshold=3,
             streak_recovery_grace_seconds=14400.0,
         )
-        base_time = time.monotonic()
+        base_time = 100000.0  # fixed value avoids float precision loss with large monotonic values
         with patch("time.monotonic", return_value=base_time):
             for i in range(3):
                 m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)
@@ -655,7 +655,7 @@ class TestStreakRecoveryGraceSeconds:
             loss_streak_threshold=3,
             streak_recovery_grace_seconds=14400.0,
         )
-        base_time = time.monotonic()
+        base_time = 100000.0  # fixed value avoids float precision loss with large monotonic values
         with patch("time.monotonic", return_value=base_time):
             m.update(10000)
             for i in range(3):
@@ -683,7 +683,7 @@ class TestStreakRecoveryGraceSeconds:
             loss_streak_threshold=3,
             streak_recovery_grace_seconds=14400.0,
         )
-        base_time = time.monotonic()
+        base_time = 100000.0  # fixed value avoids float precision loss with large monotonic values
         with patch("time.monotonic", return_value=base_time):
             for i in range(3):
                 m.record_trade_result(pnl=-100, equity=10000 - (i + 1) * 100)

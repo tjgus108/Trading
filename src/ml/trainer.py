@@ -169,6 +169,7 @@ class WalkForwardTrainer:
         model_type: str = "rf",
         use_shap_selection: bool = False,
         regime_aware: bool = False,
+        use_scaler: bool = False,
     ):
         self.symbol = symbol
         self.n_estimators = n_estimators
@@ -185,6 +186,7 @@ class WalkForwardTrainer:
             self.model_type = model_type
         self.use_shap_selection = use_shap_selection  # SHAP/importance 기반 피처 선택
         self.regime_aware = regime_aware  # 레짐별 동적 피처 선택 활성화
+        self.use_scaler = use_scaler  # StandardScaler 정규화 여부
         fb_kwargs = dict(
             forward_n=forward_n, threshold=threshold,
             binary=binary,
@@ -201,6 +203,7 @@ class WalkForwardTrainer:
         self._feature_names: List[str] = []
         self._last_feature_importances: Dict[str, float] = {}
         self._trained_regime: Optional[str] = None  # 학습 시 감지된 레짐
+        self._scaler = None  # StandardScaler (use_scaler=True 시 저장)
 
     def select_features_pfi(
         self,
@@ -339,6 +342,40 @@ class WalkForwardTrainer:
             len(X_train), len(X_val), len(X_cal), len(X_test),
             X_train.shape[1] if len(X_train) > 0 else 0,
         )
+
+        # StandardScaler 정규화 (use_scaler=True 시)
+        # train set으로만 fit → val/cal/test는 transform만 (look-ahead 금지)
+        if self.use_scaler:
+            try:
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                X_train = pd.DataFrame(
+                    scaler.fit_transform(X_train),
+                    columns=X_train.columns,
+                    index=X_train.index,
+                )
+                X_val = pd.DataFrame(
+                    scaler.transform(X_val),
+                    columns=X_val.columns,
+                    index=X_val.index,
+                )
+                X_cal = pd.DataFrame(
+                    scaler.transform(X_cal),
+                    columns=X_cal.columns,
+                    index=X_cal.index,
+                )
+                X_test = pd.DataFrame(
+                    scaler.transform(X_test),
+                    columns=X_test.columns,
+                    index=X_test.index,
+                )
+                self._scaler = scaler
+                logger.info("StandardScaler 적용 완료 (train fit → val/cal/test transform)")
+            except ImportError:
+                logger.warning("StandardScaler 미지원 — scaler 비활성")
+                self._scaler = None
+        else:
+            self._scaler = None
 
         # 학습
         # max_features='sqrt': 앙상블 다양성 확보 (기본값 'auto'='sqrt'이지만 명시)
@@ -768,6 +805,7 @@ class WalkForwardTrainer:
             "feature_importances": self._last_feature_importances,
             "train_date": str(date.today()),
             "trained_regime": self._trained_regime,
+            "scaler": self._scaler,  # StandardScaler 또는 None
         }
         with open(path, "wb") as f:
             pickle.dump(payload, f)

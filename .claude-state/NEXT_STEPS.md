@@ -1,17 +1,20 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 225 SIM 완료)_
+_Last updated: 2026-05-27 (Cycle 226 코드 완료 + Bundle OOS 결과)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 225 SIM + B(리스크) 완료
-- 225 mod 5 = 0 → **A(품질) + B(리스크) + F(리서치)**
+### 로테이션: Cycle 226 코드 완료
+- 226 mod 5 = 1 → **B(리스크) + D(ML) + F(리서치)**
 - B(리스크) 2개 작업 완료:
-  1. DrawdownMonitor weekly/monthly 리셋 → orchestrator에 연동 완료
-  2. WFO plateau_score 추가 → WalkForwardOptimizer에 구현 완료
-- SIM(Paper Simulation) BTC 단일 실행 완료
+  1. kelly_sizer.py: Cornish-Fisher CF 클리핑 (극단 skew/kurtosis 방어)
+  2. kelly_sizer.py: compute_from_trades() + Bayesian shrinkage 추가
+- D(ML) 1개 작업 완료:
+  1. trainer.py: StandardScaler use_scaler=False 옵션 추가 (look-ahead 방지)
+- Bundle OOS: 0/5 PASS (OOS Sharpe std 3.4~6.4 불안정)
+- Paper Simulation: 실행 중 (SSL 제약 합성 데이터)
 
 ### Cycle 225 SIM 결과 (BTC/USDT, 합성 BlockBootstrap)
 
@@ -48,7 +51,16 @@ _Last updated: 2026-05-28 (Cycle 225 SIM 완료)_
 - **mc_p_value가 1위 (39.6%)** — 합성 데이터에서 신호 통계적 유의성 부족
 - **profit_factor 2위 (32.2%)** — 대부분 PF 1.2~1.5 구간에서 마진 탈락
 
-### 🎯 Cycle 226 작업 방향
+### Cycle 226 D(ML) 완료
+- **WalkForwardTrainer `use_scaler`** 추가: `src/ml/trainer.py`
+  - train set으로 StandardScaler fit, val/cal/test에 transform만 적용
+  - `save()`의 pkl payload에 `scaler` 키 포함
+  - 기존 기본값 `use_scaler=False`로 하위 호환 유지
+- **drift_detector.py ADWIN 파라미터**: 변경 불필요
+  - `delta=0.05` (금융 시계열 표준), `min_window=32` (>= 30) — 이미 적절
+- 테스트: `test_adwin_drift.py` 41 passed, `test_trainer.py` 53 passed, 3 skipped
+
+### 🎯 Cycle 227 작업 방향
 
 #### A(품질): 아직 남은 항목
 - quality_audit 재실행하여 value_area PASS 여부 확인
@@ -69,5 +81,13 @@ _Last updated: 2026-05-28 (Cycle 225 SIM 완료)_
 - SSL 인터셉션으로 외부 거래소 API 전면 차단
 - 합성 데이터 결과는 방향성 참고만 — "실전 PASS"라 단정 금지
 
-**상태**: Cycle 225 SIM + B(리스크) 완료
+### Cycle 226 B(리스크) 완료
+- **kelly_sizer.py** CF-VaR 극단값 클리핑 추가:
+  -  clipped to [-5, 5],  to [-2, 50] (z_cf 발산 방지)
+- **kelly_sizer.py**  메서드 추가:
+  - 빈 리스트, 모두손실, 모두수익, NaN/inf, 소표본 Bayesian shrinkage 모두 처리
+  - _trade_history deque에 자동 기록
+- 테스트: 70 passed (test_kelly_sizer_regime_edge_cases, test_kelly_integration, test_kelly_cornish_fisher)
+
+**상태**: Cycle 226 B(리스크) 완료
 **최우선 과제**: 실거래소 데이터 접근 시 상위 전략 재검증

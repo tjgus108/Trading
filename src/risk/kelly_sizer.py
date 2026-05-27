@@ -375,6 +375,11 @@ class KellySizer:
         # 편향 보정 첨도 (Fisher's excess kurtosis)
         excess_kurt = float(np.mean(standardized ** 4)) - 3.0
 
+        # Cornish-Fisher 안전 클리핑: 극단 skew/kurtosis는 z_cf 발산 유발
+        # 실증 범위 기준: |skew| <= 5, excess_kurt in [-2, 50]
+        skew = float(np.clip(skew, -5.0, 5.0))
+        excess_kurt = float(np.clip(excess_kurt, -2.0, 50.0))
+
         # 표준 정규 분위수: z = ppf(1 - confidence) → 음수 (손실 방향)
         # 근사: ppf(0.05) ≈ -1.6449
         p = 1.0 - confidence
@@ -522,6 +527,77 @@ class KellySizer:
             win_rate, avg_win, avg_loss, capital, price, atr, target_atr,
             regime=regime, mdd_size_multiplier=mdd_size_multiplier,
         )
+
+    def compute_from_trades(
+        self,
+        trades: List[float],
+        capital: float,
+        price: float,
+        atr: Optional[float] = None,
+        target_atr: Optional[float] = None,
+        regime: Optional[str] = None,
+        min_trades: int = 10,
+    ) -> float:
+        """최근 거래 수익률 리스트로부터 포지션 사이즈 계산.
+
+        trades: 거래 손익 비율 리스트 (양수=수익, 음수=손실, e.g. [0.02, -0.01, ...])
+
+        Edge cases:
+          - 빈 리스트 → 0.0 반환
+          - 모두 손실 (wins 없음) → avg_win=0 → compute()에서 0 반환
+          - 모두 수익 (losses 없음) → avg_loss=0 → kelly_f 계산 후 정상 반환
+          - NaN/inf 자동 제거
+          - 소표본(n < min_trades): Bayesian shrinkage로 win_rate 보정
+
+        내부적으로 _trade_history deque에도 기록하여 rolling 추적 유지.
+
+        Returns:
+            포지션 사이즈 (수량). 계산 불가 시 0.0.
+        """
+        if not trades:
+            return 0.0
+
+        arr = np.array(trades, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) == 0:
+            return 0.0
+
+        # _trade_history deque에 기록 (rolling 추적)
+        for v in arr:
+            self._trade_history.append(v)
+
+        wins = arr[arr > 0]
+        losses = arr[arr < 0]
+
+        # 모두 break-even이면 edge 없음
+        if len(wins) == 0 and len(losses) == 0:
+            return 0.0
+
+        n = len(arr)
+        raw_win_rate = len(wins) / n
+        avg_win = float(wins.mean()) if len(wins) > 0 else 0.0
+        avg_loss = float(abs(losses.mean())) if len(losses) > 0 else 0.0
+
+        # 소표본 Bayesian shrinkage
+        if n < min_trades:
+            shrink_factor = n / (n + min_trades)
+            win_rate = shrink_factor * raw_win_rate + (1.0 - shrink_factor) * 0.5
+        else:
+            win_rate = raw_win_rate
+
+        return self.compute(
+            win_rate=win_rate,
+            avg_win=avg_win,
+            avg_loss=avg_loss,
+            capital=capital,
+            price=price,
+            atr=atr,
+            target_atr=target_atr,
+            regime=regime,
+        )
+
+    # 최소 거래 수: 이보다 적으면 Kelly 추정이 통계적으로 불안정
+    MIN_TRADES_FOR_KELLY: int = 10
 
     # 레짐 → Kelly fraction 스케일 팩터
     # detect_regime() 반환값("bull","bear","crisis") 별칭도 포함
