@@ -1,5 +1,39 @@
 # Work Log
 
+## [2026-05-28] Cycle 224 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — RegimeAwareFeatureBuilder 연결 + 피처 중요도 리포팅:**
+- `src/ml/model.py`: MLSignalGenerator에 regime_aware 파라미터 추가
+  - load() 시 pkl에 trained_regime 있으면 자동 RegimeAwareFeatureBuilder 전환
+  - _build_inference_features(): 레짐 인식 여부에 따라 피처 빌드 분기
+  - predict(feed_regime=): DataFeed 캐시 레짐 직접 전달 가능
+- `src/ml/model.py`: feature_importance_report(top_n=10) 추가
+  - 순위, 중요도, 비율(%), 누적 기여도, 모델명, 레짐 정보 포함
+- 테스트: 7개 신규 추가, 195 기존 포함 전부 PASS
+
+**[E] 실행 — RegimeGuardedStrategy + TWAP 엣지 케이스:**
+- `src/strategy/base.py`: RegimeGuardedStrategy 래퍼 구현
+  - inner_strategy + regime_detector + allowed_regimes(기본 TREND/RANGE)
+  - 레짐 불일치 시 HOLD 반환, 메타데이터에 regime/guarded 플래그
+- `src/exchange/twap.py`: estimate_slippage 엣지 케이스 강화
+  - qty≤0 → 즉시 0.0 반환, 부동소수점 음수 → max(0.0) 보장
+- 테스트: 14개 신규 (strategy 6 + twap 8), 기존 전부 PASS
+
+**[SIM] Paper Simulation + Bundle OOS:**
+- 3심볼 전부 0/22 PASS — mc_p_value > 0.05 주요 원인
+- 크로스심볼 공통 상위: momentum_quality, price_action_momentum, supertrend_multi
+- value_area __init__ 버그 수정: 모듈 상수 미참조 → _VA_MULT 참조로 변경
+- run_bundle_oos.py ImportError fallback 추가
+- Bundle OOS: 0/5 PASS, OOS Sharpe std 3.4~6.4
+
+**[F] 리서치:**
+- MC permutation test 합성 편향: 잔여 구조에 과적합 경고 (Build Alpha)
+- WFO 메타-과적합 방지: IS-WFA-OOS 3단계 + plateau selection (ArXiv 2603.09219)
+- 레짐 기반 전환: RL+레짐 최대 164% 추가 수익, 레짐 레이블 정확도 필수 (Springer)
+- WFO plateau check 권장: 최적 파라미터 ±10% 범위 안정성 검증
+
+---
+
 ## [2026-05-28] Cycle 222b — B(리스크) + D(ML) + SIM + F(리서치) [병렬 세션]
 
 **[B] 리스크 — FullCircuitBreakerAdapter orchestrator 주입:**
@@ -17210,3 +17244,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 15:07 UTC] Cycle 224 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

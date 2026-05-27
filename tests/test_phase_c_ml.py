@@ -963,3 +963,102 @@ class TestMultiWindowEnsemble:
         mwe = MultiWindowEnsemble(n_estimators=20)
         results = mwe.train(df)
         assert len(results) == 3
+
+
+# ---------------------------------------------------------------------------
+# Cycle 224: MLSignalGenerator regime_aware + feature_importance_report
+# ---------------------------------------------------------------------------
+
+
+class TestMLSignalGeneratorRegimeAware:
+    """MLSignalGenerator의 regime_aware 모드 및 feature_importance_report 검증."""
+
+    def test_regime_aware_init(self):
+        """regime_aware=True이면 RegimeAwareFeatureBuilder가 설정됨."""
+        from src.ml.features import RegimeAwareFeatureBuilder
+        gen = MLSignalGenerator(regime_aware=True)
+        assert isinstance(gen.feature_builder, RegimeAwareFeatureBuilder)
+        assert gen.regime_aware is True
+
+    def test_default_init_uses_feature_builder(self):
+        """기본 초기화는 FeatureBuilder를 사용."""
+        gen = MLSignalGenerator()
+        assert isinstance(gen.feature_builder, FeatureBuilder)
+        assert gen.regime_aware is False
+
+    def test_predict_no_model_regime_aware(self):
+        """모델 없이 regime_aware=True predict 시 HOLD 반환."""
+        gen = MLSignalGenerator(regime_aware=True)
+        df = _make_df(200)
+        pred = gen.predict(df)
+        assert pred.action == "HOLD"
+        assert pred.confidence == 0.0
+
+    def test_feature_importance_report_no_data(self):
+        """feature_importances 없으면 no data 메시지."""
+        gen = MLSignalGenerator()
+        report = gen.feature_importance_report()
+        assert "no data" in report
+
+    def test_feature_importance_report_with_data(self):
+        """feature_importances가 있으면 순위별 보고서 생성."""
+        gen = MLSignalGenerator()
+        gen._feature_importances = {
+            "return_1": 0.25,
+            "ema_ratio": 0.20,
+            "atr_pct": 0.15,
+            "bb_position": 0.10,
+            "volume_ratio_20": 0.10,
+            "return_3": 0.08,
+            "donchian_pct": 0.07,
+            "macd_hist": 0.05,
+        }
+        gen._model_name = "test_model"
+        report = gen.feature_importance_report(top_n=5)
+        assert "FEATURE_IMPORTANCE_REPORT" in report
+        assert "test_model" in report
+        assert "return_1" in report
+        # 상위 5개만 출력 + 나머지 요약
+        assert "3 more features" in report
+        # cumul 포함
+        assert "cumul=" in report
+
+    def test_feature_importance_report_with_regime(self):
+        """trained_regime이 있으면 보고서에 레짐 정보 포함."""
+        gen = MLSignalGenerator()
+        gen._feature_importances = {"return_1": 0.5, "atr_pct": 0.5}
+        gen._model_name = "regime_model"
+        gen._trained_regime = "bull"
+        report = gen.feature_importance_report()
+        assert "regime: bull" in report
+
+    def test_load_auto_enables_regime_aware(self):
+        """trained_regime이 포함된 pkl 로드 시 자동으로 regime_aware 활성화."""
+        import pickle, tempfile, os
+        from src.ml.features import RegimeAwareFeatureBuilder
+
+        # 간단한 모델 파일 생성
+        payload = {
+            "model": None,  # 실제 모델은 필요 없음 (로드 테스트)
+            "name": "test_regime",
+            "class_order": [0, 1],
+            "feature_importances": {"return_1": 0.5},
+            "feature_names": ["return_1", "atr_pct"],
+            "trained_regime": "bear",
+            "train_date": "2026-01-01",
+        }
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            pickle.dump(payload, f)
+            tmp_path = f.name
+
+        try:
+            gen = MLSignalGenerator()
+            assert gen.regime_aware is False
+            result = gen.load(tmp_path)
+            assert result is True
+            assert gen.regime_aware is True
+            assert gen._trained_regime == "bear"
+            assert isinstance(gen.feature_builder, RegimeAwareFeatureBuilder)
+            assert gen._feature_names == ["return_1", "atr_pct"]
+        finally:
+            os.unlink(tmp_path)

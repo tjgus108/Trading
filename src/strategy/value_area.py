@@ -28,7 +28,7 @@ _VOL_FILTER_MULT = 0.7  # 거래량 필터: vol_ma * 0.7 이상 (1.0→0.8→0.7
 class ValueAreaStrategy(BaseStrategy):
     name = "value_area"
 
-    def __init__(self, va_period: int = 20, va_mult: float = 0.7, ema_short: int = 20, ema_long: int = 50, min_breach: float = 1.5, std_floor_pct: float = _STD_FLOOR_PCT, vol_filter_mult: float = _VOL_FILTER_MULT, **kwargs):
+    def __init__(self, va_period: int = _VA_PERIOD, va_mult: float = _VA_MULT, ema_short: int = _EMA_SHORT, ema_long: int = _EMA_LONG, min_breach: float = _MIN_BREACH, std_floor_pct: float = _STD_FLOOR_PCT, vol_filter_mult: float = _VOL_FILTER_MULT, **kwargs):
         self.va_period = va_period
         self.va_mult = va_mult
         self.ema_short = ema_short

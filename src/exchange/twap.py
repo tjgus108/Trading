@@ -292,13 +292,19 @@ class TWAPExecutor:
         Returns:
             슬리피지 비율 (소수, e.g. 0.001 = 0.1%). 항상 양수 (불리한 방향).
         """
+        # Edge case: qty <= 0 → 슬리피지 없음
+        if qty <= 0:
+            return 0.0
+
         if daily_volume is None or daily_volume <= 0:
             base = 0.00055  # Bybit taker fee 0.055% — PaperTrader fee_rate와 일관성
         else:
             ratio = qty / daily_volume
+            # ratio는 항상 양수 (qty > 0, daily_volume > 0)
             base = 0.1 * float(np.sqrt(ratio))
 
         # half-spread 보정: 스프레드의 절반만큼 추가 (주문이 호가를 건너뛸 때)
+        # spread_bps < 0 은 유효하지 않으므로 0으로 처리
         half_spread = (spread_bps / 10000.0) / 2.0 if spread_bps > 0 else 0.0
 
         # buy/sell 비대칭: buy는 시장 충격이 크고(얇은 ask), sell은 약간 작은 경향
@@ -310,7 +316,7 @@ class TWAPExecutor:
             elif side_lower == "sell":
                 base *= 0.95  # 매도 시 약간 완화
 
-        return base + half_spread
+        return max(base + half_spread, 0.0)
 
     def execute_with_drawdown_protection(
         self,

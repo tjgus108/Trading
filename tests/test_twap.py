@@ -321,3 +321,64 @@ class TestInputValidation:
     def test_n_slices_negative_raises(self):
         with pytest.raises(ValueError, match="n_slices"):
             TWAPExecutor(n_slices=-1)
+
+
+# ── 6. estimate_slippage 엣지 케이스 ─────────────────────────────────────────
+
+class TestEstimateSlippageEdgeCases:
+    """estimate_slippage의 엣지 케이스 검증."""
+
+    def test_zero_qty_returns_zero(self):
+        """qty=0 → 슬리피지 0."""
+        ex = _executor()
+        assert ex.estimate_slippage(qty=0.0, price=50_000.0) == 0.0
+
+    def test_negative_qty_returns_zero(self):
+        """qty < 0 → 슬리피지 0 (NaN이 아님)."""
+        ex = _executor()
+        result = ex.estimate_slippage(qty=-1.0, price=50_000.0, daily_volume=1_000_000)
+        assert result == 0.0
+
+    def test_zero_daily_volume_uses_default(self):
+        """daily_volume=0 → 기본값 0.00055."""
+        ex = _executor()
+        slip = ex.estimate_slippage(qty=1.0, price=50_000.0, daily_volume=0)
+        # side=None이므로 비대칭 보정 없음
+        assert slip == 0.00055
+
+    def test_negative_daily_volume_uses_default(self):
+        """daily_volume < 0 → 기본값 사용."""
+        ex = _executor()
+        slip = ex.estimate_slippage(qty=1.0, price=50_000.0, daily_volume=-100)
+        assert slip == 0.00055
+
+    def test_negative_spread_bps_ignored(self):
+        """spread_bps < 0 → half_spread = 0 (음수 무시)."""
+        ex = _executor()
+        slip_neg = ex.estimate_slippage(qty=1.0, price=50_000.0, spread_bps=-10.0)
+        slip_zero = ex.estimate_slippage(qty=1.0, price=50_000.0, spread_bps=0.0)
+        assert slip_neg == slip_zero
+
+    def test_buy_higher_than_sell(self):
+        """동일 조건에서 buy 슬리피지 > sell 슬리피지 (비대칭)."""
+        ex = _executor()
+        buy_slip = ex.estimate_slippage(qty=100, price=50_000, daily_volume=1_000_000, side="buy")
+        sell_slip = ex.estimate_slippage(qty=100, price=50_000, daily_volume=1_000_000, side="sell")
+        assert buy_slip > sell_slip
+
+    def test_result_always_non_negative(self):
+        """결과가 항상 >= 0."""
+        ex = _executor()
+        for qty in [0, 0.001, 100, 1_000_000]:
+            for dv in [None, 0, 1, 1_000_000]:
+                for side in [None, "buy", "sell"]:
+                    result = ex.estimate_slippage(qty=qty, price=50_000, daily_volume=dv, side=side)
+                    assert result >= 0.0, f"Negative slip: qty={qty}, dv={dv}, side={side}"
+
+    def test_spread_bps_adds_half_spread(self):
+        """spread_bps > 0 → half_spread가 추가됨."""
+        ex = _executor()
+        slip_no_spread = ex.estimate_slippage(qty=1.0, price=50_000.0, daily_volume=1_000_000)
+        slip_with_spread = ex.estimate_slippage(qty=1.0, price=50_000.0, daily_volume=1_000_000, spread_bps=20.0)
+        expected_half = (20.0 / 10000.0) / 2.0  # 0.001
+        assert abs((slip_with_spread - slip_no_spread) - expected_half) < 1e-10

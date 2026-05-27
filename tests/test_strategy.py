@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.base import Action, Confidence, Signal, REASONING_MAX_LEN
+from src.strategy.base import Action, BaseStrategy, Confidence, Signal, REASONING_MAX_LEN
 from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 from src.strategy.ema_cross import EmaCrossStrategy
 
@@ -196,3 +196,112 @@ def test_donchian_adx_high_trend_generates_signal():
     if signal.action == Action.HOLD:
         assert "ADX 낮음" not in signal.reasoning
     assert signal.action in (Action.BUY, Action.SELL, Action.HOLD)
+
+
+# ── RegimeGuardedStrategy 테스트 ─────────────────────────────────────────────
+
+from src.strategy.base import RegimeGuardedStrategy
+
+
+class _StubDetector:
+    """테스트용 레짐 감지기 스텁."""
+
+    def __init__(self, regime: str = "TREND"):
+        self._regime = regime
+
+    def detect(self, df):
+        return self._regime
+
+
+class _StubStrategy(BaseStrategy):
+    """테스트용 전략 스텁."""
+
+    name = "stub"
+
+    def __init__(self, action=Action.BUY):
+        self._action = action
+
+    def generate(self, df):
+        return Signal(
+            action=self._action,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(df["close"].iloc[-2]),
+            reasoning="stub signal",
+            invalidation="none",
+        )
+
+
+class TestRegimeGuardedStrategy:
+    """RegimeGuardedStrategy 래퍼 테스트."""
+
+    def test_allowed_regime_passes_inner_signal(self):
+        """허용된 레짐에서는 inner 전략 신호를 그대로 전달."""
+        df = _make_df(100)
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(Action.BUY),
+            regime_detector=_StubDetector("TREND"),
+            allowed_regimes=["TREND"],
+        )
+        signal = guarded.generate(df)
+        assert signal.action == Action.BUY
+        assert signal.metadata["regime"] == "TREND"
+        assert signal.metadata["guarded"] is False
+
+    def test_disallowed_regime_returns_hold(self):
+        """허용되지 않은 레짐에서는 HOLD 반환."""
+        df = _make_df(100)
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(Action.BUY),
+            regime_detector=_StubDetector("CRISIS"),
+            allowed_regimes=["TREND", "RANGE"],
+        )
+        signal = guarded.generate(df)
+        assert signal.action == Action.HOLD
+        assert "CRISIS" in signal.reasoning
+        assert signal.metadata["guarded"] is True
+
+    def test_default_allowed_regimes(self):
+        """기본값: TREND와 RANGE 허용, CRISIS 차단."""
+        df = _make_df(100)
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(Action.SELL),
+            regime_detector=_StubDetector("RANGE"),
+        )
+        signal = guarded.generate(df)
+        assert signal.action == Action.SELL
+
+        guarded_crisis = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(Action.SELL),
+            regime_detector=_StubDetector("CRISIS"),
+        )
+        signal_crisis = guarded_crisis.generate(df)
+        assert signal_crisis.action == Action.HOLD
+
+    def test_name_prefixed(self):
+        """name이 guarded_{inner.name} 형식."""
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(),
+            regime_detector=_StubDetector(),
+        )
+        assert guarded.name == "guarded_stub"
+
+    def test_regime_case_insensitive(self):
+        """레짐 비교가 대소문자 무관."""
+        df = _make_df(100)
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(Action.BUY),
+            regime_detector=_StubDetector("trend"),  # 소문자
+            allowed_regimes=["TREND"],
+        )
+        signal = guarded.generate(df)
+        assert signal.action == Action.BUY
+
+    def test_none_df_returns_hold(self):
+        """df=None이면 HOLD."""
+        guarded = RegimeGuardedStrategy(
+            inner_strategy=_StubStrategy(),
+            regime_detector=_StubDetector(),
+        )
+        signal = guarded.generate(None)
+        assert signal.action == Action.HOLD

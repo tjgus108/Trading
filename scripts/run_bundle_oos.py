@@ -321,7 +321,7 @@ def run_bundle_oos(
     else:
         try:
             df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
-        except RuntimeError as e:
+        except (RuntimeError, ImportError) as e:
             logger.warning("실거래소 데이터 수집 실패 (%s), 합성 데이터로 fallback", e)
             df = enrich_indicators(generate_synthetic_data(limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])

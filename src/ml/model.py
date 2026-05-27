@@ -24,7 +24,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from src.ml.features import FeatureBuilder
+from src.ml.features import FeatureBuilder, RegimeAwareFeatureBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -71,20 +71,29 @@ class MLSignalGenerator:
         symbol: str = "BTC/USDT",
         forward_n: int = 5,
         threshold: float = 0.003,
+        regime_aware: bool = False,
     ):
         self.symbol = symbol
-        self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
+        self.regime_aware = regime_aware
+        if regime_aware:
+            self.feature_builder = RegimeAwareFeatureBuilder(
+                forward_n=forward_n, threshold=threshold,
+            )
+        else:
+            self.feature_builder = FeatureBuilder(forward_n=forward_n, threshold=threshold)
         self._model = None
         self._model_name: str = "no model"
         self._label_map: Dict[int, str] = {1: "BUY", -1: "SELL", 0: "HOLD"}
         self._class_order: Optional[List[int]] = None  # 모델의 class 순서
         self._feature_importances: Dict[str, float] = {}
+        self._feature_names: List[str] = []  # 학습 시 사용된 피처 이름
+        self._trained_regime: Optional[str] = None  # 학습 시 감지된 레짐
         self._train_date: Optional[str] = None
         # Inference latency tracking (벤치마크 유틸)
         self._latency_ms: List[float] = []
 
     def load(self, path: str) -> bool:
-        """모델 파일 로드. 실패 시 False 반환."""
+        """모델 파일 로드. trained_regime이 있으면 자동으로 regime_aware 활성화. 실패 시 False 반환."""
         try:
             with open(path, "rb") as f:
                 data = pickle.load(f)
@@ -92,7 +101,16 @@ class MLSignalGenerator:
             self._model_name = data.get("name", Path(path).stem)
             self._class_order = data.get("class_order", [-1, 0, 1])
             self._feature_importances = data.get("feature_importances", {})
+            self._feature_names = data.get("feature_names", [])
+            self._trained_regime = data.get("trained_regime")
             self._train_date = data.get("train_date")
+
+            # 학습 시 레짐 인식 모델이었으면 자동으로 RegimeAwareFeatureBuilder 전환
+            if self._trained_regime and not isinstance(self.feature_builder, RegimeAwareFeatureBuilder):
+                self.feature_builder = RegimeAwareFeatureBuilder()
+                self.regime_aware = True
+                logger.info("Auto-enabled regime_aware mode (trained_regime=%s)", self._trained_regime)
+
             if self._feature_importances:
                 top3 = sorted(
                     self._feature_importances.items(),
@@ -115,11 +133,16 @@ class MLSignalGenerator:
             return False
         return self.load(str(pkls[0]))
 
-    def predict(self, df: pd.DataFrame) -> MLPrediction:
+    def predict(self, df: pd.DataFrame, feed_regime: Optional[str] = None) -> MLPrediction:
         """
         마지막 완성 캔들 기준 신호 예측.
         모델 없으면 HOLD, confidence=0 반환.
         추론 경과시간은 내부적으로 기록 (benchmark_stats()로 조회).
+
+        Args:
+            df: OHLCV DataFrame
+            feed_regime: DataFeed 캐시 레짐 (regime_aware=True 시 사용).
+                        None이면 내부 detect_regime() 자동 감지.
         """
         _t0 = time.perf_counter()
         try:
@@ -131,13 +154,16 @@ class MLSignalGenerator:
                     note="모델 없음 — WalkForwardTrainer로 학습 필요",
                 )
             else:
-                feat_df = self.feature_builder.build_features_only(df)
+                feat_df = self._build_inference_features(df, feed_regime)
                 if feat_df.empty:
                     result = self._hold("피처 계산 실패")
                 elif len(feat_df) < 2:
                     result = self._hold("피처 데이터 부족")
                 else:
                     X = feat_df.iloc[[-2]]  # shape (1, n_features)
+                    # 학습 시 사용된 피처 컬럼으로 정렬 (누락은 0.0)
+                    if self._feature_names:
+                        X = X.reindex(columns=self._feature_names, fill_value=0.0)
                     proba = self._model.predict_proba(X)[0]
                     classes = self._class_order or list(self._model.classes_)
 
@@ -169,6 +195,25 @@ class MLSignalGenerator:
             logger.debug("ML predict latency: %.2f ms (model=%s)", elapsed_ms, self._model_name)
 
         return result
+
+    def _build_inference_features(
+        self, df: pd.DataFrame, feed_regime: Optional[str] = None
+    ) -> pd.DataFrame:
+        """레짐 인식 여부에 따라 적절한 피처 빌드 수행.
+
+        regime_aware=True이고 RegimeAwareFeatureBuilder가 설정된 경우:
+          - feed_regime이 있으면 build_features_with_cached_regime() 사용
+          - 없으면 build_features_regime()으로 자동 감지
+        그 외: 기본 build_features_only() 사용.
+        """
+        if self.regime_aware and isinstance(self.feature_builder, RegimeAwareFeatureBuilder):
+            if feed_regime:
+                feat_df, regime = self.feature_builder.build_features_with_cached_regime(df, feed_regime)
+            else:
+                feat_df, regime = self.feature_builder.build_features_regime(df)
+            logger.debug("Regime-aware inference: regime=%s, features=%d", regime, feat_df.shape[1] if not feat_df.empty else 0)
+            return feat_df
+        return self.feature_builder.build_features_only(df)
 
     # ------------------------------------------------------------------
     # Inference benchmark utilities
@@ -226,6 +271,46 @@ class MLSignalGenerator:
             낮은 중요도 피처 이름 리스트. 모델 미로드 시 빈 리스트.
         """
         return [name for name, imp in self._feature_importances.items() if imp < threshold]
+
+    def feature_importance_report(self, top_n: int = 10) -> str:
+        """피처 중요도 순위 보고서 반환.
+
+        순위, 중요도 값, 비율(%), 누적 기여도를 포함한 텍스트 보고서.
+        로드된 모델에 feature_importances가 없으면 "(no data)" 반환.
+
+        Args:
+            top_n: 상위 N개 피처 출력 (기본 10)
+
+        Returns:
+            str: 순위별 피처명 + 중요도 + 누적 기여도
+        """
+        if not self._feature_importances:
+            return "FEATURE_IMPORTANCE: (no data)"
+
+        ranked = sorted(
+            self._feature_importances.items(), key=lambda x: x[1], reverse=True
+        )
+        total = sum(v for _, v in ranked)
+        cutoff = min(top_n, len(ranked))
+        lines = [
+            f"FEATURE_IMPORTANCE_REPORT (top {cutoff} / {len(ranked)}):",
+            f"  model: {self._model_name}",
+        ]
+        if self._trained_regime:
+            lines.append(f"  regime: {self._trained_regime}")
+        cumulative = 0.0
+        for rank, (fname, imp) in enumerate(ranked[:cutoff], start=1):
+            pct = imp / total * 100 if total > 0 else 0.0
+            cumulative += pct
+            lines.append(
+                f"  {rank:2d}. {fname:<22s} {imp:.4f}  ({pct:5.1f}%)  cumul={cumulative:5.1f}%"
+            )
+        # 하위 피처 요약 (top_n 이후)
+        if len(ranked) > cutoff:
+            rest_imp = sum(v for _, v in ranked[cutoff:])
+            rest_pct = rest_imp / total * 100 if total > 0 else 0.0
+            lines.append(f"  ... {len(ranked) - cutoff} more features ({rest_pct:.1f}% total)")
+        return "\n".join(lines)
 
     def _hold(self, note: str) -> MLPrediction:
         """note와 함께 HOLD 신호(confidence=0)를 반환하는 내부 헬퍼."""
