@@ -1,5 +1,30 @@
 # Work Log
 
+## [2026-05-27] Cycle 223 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[B] 리스크 — orchestrator ↔ pipeline regime 연결:**
+- `src/pipeline/runner.py`: `TradingPipeline.current_regime: Optional[str] = None` 속성 추가
+  - `_run_inner()` → `risk_manager.evaluate(..., regime=self.current_regime)` 전달
+- `src/orchestrator.py`: `run_once()` 내 regime 감지 후 `self._pipeline.current_regime = regime` 주입
+  - 매 사이클 SimpleRegimeDetector 결과가 리스크 평가에 자동 반영
+
+**[C] 데이터 — SSL/cert 에러 transient 분류 개선:**
+- `src/data/feed.py`: `_is_transient_error()` SSL/cert 에러 string 감지 추가
+  - `ssl.SSLError` 등 ccxt 래핑 안 된 SSL 에러도 transient 분류
+  - exchange fallback이 SSL 환경에서 더 확실하게 트리거됨
+
+**[SIM] 시뮬레이션 결과 (합성 데이터):**
+- Paper Sim (1h WF, BTC): 0/22 PASS. Top: `momentum_quality`(Sharpe 3.96, PF 1.56), `supertrend_multi`(Sharpe 3.58, PF 1.60)
+- Bundle OOS (4h, BTC): 0/5 PASS. `value_area` avg trades 3.6 (희소), `elder_impulse` fold1 PASS 유일
+
+**[F] 리서치:**
+- `momentum_quality`/`supertrend_multi`: PF 1.5+ 합성 데이터 1~2위 → 실거래소 1순위
+- `value_area` 4h: min_volume_pct 파라미터 완화 검토 필요 (trades 너무 희소)
+
+**테스트:** 7991 passed, 23 skipped ✅
+
+---
+
 ## [2026-05-27] Cycle 222 — B(리스크) + D(ML) + SIM + F(리서치)
 
 **[B] 리스크 — DrawdownMonitor + RiskManager 개선:**
@@ -17023,6 +17048,140 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-27 05:27 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-27 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 10:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-27 10:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-27 10:22 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

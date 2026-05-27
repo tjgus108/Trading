@@ -1,30 +1,30 @@
 # Current Cycle Briefing
 
-_Cycle 222 — B(리스크) + D(ML) + F(리서치)_
+_Cycle 223 — C(데이터) + B(리스크) + F(리서치)_
 _완료: 2026-05-27_
 
 ## 수행 내용
 
-### B(리스크)
-- `DrawdownMonitor.reset_weekly(equity)`: 주간 CB 해제 + weekly_start 갱신
-- `DrawdownMonitor.reset_monthly(equity)`: monthly_start 갱신 (FORCE_LIQUIDATE는 수동 해제)
-- `RiskManager.adaptive_stop_multiplier()`: `regime` 파라미터 + `_REGIME_STOP_BOUNDS` 테이블
-  - CRISIS≥2.5, HIGH_VOL/TREND_DOWN≥2.0, TREND_UP≤1.5
-- `RiskManager.evaluate()`: `regime` 파라미터 → `adaptive_stop_multiplier` 전달
+### B(리스크) — orchestrator ↔ pipeline regime 연결
+- `src/pipeline/runner.py`: `TradingPipeline.current_regime: Optional[str] = None` 추가
+  - `_run_inner()` → `risk_manager.evaluate(..., regime=self.current_regime)` 전달
+- `src/orchestrator.py`: `run_once()` 내 `self._pipeline.current_regime = regime` 주입
+- Cycle 222에서 추가한 `adaptive_stop_multiplier(regime=...)` 이제 실제 파이프라인에서 작동
 
-### D(ML)
-- `paper_simulation.py`: 윈도우별 `fail_reasons` 수집 + FAIL 진단 섹션
+### C(데이터) — SSL/cert 에러 transient 분류
+- `src/data/feed.py`: `_is_transient_error()` SSL/cert string 감지 추가
+  - `ssl.SSLError` 등 ccxt 비래핑 SSL 에러도 transient 분류
+  - 이미 `_fetch_public_ohlcv`에 있는 SSL 처리 로직과 일관성 확보
 
 ### 테스트
-- 신규 3건 추가 (reset_weekly/reset_monthly 테스트)
-- 전체 7987개 PASS
+- 7991 passed, 23 skipped ✅ (기존 테스트 깨진 것 없음)
 
 ## 시뮬레이션
-- Paper Sim: BTC/ETH/SOL 모두 0/22 PASS (low_pf 주원인)
-- Bundle OOS: 5전략 FAIL, value_area 최우선 (4/9 fold PASS)
-- 실거래소 검증 1순위: momentum_quality, price_action_momentum
+- Paper Sim (1h WF, BTC): 0/22 PASS. Top: `momentum_quality`(3.96), `supertrend_multi`(3.58)
+- Bundle OOS (4h, BTC): 0/5 PASS. `value_area` 상대 1위 (trades 희소)
 
-## 다음 사이클 (223)
-- 223 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)**
-- orchestrator.py에 regime 전달 연결
+## 다음 사이클 (224)
+- 224 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)**
 - FullCircuitBreakerAdapter orchestrator 주입
+- TWAP 실행기 검증
+- value_area 신호 빈도 개선 검토
