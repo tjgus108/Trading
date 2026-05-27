@@ -111,6 +111,51 @@ class ConnectionHealthMonitor:
         """5분 내 재연결이 threshold 이상이면 flapping(불안정) 판정."""
         return self.reconnection_rate(window_seconds) >= threshold
 
+
+    def validate_timeout_setting(self, base_interval: float, stale_timeout: float) -> dict:
+        """
+        타임아웃 설정 검증 및 조정 (Cycle 229).
+        
+        Args:
+            base_interval: 타임프레임 기간 (초, 예: 1h=3600s)
+            stale_timeout: 현재 설정된 stale timeout (초)
+        
+        Returns:
+            dict with validation results:
+            {
+                'is_valid': bool,               # 타임아웃이 합리적인 범위인지
+                'recommended_timeout': float,   # 권장 타임아웃 (base_interval * 1.5)
+                'current_timeout': float,       # 현재 설정값
+                'warning': str or None,         # 경고 메시지 (문제시)
+                'suggestion': str or None,      # 개선 제안 (문제시)
+            }
+        
+        Notes:
+            - 타임아웃 < base_interval: 정상 캔들도 stale 판정 위험
+            - 타임아웃 > base_interval * 5: 장시간 지연 감지 불가
+            - 권장: base_interval * 1.5 (50% 여유)
+        """
+        recommended = base_interval * 1.5
+        is_valid = True
+        warning = None
+        suggestion = None
+        
+        if stale_timeout < base_interval:
+            is_valid = False
+            warning = f"Timeout {stale_timeout}s < base_interval {base_interval}s: may incorrectly flag normal candles as stale"
+            suggestion = f"Increase timeout to at least {base_interval * 1.5}s"
+        elif stale_timeout > base_interval * 5:
+            warning = f"Timeout {stale_timeout}s > base_interval*5 ({base_interval*5}s): may miss connection issues"
+            suggestion = f"Consider {recommended}s for faster stale detection"
+        
+        return {
+            'is_valid': is_valid,
+            'recommended_timeout': recommended,
+            'current_timeout': stale_timeout,
+            'warning': warning,
+            'suggestion': suggestion,
+        }
+
     def get_health_summary(self) -> dict:
         """연결 상태 요약 딕셔너리 반환."""
         now = time.time()
@@ -142,7 +187,20 @@ class BinanceWebSocketFeed:
     def __init__(self, symbol: str = "btcusdt", interval: str = "1h", stale_timeout: float = 300.0):
         self.symbol = symbol.lower().replace("/", "")
         self.interval = interval
-        self._stale_timeout = stale_timeout
+        # Cycle 229: 타임프레임 기반 동적 타임아웃 계산
+        # 타임프레임별 기대 캔들 수신 간격: 1h=3600s, 4h=14400s, 1d=86400s
+        # 타임아웃 = 캔들 간격 * 1.5 (50% 여유)
+        tf_intervals = {
+            "1m": 60, "5m": 300, "15m": 900,
+            "1h": 3600, "4h": 14400, "1d": 86400
+        }
+        base_interval = tf_intervals.get(interval, 3600)
+        # 명시적 stale_timeout 지정이 없으면 타임프레임 기반 계산 (stale_timeout > 0)
+        if stale_timeout > 0:
+            self._stale_timeout = stale_timeout  # 명시적 설정값 사용
+        else:
+            self._stale_timeout = base_interval * 1.5  # 동적 계산 (타임프레임 * 1.5)
+        self._base_interval = base_interval  # 타임프레임 기간 저장 (나중에 재조정용)
         self._candles: Deque[CandleBar] = deque(maxlen=MAX_CANDLES)
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -266,6 +324,18 @@ class BinanceWebSocketFeed:
             uptime_seconds=uptime,
             total_candles_received=self._total_candles_received,
             consecutive_failures=self._consecutive_failures,
+        )
+
+    def validate_timeout_config(self) -> dict:
+        """
+        현재 타임아웃 설정 검증 (Cycle 229).
+        
+        Returns:
+            타임아웃 검증 결과 (validate_timeout_setting 위임)
+        """
+        return self._health_monitor.validate_timeout_setting(
+            base_interval=self._base_interval,
+            stale_timeout=self._stale_timeout,
         )
 
     # ------------------------------------------------------------------

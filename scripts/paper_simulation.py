@@ -14,6 +14,7 @@ Paper Trading 시뮬레이션 — 실제 Bybit 데이터로 전략들을 Walk-Fo
 from __future__ import annotations
 from typing import Optional, List, Dict, Tuple, Set
 
+import argparse
 import importlib
 import json
 import logging
@@ -759,11 +760,17 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     return report, results
 
 
-def run_simulation():
+def run_simulation(mc_p_threshold: float = 0.05):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)}")
     print("=" * 70)
+
+    # MC p-value 임계값 패치 (기본 0.05, --mc-p-threshold로 조절 가능)
+    import src.backtest.engine as _engine_mod
+    _engine_mod.MC_P_THRESHOLD = mc_p_threshold
+    if mc_p_threshold != 0.05:
+        print(f"[CONFIG] MC p-value threshold overridden: {mc_p_threshold}", flush=True)
 
     pass_list = load_pass_strategies()
     if not pass_list:
@@ -824,4 +831,12 @@ def run_simulation():
 
 
 if __name__ == "__main__":
-    sys.exit(run_simulation())
+    parser = argparse.ArgumentParser(description="Paper Trading Walk-Forward Simulation")
+    parser.add_argument(
+        "--mc-p-threshold",
+        type=float,
+        default=0.05,
+        help="MC permutation test p-value 상한 (기본 0.05, 예: 0.10으로 완화 가능)",
+    )
+    args = parser.parse_args()
+    sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold))

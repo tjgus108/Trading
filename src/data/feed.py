@@ -226,6 +226,10 @@ class DataFeed:
 
         # ─ 볼륨 단위 정규화
         self._volume_unit = volume_unit  # "base" (BTC) 또는 "quote" (USDT)
+        
+        # ─ Order book depth 캐시 (Cycle 229 개선)
+        self._order_book_cache: dict = {}  # (symbol, levels) → (depth_dict, timestamp)
+
     def _effective_ttl(self, symbol: str) -> float:
         """레짐 기반 캐시 TTL 계산. 고변동성이면 짧게, 저변동성이면 길게."""
         regime = self.get_cached_regime(symbol)
@@ -1144,6 +1148,114 @@ class DataFeed:
         except Exception as e:
             logger.warning("fetch_open_interest failed for %s: %s", symbol, e)
             return None
+
+
+
+    def get_order_book_depth(self, symbol: str, levels: int = 5, cache_ttl: int = 5) -> Optional[Dict]:
+        """
+        Order book depth 정보 조회 (호가창 깊이).
+        
+        TWAP 슬라이스 크기를 호가창 깊이에 동적 연동하기 위한 메서드.
+        
+        Args:
+            symbol: 거래 심볼 (예: "BTC/USDT")
+            levels: 호가 깊이 (기본 5 = 상위 5 호가, 최대 20)
+            cache_ttl: 캐시 유지 시간 (초, 기본 5초 - 호가창은 실시간 변동이 많으므로 짧은 TTL)
+        
+        Returns:
+            dict with structure:
+            {
+                'symbol': str,
+                'bids': [(price, volume), ...],    # 매수 호가 (가격 내림차순)
+                'asks': [(price, volume), ...],    # 매도 호가 (가격 오름차순)
+                'bid_depth': float,                 # 최상위 호가 5개 누적 물량
+                'ask_depth': float,                 # 최상위 호가 5개 누적 물량
+                'spread': float,                    # 호가 스프레드 = (ask[0] - bid[0]) / mid_price
+                'timestamp': float,                 # 조회 시간 (unix timestamp)
+            }
+            
+            실패 시 None 반환 (파이프라인 블록 금지, 호가창 미사용 시 안전)
+        
+        Notes:
+            - 캐시: (symbol, levels) 키로 관리하여 반복 조회 시 지연 방지
+            - 호가창은 실시간 변동이 크므로 짧은 TTL 필요 (VWAP/TWAP 신뢰도 보장)
+            - 레벨 개수 제한: 대부분 거래소는 20단계까지 지원
+            - SSL 인터셉션 환경 대응: transient 에러 시 None 반환 (fallback 자동 트리거)
+        """
+        # 호가 깊이 제한 검증
+        levels = min(max(levels, 1), 20)
+        cache_key = (symbol.upper(), levels)
+        now = time.time()
+        
+        # 호가창 캐시 확인 (짧은 TTL: 5초)
+        if cache_key in self._order_book_cache:
+            cached_data, ts = self._order_book_cache[cache_key]
+            if now - ts < cache_ttl:
+                logger.debug(
+                    "Order book depth cache HIT: %s levels=%d (age=%.1fs)",
+                    symbol, levels, now - ts
+                )
+                return cached_data
+        
+        # 캐시 미스: 거래소에서 호가 데이터 fetch
+        try:
+            logger.debug("Fetching order book depth: %s levels=%d", symbol, levels)
+            order_book = self.connector.fetch_order_book(symbol, limit=levels)
+            
+            if not order_book or 'bids' not in order_book or 'asks' not in order_book:
+                logger.warning("Invalid order book structure for %s", symbol)
+                return None
+            
+            bids = order_book['bids'][:levels]
+            asks = order_book['asks'][:levels]
+            
+            # 누적 물량 계산
+            bid_depth = sum(vol for _, vol in bids)
+            ask_depth = sum(vol for _, vol in asks)
+            
+            # 스프레드 계산 (mid_price 기반 퍼센티지)
+            best_bid = bids[0][0] if bids else None
+            best_ask = asks[0][0] if asks else None
+            
+            if best_bid and best_ask:
+                mid_price = (best_bid + best_ask) / 2
+                spread = (best_ask - best_bid) / mid_price if mid_price > 0 else 0
+            else:
+                spread = 0
+            
+            result = {
+                'symbol': symbol.upper(),
+                'bids': bids,
+                'asks': asks,
+                'bid_depth': bid_depth,
+                'ask_depth': ask_depth,
+                'spread': spread,
+                'timestamp': now,
+            }
+            
+            # 캐시 저장
+            self._order_book_cache[cache_key] = (result, now)
+            
+            logger.debug(
+                "Order book depth fetched: %s levels=%d, bid_depth=%.2f, ask_depth=%.2f, spread=%.4f%%",
+                symbol, levels, bid_depth, ask_depth, spread * 100
+            )
+            return result
+        
+        except Exception as e:
+            # Transient 에러는 로깅만 (파이프라인 블록 금지)
+            if _is_transient_error(e):
+                logger.warning(
+                    "Order book fetch transient error (%s): %s — returning None",
+                    type(e).__name__, symbol
+                )
+            else:
+                logger.error(
+                    "Order book fetch fatal error: %s — %s",
+                    symbol, type(e).__name__
+                )
+            return None
+
 
     @staticmethod
     def compute_fr_oi_features(fr_series: pd.Series, oi_series: pd.Series) -> pd.DataFrame:
