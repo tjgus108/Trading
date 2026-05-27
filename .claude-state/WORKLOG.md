@@ -1,5 +1,40 @@
 # Work Log
 
+## [2026-05-28] Cycle 229 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[C] 데이터 — DataFeed + WebSocket 개선 2건:**
+- `src/data/feed.py`: get_order_book_depth(symbol, levels=5) 메서드 추가
+  - 호가창 깊이 조회, 누적 물량/스프레드 계산, 5초 TTL 캐싱
+  - TWAP 슬라이스 크기 동적 연동의 기반
+- `src/data/websocket_feed.py`: 타임프레임 기반 동적 타임아웃 계산
+  - BinanceWebSocketFeed: 1h→5400s, 4h→21600s, 1d→129600s (간격×1.5)
+  - ConnectionHealthMonitor.validate_timeout_setting() 범위 검증 메서드
+  - WebSocketFeed.validate_timeout_config() 공개 메서드 추가
+- 테스트: 신규 10/10 + 기존 39/39 = 49 passed
+
+**[B] 리스크 — MC permutation threshold 파라미터화:**
+- `scripts/paper_simulation.py`: `--mc-p-threshold` CLI 옵션 추가
+  - 기본값 0.05 유지 (하위 호환), `--mc-p-threshold 0.10`으로 완화 가능
+  - MC_P_THRESHOLD 런타임 패치 방식으로 engine 모듈에 전달
+- VaR 소표본 임계값 검증: portfolio_optimizer(T<30 경고), kelly_sizer(min_trades=30/20) — 이미 적절, 변경 없음
+- 기존 테스트 전부 PASS
+
+**[SIM] FAIL 원인 분석 + 파라미터 민감도:**
+- PASS 기준 5개 확인: Sharpe≥1.0, MDD≤20%, PF≥1.5, Trades≥15, mc_p≤0.05 (AND 논리)
+- MC test: 부호 뒤집기, N=500 permutation
+- 파라미터 민감도: supertrend_multi(3개, 저위험), momentum_quality(6개, 중간), price_action_momentum(9개, 고위험)
+- 파라미터 많을수록 합성 데이터 과적합 → mc_p_value 취약
+
+**[F] 리서치 — Regime-aware MC + SPA test + Paper→Live 전환:**
+- Regime-aware MC: HMM 레짐 레이블로 블록 인덱스 활용, 공개 라이브러리 미존재(직접 구현 필요)
+- SPA test: `arch.bootstrap.SPA`로 즉시 사용 가능, 355+ 전략 다중 비교 시 overfitting 보정
+- Paper→Live 전환: 암호화폐 봇 73%가 6개월 내 실패, Sharpe 40-60% 감소 일반적
+  - 체크리스트: paper 30-90일, 5-10%→25%→풀 스케일 순차 투입
+  - paper 기준 Sharpe≥1.7 상향 검토 (live 40% 감소 감안)
+- 출처: arch 공식문서, Alpaca paper-live 가이드, 3commas 2025 리포트 등
+
+---
+
 ## [2026-05-28] Cycle 228 — E(실행) + A(품질) + SIM + F(리서치)
 
 **[E] 실행 — PaperTrader + TWAP 개선 2건:**
