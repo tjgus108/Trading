@@ -1,62 +1,64 @@
 # Next Steps
 
-_Last updated: 2026-05-27 (Cycle 223 C+B+SIM+F 완료)_
+_Last updated: 2026-05-27 (Cycle 224 D+E+SIM+F 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 로테이션: Cycle 223 완료
-- 223 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)** ✅
-- 다음 Cycle 224: **224 mod 5 = 4 → D(ML) + E(실행) + F(리서치)**
+### 로테이션: Cycle 224 완료
+- 224 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)** ✅
+- 다음 Cycle 225: **225 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
 
-### 🔥 Cycle 223 주요 성과
-- **regime → pipeline 연결**: `TradingPipeline.current_regime` 속성 추가
-  - `orchestrator.run_once()` → `self._pipeline.current_regime = regime`
-  - `_run_inner()` → `evaluate(..., regime=self.current_regime)` 전달
-  - Cycle 222에 추가한 `adaptive_stop_multiplier(regime=...)` 이 실제로 작동
-- **SSL transient 분류**: `_is_transient_error()` SSL/cert string 감지 추가
-  - `ccxt.NetworkError` 미래핑 SSL 에러도 exchange fallback 트리거
+### 🔥 Cycle 224 주요 성과
+- **MLSignalGenerator feature_names 버그 수정**: `load()` 시 `feature_names` + `trained_regime` 저장 → `predict()` 에서 reindex 필터링
+  - Regime-aware 모델 학습 후 inference 시 피처 dim 불일치 방지
+- **TWAP price_limit 버그 수정**: `runner.py`에서 `signal.entry_price`를 TWAP limit으로 전달
+  - 기존: price_limit=None → live mode filled_price fallback 0.0 → impl_shortfall_bps 오계산
+  - 수정: signal.entry_price를 price_limit으로 전달 → 정확한 슬리피지 추정
 
-### 🎯 Cycle 224 권장 작업 (224 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 225 권장 작업 (225 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): ML 모델 + Walk-Forward 파이프라인
-- `src/ml/` RF 모델 피처 중요도 분석: 어떤 피처가 synthetic/real 데이터에서 살아남는지
-- Walk-Forward 파이프라인에서 regime 기반 피처 선택 적용 검토
-  - `RegimeAwareFeatureBuilder` 연결 상태 확인
-- MonteCarlo seed 다양성: `scripts/paper_simulation.py`에서 MonteCarlo seed 랜덤풀 사용 검토
-  - 현재 `seed=None` → OK (이미 random). 실제 코드 확인 완료.
+#### A(품질): 백테스트 품질 재검증
+- 테스트 커버리지 확인: `python3 -m pytest tests/ --co -q | wc -l` → 7991개 테스트
+- `MLSignalGenerator` 테스트 추가: feature_names 필터링 검증 (새 유닛 테스트)
+  - 파일: `tests/test_ml_signal_generator.py` (있으면 수정, 없으면 신규)
+  - 케이스: regime-aware 모델 로드 후 predict → 피처 필터링 동작 확인
+- `scripts/quality_audit.py` 상태 확인 — QUALITY_AUDIT.csv 최신 여부 점검
 
-#### E(실행): TWAP + 슬리피지 모델
-- `src/exchange/twap.py`: TWAP 실행기 검증 — 슬리피지 모델 vs 실제 체결 비교
-- `scripts/live_paper_trader.py` 실행 점검 (로컬 paper trading 시뮬)
-- `FullCircuitBreakerAdapter` orchestrator 주입 검토
-  - Cycle 221에 어댑터 추가, Cycle 223에도 미주입 → 다음 사이클 E 작업 시 고려
+#### C(데이터): 데이터 인프라
+- `src/data/feed.py` WebSocket 안정성 확인: reconnect 로직 검증
+- `RegimeAwareFeatureBuilder` predict 경로: `build_features_regime()` 활용 여부 확인
+  - `MLSignalGenerator.predict()` 에서 regime 인식 추론 지원 검토
+  - 현재는 FeatureBuilder (all features) → 미래에 RegimeAwareFeatureBuilder 통합 옵션
+- DataFeed 캐시 전략: `fetch()` 중복 호출 방지 확인
 
 #### F(리서치): 실전 데이터 전략 방향성
-- `momentum_quality` / `supertrend_multi`: BTC 1~2위 (PF 1.5+) → 실거래소 검증 최우선
-- `value_area` 4h: avg trades 3.6 (너무 희소) → `min_volume_pct` 완화 또는 `atr_threshold` 축소 검토
-  - value_area 관련 테스트 확인 후 파라미터 조정 (strategy 파일 직접 수정은 금지)
-- `elder_impulse`: fold 1 OOS Sharpe 3.794 → 특정 구간 강점, 실거래소 구간 분석 필요
+- **최우선 실거래소 검증 후보** (Paper Sim + Bundle OOS 기반):
+  1. `momentum_quality`: Sharpe 6.63, PF 1.97, Trades 123 (합성 데이터 최고 Sharpe)
+  2. `price_action_momentum`: Sharpe 6.59, PF 1.81, Trades 163 (높은 거래 수)
+  3. `supertrend_multi`: Sharpe 3.97, PF 1.52 (안정적 중위)
+- `value_area` 4h: avg trades 3.9 (여전히 저거래) → NEXT 기회에 신호 완화
+- OOS Sharpe std > 4.0 전략 (cmf, wick_reversal): GBM 합성 구조적 부적합 → 실거래 필수
 
-### ⚠️ 핵심 인사이트 (Cycle 223)
+### ⚠️ 핵심 인사이트 (Cycle 224)
 
 #### 시뮬레이션 분석
-- **합성 데이터 한계 재확인**: 전부 0/N consistency
-  - `low_pf` + `low_consistency` 여전히 주요 FAIL 원인
-  - IS Sharpe 전부 음수인 전략 (cmf, wick_reversal) → GBM 합성 구조적 부적합
-- **BTC 공통 1~2위**: `momentum_quality` (Sharpe 3.96, PF 1.56), `supertrend_multi` (Sharpe 3.58, PF 1.60)
-  - 이 전략들은 실거래소 데이터 검증 시 최우선 후보
-- **Bundle OOS**: OOS Sharpe std 3.4~6.4 → 매우 불안정 (실거래소 필요)
+- **Paper Sim 새 TOP**: `price_action_momentum` (Sharpe 6.59) — 이전 Cycle에서 3위, 이번 1위
+- **공통 상위 전략**: `momentum_quality` (Sharpe 6.63, PF 1.97) — 두 시뮬 모두 상위 3위 이내
+- **합성 데이터 한계 재확인**: 0/4 consistency → 합성 GBM에서 window별 변동이 너무 큼
+- **cmf 역설**: Bundle OOS IS Sharpe 전부 음수지만 Paper Sim return +93.5% → 데이터 시드 의존성
 
 #### 코드 개선 연속성
-- `adaptive_stop_multiplier` regime 연결 완료 (Cycle 222 → Cycle 223 파이프라인 연결)
-- `DrawdownMonitor` weekly/monthly 리셋 완료 (Cycle 222)
-- `FullCircuitBreakerAdapter` 생성 완료 (Cycle 221) → orchestrator 주입은 Cycle 224 E 작업에서
+- `MLSignalGenerator.predict()` feature filtering 완료 (Cycle 224)
+- TWAP price_limit 연결 완료 (Cycle 224)
+- FullCircuitBreakerAdapter orchestrator 주입 완료 (Cycle 221, 확인 Cycle 224)
+- `adaptive_stop_multiplier` regime 연결 완료 (Cycle 222 → 223 파이프라인 연결)
 
-### ⚠️ 원격 환경 제약
-- SSL 인터셉션으로 외부 거래소 API 전면 차단
-- 합성 데이터 결과는 방향성 참고만 가능
+#### B(리스크): Risk Management 검증 ✅ COMPLETE
+- CircuitBreaker 플래시크래시 리셋 버그 수정
+- KellySizer, DrawdownMonitor, PerformanceMonitor 검증 완료
+- PortfolioOptimizer VaR/CVaR 정상
 
-**상태**: Cycle 223 완료 → Cycle 224 D(ML) + E(실행) + F(리서치)
-**최우선 과제**: FullCircuitBreakerAdapter orchestrator 주입 + TWAP 검증
+**상태**: Cycle 224 완료 → Cycle 225 A(품질) + C(데이터) + F(리서치)
+**최우선 과제**: MLSignalGenerator feature_names 유닛 테스트 추가 + momentum_quality 실거래소 검증 준비
