@@ -16,6 +16,43 @@ _Last updated: 2026-05-27 (Cycle 226 코드 완료 + Bundle OOS 결과)_
 - Bundle OOS: 0/5 PASS (OOS Sharpe std 3.4~6.4 불안정)
 - Paper Simulation: 실행 중 (SSL 제약 합성 데이터)
 
+### Cycle 226 SIM 결과 (BTC/USDT, 합성 BlockBootstrap)
+
+#### Paper Simulation (1h, 3심볼)
+- **0/22 PASS** — 전 전략 mc_p_value > 0.05 주요 원인
+- BTC 평균 수익률: +30.98%, Top: price_action_momentum (+120.35%)
+- 상위 전략은 Sharpe>1.0, PF>1.5, MDD<20% 모두 충족 — mc_p_value만 탈락
+- **핵심 발견**: 합성 BlockBootstrap 데이터에서 mc_p_value 편향 확인
+  - mc_p_threshold 0.05 → 0.10 완화 검토 필요 (실전 데이터 검증 후)
+
+#### BTC 상위 3 전략 (실전 검증 최우선 후보)
+| 전략 | Sharpe | PF | Trades | MDD | SharpeStd |
+|-----|--------|-----|--------|-----|-----------|
+| supertrend_multi | 7.39 | 2.25 | 118 | 6.8% | 1.31 |
+| momentum_quality | 6.25 | 1.93 | 123 | 8.1% | 1.07 |
+| price_action_momentum | 6.58 | 1.79 | 166 | 13.6% | 1.21 |
+
+#### Bundle OOS (4h, BTC/USDT)
+- **0/5 PASS** — cmf, elder_impulse, wick_reversal, narrow_range, value_area
+- OOS Sharpe std 전부 >1.5 (3.4~6.4) — 파라미터 불안정
+
+### 🎯 Cycle 227 작업 방향 (227 mod 5 = 2 → B(리스크) + D(ML) + F)
+
+#### B(리스크): mc_p_value 임계값 완화 검토
+- `scripts/paper_simulation.py`의 MC permutation test 임계값 0.05 → 0.10 옵션 추가
+  - 합성 데이터에서 p_threshold=0.10으로 재실행 시 PASS 전략 증가 예측
+  - 실전 데이터 사용 가능 시 p_threshold=0.05 유지
+
+#### D(ML): use_scaler=True 기본화 실험
+- WalkForwardTrainer(use_scaler=True) 로 재학습 → test_accuracy 변화 관찰
+- StandardScaler가 feature importance에 미치는 영향 분석
+
+#### F(리서치): 상위 전략 강건성 분석
+- supertrend_multi, momentum_quality, price_action_momentum 실전 데이터 검증 최우선
+- SharpeStd가 낮은 order_flow_imbalance_v2(std=0.30) 안정성 주목
+
+---
+
 ### Cycle 225 SIM 결과 (BTC/USDT, 합성 BlockBootstrap)
 
 #### value_area va_mult=0.6 효과

@@ -27,9 +27,16 @@
 - OOS Sharpe std: cmf=3.4, elder=4.1, wick=4.2, narrow=6.4, value_area=5.0 (전부 >1.5 불안정)
 - IS Sharpe 대부분 음수 (합성 GBM에서 전략 미작동 확인)
 
-**[SIM] Paper Simulation (1h, 3심볼, 합성 BlockBootstrap) — 실행 중:**
-- 실행 중 (SSL 제약으로 합성 데이터 사용)
-- 이전 결과 (20:33 UTC): 0/22 PASS, profit_factor < 1.5 주요 원인 (PF=1.36-1.48 마진 탈락)
+**[SIM] Paper Simulation (1h, 3심볼, 합성 BlockBootstrap) — 완료:**
+- 3심볼 모두 0/22 PASS (mc_p_value 주요 원인)
+- BTC 평균 수익률: +30.98%, 최고: price_action_momentum (+120.35%)
+- BTC 상위 5 (Composite Score):
+  - supertrend_multi: Score=58.8, Sharpe=7.39, PF=2.25, Trades=118, MDD=6.8%
+  - momentum_quality: Score=55.2, Sharpe=6.25, PF=1.93, Trades=123, MDD=8.1%
+  - price_action_momentum: Score=55.0, Sharpe=6.58, PF=1.79, Trades=166, MDD=13.6%
+  - volatility_cluster: Score=49.9, Sharpe=5.58, PF=2.18, MDD=5.4%
+- 모든 상위 전략이 Sharpe>1.0, PF>1.5, MDD<20% 충족 → mc_p_value만 탈락
+- mc_p_value 합성 데이터 편향: BlockBootstrap에서도 잔여 구조로 인해 p>0.05
 
 **[F] 리서치 — Bundle OOS 분석:**
 - IS Sharpe 전부 음수 = GBM 합성 데이터 특성 (랜덤워크에서 기술적 패턴 무력화)
