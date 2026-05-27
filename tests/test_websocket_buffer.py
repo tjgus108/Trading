@@ -133,6 +133,12 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
 
+import sys
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 8),
+    reason="AsyncMock requires Python 3.8+",
+)
 class TestWebSocketReconnect:
     """WebSocket 재연결 로직 검증 (외부 API 호출 없이 모킹)."""
 

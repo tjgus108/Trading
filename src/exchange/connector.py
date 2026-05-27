@@ -45,6 +45,8 @@ class ExchangeConnector:
         self._active_data_exchange: Optional[str] = None  # 현재 데이터 fetch에 사용 중인 거래소
 
     def connect(self) -> None:
+        if ccxt is None:
+            raise ImportError("ccxt library is not available (SSL or install issue)")
         exchange_class = getattr(ccxt, self.exchange_name)
         config = {
             "apiKey": os.environ["EXCHANGE_API_KEY"],

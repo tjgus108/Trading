@@ -49,7 +49,9 @@ def _make_buy_df(n=80):
     ema20 = close_s.ewm(span=20, adjust=False).mean()
     returns = close_s.pct_change()
     rv = returns.rolling(20).std()
-    rv_pct = rv.rolling(50).rank(pct=True)
+    rv_pct = rv.rolling(50).apply(
+        lambda x: pd.Series(x).rank(pct=True).iloc[-1], raw=False
+    )
     band_mult = 0.01 + 0.02 * rv_pct
     lower = ema20 * (1 - band_mult)
 
@@ -75,7 +77,9 @@ def _make_sell_df(n=80):
     ema20 = close_s.ewm(span=20, adjust=False).mean()
     returns = close_s.pct_change()
     rv = returns.rolling(20).std()
-    rv_pct = rv.rolling(50).rank(pct=True)
+    rv_pct = rv.rolling(50).apply(
+        lambda x: pd.Series(x).rank(pct=True).iloc[-1], raw=False
+    )
     band_mult = 0.01 + 0.02 * rv_pct
     upper = ema20 * (1 + band_mult)
 

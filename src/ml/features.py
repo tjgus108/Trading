@@ -605,6 +605,14 @@ class RegimeAwareFeatureBuilder:
         if X.empty or len(X) < 20:
             return {}
 
+        # y에 NaN이 남아있을 수 있으므로 제거하고 int 변환 (sklearn 호환)
+        valid = y.notna()
+        X = X.loc[valid]
+        y = y.loc[valid].astype(int)
+
+        if X.empty or len(X) < 20:
+            return {}
+
         rf = RandomForestClassifier(
             n_estimators=50, max_depth=4, random_state=42, n_jobs=1
         )

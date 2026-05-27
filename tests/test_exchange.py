@@ -30,6 +30,20 @@ except (ImportError, OSError):
     _mock_ccxt.NetworkError = type("NetworkError", (Exception,), {})
     _mock_ccxt.RequestTimeout = type("RequestTimeout", (_mock_ccxt.NetworkError,), {})
     _mock_ccxt.NotSupported = type("NotSupported", (Exception,), {})
+    _mock_ccxt.RateLimitExceeded = type("RateLimitExceeded", (_mock_ccxt.NetworkError,), {})
+    _mock_ccxt.DDoSProtection = type("DDoSProtection", (_mock_ccxt.NetworkError,), {})
+    _mock_ccxt.BadSymbol = type("BadSymbol", (Exception,), {})
+    _mock_ccxt.InvalidAddress = type("InvalidAddress", (Exception,), {})
+    _mock_ccxt.AuthenticationError = type("AuthenticationError", (Exception,), {})
+    _mock_ccxt.PermissionDenied = type("PermissionDenied", (Exception,), {})
+    # 알려진 거래소 클래스를 mock으로 등록 (다른 테스트에서 getattr(ccxt, name) 사용)
+    _MockExchangeClass = type("_MockExchange", (), {"__init__": lambda self, *a, **kw: None})
+    for _exch_name in (
+        "bybit", "binance", "okx", "kraken", "coinbase", "huobi",
+        "kucoin", "gate", "bitfinex", "bitmex", "deribit", "ftx",
+        "bitget", "mexc", "phemex", "bitmart", "gemini", "poloniex",
+    ):
+        setattr(_mock_ccxt, _exch_name, _MockExchangeClass)
     sys.modules["ccxt"] = _mock_ccxt
 
 import ccxt  # noqa: E402 — 이제 실제든 mock이든 import 가능
@@ -37,6 +51,18 @@ import ccxt  # noqa: E402 — 이제 실제든 mock이든 import 가능
 # connector 모듈 import 전에 ccxt가 sys.modules에 있어야 함
 from src.exchange.connector import ExchangeConnector, API_CALL_TIMEOUT  # noqa: E402
 from src.exchange.paper_connector import PaperConnector  # noqa: E402
+
+# 이미 로드된 모듈의 ccxt 참조를 mock으로 교체 (테스트 순서 의존 방지)
+if not HAS_CCXT:
+    import src.exchange.connector as _conn_mod
+    if _conn_mod.ccxt is None:
+        _conn_mod.ccxt = ccxt
+    try:
+        import src.data.feed as _feed_mod
+        if _feed_mod.ccxt is None:
+            _feed_mod.ccxt = ccxt
+    except Exception:
+        pass
 
 
 # ─────────────────────────────────────────────────────────────

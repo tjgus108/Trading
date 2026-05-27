@@ -813,6 +813,8 @@ class BotOrchestrator:
         self._last_regime: Optional[str] = None
         self._last_tournament_winner: Optional[str] = None
         self._last_run_date: Optional[date] = None
+        self._last_run_week: Optional[int] = None     # ISO week number for weekly reset
+        self._last_run_month: Optional[int] = None    # month number for monthly reset
         # Implementation Shortfall 누적 메트릭
         self._impl_shortfall_samples: List[float] = []
         self._drawdown_monitor = DrawdownMonitor(
@@ -858,13 +860,47 @@ class BotOrchestrator:
         self._assert_ready()
         self._update_funding_rates()
 
-        # 자정 감지: 날짜가 바뀌면 일일 손실 리셋
+        # 자정 감지: 날짜가 바뀌면 일일 손실 리셋 + DrawdownMonitor 기간별 리셋
         today = date.today()
         if self._last_run_date is not None and self._last_run_date != today:
             logger.info("날짜 변경 감지 (%s → %s): 일일 손실 리셋", self._last_run_date, today)
             if self._risk_manager:
                 self._risk_manager.reset_daily()
+            # DrawdownMonitor 일일 리셋
+            try:
+                balance = self._pipeline._fetch_balance_usd()
+                self._drawdown_monitor.reset_daily(balance)
+                logger.info("DrawdownMonitor daily reset: equity=%.2f", balance)
+            except Exception as e:
+                logger.debug("DrawdownMonitor daily reset skipped: %s", e)
+
+        # 주간 리셋: ISO week 변경 감지 (월요일 시작)
+        current_week = today.isocalendar()[1]
+        if self._last_run_week is not None and self._last_run_week != current_week:
+            logger.info("주간 변경 감지 (week %d → %d): DrawdownMonitor weekly reset",
+                        self._last_run_week, current_week)
+            try:
+                balance = self._pipeline._fetch_balance_usd()
+                self._drawdown_monitor.reset_weekly(balance)
+                logger.info("DrawdownMonitor weekly reset: equity=%.2f", balance)
+            except Exception as e:
+                logger.debug("DrawdownMonitor weekly reset skipped: %s", e)
+
+        # 월간 리셋: 월 변경 감지
+        current_month = today.month
+        if self._last_run_month is not None and self._last_run_month != current_month:
+            logger.info("월간 변경 감지 (month %d → %d): DrawdownMonitor monthly reset",
+                        self._last_run_month, current_month)
+            try:
+                balance = self._pipeline._fetch_balance_usd()
+                self._drawdown_monitor.reset_monthly(balance)
+                logger.info("DrawdownMonitor monthly reset: equity=%.2f", balance)
+            except Exception as e:
+                logger.debug("DrawdownMonitor monthly reset skipped: %s", e)
+
         self._last_run_date = today
+        self._last_run_week = current_week
+        self._last_run_month = current_month
 
         # DrawdownMonitor 체크 (거래 전)
         try:

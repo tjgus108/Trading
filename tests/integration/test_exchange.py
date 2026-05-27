@@ -12,6 +12,13 @@ from src.exchange.connector import ExchangeConnector
 
 
 def _require_credentials():
+    try:
+        import ccxt as _test_ccxt
+        # mock ccxt인지 확인 (실제 ccxt에는 __version__ 속성이 있음)
+        if not hasattr(_test_ccxt, "__version__"):
+            pytest.skip("ccxt is a mock module (real ccxt not available)")
+    except (ImportError, OSError):
+        pytest.skip("ccxt not available (SSL or install issue)")
     if not os.environ.get("EXCHANGE_API_KEY"):
         pytest.skip("No API credentials: set EXCHANGE_API_KEY and EXCHANGE_API_SECRET")
 

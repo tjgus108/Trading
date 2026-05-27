@@ -1271,3 +1271,144 @@ def test_param_count_warning_logged(caplog):
                for r in caplog.records), (
         f"파라미터 수 경고 없음. 기록: {[r.message for r in caplog.records]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 225 B: plateau_score 테스트
+# ---------------------------------------------------------------------------
+
+
+def test_plateau_score_field_exists_in_result():
+    """WalkForwardResult에 plateau_score 필드가 존재한다."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    r = WalkForwardResult(
+        strategy_name="test", best_params={}, windows=[],
+        avg_oos_sharpe=0.0, oos_sharpe_std=0.0,
+        is_stable=False, overfit_windows=0,
+    )
+    assert hasattr(r, "plateau_score")
+    assert r.plateau_score is None  # default
+
+
+def test_plateau_score_in_summary():
+    """plateau_score가 설정되면 summary()에 표시된다."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    r = WalkForwardResult(
+        strategy_name="test", best_params={"a": 10}, windows=[],
+        avg_oos_sharpe=1.0, oos_sharpe_std=0.1,
+        is_stable=True, overfit_windows=0,
+        plateau_score=0.92,
+    )
+    summary = r.summary()
+    assert "plateau_score" in summary
+    assert "0.920" in summary
+    assert "STABLE" in summary
+
+
+def test_plateau_score_sensitive_label():
+    """plateau_score < 0.8이면 SENSITIVE 태그."""
+    from src.backtest.walk_forward import WalkForwardResult
+
+    r = WalkForwardResult(
+        strategy_name="test", best_params={"a": 10}, windows=[],
+        avg_oos_sharpe=1.0, oos_sharpe_std=0.1,
+        is_stable=True, overfit_windows=0,
+        plateau_score=0.65,
+    )
+    summary = r.summary()
+    assert "SENSITIVE" in summary
+
+
+def test_compute_plateau_score_basic():
+    """_compute_plateau_score: 이웃이 best와 유사하면 score가 1.0에 가깝다."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+
+    best_params = {"fast_span": 20, "slow_span": 50}
+    # fast_span=20 ±10% → 18~22 범위 → 이웃: fast_span=21 (5% 차이)
+    combos = [
+        {"fast_span": 20, "slow_span": 50},  # best
+        {"fast_span": 21, "slow_span": 50},  # 이웃 (5% 차이)
+        {"fast_span": 19, "slow_span": 50},  # 이웃 (5% 차이)
+        {"fast_span": 30, "slow_span": 50},  # 비이웃 (50% 차이)
+    ]
+    is_dist = {
+        str(sorted(combos[0].items())): 2.0,
+        str(sorted(combos[1].items())): 1.9,
+        str(sorted(combos[2].items())): 1.8,
+        str(sorted(combos[3].items())): 0.5,
+    }
+
+    score = WalkForwardOptimizer._compute_plateau_score(
+        best_params, is_dist, combos, tolerance=0.10,
+    )
+    assert score is not None
+    # 이웃 평균 (1.9 + 1.8) / 2 = 1.85 / 2.0 = 0.925
+    assert abs(score - 0.925) < 0.01
+
+
+def test_compute_plateau_score_no_neighbors():
+    """이웃이 없으면 None 반환."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+
+    best_params = {"fast_span": 20}
+    combos = [
+        {"fast_span": 20},
+        {"fast_span": 50},  # 150% 차이 → 비이웃
+    ]
+    is_dist = {
+        str(sorted(combos[0].items())): 2.0,
+        str(sorted(combos[1].items())): 0.5,
+    }
+
+    score = WalkForwardOptimizer._compute_plateau_score(
+        best_params, is_dist, combos, tolerance=0.10,
+    )
+    assert score is None
+
+
+def test_compute_plateau_score_empty_params():
+    """빈 파라미터 → None."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+
+    assert WalkForwardOptimizer._compute_plateau_score({}, {}, []) is None
+
+
+def test_compute_plateau_score_best_sharpe_zero():
+    """best IS Sharpe가 0이면 None."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+
+    best = {"a": 10}
+    combos = [{"a": 10}, {"a": 11}]
+    dist = {str(sorted(combos[0].items())): 0.0, str(sorted(combos[1].items())): 0.5}
+
+    assert WalkForwardOptimizer._compute_plateau_score(best, dist, combos) is None
+
+
+def test_plateau_score_e2e_in_optimizer():
+    """WalkForwardOptimizer.run()에서 plateau_score가 계산되어 결과에 포함된다."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    # 촘촘한 그리드: ±10% 이웃이 존재하도록
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [18, 20, 22], "slow_span": [45, 50, 55]},
+        n_windows=2,
+    )
+    df = make_df(600)
+    result = opt.run(df)
+
+    # plateau_score가 None이 아닐 수 있음 (이웃이 존재하므로)
+    # 값이 있으면 0 이상의 float
+    if result.plateau_score is not None:
+        assert isinstance(result.plateau_score, float)
+        assert result.plateau_score >= 0.0

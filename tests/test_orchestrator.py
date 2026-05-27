@@ -729,3 +729,84 @@ def test_cycle_count_increments_on_run_once(cfg, mock_connector):
         assert orch._cycle_count == 1
         orch.run_once()
         assert orch._cycle_count == 2
+
+
+# ── DrawdownMonitor 기간별 리셋 오케스트레이션 테스트 ─────────────────────────
+
+
+def test_daily_reset_calls_drawdown_monitor_reset_daily(cfg, mock_connector):
+    """날짜가 바뀌면 DrawdownMonitor.reset_daily()가 호출된다."""
+    from datetime import date
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+    orch._last_run_date = date(2026, 5, 27)  # 어제
+    orch._last_run_week = 22
+    orch._last_run_month = 5
+
+    ok_status = MagicMock()
+    ok_status.halted = False
+    ok_status.alert_level = AlertLevel.NONE
+
+    with patch("src.orchestrator.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 28)  # 오늘
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        with patch.object(orch._drawdown_monitor, "update", return_value=ok_status):
+            with patch.object(orch._drawdown_monitor, "reset_daily") as mock_reset:
+                with patch.object(orch._pipeline, "_fetch_balance_usd", return_value=10000.0):
+                    orch.run_once()
+
+    mock_reset.assert_called_once_with(10000.0)
+
+
+def test_weekly_reset_calls_drawdown_monitor_reset_weekly(cfg, mock_connector):
+    """ISO 주차가 바뀌면 DrawdownMonitor.reset_weekly()가 호출된다."""
+    from datetime import date
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+    # 2026-05-25 = 월요일 (ISO week 22)
+    orch._last_run_date = date(2026, 5, 24)  # 일요일 (week 21)
+    orch._last_run_week = 21
+    orch._last_run_month = 5
+
+    ok_status = MagicMock()
+    ok_status.halted = False
+    ok_status.alert_level = AlertLevel.NONE
+
+    with patch("src.orchestrator.date") as mock_date:
+        mock_date.today.return_value = date(2026, 5, 25)  # 월요일 (week 22)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        with patch.object(orch._drawdown_monitor, "update", return_value=ok_status):
+            with patch.object(orch._drawdown_monitor, "reset_weekly") as mock_reset:
+                with patch.object(orch._drawdown_monitor, "reset_daily"):
+                    with patch.object(orch._pipeline, "_fetch_balance_usd", return_value=9500.0):
+                        orch.run_once()
+
+    mock_reset.assert_called_once_with(9500.0)
+
+
+def test_monthly_reset_calls_drawdown_monitor_reset_monthly(cfg, mock_connector):
+    """월이 바뀌면 DrawdownMonitor.reset_monthly()가 호출된다."""
+    from datetime import date
+    from src.risk.drawdown_monitor import AlertLevel
+
+    orch = _make_orch(cfg, mock_connector)
+    orch._last_run_date = date(2026, 5, 31)  # 5월 마지막 날
+    orch._last_run_week = 22
+    orch._last_run_month = 5
+
+    ok_status = MagicMock()
+    ok_status.halted = False
+    ok_status.alert_level = AlertLevel.NONE
+
+    with patch("src.orchestrator.date") as mock_date:
+        mock_date.today.return_value = date(2026, 6, 1)  # 6월 1일
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        with patch.object(orch._drawdown_monitor, "update", return_value=ok_status):
+            with patch.object(orch._drawdown_monitor, "reset_monthly") as mock_reset:
+                with patch.object(orch._drawdown_monitor, "reset_daily"):
+                    with patch.object(orch._pipeline, "_fetch_balance_usd", return_value=9000.0):
+                        orch.run_once()
+
+    mock_reset.assert_called_once_with(9000.0)

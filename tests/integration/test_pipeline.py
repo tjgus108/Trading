@@ -17,6 +17,12 @@ from src.strategy.donchian_breakout import DonchianBreakoutStrategy
 
 
 def _require_credentials():
+    try:
+        import ccxt as _test_ccxt
+        if not hasattr(_test_ccxt, "__version__"):
+            pytest.skip("ccxt is a mock module (real ccxt not available)")
+    except (ImportError, OSError):
+        pytest.skip("ccxt not available (SSL or install issue)")
     if not os.environ.get("EXCHANGE_API_KEY"):
         pytest.skip("No API credentials: set EXCHANGE_API_KEY and EXCHANGE_API_SECRET")
 

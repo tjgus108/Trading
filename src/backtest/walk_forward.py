@@ -111,6 +111,10 @@ class WalkForwardResult:
     fold_pass_rate: Optional[float] = None
     # low_trades_folds: OOS trades < 30인 fold 수 (통계적 신뢰도 낮음 경고)
     low_trades_folds: int = 0
+    # plateau_score: 최적 파라미터 주변 ±10% 범위의 IS Sharpe 안정성 (0~1)
+    # = mean(neighbor_sharpes) / best_sharpe.  1.0에 가까울수록 안정적.
+    # None이면 계산 불가 (그리드 내 이웃 없음 등)
+    plateau_score: Optional[float] = None
 
     @property
     def is_robust(self) -> bool:
@@ -137,6 +141,9 @@ class WalkForwardResult:
             lines.append(f"  [WARN] low_trades_folds: {self.low_trades_folds}/{len(self.windows)} (OOS<30 trades)")
         if self.weighted_oos_sharpe is not None:
             lines.append(f"  weighted_oos_sharpe: {self.weighted_oos_sharpe:.3f}")
+        if self.plateau_score is not None:
+            plateau_tag = "STABLE" if self.plateau_score >= 0.8 else "SENSITIVE"
+            lines.append(f"  plateau_score: {self.plateau_score:.3f} ({plateau_tag})")
         if self.param_stability_cv:
             unstable = {k: v for k, v in self.param_stability_cv.items() if v > 0.5}
             lines.append(f"  param_cv: {self.param_stability_cv}")
@@ -411,6 +418,19 @@ class WalkForwardOptimizer:
                 )
                 is_stable = False
 
+        # plateau_score: 최적 파라미터 ±10% 이웃의 IS Sharpe 안정성
+        plateau_score = self._compute_plateau_score(
+            best_final_params, last_is_sharpe_dist, all_combinations,
+        )
+        if plateau_score is not None and plateau_score < 0.8:
+            fail_reasons.append(
+                f"plateau_score={plateau_score:.3f} < 0.8 (파라미터 민감도 높음)"
+            )
+            logger.warning(
+                "[%s] plateau_score=%.3f — 최적 파라미터 주변 성과 불안정",
+                self.strategy_name, plateau_score,
+            )
+
         result = WalkForwardResult(
             strategy_name=self.strategy_name,
             best_params=best_final_params,
@@ -426,6 +446,7 @@ class WalkForwardOptimizer:
             wfe=wfe,
             fold_pass_rate=fold_pass_rate,
             low_trades_folds=low_trades_folds,
+            plateau_score=plateau_score,
         )
         logger.info(result.summary())
         return result
@@ -577,6 +598,85 @@ class WalkForwardOptimizer:
         values = list(self._param_grid.values())
         for combo in itertools.product(*values):
             yield dict(zip(keys, combo))
+
+    @staticmethod
+    def _compute_plateau_score(
+        best_params: dict,
+        is_sharpe_dist: Dict[str, float],
+        all_combinations: List[dict],
+        tolerance: float = 0.10,
+    ) -> Optional[float]:
+        """최적 파라미터 ±tolerance 범위 이웃의 IS Sharpe 안정성 점수 계산.
+
+        plateau_score = mean(neighbor_sharpes) / best_sharpe
+        1.0에 가까울수록 최적 파라미터 주변이 안정적 (평탄).
+        0에 가까울수록 최적 파라미터가 날카로운 봉우리 (과최적화 위험).
+
+        Args:
+            best_params: 최종 선택된 파라미터 dict.
+            is_sharpe_dist: {str(sorted(params.items())): is_sharpe} 분포.
+            all_combinations: 전체 파라미터 조합 리스트.
+            tolerance: 이웃 판단 기준 (기본 ±10%).
+
+        Returns:
+            plateau_score (0~1+) 또는 None (계산 불가 시).
+        """
+        if not best_params or not is_sharpe_dist:
+            return None
+
+        best_key = str(sorted(best_params.items()))
+        best_sharpe = is_sharpe_dist.get(best_key)
+        if best_sharpe is None or best_sharpe <= 0:
+            return None
+
+        # 이웃 파라미터 찾기: 각 파라미터 값이 best_params의 ±tolerance 이내인 조합
+        neighbor_sharpes: list = []
+        for combo in all_combinations:
+            combo_key = str(sorted(combo.items()))
+            if combo_key == best_key:
+                continue  # 자기 자신 제외
+            combo_sharpe = is_sharpe_dist.get(combo_key)
+            if combo_sharpe is None:
+                continue
+
+            is_neighbor = True
+            for pname, pval in best_params.items():
+                cval = combo.get(pname)
+                if cval is None:
+                    is_neighbor = False
+                    break
+                try:
+                    pval_f = float(pval)
+                    cval_f = float(cval)
+                except (TypeError, ValueError):
+                    # 비수치 파라미터: 동일해야 이웃
+                    if cval != pval:
+                        is_neighbor = False
+                        break
+                    continue
+                if abs(pval_f) < 1e-9:
+                    # 0에 가까운 경우: 절대 차이로 비교
+                    if abs(cval_f - pval_f) > tolerance:
+                        is_neighbor = False
+                        break
+                else:
+                    if abs(cval_f - pval_f) / abs(pval_f) > tolerance:
+                        is_neighbor = False
+                        break
+
+            if is_neighbor:
+                neighbor_sharpes.append(combo_sharpe)
+
+        if not neighbor_sharpes:
+            return None
+
+        mean_neighbor = sum(neighbor_sharpes) / len(neighbor_sharpes)
+        score = round(mean_neighbor / best_sharpe, 4)
+        logger.info(
+            "plateau_score: best_sharpe=%.4f neighbors=%d mean_neighbor=%.4f score=%.4f",
+            best_sharpe, len(neighbor_sharpes), mean_neighbor, score,
+        )
+        return score
 
 
 # ------------------------------------------------------------------
