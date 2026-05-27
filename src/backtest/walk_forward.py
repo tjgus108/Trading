@@ -1111,7 +1111,9 @@ class WalkForwardValidator:
                 "max_drawdown": oos_result.max_drawdown,
                 "total_trades": oos_result.total_trades,
                 "win_rate": oos_result.win_rate,
+                "profit_factor": oos_result.profit_factor,
                 "passed": oos_result.passed,
+                "fail_reasons": list(oos_result.fail_reasons),
                 "is_sharpe": is_result.sharpe_ratio,
                 "wfe": round(oos_result.sharpe_ratio / is_result.sharpe_ratio, 4)
                        if is_result.sharpe_ratio > 0 else

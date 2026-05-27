@@ -11,10 +11,6 @@ import traceback
 import warnings
 from pathlib import Path
 
-# 로깅/경고 억제 (외부 API 호출 에러 로그 방지)
-logging.getLogger().setLevel(logging.CRITICAL)
-for name in list(logging.root.manager.loggerDict.keys()):
-    logging.getLogger(name).setLevel(logging.CRITICAL)
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -387,6 +383,10 @@ def find_strategy_classes() -> List[Tuple[str, str, type]]:
 
 
 def run_audit():
+    logging.getLogger().setLevel(logging.CRITICAL)
+    for name in list(logging.root.manager.loggerDict.keys()):
+        logging.getLogger(name).setLevel(logging.CRITICAL)
+
     print("=" * 70)
     print("전략 품질 감사 (Quality Audit)")
     print("=" * 70)

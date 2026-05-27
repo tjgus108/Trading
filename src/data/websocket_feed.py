@@ -83,14 +83,11 @@ class ConnectionHealthMonitor:
     def __init__(self) -> None:
         self._start_time: float = time.time()
         self._last_candle_time: Optional[float] = None
-        self._reconnection_history: list = []  # [{timestamp, reason}]
+        self._reconnection_history: deque = deque(maxlen=self._MAX_HISTORY)
 
     def record_reconnection(self, reason: str) -> None:
         """재연결 이벤트 기록."""
         self._reconnection_history.append({"timestamp": time.time(), "reason": reason})
-        # 최근 10개만 유지
-        if len(self._reconnection_history) > self._MAX_HISTORY:
-            self._reconnection_history = self._reconnection_history[-self._MAX_HISTORY:]
 
     def record_candle(self) -> None:
         """캔들 수신 시 마지막 수신 시간 갱신."""
@@ -104,6 +101,16 @@ class ConnectionHealthMonitor:
             return False
         return (time.time() - self._last_candle_time) >= timeout_seconds
 
+    def reconnection_rate(self, window_seconds: float = 3600.0) -> float:
+        """최근 window_seconds 내 재연결 횟수 반환. 비율 높으면 연결 불안정."""
+        now = time.time()
+        cutoff = now - window_seconds
+        return sum(1 for ev in self._reconnection_history if ev["timestamp"] >= cutoff)
+
+    def is_flapping(self, window_seconds: float = 300.0, threshold: int = 3) -> bool:
+        """5분 내 재연결이 threshold 이상이면 flapping(불안정) 판정."""
+        return self.reconnection_rate(window_seconds) >= threshold
+
     def get_health_summary(self) -> dict:
         """연결 상태 요약 딕셔너리 반환."""
         now = time.time()
@@ -112,7 +119,9 @@ class ConnectionHealthMonitor:
             "uptime_seconds": now - self._start_time,
             "total_reconnections": len(self._reconnection_history),
             "last_candle_age_seconds": last_candle_age,
-            "is_healthy": not self.is_stale(),
+            "is_healthy": not self.is_stale() and not self.is_flapping(),
+            "is_flapping": self.is_flapping(),
+            "reconnection_rate_1h": self.reconnection_rate(3600.0),
             "reconnection_history": list(self._reconnection_history),
         }
 

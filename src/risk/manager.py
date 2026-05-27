@@ -161,6 +161,54 @@ class CircuitBreaker:
         self._consecutive_losses = 0
 
 
+class FullCircuitBreakerAdapter:
+    """circuit_breaker.CircuitBreaker(풀버전)을 RiskManager의 레거시 CB 인터페이스로 어댑트.
+
+    사용법:
+        from src.risk.circuit_breaker import CircuitBreaker as FullCB
+        full_cb = FullCB(daily_drawdown_limit=0.03, total_drawdown_limit=0.15)
+        adapter = FullCircuitBreakerAdapter(full_cb, initial_balance=10_000)
+        risk_mgr = RiskManager(circuit_breaker=adapter)
+    """
+
+    def __init__(self, full_cb, initial_balance: float):
+        self._cb = full_cb
+        self._peak_balance: float = initial_balance
+        self._daily_start_balance: float = initial_balance
+
+    def check(
+        self,
+        current_balance: float,
+        last_candle_pct_change: float,
+        current_price: Optional[float] = None,
+        timestamp: Optional[float] = None,
+    ) -> Optional[str]:
+        self._peak_balance = max(self._peak_balance, current_balance)
+
+        candle_open = candle_close = None
+        if last_candle_pct_change != 0.0 and current_price is not None and current_price > 0:
+            candle_close = current_price
+            denom = 1.0 + last_candle_pct_change
+            candle_open = current_price / denom if denom != 0 else None
+
+        result = self._cb.check(
+            current_balance=current_balance,
+            peak_balance=self._peak_balance,
+            daily_start_balance=self._daily_start_balance,
+            candle_open=candle_open,
+            candle_close=candle_close,
+        )
+        return result["reason"] if result["triggered"] else None
+
+    def record_trade_result(self, pnl: float, account_balance: float) -> None:
+        self._cb.record_trade_result(is_loss=(pnl < 0))
+
+    def reset_daily(self, new_daily_start: Optional[float] = None) -> None:
+        if new_daily_start is not None:
+            self._daily_start_balance = new_daily_start
+        self._cb.reset_daily(self._daily_start_balance)
+
+
 class RiskManager:
     def __init__(
         self,

@@ -1022,3 +1022,44 @@ class TestDrawdownMonitorRiskIntegration:
 
         assert cb_result2["triggered"] is True
         assert dd_status2.halted is True
+
+
+# ── FullCircuitBreakerAdapter ─────────────────────────────────────────────────
+
+def test_full_cb_adapter_no_trigger():
+    """풀버전 CB 어댑터: 정상 범위 → None 반환."""
+    from src.risk.circuit_breaker import CircuitBreaker as FullCB
+    from src.risk.manager import FullCircuitBreakerAdapter
+    full_cb = FullCB(daily_drawdown_limit=0.05, total_drawdown_limit=0.15)
+    adapter = FullCircuitBreakerAdapter(full_cb, initial_balance=10_000)
+    result = adapter.check(current_balance=9_800, last_candle_pct_change=-0.01)
+    assert result is None
+
+
+def test_full_cb_adapter_triggers_on_drawdown():
+    """풀버전 CB 어댑터: 일일 낙폭 초과 → 사유 문자열 반환."""
+    from src.risk.circuit_breaker import CircuitBreaker as FullCB
+    from src.risk.manager import FullCircuitBreakerAdapter
+    full_cb = FullCB(daily_drawdown_limit=0.05, total_drawdown_limit=0.15)
+    adapter = FullCircuitBreakerAdapter(full_cb, initial_balance=10_000)
+    result = adapter.check(current_balance=9_400, last_candle_pct_change=-0.02)
+    assert result is not None
+    assert "일일" in result
+
+
+def test_full_cb_adapter_with_risk_manager():
+    """FullCircuitBreakerAdapter를 RiskManager에 주입 → evaluate() 정상 동작."""
+    from src.risk.circuit_breaker import CircuitBreaker as FullCB
+    from src.risk.manager import FullCircuitBreakerAdapter, RiskManager, RiskStatus
+    full_cb = FullCB(daily_drawdown_limit=0.03, total_drawdown_limit=0.15)
+    adapter = FullCircuitBreakerAdapter(full_cb, initial_balance=10_000)
+    rm = RiskManager(circuit_breaker=adapter)
+    # 정상 범위 → APPROVED
+    res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=9_900,
+                      last_candle_pct_change=-0.01)
+    assert res.status == RiskStatus.APPROVED
+    # 낙폭 초과 → BLOCKED
+    res2 = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=9_600,
+                       last_candle_pct_change=-0.04)
+    assert res2.status == RiskStatus.BLOCKED
+    assert "Circuit breaker" in res2.reason
