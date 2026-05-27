@@ -1,38 +1,46 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 228 완료: E+A+SIM+F)_
+_Last updated: 2026-05-28 (Cycle 229 완료: C 개선)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### ✓ Cycle 228 완료 (2026-05-28)
-- **E(실행)**: PaperTrader load_state 스키마검증 + TWAP unfilled_qty 누적 재시도 (146 tests passed)
-- **A(품질)**: MLSignalGenerator regime_aware 추론 통합 테스트 3개 추가 (74 tests passed)
-- **SIM**: 0/22 PASS 유지 (합성 데이터 mc_p_value 편향)
-- **F(리서치)**: TWAP MEV 봇 위험, Paper→Live 슬리피지 사례, MC test 편향 대안 조사
+### ✓ Cycle 229 완료 (2026-05-28)
+- **C(데이터)**: 
+  - DataFeed.get_order_book_depth() 추가 (호가창 깊이 조회, TWAP 슬라이스 연동용)
+  - BinanceWebSocketFeed 타임프레임 기반 동적 타임아웃 계산 
+  - ConnectionHealthMonitor.validate_timeout_setting() 검증 메서드
+  - 신규 테스트 10/10 PASS + 기존 테스트 39/39 PASS
 
-### 🎯 Cycle 229 작업 방향 (229 mod 5 = 4 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 230 작업 방향 (230 mod 5 = 0 → A(품질) + D(ML) + SIM + F(리서치))
 
-#### C(데이터): 호가창 깊이 연동 검토
-- 리서치 결과: TWAP 슬라이스 크기를 호가창 깊이에 동적 연동 필요
-- DataFeed에서 order book depth 정보 접근 가능 여부 확인
-- WebSocket ConnectionHealthMonitor 안정성 점검
+#### A(품질): 데이터 품질 메트릭 수집 강화
+- Anomaly 감지율 추적 (duplicate_close, stale_feed, timestamp_gap 등)
+- Cache hit/miss 비율 실시간 모니터링
+- Order book depth 사용률 추적 (TWAP 슬라이스 조정용)
 
-#### B(리스크): MC permutation test 대안 검토
-- Regime-aware Monte Carlo (레짐 블록 단위 셔플) 검토
-- SPA(Superior Predictive Ability) test 구현 가능성 평가
-- mc_p_threshold 0.05 → 0.10 완화 옵션 추가 (실전 데이터 검증 후 적용)
+#### D(ML): Regime-aware VWAP 특성 추가
+- order_book_depth → ask/bid depth imbalance 피처
+- 호가창 스프레드 변동성 = 시장 유동성 지표
+- 레짐별 호가창 깊이 프로파일 분석
 
-#### F(리서치): 레짐 기반 MC test + 실전 전환 체크리스트
-- Regime-aware MC permutation 구현 사례 리서치
-- Paper→Live 전환 체크리스트 정립 (호가창 깊이 비율 등)
+#### SIM: MC permutation test 대안 평가
+- Regime-aware Monte Carlo: 블록 단위 셔플 (기존 완전 셔플 대체)
+- Block size selection: 블록 길이 = 레짐 전환 기간
+- SPA test 검토 (Superior Predictive Ability, Hansen 2005)
+
+#### F(리서치): TWAP 슬라이스 최적화
+- 호가창 깊이 비율 → 슬라이스 크기 매핑 (동적 TWAP)
+- 고변동성 시장에서 호가창 깊이 급락 시 슬라이스 축소
+- Paper→Live 체크리스트 (호가창 데이터 신뢰도, 스프레드 임계값)
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
 - 합성 데이터 결과는 방향성 참고만 — "실전 PASS" 단정 금지
+- Order book depth 실제 거래소 데이터는 아직 미수집 (스텁 상태)
 
 ### 핵심 메트릭
 - 상위 3 전략: supertrend_multi(Sharpe 7.39), momentum_quality(6.25), price_action_momentum(6.58)
 - 모두 Sharpe≥1.0, PF≥1.5, MDD≤20% 충족 → mc_p_value만 탈락
-- 테스트: 7,800+ passed
+- 테스트: 7,849 passed (229 추가)
