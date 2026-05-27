@@ -707,6 +707,68 @@ class WalkForwardTrainer:
             ranked = ranked[:top_n]
         return ranked
 
+    def compare_feature_importance(
+        self,
+        df: pd.DataFrame,
+        top_n: int = 10,
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        use_scaler=True / False 두 설정으로 각각 학습 후 피처 중요도를 비교.
+
+        동일한 df에서 스케일링 유무에 따른 feature_importances_ 차이를 확인.
+        WalkForwardTrainer(use_scaler=False)와 WalkForwardTrainer(use_scaler=True)를
+        내부적으로 별도 생성해 학습 후 상위 top_n 피처 중요도를 반환.
+
+        Args:
+            df: OHLCV DataFrame (최소 200 캔들 권장).
+            top_n: 각 결과에서 상위 N개 피처 반환 (기본 10).
+
+        Returns:
+            {
+                "no_scaler":  {feature: importance, ...},   # use_scaler=False
+                "with_scaler": {feature: importance, ...},  # use_scaler=True
+            }
+            학습 실패 시 해당 키 값은 빈 dict.
+
+        Example:
+            trainer = WalkForwardTrainer(symbol="BTC/USDT")
+            result = trainer.compare_feature_importance(df, top_n=8)
+            # result["no_scaler"] vs result["with_scaler"]
+        """
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.metrics import accuracy_score
+        except ImportError:
+            logger.error("scikit-learn 미설치")
+            return {"no_scaler": {}, "with_scaler": {}}
+
+        output: Dict[str, Dict[str, float]] = {}
+
+        for scaler_flag in (False, True):
+            key = "with_scaler" if scaler_flag else "no_scaler"
+            try:
+                tmp = WalkForwardTrainer(
+                    symbol=self.symbol,
+                    n_estimators=self.n_estimators,
+                    max_depth=self.max_depth,
+                    binary=self.binary,
+                    triple_barrier=self.triple_barrier,
+                    model_type=self.model_type if self.model_type != "xgboost" else "rf",
+                    regime_aware=self.regime_aware,
+                    use_scaler=scaler_flag,
+                )
+                result = tmp.train(df)
+                ranked = sorted(
+                    result.feature_importances.items(),
+                    key=lambda x: x[1], reverse=True,
+                )[:top_n]
+                output[key] = {f: round(imp, 4) for f, imp in ranked}
+            except Exception as e:
+                logger.warning("compare_feature_importance (%s) 실패: %s", key, e)
+                output[key] = {}
+
+        return output
+
     def compute_ensemble_weight(
         self,
         results: List["TrainingResult"],

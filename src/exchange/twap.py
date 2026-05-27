@@ -64,6 +64,95 @@ class TWAPExecutor:
         self.timeout_per_slice = timeout_per_slice
         self.max_retries_per_slice = max_retries_per_slice
 
+    def _calculate_dynamic_slice_qty(
+        self,
+        connector,
+        symbol: str,
+        side: str,
+        base_slice_qty: float,
+        depth_ratio_threshold: float = 0.10,
+    ) -> float:
+        """
+        호가창 깊이에 기반해 슬라이스 크기를 동적으로 조정.
+        
+        주문 크기가 호가창 깊이의 threshold(기본 10%)를 초과하면 슬라이스를 축소.
+        
+        Args:
+            connector: 거래소 커넥터 (get_order_book_depth 메서드 필수, 없으면 None 반환 가능)
+            symbol: 거래 심볼
+            side: "buy" | "sell"
+            base_slice_qty: 기본 슬라이스 크기 (조정 전)
+            depth_ratio_threshold: 호가창 깊이 대비 임계값 (기본 10%, 0.0 ~ 1.0)
+        
+        Returns:
+            조정된 슬라이스 크기 (호가창이 없으면 base_slice_qty 반환)
+        
+        Notes:
+            - connector에 fetch_order_book 메서드 없으면 fallback (기본 크기 반환)
+            - depth 데이터가 None이면 fallback (기본 크기 반환)
+            - side="buy"면 ask_depth, side="sell"면 bid_depth 사용
+            - 계산 실패해도 파이프라인 블록 없음 (항상 슬라이스 크기 반환)
+        """
+        # Connector 검증: order book 조회 메서드 확인
+        if connector is None or not hasattr(connector, 'fetch_order_book'):
+            return base_slice_qty
+        
+        try:
+            # 호가창 깊이 조회 시도
+            order_book = connector.fetch_order_book(symbol, limit=5)
+            if not order_book or 'bids' not in order_book or 'asks' not in order_book:
+                logger.debug(
+                    "Order book depth adjustment: invalid order book for %s, using base slice qty",
+                    symbol
+                )
+                return base_slice_qty
+            
+            bids = order_book.get('bids', [])
+            asks = order_book.get('asks', [])
+            
+            # 호가창 깊이(상위 5호가 누적) 계산
+            bid_depth = sum(vol for _, vol in bids[:5]) if bids else 0
+            ask_depth = sum(vol for _, vol in asks[:5]) if asks else 0
+            
+            # side 기반 적절한 깊이 선택
+            if side.lower() == 'buy':
+                market_depth = ask_depth  # buy 주문은 ask쪽 깊이가 중요
+            else:
+                market_depth = bid_depth  # sell 주문은 bid쪽 깊이가 중요
+            
+            if market_depth <= 0:
+                logger.debug(
+                    "Order book depth adjustment: zero market depth for %s %s, using base slice qty",
+                    symbol, side
+                )
+                return base_slice_qty
+            
+            # 슬라이스 크기가 호가창 깊이의 threshold를 초과하면 축소
+            depth_ratio = base_slice_qty / market_depth
+            if depth_ratio > depth_ratio_threshold:
+                adjusted_qty = market_depth * depth_ratio_threshold
+                logger.info(
+                    "Order book depth adjustment: %s %s slice_qty %.6f → %.6f "
+                    "(depth=%.2f, ratio=%.1f%%)",
+                    symbol, side, base_slice_qty, adjusted_qty,
+                    market_depth, depth_ratio * 100
+                )
+                return adjusted_qty
+            
+            logger.debug(
+                "Order book depth check: %s %s slice_qty=%.6f, depth=%.2f, ratio=%.1f%% (OK)",
+                symbol, side, base_slice_qty, market_depth, depth_ratio * 100
+            )
+            return base_slice_qty
+        
+        except Exception as e:
+            # 호가창 조회 실패 시 fallback (파이프라인 블록 없음)
+            logger.debug(
+                "Order book depth adjustment failed for %s: %s — using base slice qty",
+                symbol, type(e).__name__
+            )
+            return base_slice_qty
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -103,6 +192,10 @@ class TWAPExecutor:
                 f"price_limit must be > 0 in dry_run mode, got {price_limit}"
             )
         slice_qty = total_qty / self.n_slices
+
+        # Order book depth 기반 동적 슬라이스 조정
+
+        slice_qty = self._calculate_dynamic_slice_qty(connector, symbol, side, slice_qty)
         filled_prices: List[float] = []
         filled_quantities: List[float] = []
         partial_fills = 0

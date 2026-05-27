@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-28] Cycle 230 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — bid_ask_depth_imbalance 피처 + compare_feature_importance:**
+- `src/ml/features.py`: FeatureBuilder._compute_features()에 bid_ask_depth_imbalance 피처 추가
+  - 계산: (bid_depth - ask_depth) / (bid_depth + ask_depth + 1e-9)
+  - bid_depth/ask_depth 컬럼 없으면 피처 미생성 (안전 처리)
+  - REGIME_OPTIONAL_FEATURES bull/bear/ranging에 포함, crisis 제외
+- `src/ml/trainer.py`: compare_feature_importance(df, top_n=10) 메서드 추가
+  - use_scaler=False/True로 각각 학습 후 상위 피처 중요도 비교
+- 테스트: 118 passed
+
+**[E] 실행 — TWAP order book depth 기반 동적 슬라이스:**
+- `src/exchange/twap.py`: _calculate_dynamic_slice_qty() 메서드 추가 (~89줄)
+  - 호가창 깊이 대비 주문 크기가 임계값(10%) 초과 시 슬라이스 자동 축소
+  - Buy→ask depth, Sell→bid depth (side-aware)
+  - connector/order book 없으면 기존 고정 크기로 fallback
+- 테스트: 76 passed (기존 71 + 신규 5)
+
+**[SIM] mc_p_threshold=0.10 시뮬레이션 + SPA test 분석:**
+- mc_p_threshold=0.10 시뮬레이션 실행 (SSL 합성 데이터)
+- SPA test 분석: arch 라이브러리 미설치, 교체 범위 ~20-30줄
+  - 현재 sign randomization test (500 permutations, seed=42)
+  - arch.bootstrap.SPA로 교체 시 heteroscedasticity 처리 + 다중비교 보정
+
+**[F] 리서치 — OFI/WFO/리스크 실패 사례:**
+- Order Book Imbalance: VPIN이 BTC 가격 점프 예측에 유의미, OFI 기반 VAR-FNN 하이브리드 모델
+- WFO 최신: CPCV가 과적합 완화에 우수, 단 WFO가 여전히 표준
+- 리스크 실패: BitMEX 2024 Flash Crash (BTC $60K→$8.9K, 2분), Fractional Kelly(10-25%) 권장
+- 출처: ScienceDirect, arxiv, FTI Consulting 등
+
+---
+
 ## [2026-05-28] Cycle 229 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[C] 데이터 — DataFeed + WebSocket 개선 2건:**
@@ -18701,3 +18733,6 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-27 22:54 UTC] Cycle 229 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-27 23:00 UTC] Cycle 230 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

@@ -246,6 +246,17 @@ class FeatureBuilder:
             sopr_std = sopr.rolling(28, min_periods=5).std()
             feat["sopr_delta"] = sopr.diff(28) / (sopr_std + 1e-9)
 
+        # Order book depth imbalance (Cycle 230)
+        # df에 'bid_depth' + 'ask_depth' 컬럼이 있을 때만 추가
+        # 출처: DataFeed.get_order_book_depth() 반환 bid_depth / ask_depth
+        # 양수(>0): 매수 우세(bid > ask), 음수: 매도 우세
+        # 호가창 데이터 미수집 시 NaN → dropna로 안전하게 제거됨
+        if "bid_depth" in df.columns and "ask_depth" in df.columns:
+            bid = df["bid_depth"].replace(0, np.nan)
+            ask = df["ask_depth"].replace(0, np.nan)
+            total = bid + ask
+            feat["bid_ask_depth_imbalance"] = (bid - ask) / (total + 1e-9)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -384,9 +395,9 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
 
 # 각 레짐의 base 피처 외에 선택적 피처 (df에 컬럼 있으면 추가)
 REGIME_OPTIONAL_FEATURES: Dict[str, List[str]] = {
-    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta"],
-    "bear":    ["delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta"],
-    "ranging": ["btc_close_lag1", "sopr_delta"],
+    "bull":    ["btc_close_lag1", "delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta", "bid_ask_depth_imbalance"],
+    "bear":    ["delta_fr", "fr_oi_interaction", "exchange_netflow_norm", "sopr_delta", "bid_ask_depth_imbalance"],
+    "ranging": ["btc_close_lag1", "sopr_delta", "bid_ask_depth_imbalance"],
     "crisis":  ["delta_fr", "exchange_netflow_norm", "sopr_delta"],
 }
 
@@ -559,6 +570,7 @@ class RegimeAwareFeatureBuilder:
                     "fr_oi_interaction": "open_interest",
                     "exchange_netflow_norm": "exchange_netflow",
                     "sopr_delta": "sopr",
+                    "bid_ask_depth_imbalance": "bid_depth",
                 }.get(feat, feat)
                 if source_col in df.columns:
                     base_feats.append(feat)
