@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 234 E 진행중)_
+_Last updated: 2026-05-28 (Cycle 234 D 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -19,13 +19,16 @@ _Last updated: 2026-05-28 (Cycle 234 E 진행중)_
 
 ### 🎯 Cycle 234 작업 방향 (234 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### D(ML): 피처 중복 제거 + 레짐 조건부 fold 가중
-- `src/ml/features.py`에서 `bid_ask_depth_imbalance` 제거 (OFI와 완전 동일)
-  - Cycle 233에서 Pearson=1.0 확인 → 중복 피처 확정
-  - 제거 시 피처 수 -1 → 관련 테스트 업데이트 필요
-- walk_forward.py: 레짐 조건부 fold 가중치 (HIGH_VOL fold → 낮은 가중치)
-  - OOS Sharpe std 감소 목표: 현재 3.4~6.4 → 목표 < 2.0
-  - 구현: fold_weight = 1/(1 + regime_vol_factor) 로 HIGH_VOL fold 다운웨이팅
+#### D(ML): 피처 중복 제거 + 레짐 조건부 fold 가중 — ✅ COMPLETED
+- `src/ml/features.py`: `bid_ask_depth_imbalance` 완전 제거 확인 (이미 반영됨)
+  - REGIME_OPTIONAL_FEATURES, source_col 매핑, compute 블록 모두 없음
+- `src/backtest/walk_forward.py`: `use_regime_weights` + `oos_vols` + 가중치 로직 모두 반영됨
+- 테스트 4개 추가 (tests/test_feature_builder.py 2개, tests/test_walk_forward.py 2개):
+  - test_bid_ask_depth_imbalance_removed
+  - test_bid_depth_not_in_regime_features
+  - test_regime_weights_high_vol_downweighted
+  - test_regime_weights_equal_vol_equals_avg
+- 결과: 111 passed (0 failed)
 
 #### E(실행): TWAP + 체결 품질 개선
 - ✅ **COMPLETED**: TWAP 거래량 가중 슬라이스 크기

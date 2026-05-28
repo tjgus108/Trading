@@ -536,3 +536,31 @@ class TestGetFeatureImportance:
         df = _make_ohlcv(10)  # 너무 짧음
         result = builder.get_feature_importance(df, regime="bull")
         assert isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# Cycle 234 D(ML) — bid_ask_depth_imbalance 제거 검증
+# ---------------------------------------------------------------------------
+
+def test_bid_ask_depth_imbalance_removed():
+    """bid_ask_depth_imbalance가 REGIME_OPTIONAL_FEATURES 어느 레짐에도 없어야 함."""
+    from src.ml.features import REGIME_OPTIONAL_FEATURES
+    for regime, feats in REGIME_OPTIONAL_FEATURES.items():
+        assert "bid_ask_depth_imbalance" not in feats, (
+            f"bid_ask_depth_imbalance still present in REGIME_OPTIONAL_FEATURES['{regime}']"
+        )
+
+
+def test_bid_depth_not_in_regime_features():
+    """bid_depth/ask_depth 컬럼이 df에 있어도 bid_ask_depth_imbalance 피처가 생성되지 않아야 함."""
+    from src.ml.features import FeatureBuilder
+    builder = FeatureBuilder(forward_n=3, binary=True)
+    df = _make_ohlcv(200)
+    # bid_depth / ask_depth 컬럼 추가
+    df["bid_depth"] = 1000.0
+    df["ask_depth"] = 800.0
+    result = builder.build(df)
+    X = result["X"] if isinstance(result, dict) else result[0]
+    assert "bid_ask_depth_imbalance" not in X.columns, (
+        "bid_ask_depth_imbalance must not be generated even when bid_depth/ask_depth are present"
+    )

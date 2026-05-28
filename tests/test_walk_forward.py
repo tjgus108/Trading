@@ -1412,3 +1412,54 @@ def test_plateau_score_e2e_in_optimizer():
     if result.plateau_score is not None:
         assert isinstance(result.plateau_score, float)
         assert result.plateau_score >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Cycle 234 D(ML) — regime_weights (use_regime_weights) 단위 테스트
+# ---------------------------------------------------------------------------
+
+def test_regime_weights_high_vol_downweighted():
+    """HIGH_VOL fold는 낮은 가중치를 받아야 함.
+
+    수동으로 oos_vols + oos_sharpes를 구성해 가중치 공식을 직접 검증한다.
+    fold A: vol=0.01 (low), sharpe=0.5
+    fold B: vol=0.10 (high), sharpe=2.0
+    regime 가중치: w_A = 1/(1+0.01/mean), w_B = 1/(1+0.10/mean)
+    → w_A > w_B → weighted < equal-weighted average
+    """
+    oos_vols = [0.01, 0.10]
+    oos_sharpes = [0.5, 2.0]
+
+    mean_vol = sum(oos_vols) / len(oos_vols)
+    raw_weights = [1.0 / (1.0 + v / (mean_vol + 1e-9)) for v in oos_vols]
+    total_w = sum(raw_weights)
+    weights = [w / total_w for w in raw_weights]
+    weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
+    equal_avg = sum(oos_sharpes) / len(oos_sharpes)
+
+    # HIGH_VOL fold (sharpe=2.0) is downweighted → weighted < equal_avg
+    assert weighted < equal_avg, (
+        f"regime_weights should downweight high-vol fold: weighted={weighted:.4f} "
+        f"should be < equal_avg={equal_avg:.4f}"
+    )
+    # LOW_VOL fold (sharpe=0.5) gets higher weight
+    assert weights[0] > weights[1], (
+        f"Low-vol fold weight {weights[0]:.4f} should exceed high-vol fold weight {weights[1]:.4f}"
+    )
+
+
+def test_regime_weights_equal_vol_equals_avg():
+    """모든 fold의 변동성이 동일하면 weighted == simple average."""
+    oos_vols = [0.05, 0.05, 0.05]
+    oos_sharpes = [1.0, 2.0, 3.0]
+
+    mean_vol = sum(oos_vols) / len(oos_vols)
+    raw_weights = [1.0 / (1.0 + v / (mean_vol + 1e-9)) for v in oos_vols]
+    total_w = sum(raw_weights)
+    weights = [w / total_w for w in raw_weights]
+    weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
+    equal_avg = sum(oos_sharpes) / len(oos_sharpes)
+
+    assert abs(weighted - equal_avg) < 1e-9, (
+        f"Equal vol folds should give weighted={weighted:.6f} == avg={equal_avg:.6f}"
+    )
