@@ -443,42 +443,49 @@ class BacktestEngine:
     @staticmethod
     def _mc_permutation_test(trades: list, original_sharpe: float, block_size: int = 1) -> float:
         """Sign randomization test with optional block shuffling.
-        
+
+        Both the baseline and permuted Sharpe are computed from the same trade
+        PnL array so the comparison is on the same scale.  The equity-curve
+        Sharpe (original_sharpe) is intentionally NOT used as the threshold
+        because it is computed from candle-level returns and is not directly
+        comparable to trade-level statistics (different n → different std-error
+        of the mean, leading to inflated p-values).
+
         Args:
-            trades: list of trade returns
-            original_sharpe: original Sharpe ratio
-            block_size: size of blocks for shuffling (default 1 = sign randomization)
-                       block_size > 1: shuffle blocks of consecutive returns to preserve serial structure
-        
+            trades: list of trade PnL values
+            original_sharpe: unused (kept for API compatibility)
+            block_size: 1 = sign randomization; >1 = block shuffle
+
         Returns:
-            p-value (fraction of permutations with Sharpe >= original_sharpe)
+            p-value (fraction of permutations with trade-Sharpe >= baseline)
         """
         rng = np.random.default_rng(42)
         arr = np.array(trades, dtype=float)
         n = len(arr)
         ann = np.sqrt(8760)
-        n_better = 0
-        
-        # Ensure block_size is valid
+
         if block_size < 1:
             block_size = 1
-        
+
+        # Baseline: trade-based Sharpe (same formula as permuted)
+        trade_std = arr.std()
+        trade_sharpe = (arr.mean() / trade_std * ann) if trade_std > 1e-10 else 0.0
+
+        n_better = 0
         for _ in range(MC_N_PERMUTATIONS):
             if block_size == 1:
-                # Original behavior: sign randomization
                 signs = rng.choice([-1.0, 1.0], size=n)
                 perm_trades = arr * signs
             else:
-                # Block shuffling: shuffle blocks while preserving order within blocks
                 n_blocks = (n + block_size - 1) // block_size
                 blocks = [arr[i*block_size:(i+1)*block_size] for i in range(n_blocks)]
                 rng.shuffle(blocks)
                 perm_trades = np.concatenate(blocks)[:n]
-            
+
             mean_r = perm_trades.mean()
             std_r = perm_trades.std()
             perm_sharpe = (mean_r / std_r * ann) if std_r > 1e-10 else 0.0
-            if perm_sharpe >= original_sharpe:
+            if perm_sharpe >= trade_sharpe:
                 n_better += 1
-        
+
         return n_better / MC_N_PERMUTATIONS

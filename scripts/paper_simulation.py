@@ -642,7 +642,7 @@ def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
 # 환경변수 PAPER_SIM_BOOTSTRAP=0 으로 GBM 모드 강제 가능
 import os as _os
 USE_BLOCK_BOOTSTRAP = _os.environ.get("PAPER_SIM_BOOTSTRAP", "1") != "0"
-BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "36"))
+BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "72"))
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 

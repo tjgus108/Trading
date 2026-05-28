@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 234 완료)_
+_Last updated: 2026-05-28 (Cycle 235 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 228 → 234 (7사이클)
+### 이번 세션 완료 사이클: 228 → 235 (8사이클)
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -17,41 +17,44 @@ _Last updated: 2026-05-28 (Cycle 234 완료)_
 | 232 | B+D+SIM+F | KellySizer dynamic fraction, VPIN 피처, Sharpe IC, 버그 1건 수정 |
 | 233 | C+B+SIM+F | OFI/VPIN 상관성 분석, Kelly+MDD 통합, --pass-ratio 인자 추가 |
 | 234 | D+E+SIM+F | bid_ask_depth_imbalance 제거, regime fold weighting, TWAP volume-weights |
+| 235 | A+C+SIM+F | **MC test 버그 수정** (0→7/11/4 PASS), block_size 36→72 |
 
-### 🎯 Cycle 235 작업 방향 (235 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 236 작업 방향 (236 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): mc_p_value 계산 개선 + narrow_range PF 미달 분석
-- Cycle 234 Paper SIM: narrow_range PF 1.49 (기준 1.5에 -0.01 미달)
-  - `src/strategy/narrow_range.py` 신호 임계값 확인
-  - exit_pct 또는 min_range_ratio 파라미터 소폭 조정 검토
-  - 단, 합성 데이터 기준이므로 실거래소 검증 후 확정
-- momentum_quality: Sharpe 5.08이지만 mc_p_value > 0.05 → Consistency 0/4
-  - `scripts/paper_simulation.py` mc_p_value 계산 로직 점검
-  - Monte Carlo block bootstrap block_size 영향도 분석
+#### B(리스크): PASS 전략 리스크 파라미터 최적화
+- Cycle 235 Paper SIM PASS 전략 확인:
+  - BTC PASS 7종: price_action_momentum, momentum_quality, cmf, volume_breakout, order_flow_imbalance_v2, htf_ema, positional_scaling
+  - ETH PASS 11종: supertrend_multi(4/4!), cmf, price_action_momentum, volatility_cluster, volume_breakout, order_flow_imbalance_v2, momentum_quality, roc_ma_cross, narrow_range, htf_ema, value_area
+  - SOL PASS 4종: cmf, momentum_quality, order_flow_imbalance_v2, volatility_cluster
+- **크로스-심볼 안정 전략** (2심볼 이상 PASS): cmf, momentum_quality, order_flow_imbalance_v2
+- `src/risk/kelly_sizer.py`: cmf/momentum_quality/ofi_v2에 특화된 Kelly 파라미터 검토
+  - 현재: dynamic_fraction=0.5 (Cycle 232 추가)
+  - 제안: PASS 전략은 fraction 0.6까지 허용, FAIL은 0.3으로 축소
+- `src/risk/drawdown_monitor.py`: supertrend_multi 4/4 PASS → MDD 10.6% 우수, max_drawdown_limit 20%→18% 검토
 
-#### C(데이터): BlockBootstrap 블록 크기 확대 + WebSocket 안정성
-- IS Sharpe 100% 음수(cmf, wick_reversal): GBM block_size=36봉이 너무 짧아 추세 소실
-  - `scripts/paper_simulation.py`: block_size 36 → 72봉 (72h = 3일) 검토
-  - 72봉 블록으로 추세 성분 보존 → IS Sharpe 음수 비율 감소 기대
-- `src/data/websocket_feed.py`: 재연결 exponential backoff 검증
+#### D(ML): PASS 전략 피처 중요도 분석
+- order_flow_imbalance_v2: 3심볼 PASS, OFI + VPIN 피처 기여도 확인
+  - `src/ml/features.py`: VPIN/OFI 피처가 RandomForest에서 어느 정도 weight?
+  - 피처 중요도 상위 5개 추출 → 다음 피처 엔지니어링 방향
+- `src/ml/trainer.py`: walk_forward training에 supertrend_multi 시그널 통합 가능성 검토
+  - ETH supertrend_multi: Sharpe 5.54, 4/4 PASS → IS 신호 안정성 높음
 
-#### SIM: use_regime_weights=True 효과 검증
-- 이번 사이클(234) walk_forward에 use_regime_weights 추가됨
-- 다음 SIM에서 OOS Sharpe std 감소 확인 (목표: 3.4~6.4 → < 2.0)
-- run_bundle_oos.py에 --use-regime-weights 플래그 추가 검토
-
-#### F(리서치): GBM 합성 데이터 vs 실거래소 乖離 + 블록 크기 영향
-- GBM block_size 감도 분석: 36/72/144봉 비교 → IS Sharpe 분포 변화
-- narrow_range fold 8: OOS Sharpe -14.1 극단값 → IS/OOS 레짐 불일치 원인 분석
+#### F(리서치): 크로스-심볼 전략 일관성 + 4h OOS 개선 방향
+- cmf + momentum_quality + order_flow_imbalance_v2: 왜 3심볼 PASS인가?
+  - 공통점: 트렌드 추종 + OFI 기반 진입 조건
+  - BTC/ETH/SOL 모두 변동성 구조가 비슷한 블록 부트스트랩에서 강함
+- run_bundle_oos.py 4h OOS: IS Sharpe 전부 음수 문제
+  - 4h GBM block_size도 72로 업데이트 필요 (현재 기본값 36)
+  - `scripts/run_bundle_oos.py` 내 block_size 설정 확인
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
-- 합성 데이터 결과는 방향성 참고만
+- 합성 데이터 결과는 방향성 참고만 — 실전 데이터 PASS 기준 미충족
 
-### 핵심 메트릭
-- 상위 3: momentum_quality(Sharpe 5.08, +55%), price_action_momentum(Sharpe 3.74, +47%), narrow_range(Sharpe 3.35, PF 1.49)
-- 테스트: 8,127 passed (Cycle 234 +14개)
-- 새로 추가된 인프라:
-  - bid_ask_depth_imbalance 중복 제거 (features.py)
-  - regime 조건부 fold 가중치 (walk_forward.py use_regime_weights)
-  - TWAP volume-weighted slices (twap.py volume_weights)
+### 핵심 메트릭 (Cycle 235 기준)
+- **크로스-심볼 PASS (2종+)**: cmf, momentum_quality, order_flow_imbalance_v2, volume_breakout, htf_ema
+- **최강 단일 심볼**: ETH supertrend_multi (4/4, Sharpe 5.54), BTC price_action_momentum (3/4, Sharpe 5.21)
+- **테스트**: 8,127 passed (Cycle 235 변화 없음 — 코드 수정만)
+- **핵심 인프라 수정**:
+  - MC test 버그 수정: equity-curve Sharpe vs trade PnL 단위 불일치 → 동일 기준 비교로 통일
+  - BlockBootstrap block_size 36→72 (3일 블록, 추세 보존 강화)
