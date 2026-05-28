@@ -1,46 +1,51 @@
 ======================================================================
-🔄 CYCLE 234 — 2026-05-28
+🔄 CYCLE 233 — 2026-05-28T14:49:25.361483Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리
-
-### [D] ML & Signals
-- **Focus**: 중복 피처 제거 + regime 조건부 fold 가중치
-- **완료**:
-  - `src/ml/features.py`: bid_ask_depth_imbalance 완전 제거 (OFI Pearson=1.0 중복)
-  - `src/backtest/walk_forward.py`: use_regime_weights 파라미터 추가
-    - HIGH_VOL fold 다운웨이팅: weight = 1/(1 + vol/mean_vol)
-    - weighted_oos_sharpe에 반영 (PASS/FAIL 기준 avg_oos_sharpe는 변경 없음)
-- **테스트**: 4개 신규
+## 이번 사이클 배정 카테고리 (병렬 3개)
 
 ### [E] Execution
-- **Focus**: TWAP 거래량 가중 슬라이스
-- **완료**:
-  - `src/exchange/twap.py`: volume_weights 파라미터 추가
-    - 비례 슬라이스: slice_qty[i] = total_qty * weights[i] / sum(weights)
-    - 잘못된 길이/None → 균등 슬라이스 fallback
-  - `tests/test_twap.py`: TestVolumeWeightedSlices 10개 추가
-- **테스트**: 10개 신규
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
 
-## SIM 결과 요약
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-### Paper (Walk-Forward 1h봉)
-- **0/22 PASS** (합성 GBM 데이터 한계)
-- 상위: momentum_quality (Sharpe 5.08), price_action_momentum (Sharpe 3.74), narrow_range (Sharpe 3.35, PF 1.49)
-- 공통 실패 원인: Consistency 0/4, mc_p_value > 0.05
+### [SIM] Paper Simulation & Auto-improve
+- **Agent**: backtest-agent
+- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
 
-### OOS Bundle (4h봉)
-- **0/5 PASS**, OOS Sharpe std 3.4~6.4
-- narrow_range: 3/9 fold PASS (최다)
-- wick_reversal: 2/9 fold PASS
-- IS Sharpe 100% 음수: cmf, wick_reversal (GBM 블록 크기 문제)
+### [F] Research
+- **Agent**: strategy-researcher-agent
+- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
-## 테스트 현황
-- **8,127 passed** (+14 from Cycle 233)
-- 회귀: 없음
+## 이전 사이클 현황
+**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
+  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
+  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
+  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
+  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
 
-## 다음 사이클: 235 (235 mod 5 = 0 → A(품질) + C(데이터) + F)
-- A: narrow_range PF 1.49→1.5 분석, mc_p_value 로직 점검
-- C: BlockBootstrap block_size 36→72 검토 (IS Sharpe 음수 개선)
-- F: GBM 합성 vs 실거래소 데이터 乖離 분석
-======================================================================
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
+  - ERROR 기록 존재
+
+## ⛔ 금지 사항
+- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
+- 한 카테고리에 2 사이클 연속 집중 금지
+- 실패 사례 리서치 없이 코드만 작성 금지
+
+## 📋 사이클 종료 시 필수 수행
+1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
+2. STATUS.md 업데이트 (전체 현황)
+3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
+4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
+5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
+
+## 🚀 실행 지침 (Claude Code 세션용)
+이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
+1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
+2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
+3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
+4. 커밋 + push

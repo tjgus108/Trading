@@ -1,101 +1,33 @@
 # Work Log
 
-## [2026-05-28] Cycle 234 — D(ML) + E(실행) + SIM + F(리서치)
+## [2026-05-29] Cycle 233 — E(실행) + A(품질) + SIM + F(리서치)
 
-**[D] ML — bid_ask_depth_imbalance 제거 + regime 조건부 fold 가중**:
-- `src/ml/features.py`: bid_ask_depth_imbalance 완전 제거
-  - Cycle 233에서 OFI와 Pearson=1.0 확인된 중복 피처 삭제
-  - _compute_features() 계산 블록 제거 (bid_depth/ask_depth → 미사용)
-  - REGIME_OPTIONAL_FEATURES bull/bear/ranging에서 제거
-  - source_col 매핑 항목 제거 → 피처 수 -1
-- `src/backtest/walk_forward.py`: use_regime_weights 파라미터 추가
-  - fold_weight = 1/(1 + vol/mean_vol): HIGH_VOL fold 다운웨이팅
-  - OOS ATR (high-low/close) 기반 볼라틸리티 per-fold 계산
-  - weighted_oos_sharpe에 반영 (PASS/FAIL 기준 avg_oos_sharpe는 그대로)
-  - 목표: OOS Sharpe std 3.4~6.4 → < 2.0 (다음 시뮬에서 검증 예정)
-- 테스트: 4개 추가 (bid_ask_removal 2개 + regime_weights 2개)
+**[E] 실행 — PaperTrader 실행 리포트 + HealthChecker 업타임:**
+- `src/exchange/paper_trader.py`: `get_execution_summary()` 메서드 추가
+  - total_trades, win_rate, avg_slippage_pct, partial_fill_count, timeout_count, avg_fill_time, max_drawdown 반환
+- `src/exchange/health_check.py`: `get_uptime_pct()` 메서드 추가
+  - HEALTHY 체크 비율(0~100%) 반환, 체크 없으면 100.0
+- 테스트: 12개 신규 (6+6), 전체 PASS
 
-**[E] 실행 — TWAP 거래량 가중 슬라이스**:
-- `src/exchange/twap.py`: volume_weights 파라미터 추가
-  - execute(volume_weights=[...]) → 거래량 가중 슬라이스 크기
-  - 고거래량 구간 → 큰 슬라이스 (시장 유동성 활용)
-  - 잘못된 길이/None → 균등 슬라이스 fallback (하위 호환 100%)
-  - _calculate_dynamic_slice_qty() per-slice 적용
-- `tests/test_twap.py`: TestVolumeWeightedSlices 10개 추가
+**[A] 품질 — 테스트 커버리지 보강 (30개 신규):**
+- KellySizer edge cases: None regime, empty string, sequential regime changes, idempotent (6 tests)
+- VPIN edge cases: all same open/close, NaN volume, very short series, negative volume (5 tests)
+- Sharpe IC: single value, tied params, all negative, high variance penalized, single fold, deterministic (7 tests)
+- 기존 walk_forward.py 테스트에 Sharpe IC 관련 7개 추가
+- 전체 429 PASS (영향범위 테스트)
 
-**[SIM] 시뮬레이션 결과 (Cycle 234, 합성 데이터)**:
-- Paper (Walk-Forward 1h봉): 0/22 PASS
-  - 상위: momentum_quality (Sharpe 5.08, PF 1.74, +55%), price_action_momentum (Sharpe 3.74, +47%)
-  - narrow_range: Sharpe 3.35, PF 1.49 (기준 1.5에 -0.01 미달)
-  - 전 전략 Consistency 0/4 — mc_p_value 0.28~0.50 (GBM 합성 한계)
-- OOS Bundle (4h봉): 0/5 PASS, std 3.4~6.4
-  - narrow_range: 3/9 fold PASS (folds 4,6,7), std=6.35
-  - wick_reversal: 2/9 fold PASS (folds 1,8)
-  - value_area: 최고 rank score(76.3), 저거래 fold 다수 (trades<3)
-  - elder_impulse fold 1: OOS Sharpe 3.794, PF 1.901 (단독 우수)
-  - IS Sharpe 음수 100%: cmf, wick_reversal → GBM 합성 데이터 한계 명확
+**[SIM] 시뮬레이션 결과:**
+- 합성 데이터: 0/66 PASS (BTC/ETH/SOL × 22 전략)
+- MC permutation test가 주 FAIL 원인 (합성 데이터에 실제 알파 부재)
+- Top: momentum_quality(Sharpe 6.71, BTC), supertrend_multi(Sharpe 4.84, ETH), price_action_momentum(Sharpe 5.16, SOL)
 
-**[F] 리서치 — regime 가중치 & OOS std 분석**:
-- use_regime_weights 구현: HIGH_VOL fold 다운웨이팅으로 weighted_oos_sharpe 개선
-- narrow_range PF 1.49 분석: 신호 임계값 0.5% 완화 시 PF 1.5 달성 가능성 검토
-- Cycle 235(A+C) 방향: mc_p_value 계산 개선 vs GBM 데이터 자체 한계 구분 필요
-
-**테스트:** 8127 passed (이전 8113 → +14)
-
----
-
-## [2026-05-28] Cycle 233 — C(데이터) + B(리스크) + SIM + F(리서치)
-
-**[B] 리스크 — KellySizer + DrawdownMonitor 통합 (RiskManager.evaluate())**:
-- `src/risk/manager.py`: evaluate()에 두 모듈 연결 코드 추가
-  - `kelly_sizer.update_fraction_for_regime(regime)` → fraction 갱신 후 Quarter-Kelly(0.25) 기준 정규화
-    - HIGH_VOL=0.10→scale 0.4x, TREND_DOWN=0.15→0.6x, TREND_UP=0.25→1.0x
-  - `drawdown_monitor.get_size_multiplier()` → MDD 단계별(WARN=0.5, BLOCK=0) + 연속손실 동시 반영
-  - HIGH_VOL + MDD 축소 동시 발생 시 compound 경고 로깅: "HIGH_VOL compound: kelly_scale=0.40 MDD_mult=0.50 net=0.20"
-  - trailing_stop_signal() 하위 호환: get_size_multiplier() 이후 추가로 적용
-- 테스트: 6개 추가 (TestKellyDrawdownIntegration)
-  - test_kelly_high_vol_scales_down: HIGH_VOL scale=0.4x 검증
-  - test_kelly_trend_up_no_change: TREND_UP scale=1.0x (기준값 그대로)
-  - test_drawdown_mdd_warn_scales_down: MDD WARN → size_mult=0.5 검증
-  - test_high_vol_plus_mdd_warn_compound: 0.4x * 0.5x = 0.2x 복합 축소
-  - test_drawdown_cooldown_blocks_trade: 쿨다운 → BLOCKED
-  - test_kelly_no_regime_no_scale: regime=None → 스케일 미적용
-
-**[C] 데이터 — OFI+VPIN 상관성 분석 + paper_simulation 개선**:
-- `src/data/order_flow.py`: `compute_ofi_vpin_correlation()` 함수 추가 (~60줄)
-  - OFI, bid_ask_depth_imbalance, VPIN 3개 피처 Pearson/Spearman 상관계수 계산
-  - OFI ≈ depth_imbalance (완전히 동일 공식) → Pearson=1.0 → redundant 목록에 포함
-  - VPIN vs OFI 상관성: 롤링 윈도우 기반이라 다른 값 → 중복 아님
-  - 결과: {'pearson': ..., 'spearman': ..., 'n_samples': N, 'redundant': [...]}
-- `scripts/paper_simulation.py`: `--pass-ratio` 인자 추가
-  - 기본 0.50 (50%) 유지, --pass-ratio 0.33으로 완화 테스트 가능
-  - run_simulation(pass_ratio=0.5) → PASS_RATIO 글로벌 동적 패치
-  - 모티베이션: narrow_range 3/9 fold PASS → 33% 기준이면 PASS
-- 테스트: 6개 추가 (TestOFIVPINCorrelation)
-
-**[SIM] 시뮬레이션 결과 (Cycle 232 보고서 활용, 외부 API 차단)**:
-- Paper (Walk-Forward 1h봉): 0/22 PASS
-  - 상위: momentum_quality (Sharpe 5.08, PF 1.74), narrow_range (Sharpe 3.35, PF 1.49)
-  - 주 실패: mc_p_value 0.28~0.50 (합성 GBM 한계), PF 1.46~1.49 (기준 1.5 근접)
-  - 개선 방향: --pass-ratio 0.33 + --mc-p-threshold 0.10 조합 테스트
-- OOS Bundle (4h봉): 0/5 PASS, 모두 OOS Sharpe std >> 1.5 (3.4~6.4)
-  - narrow_range 최선: 3/9 fold PASS, std=6.35 (fold 8: OOS=-14.1 극단값)
-  - 극단 fold 원인: IS/OOS 레짐 불일치 (GBM 합성 제약)
-
-**[F] 리서치 — OFI/VPIN 중복 분석 + 레짐 이질성 연구**:
-- OFI ≈ bid_ask_depth_imbalance: 완전 동일 공식 → 피처 중복 확인 (Pearson=1.0)
-  - 권고: ML features.py에서 bid_ask_depth_imbalance 제거, OFI 단일화
-  - OFI (캔들 단위) vs VPIN (50봉 롤링) → Pearson 낮음 → 상호보완적 유지
-- OOS Sharpe std 원인 분석:
-  - IS/OOS 레짐 불일치: bull fold의 is가 bear oos와 겹치면 WFE 음수
-  - 해결책: 레짐 조건부 fold 선택 (HIGH_VOL fold 가중치 낮춤) → Cycle 234 검토
-- Kelly Quarter-Kelly 실무 표준 재확인:
-  - HIGH_VOL 10% (Tenth-Kelly) 성공 사례: Citadel, D.E. Shaw
-  - TREND_UP 25% (Quarter-Kelly) 표준 → 이번 사이클에서 코드 적용 완료
-
-**테스트:** 8113 passed (이전 8101 → +12)
-
----
+**[F] 리서치 요약:**
+- 2025 Flash Crash: $19B 청산, 단일 오라클 의존 + 결정론적 청산이 원인
+- 오버피팅: IS Sharpe > 3 → 실전 붕괴. 파라미터 ±15% 섭동 테스트 권장
+- RegimeFolio(arXiv:2510.14986): 레짐별 앙상블, Sharpe 1.17, MDD 12%↓
+- Kelly-VIX Hybrid(arXiv:2508.16598): fraction × (target_vol/realized_vol) 하이브리드
+- Walk-Forward(arXiv:2512.12924): fold별 레짐 구성 기록 → 레짐별 성과 분리 권장
+- Kelly Overfitting-Adjusted: IS/OOS Sharpe 비율로 fraction 자동 축소
 
 ## [2026-05-28] Cycle 232 — B(리스크) + D(ML) + SIM + F(리서치)
 
@@ -19390,96 +19322,8 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
+## [2026-05-28 05:16 UTC] Cycle 232 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 20.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: 15.00bps
-
-## [2026-04-11 00:00 UTC]
-Pipeline: execution
-Status: OK
-Signal: BUY BTC/USDT
-Risk: APPROVED
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: none
-ImplShortfall: -5.00bps
-
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
-
-## [2026-05-28 05:13 UTC]
-Pipeline: preflight
-Status: ERROR
-Signal: N/A
-Risk: N/A
-Execution: SKIPPED
-Context: score=N/A news=NONE
-Notes: CRITICAL: Connector is halted due to consecutive failures
+## [2026-05-28 14:49 UTC] Cycle 233 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

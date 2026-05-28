@@ -391,6 +391,54 @@ class PaperTrader:
             "regime": self._current_regime,
         }
 
+    def get_execution_summary(self) -> dict:
+        """실행 품질 요약 리포트: live_paper_trader 로깅용.
+
+        Returns:
+            dict with keys:
+              - total_trades: 전체 거래 수
+              - win_rate: SELL 기준 승률 (0~1)
+              - avg_slippage_pct: 평균 슬리피지 (%)
+              - partial_fill_count: 부분체결 횟수
+              - timeout_count: 타임아웃 횟수 (equity_history에는 미포함, trades에도 미포함)
+              - avg_fill_time: 평균 체결 시간 간격 (초), 거래 2건 미만이면 0.0
+              - max_drawdown: equity_history 기반 최대 낙폭 (%)
+        """
+        trades = self.account.trades
+        sell_trades = [t for t in trades if t.action == "SELL"]
+        win_count = sum(1 for t in sell_trades if t.pnl > 0)
+        win_rate = win_count / len(sell_trades) if sell_trades else 0.0
+
+        # 평균 슬리피지 (bps → % 변환: bps / 100)
+        if trades:
+            avg_slippage_pct = sum(t.slippage_pct for t in trades) / len(trades) / 100.0
+        else:
+            avg_slippage_pct = 0.0
+
+        partial_fill_count = sum(1 for t in trades if t.is_partial)
+
+        # avg_fill_time: 연속 거래 간 시간 간격의 평균
+        if len(trades) >= 2:
+            intervals = [
+                trades[i + 1].timestamp - trades[i].timestamp
+                for i in range(len(trades) - 1)
+            ]
+            avg_fill_time = sum(intervals) / len(intervals)
+        else:
+            avg_fill_time = 0.0
+
+        max_drawdown = self._calculate_max_drawdown()
+
+        return {
+            "total_trades": len(trades),
+            "win_rate": round(win_rate, 4),
+            "avg_slippage_pct": round(avg_slippage_pct, 6),
+            "partial_fill_count": partial_fill_count,
+            "timeout_count": 0,  # timeouts are not recorded in trades list
+            "avg_fill_time": round(avg_fill_time, 4),
+            "max_drawdown": round(max_drawdown, 4),
+        }
+
     def get_summary(self) -> dict:
         """모의거래 요약: total_return%, trade_count, win_rate, max_drawdown_pct. slippage in basis points."""
         trades = self.account.trades

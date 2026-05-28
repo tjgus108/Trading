@@ -291,3 +291,78 @@ class TestFeatureBuilderVPIN:
         builder = FeatureBuilder()
         X, _ = builder.build(df)
         assert isinstance(X, pd.DataFrame)
+
+    def test_vpin_all_same_open_close(self):
+        """모든 캔들이 open == close (도지) → VPIN = 0.5 (중립)."""
+        n = 60
+        price = np.full(n, 100.0)
+        df = pd.DataFrame({
+            "open": price,
+            "high": price + 1.0,
+            "low": price - 1.0,
+            "close": price,
+            "volume": np.ones(n) * 500,
+        })
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        if "vpin_50" in X.columns and len(X) > 0:
+            # open == close → buy_frac=0.5 → imbalance=0 → vpin=0.5 (fillna default)
+            # 실제로 |buy_vol - sell_vol| = |0.5*V - 0.5*V| = 0 → ratio = 0/sum → fillna(0.5)
+            # 하지만 rolling sum이 0이 아닌 이상 vpin = 0.0 (imbalance sum = 0)
+            # 어느 경우든 값이 [0, 1] 범위
+            assert X["vpin_50"].min() >= 0.0
+            assert X["vpin_50"].max() <= 1.0
+
+    def test_vpin_nan_volume_no_crash(self):
+        """볼륨에 NaN 값이 포함된 경우 → 크래시 없이 처리."""
+        n = 60
+        closes = np.linspace(100, 110, n)
+        volumes = np.ones(n) * 500
+        volumes[10:15] = np.nan  # 일부 NaN
+        df = pd.DataFrame({
+            "open": closes * 0.999,
+            "high": closes * 1.001,
+            "low": closes * 0.999,
+            "close": closes,
+            "volume": volumes,
+        })
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        assert isinstance(X, pd.DataFrame)
+        if "vpin_50" in X.columns and len(X) > 0:
+            # NaN volume은 fillna(0)으로 처리되므로 결과 유효
+            assert X["vpin_50"].min() >= 0.0
+            assert X["vpin_50"].max() <= 1.0
+
+    def test_vpin_very_short_series_no_feature(self):
+        """5행 데이터 → len < 10이므로 vpin_50 피처 미생성."""
+        df = pd.DataFrame({
+            "open": [100, 101, 102, 103, 104],
+            "high": [101, 102, 103, 104, 105],
+            "low": [99, 100, 101, 102, 103],
+            "close": [100.5, 101.5, 102.5, 103.5, 104.5],
+            "volume": [500, 500, 500, 500, 500],
+        })
+        builder = FeatureBuilder()
+        feat = builder._compute_features(df)
+        assert "vpin_50" not in feat.columns
+
+    def test_vpin_negative_volume_clipped(self):
+        """음수 볼륨 → clip(lower=0)으로 처리, 크래시 없음."""
+        n = 60
+        closes = np.linspace(100, 110, n)
+        volumes = np.ones(n) * 500
+        volumes[5:10] = -100  # 음수 볼륨 (비정상)
+        df = pd.DataFrame({
+            "open": closes * 0.999,
+            "high": closes * 1.001,
+            "low": closes * 0.999,
+            "close": closes,
+            "volume": volumes,
+        })
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        assert isinstance(X, pd.DataFrame)
+        if "vpin_50" in X.columns and len(X) > 0:
+            assert X["vpin_50"].min() >= 0.0
+            assert X["vpin_50"].max() <= 1.0

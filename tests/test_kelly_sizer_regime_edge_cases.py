@@ -424,3 +424,48 @@ class TestKellySizerDynamicFraction:
         size_hv = sizer_hv.compute(**kwargs)
         size_up = sizer_up.compute(**kwargs)
         assert size_hv < size_up
+
+    def test_get_dynamic_fraction_none_regime_raises(self):
+        """None 레짐 → AttributeError (regime.upper() 호출 시)."""
+        sizer = KellySizer()
+        with pytest.raises(AttributeError):
+            sizer.get_dynamic_fraction(None)
+
+    def test_update_fraction_for_regime_none_raises(self):
+        """None 레짐 → AttributeError."""
+        sizer = KellySizer()
+        with pytest.raises(AttributeError):
+            sizer.update_fraction_for_regime(None)
+
+    def test_update_fraction_sequential_regime_changes(self):
+        """여러 레짐으로 순차적 update → 매번 올바른 fraction으로 갱신."""
+        sizer = KellySizer(fraction=0.5)
+        regimes_expected = [
+            ("HIGH_VOL", 0.10),
+            ("TREND_UP", 0.25),
+            ("CRISIS", 0.10),
+            ("RANGING", 0.20),
+            ("TREND_DOWN", 0.15),
+        ]
+        for regime, expected in regimes_expected:
+            result = sizer.update_fraction_for_regime(regime)
+            assert result == pytest.approx(expected), (
+                f"regime={regime}: expected {expected}, got {result}"
+            )
+            assert sizer.fraction == pytest.approx(expected)
+
+    def test_update_fraction_idempotent_same_regime(self):
+        """동일 레짐 반복 호출 → fraction 변동 없음 (멱등성)."""
+        sizer = KellySizer(fraction=0.5)
+        sizer.update_fraction_for_regime("CRISIS")
+        val1 = sizer.fraction
+        sizer.update_fraction_for_regime("CRISIS")
+        val2 = sizer.fraction
+        sizer.update_fraction_for_regime("CRISIS")
+        val3 = sizer.fraction
+        assert val1 == val2 == val3 == pytest.approx(0.10)
+
+    def test_get_dynamic_fraction_empty_string(self):
+        """빈 문자열 레짐 → 기본값(0.20)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("") == pytest.approx(0.20)

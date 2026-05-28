@@ -1870,6 +1870,83 @@ def test_save_state_json_serializable():
     assert restored["positions"]["BTC/USDT"] == state["positions"]["BTC/USDT"]
 
 
+# ── get_execution_summary 테스트 ──────────────────────────────────
+
+def test_execution_summary_keys():
+    """get_execution_summary() 반환 dict에 필수 키 존재."""
+    pt = PaperTrader()
+    summary = pt.get_execution_summary()
+    for key in ("total_trades", "win_rate", "avg_slippage_pct",
+                "partial_fill_count", "timeout_count", "avg_fill_time",
+                "max_drawdown"):
+        assert key in summary
+
+
+def test_execution_summary_empty_trades():
+    """거래 없으면 기본값 반환."""
+    pt = PaperTrader()
+    summary = pt.get_execution_summary()
+    assert summary["total_trades"] == 0
+    assert summary["win_rate"] == 0.0
+    assert summary["avg_slippage_pct"] == 0.0
+    assert summary["partial_fill_count"] == 0
+    assert summary["timeout_count"] == 0
+    assert summary["avg_fill_time"] == 0.0
+    assert summary["max_drawdown"] == 0.0
+
+
+def test_execution_summary_after_trades():
+    """BUY+SELL 후 execution_summary 값이 올바름."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=1200.0, quantity=2.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert summary["total_trades"] == 2
+    assert summary["win_rate"] == 1.0
+    assert summary["partial_fill_count"] == 0
+    assert summary["max_drawdown"] >= 0.0
+
+
+def test_execution_summary_partial_fill_count():
+    """부분체결 카운트가 올바르게 집계."""
+    pt = PaperTrader(initial_balance=200000.0, partial_fill_prob=1.0,
+                     slippage_pct=0.0, timeout_prob=0.0, fee_rate=0.0)
+    for _ in range(5):
+        pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=10.0,
+                          strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert summary["partial_fill_count"] == 5
+
+
+def test_execution_summary_avg_fill_time():
+    """avg_fill_time이 0 이상인지 확인 (거래 2건 이상일 때)."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    pt.execute_signal("BTC/USDT", "SELL", price=110.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert summary["avg_fill_time"] >= 0.0
+
+
+def test_execution_summary_win_rate_mixed():
+    """혼합 승패에서 win_rate 정확도."""
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    # 2승 1패
+    for sell_price in [1100.0, 1200.0, 800.0]:
+        pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                          strategy="s", confidence="H")
+        pt.execute_signal("BTC/USDT", "SELL", price=sell_price, quantity=1.0,
+                          strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert abs(summary["win_rate"] - 2.0 / 3.0) < 1e-3
+
+
 def test_save_state_equity_history_truncated():
     """equity_history가 500개로 truncate."""
     pt = PaperTrader(initial_balance=1_000_000.0, slippage_pct=0.0,

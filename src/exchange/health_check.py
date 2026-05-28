@@ -271,6 +271,21 @@ class HealthChecker:
             "warnings": warnings_list,
         }
 
+    def get_uptime_pct(self) -> float:
+        """시스템이 HEALTHY 상태였던 시간 비율(%) 반환.
+
+        check 결과(HEALTHY vs non-HEALTHY)를 기반으로 계산.
+        check가 0회이면 100.0 반환 (아직 실패 없음).
+
+        Returns:
+            float: 0.0 ~ 100.0 (%)
+        """
+        total = self.state.total_checks
+        if total == 0:
+            return 100.0
+        healthy_checks = total - self.state.total_failures
+        return round(healthy_checks / total * 100.0, 4)
+
     def summary(self) -> dict:
         """현재 상태 요약."""
         return self.state.to_dict()

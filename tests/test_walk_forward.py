@@ -1419,14 +1419,7 @@ def test_plateau_score_e2e_in_optimizer():
 # ---------------------------------------------------------------------------
 
 def test_regime_weights_high_vol_downweighted():
-    """HIGH_VOL fold는 낮은 가중치를 받아야 함.
-
-    수동으로 oos_vols + oos_sharpes를 구성해 가중치 공식을 직접 검증한다.
-    fold A: vol=0.01 (low), sharpe=0.5
-    fold B: vol=0.10 (high), sharpe=2.0
-    regime 가중치: w_A = 1/(1+0.01/mean), w_B = 1/(1+0.10/mean)
-    → w_A > w_B → weighted < equal-weighted average
-    """
+    """HIGH_VOL fold는 낮은 가중치를 받아야 함."""
     oos_vols = [0.01, 0.10]
     oos_sharpes = [0.5, 2.0]
 
@@ -1437,12 +1430,10 @@ def test_regime_weights_high_vol_downweighted():
     weighted = sum(w * s for w, s in zip(weights, oos_sharpes))
     equal_avg = sum(oos_sharpes) / len(oos_sharpes)
 
-    # HIGH_VOL fold (sharpe=2.0) is downweighted → weighted < equal_avg
     assert weighted < equal_avg, (
         f"regime_weights should downweight high-vol fold: weighted={weighted:.4f} "
         f"should be < equal_avg={equal_avg:.4f}"
     )
-    # LOW_VOL fold (sharpe=0.5) gets higher weight
     assert weights[0] > weights[1], (
         f"Low-vol fold weight {weights[0]:.4f} should exceed high-vol fold weight {weights[1]:.4f}"
     )
@@ -1463,3 +1454,146 @@ def test_regime_weights_equal_vol_equals_avg():
     assert abs(weighted - equal_avg) < 1e-9, (
         f"Equal vol folds should give weighted={weighted:.6f} == avg={equal_avg:.6f}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 233 A: Sharpe IC 파라미터 선택 엣지 케이스 테스트
+# ---------------------------------------------------------------------------
+
+
+class TestSharpeICEdgeCases:
+    """_sharpe_ic (avg - 0.5 * std) 기반 파라미터 선택 엣지 케이스."""
+
+    def test_sharpe_ic_single_value(self):
+        """단일 OOS Sharpe → std=0 → IC = avg."""
+        import statistics as _stat
+        sharpes = [1.5]
+        avg = sum(sharpes) / len(sharpes)
+        std = _stat.stdev(sharpes) if len(sharpes) > 1 else 0.0
+        ic = avg - 0.5 * std
+        assert ic == pytest.approx(1.5)
+
+    def test_sharpe_ic_tied_params(self):
+        """모든 파라미터의 OOS Sharpe가 동일 → IC도 동일 → 아무 파라미터나 선택 가능."""
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+        from unittest.mock import patch, MagicMock
+
+        grid = {"fast_span": [10, 20], "slow_span": [40, 50]}
+
+        def factory(params):
+            return EmaCrossStrategy(
+                fast_span=params.get("fast_span", 20),
+                slow_span=params.get("slow_span", 50),
+            )
+
+        mock_result = MagicMock()
+        mock_result.sharpe_ratio = 1.0
+        mock_result.total_trades = 50
+        mock_result.total_return = 0.1
+        mock_result.win_rate = 0.55
+        mock_result.max_drawdown = 0.05
+        mock_result.profit_factor = 1.5
+        mock_result.passed = True
+        mock_result.fail_reasons = []
+        mock_result.wfe = 1.0
+
+        with patch("src.backtest.walk_forward.BacktestEngine") as MockEngine:
+            mock_engine = MockEngine.return_value
+            mock_engine.run.return_value = mock_result
+            MockEngine.apply_wfe = MagicMock()
+
+            opt = WalkForwardOptimizer(
+                strategy_name="ema_cross",
+                strategy_factory=factory,
+                param_grid=grid,
+                n_windows=2,
+            )
+            result = opt.run(make_df(600))
+
+        assert result.best_params.get("fast_span") in grid["fast_span"]
+        assert result.best_params.get("slow_span") in grid["slow_span"]
+
+    def test_sharpe_ic_all_negative_sharpes(self):
+        """모든 OOS Sharpe가 음수 → IC도 음수 → 가장 덜 나쁜 파라미터 선택."""
+        import statistics as _stat
+
+        param_oos_map = {
+            "a": [-1.0, -0.5],
+            "b": [-2.0, -1.5],
+            "c": [-0.3, -0.2],
+        }
+
+        def _sharpe_ic(sharpes):
+            avg = sum(sharpes) / len(sharpes)
+            std = _stat.stdev(sharpes) if len(sharpes) > 1 else 0.0
+            return avg - 0.5 * std
+
+        best_key = max(param_oos_map, key=lambda k: _sharpe_ic(param_oos_map[k]))
+        assert best_key == "c"
+
+    def test_sharpe_ic_high_variance_penalized(self):
+        """높은 분산 파라미터가 IC에 의해 벌점받는지 확인."""
+        import statistics as _stat
+
+        def _sharpe_ic(sharpes):
+            avg = sum(sharpes) / len(sharpes)
+            std = _stat.stdev(sharpes) if len(sharpes) > 1 else 0.0
+            return avg - 0.5 * std
+
+        ic_a = _sharpe_ic([3.0, -1.0])
+        ic_b = _sharpe_ic([0.8, 0.9])
+
+        assert ic_b > ic_a, (
+            f"안정적 파라미터(IC={ic_b:.3f})가 불안정 파라미터(IC={ic_a:.3f})보다 높아야 함"
+        )
+
+    def test_sharpe_ic_single_fold_optimizer(self):
+        """n_windows=1 → 단일 fold에서도 정상 동작."""
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+
+        def factory(params):
+            return EmaCrossStrategy(
+                fast_span=params.get("fast_span", 20),
+                slow_span=params.get("slow_span", 50),
+            )
+
+        opt = WalkForwardOptimizer(
+            strategy_name="ema_cross",
+            strategy_factory=factory,
+            param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+            n_windows=1,
+        )
+        result = opt.run(make_df(800))
+        assert isinstance(result.best_params, dict)
+        if result.windows:
+            assert len(result.windows) >= 1
+
+    def test_sharpe_ic_param_selection_deterministic(self):
+        """동일 입력 → 동일 파라미터 선택 (결정론적)."""
+        from src.backtest.walk_forward import WalkForwardOptimizer
+        from src.strategy.ema_cross import EmaCrossStrategy
+
+        def factory(params):
+            return EmaCrossStrategy(
+                fast_span=params.get("fast_span", 20),
+                slow_span=params.get("slow_span", 50),
+            )
+
+        grid = {"fast_span": [10, 20], "slow_span": [40, 50]}
+        df = make_df(600)
+
+        results = []
+        for _ in range(2):
+            opt = WalkForwardOptimizer(
+                strategy_name="ema_cross",
+                strategy_factory=factory,
+                param_grid=grid,
+                n_windows=2,
+            )
+            results.append(opt.run(df))
+
+        assert results[0].best_params == results[1].best_params, (
+            f"Deterministic failure: {results[0].best_params} != {results[1].best_params}"
+        )

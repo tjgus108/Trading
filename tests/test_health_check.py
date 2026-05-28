@@ -256,6 +256,82 @@ def test_no_reconnect_fn_stays_disconnected():
 
 # ── LivePaperTrader 통합 ─────────────────────────────────
 
+# ── get_uptime_pct ───────────────────────────────────────
+
+def test_uptime_pct_no_checks():
+    """check 0회이면 uptime 100%."""
+    checker = HealthChecker(check_fn=lambda: {"connected": True})
+    assert checker.get_uptime_pct() == 100.0
+
+
+def test_uptime_pct_all_healthy():
+    """모든 check가 HEALTHY이면 uptime 100%."""
+    checker = HealthChecker(check_fn=lambda: {"connected": True})
+    for _ in range(10):
+        checker.run_check()
+    assert checker.get_uptime_pct() == 100.0
+
+
+def test_uptime_pct_all_failures():
+    """모든 check가 실패이면 uptime 0%."""
+    checker = HealthChecker(
+        check_fn=lambda: {"connected": False},
+        reconnect_fn=None,
+    )
+    for _ in range(5):
+        checker.run_check()
+    assert checker.get_uptime_pct() == 0.0
+
+
+def test_uptime_pct_mixed():
+    """혼합 상태: 정확한 비율 계산."""
+    call_count = {"n": 0}
+    def check_fn():
+        call_count["n"] += 1
+        # 처음 3회는 healthy, 나머지 2회는 disconnected
+        if call_count["n"] <= 3:
+            return {"connected": True}
+        return {"connected": False}
+
+    checker = HealthChecker(
+        check_fn=check_fn,
+        reconnect_fn=None,
+    )
+    for _ in range(5):
+        checker.run_check()
+    # 3 healthy + 2 failures = 60% uptime
+    assert abs(checker.get_uptime_pct() - 60.0) < 0.1
+
+
+def test_uptime_pct_after_reset():
+    """reset() 후 uptime은 다시 100%."""
+    checker = HealthChecker(
+        check_fn=lambda: {"connected": False},
+        reconnect_fn=None,
+    )
+    checker.run_check()
+    assert checker.get_uptime_pct() == 0.0
+    checker.reset()
+    assert checker.get_uptime_pct() == 100.0
+
+
+def test_uptime_pct_degraded_counts_as_failure():
+    """DEGRADED (데이터 stale)도 failure로 카운트."""
+    checker = HealthChecker(
+        check_fn=lambda: {"connected": True},
+        data_stale_threshold=60.0,
+    )
+    # 1 healthy
+    checker.run_check()
+    # stale data -> degraded
+    checker.state.last_data_time = time.time() - 120.0
+    checker.run_check()
+    # 1 healthy + 1 degraded (failure) = 50%
+    assert abs(checker.get_uptime_pct() - 50.0) < 0.1
+
+
+# ── LivePaperTrader 통합 ─────────────────────────────────
+
 def test_live_paper_trader_health_check_integration():
     """LivePaperTrader에 HealthChecker가 올바르게 통합되어 있는지 확인."""
     from unittest.mock import patch
