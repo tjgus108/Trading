@@ -710,3 +710,187 @@ class TestCalculateDynamicSliceQtyEdgeCases:
         # "long" is not "buy", so default to bid_depth=100
         # depth_ratio = 150/100 = 1.5 > 0.10 → adjusted=10
         assert result == 10.0
+
+
+# ── 8. Volume-weighted slice sizing ─────────────────────────────────────────
+
+class TestVolumeWeightedSlices:
+    """Volume-weighted slice sizing verification."""
+
+    def test_equal_weights_behaves_like_uniform(self):
+        """weights=[1,1,1] → same as no weights (3 equal slices)."""
+        np.random.seed(42)
+        ex = _executor(n_slices=3)
+        result_uniform = _run(ex, qty=3.0, price=50_000.0)
+        
+        np.random.seed(42)
+        ex2 = _executor(n_slices=3)
+        result_weighted = ex2.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=3.0,
+            price_limit=50_000.0,
+            volume_weights=[1, 1, 1],
+        )
+        
+        # Both should have same slices_executed
+        assert result_uniform.slices_executed == result_weighted.slices_executed == 3
+        # Both should have total_qty == 3.0
+        assert result_uniform.total_qty == result_weighted.total_qty == 3.0
+
+    def test_volume_weights_distribute_qty_proportionally(self):
+        """weights=[1,2,3] → first slice gets 1/6, middle 2/6, last 3/6 of total_qty."""
+        np.random.seed(123)
+        ex = _executor(n_slices=3)
+        
+        # Track individual slice fills in dry_run
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=6.0,  # Total 6.0
+            price_limit=50_000.0,
+            volume_weights=[1, 2, 3],  # Proportions: 1/6, 2/6, 3/6
+        )
+        
+        # Should have 3 slices executed
+        assert result.slices_executed == 3
+        assert result.total_qty == 6.0
+        # filled_qty should be close to total_qty (in dry_run, some partial fills expected)
+        assert result.filled_qty > 0
+
+    def test_volume_weights_wrong_length_falls_back_to_equal(self):
+        """weights with wrong length → equal slicing (fallback)."""
+        np.random.seed(456)
+        ex = _executor(n_slices=5)
+        
+        # Pass weights with wrong length
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=5.0,
+            price_limit=50_000.0,
+            volume_weights=[1, 2, 3],  # len=3 != n_slices=5
+        )
+        
+        # Should fallback to equal slicing
+        assert result.slices_executed == 5
+        assert result.total_qty == 5.0
+
+    def test_volume_weights_none_equal_slicing(self):
+        """volume_weights=None → equal slicing (no regression)."""
+        np.random.seed(789)
+        ex = _executor(n_slices=4)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=4.0,
+            price_limit=50_000.0,
+            volume_weights=None,
+        )
+        
+        assert result.slices_executed == 4
+        assert result.total_qty == 4.0
+        assert result.filled_qty > 0
+
+    def test_volume_weights_zero_sum_falls_back(self):
+        """weights sum to 0 → fallback to equal slicing."""
+        ex = _executor(n_slices=3)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=3.0,
+            price_limit=50_000.0,
+            volume_weights=[0, 0, 0],  # sum=0, should fallback
+        )
+        
+        assert result.slices_executed == 3
+
+    def test_volume_weights_single_slice(self):
+        """n_slices=1, volume_weights=[5] → single slice with qty=5."""
+        np.random.seed(999)
+        ex = _executor(n_slices=1)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=5.0,
+            price_limit=50_000.0,
+            volume_weights=[5],
+        )
+        
+        assert result.slices_executed == 1
+        assert result.total_qty == 5.0
+
+    def test_volume_weights_skewed_distribution(self):
+        """weights=[1, 1, 8] → heavily skewed toward last slice."""
+        np.random.seed(111)
+        ex = _executor(n_slices=3)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=10.0,
+            price_limit=50_000.0,
+            volume_weights=[1, 1, 8],  # Proportions: 1/10, 1/10, 8/10
+        )
+        
+        assert result.slices_executed == 3
+        assert result.total_qty == 10.0
+
+    def test_volume_weights_fractional_values(self):
+        """weights=[0.5, 1.5, 2.0] → fractional normalization."""
+        np.random.seed(222)
+        ex = _executor(n_slices=3)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=4.0,
+            price_limit=50_000.0,
+            volume_weights=[0.5, 1.5, 2.0],  # sum=4.0
+        )
+        
+        assert result.slices_executed == 3
+        assert result.total_qty == 4.0
+
+    def test_volume_weights_very_small_values(self):
+        """weights=[0.0001, 0.0002, 0.0003] → very small but valid."""
+        ex = _executor(n_slices=3)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=3.0,
+            price_limit=50_000.0,
+            volume_weights=[0.0001, 0.0002, 0.0003],
+        )
+        
+        assert result.slices_executed == 3
+        assert result.total_qty == 3.0
+
+    def test_volume_weights_large_values(self):
+        """weights=[1e6, 2e6, 3e6] → large values (should normalize)."""
+        ex = _executor(n_slices=3)
+        
+        result = ex.execute(
+            connector=None,
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=6.0,
+            price_limit=50_000.0,
+            volume_weights=[1e6, 2e6, 3e6],
+        )
+        
+        assert result.slices_executed == 3
+        assert result.total_qty == 6.0

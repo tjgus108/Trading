@@ -175,6 +175,7 @@ class WalkForwardOptimizer:
         stability_lambda: float = 0.5,  # Sharpe - λ*CV penalty 계수
         plateau_pct: float = 0.9,  # 플래토 룰: IS 최고 Sharpe의 이 비율 이상인 파라미터 집합 중 중간값 선택
         fold_decay: float = 0.0,  # time-decay: 0=동일가중, 양수=최근fold에 지수적 가중치
+        use_regime_weights: bool = False,  # HIGH_VOL fold 다운웨이팅
     ):
         """
         Args:
@@ -204,6 +205,7 @@ class WalkForwardOptimizer:
         self.stability_lambda = stability_lambda
         self.plateau_pct = plateau_pct
         self.fold_decay = fold_decay
+        self.use_regime_weights = use_regime_weights
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -269,6 +271,7 @@ class WalkForwardOptimizer:
         # fold별 최적 파라미터 수집 (파라미터 안정성 CV 계산용)
         fold_params_history: List[dict] = []
         low_trades_folds = 0  # OOS trades < 30인 fold 수
+        oos_vols: List[float] = []
 
         for i, (is_df, oos_df) in enumerate(windows):
             # IS 최적화 (Sharpe - λ*CV 목적함수 + 플래토 룰 적용)
@@ -281,6 +284,14 @@ class WalkForwardOptimizer:
             # OOS 검증
             oos_strategy = self.strategy_factory(best_params)
             oos_result = self._engine.run(oos_strategy, oos_df)
+
+            # OOS ATR (변동성) 계산 — regime 가중치에 사용
+            if all(c in oos_df.columns for c in ["high", "low", "close"]):
+                _atr = (oos_df["high"] - oos_df["low"]) / (oos_df["close"] + 1e-9)
+                oos_vol = float(_atr.mean())
+            else:
+                oos_vol = 0.0
+            oos_vols.append(oos_vol)
 
             # OOS 거래 수 통계적 신뢰도 경고 (학술 기준: fold당 30 trades)
             MIN_RELIABLE_OOS_TRADES = 30
@@ -373,17 +384,31 @@ class WalkForwardOptimizer:
                 except (TypeError, ValueError):
                     pass  # 비수치 파라미터는 스킵
 
-        # time-decay 가중평균 OOS Sharpe 계산
+        # weighted_oos_sharpe: time-decay 또는 regime 가중치 (선택)
         import math
         n_folds = len(oos_sharpes)
-        if n_folds > 0 and self.fold_decay != 0.0:
+        if n_folds > 0 and self.use_regime_weights and oos_vols:
+            mean_vol = sum(oos_vols) / len(oos_vols)
+            # HIGH_VOL fold 다운웨이팅: fold_weight = 1/(1 + vol_ratio)
+            raw_weights = [1.0 / (1.0 + v / (mean_vol + 1e-9)) for v in oos_vols]
+            total_w = sum(raw_weights)
+            weights = [w / total_w for w in raw_weights]
+            weighted_oos_sharpe = sum(w * s for w, s in zip(weights, oos_sharpes))
+        elif n_folds > 0 and self.fold_decay != 0.0:
             raw_weights = [math.exp(self.fold_decay * i) for i in range(n_folds)]
             total_w = sum(raw_weights)
             weights = [w / total_w for w in raw_weights]
             weighted_oos_sharpe = sum(w * s for w, s in zip(weights, oos_sharpes))
         else:
-            # fold_decay=0이면 동일 가중치 → weighted == avg
             weighted_oos_sharpe = avg_oos
+
+        if self.use_regime_weights and oos_vols:
+            logger.info(
+                "[%s] regime_weights applied: vols=%s weights=%s",
+                self.strategy_name,
+                [round(v, 4) for v in oos_vols],
+                [round(w, 4) for w in weights],
+            )
 
         # WFE = avg OOS Sharpe / avg IS Sharpe
         all_is_sharpes = [wr.is_sharpe for wr in window_results]

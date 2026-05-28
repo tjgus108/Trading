@@ -164,6 +164,7 @@ class TWAPExecutor:
         side: str,
         total_qty: float,
         price_limit: Optional[float] = None,
+        volume_weights: Optional[List[float]] = None,
     ) -> TWAPResult:
         """TWAP 주문 실행.
 
@@ -173,6 +174,9 @@ class TWAPExecutor:
             side: "buy" | "sell"
             total_qty: 총 주문 수량
             price_limit: 제한 가격 (None이면 시장가)
+            volume_weights: 부피 가중 슬라이스 사이징. len==n_slices이면 정규화 후 사용.
+                          높은 부피 기간에 큰 슬라이스를 배정해 시장 영향 감소.
+                          None이면 균등 분할 (기존 동작).
 
         Returns:
             TWAPResult (부분 체결/타임아웃 정보 포함)
@@ -195,7 +199,24 @@ class TWAPExecutor:
 
         # Order book depth 기반 동적 슬라이스 조정
 
-        slice_qty = self._calculate_dynamic_slice_qty(connector, symbol, side, slice_qty)
+
+        # Volume-weighted slice sizes
+        if volume_weights is not None and len(volume_weights) == self.n_slices and sum(volume_weights) > 0:
+            total_w = sum(volume_weights)
+            slice_qtys = [total_qty * w / total_w for w in volume_weights]
+            logger.info(
+                "TWAP volume-weighted: n_slices=%d, weights=%s",
+                self.n_slices, [round(w/total_w, 3) for w in volume_weights],
+            )
+        else:
+            base_slice_qty = total_qty / self.n_slices
+            slice_qtys = [base_slice_qty] * self.n_slices
+        
+        # Apply depth adjustment per-slice
+        for j in range(self.n_slices):
+            slice_qtys[j] = self._calculate_dynamic_slice_qty(
+                connector, symbol, side, slice_qtys[j]
+            )
         filled_prices: List[float] = []
         filled_quantities: List[float] = []
         partial_fills = 0
@@ -221,7 +242,7 @@ class TWAPExecutor:
                     break
             
             # 이번 슬라이스의 주문량: 계획된 slice_qty + 이전 미체결량
-            current_slice_qty = slice_qty + unfilled_qty
+            current_slice_qty = slice_qtys[i] + unfilled_qty
             unfilled_qty = 0.0  # 초기화 (fill 후에 계산)
 
             if self.dry_run:

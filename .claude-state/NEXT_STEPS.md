@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 233 완료)_
+_Last updated: 2026-05-28 (Cycle 234 E 진행중)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -28,8 +28,22 @@ _Last updated: 2026-05-28 (Cycle 233 완료)_
   - 구현: fold_weight = 1/(1 + regime_vol_factor) 로 HIGH_VOL fold 다운웨이팅
 
 #### E(실행): TWAP + 체결 품질 개선
-- TWAP 동적 슬라이스: 거래량 가중 슬라이스 크기 (고거래량 → 더 큰 슬라이스)
-- 슬리피지 모델 정확도: 합성 데이터 기반 슬리피지 추정치 검증
+- ✅ **COMPLETED**: TWAP 거래량 가중 슬라이스 크기
+  - volume_weights: Optional[List[float]] 파라미터 추가 (execute() 시그니처)
+  - 구현: weights 정규화 → 비례 슬라이스 크기 배정 → 깊이 조정 적용
+  - 테스트: TestVolumeWeightedSlices 클래스 10개 추가
+    - test_equal_weights_behaves_like_uniform
+    - test_volume_weights_distribute_qty_proportionally
+    - test_volume_weights_wrong_length_falls_back_to_equal
+    - test_volume_weights_none_equal_slicing
+    - test_volume_weights_zero_sum_falls_back
+    - test_volume_weights_single_slice
+    - test_volume_weights_skewed_distribution
+    - test_volume_weights_fractional_values
+    - test_volume_weights_very_small_values
+    - test_volume_weights_large_values
+  - 회귀 테스트: 61/61 PASS (기존 기능 보존)
+  - 코드 변경: twap.py 라인 167 (volume_weights 파라미터), 203-219 (가중 슬라이스 로직), 245 (slice_qtys[i] 사용)
 
 #### SIM: --pass-ratio 0.33 + --mc-p-threshold 0.10 조합 효과
 - narrow_range: 3/9 fold PASS → 33% 기준이면 PASS 가능성
@@ -47,5 +61,5 @@ _Last updated: 2026-05-28 (Cycle 233 완료)_
 
 ### 핵심 메트릭
 - 상위 3: price_action_momentum(Sharpe 3.74, +47%), momentum_quality(Sharpe 5.08, +55%), narrow_range(3/9 PASS)
-- 테스트: 8,113 passed (Cycle 233 +12개)
-- 새로 추가된 인프라: Kelly+MDD compound scaling, OFI/VPIN 상관성 분석, --pass-ratio 옵션
+- 테스트: 8,113 → 8,124 passed (+11개, TestVolumeWeightedSlices)
+- 새로 추가된 인프라: Kelly+MDD compound scaling, OFI/VPIN 상관성 분석, --pass-ratio 옵션, TWAP volume_weights
