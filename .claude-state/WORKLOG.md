@@ -25,12 +25,11 @@
 - 근본 원인: GBM 합성 데이터 → IS Sharpe 음수 (cmf/wick_reversal 100%, elder_impulse 89%)
 - 권고: OOS Sharpe std 임계값을 합성 데이터에서는 완화 검토 (실거래소 데이터 전용 기준)
 
-**[SIM] Paper Simulation — 직전 Cycle 235 결과 (2026-05-28T16:25):**
-- 0/22 PASS (BTC/USDT, 22전략, 4 walk-forward 윈도우)
-- FAIL 주원인: mc_p_value > 0.05 (합성 데이터 alpha 부재)
-- Top 3: momentum_quality(Sharpe 6.01), volume_breakout(Sharpe 4.34), price_action_momentum(Sharpe 4.20)
-- Sharpe std 최소 전략: volume_breakout(std 0.40), narrow_range(std 0.74), momentum_quality(std 0.75)
-  → 이 전략들이 실거래소 데이터에서 PASS 가능성 가장 높음
+**[SIM] Paper Simulation (BTC/USDT) — 2026-05-28T20:19 (Cycle 237 신규 실행):**
+- 0/22 PASS (FAIL 주원인: mc_p_value > 0.05, 합성 GBM 데이터에 alpha 부재)
+- Top 3: price_action_momentum(Sharpe 5.06), momentum_quality(Sharpe 4.16), volume_breakout(Sharpe 4.03)
+- Sharpe std 최소 전략 (안정성 기준): roc_ma_cross(std 0.21), engulfing_zone(std 0.54), positional_scaling(std 0.77)
+  → roc_ma_cross가 실거래소 데이터에서 가장 일관될 가능성 (Sharpe 2.22, PF 1.56)
 
 **[F] 리서치:**
 - 현재 구현 상태 확인: perturbation_check, get_vol_scaled_fraction, check_regime_death 모두 구현 완료

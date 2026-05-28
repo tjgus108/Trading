@@ -42,15 +42,16 @@ _Last updated: 2026-05-28 (Cycle 237 완료)_
 
 ### 시뮬레이션 분석 결과
 
-#### Paper Simulation 상위 전략 (BTC/USDT, 합성 데이터)
+#### Paper Simulation 상위 전략 (BTC/USDT, 합성 데이터, 2026-05-28T20:19)
 | 순위 | 전략 | Sharpe | Sharpe Std | PF | Trades |
 |------|------|--------|-----------|-----|--------|
-| 1 | momentum_quality | 6.01 | 0.75 | 1.83 | 126 |
-| 2 | volume_breakout | 4.34 | 0.40 | 1.67 | 96 |
-| 3 | price_action_momentum | 4.20 | 1.69 | 1.48 | 157 |
-| 4 | supertrend_multi | 4.15 | 1.98 | 1.64 | 100 |
+| 1 | price_action_momentum | 5.06 | 1.73 | 1.60 | 147 |
+| 2 | momentum_quality | 4.16 | 2.50 | 1.56 | 118 |
+| 3 | volume_breakout | 4.03 | 1.33 | 1.65 | 91 |
+| 4 | linear_channel_rev | 2.72 | 1.19 | 1.76 | 33 |
 
-**Sharpe std 최소 전략** (파라미터 안정성 우수): volume_breakout(0.40), momentum_quality(0.75)
+**Sharpe std 최소 전략** (안정성 우수): roc_ma_cross(0.21), engulfing_zone(0.54), positional_scaling(0.77)
+→ roc_ma_cross 주목: Sharpe 2.22, std 0.21 — 실거래소 데이터에서 일관성 가장 기대됨
 
 #### Bundle OOS (BTC/USDT 4h, 합성 데이터) — 2026-05-28T20:17
 - 0/5 PASS — narrow_range 3/9 fold pass (최다)
