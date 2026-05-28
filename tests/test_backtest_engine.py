@@ -745,3 +745,59 @@ def test_normal_atr_no_skip_reason():
     result = engine.run(AlwaysBuyStrategy(), df)
     atr_skip_reasons = [r for r in result.fail_reasons if "atr=0" in r]
     assert len(atr_skip_reasons) == 0
+
+
+# ---------------------------------------------------------------------------
+# perturbation_check() 테스트
+# ---------------------------------------------------------------------------
+
+def test_perturbation_check_robust():
+    """Sharpe가 파라미터 섭동에 민감하지 않으면 ROBUST 판정."""
+    def stable_eval(params):
+        return 2.0  # 섭동에도 동일한 Sharpe
+
+    result = BacktestEngine.perturbation_check(
+        params={"a": 10.0, "b": 5.0},
+        eval_fn=stable_eval,
+    )
+    assert result["is_robust"] is True
+    assert result["is_fragile"] is False
+    assert result["baseline_sharpe"] == 2.0
+    assert result["robust_ratio_actual"] == 1.0
+
+
+def test_perturbation_check_fragile():
+    """±10% 섭동 시 Sharpe < 1.0이면 FRAGILE 판정."""
+    def fragile_eval(params):
+        if params.get("a", 10.0) != 10.0:
+            return 0.3  # 섭동 시 붕괴
+        return 2.0
+
+    result = BacktestEngine.perturbation_check(
+        params={"a": 10.0},
+        eval_fn=fragile_eval,
+        fragile_threshold=1.0,
+    )
+    assert result["is_fragile"] is True
+    assert "a" in result["fragile_params"]
+
+
+def test_perturbation_check_returns_structure():
+    """반환 dict에 모든 키가 존재해야 함."""
+    result = BacktestEngine.perturbation_check(
+        params={"x": 1.0},
+        eval_fn=lambda p: 1.5,
+    )
+    for key in ("baseline_sharpe", "mean_perturb_sharpe", "robust_ratio_actual",
+                "is_robust", "is_fragile", "fragile_params", "perturb_results"):
+        assert key in result, f"Missing key: {key}"
+
+
+def test_perturbation_check_non_numeric_params_skipped():
+    """문자열 파라미터는 섭동 대상에서 제외."""
+    result = BacktestEngine.perturbation_check(
+        params={"mode": "fast", "period": 14.0},
+        eval_fn=lambda p: 1.8,
+    )
+    assert "mode" not in result["perturb_results"]
+    assert "period" in result["perturb_results"]
