@@ -613,6 +613,55 @@ class KellySizer:
     }
     _DEFAULT_REGIME_SCALE: float = 0.5  # 알 수 없는 레짐 보수적 처리
 
+    # 레짐 → 절대 Kelly fraction (Quarter-Kelly 실무 기준 기반)
+    # 고변동성 10%, 저변동성 25%, 상승장 25%, 하락장 15%, 위기 10%
+    _REGIME_FRACTION: dict = {
+        "TREND_UP":   0.25,  # 저변동성 상승장: Quarter-Kelly (25%)
+        "TREND_DOWN": 0.15,  # 하락장: 보수적 Sixth-Kelly
+        "RANGING":    0.20,  # 레인지장: Fifth-Kelly
+        "HIGH_VOL":   0.10,  # 고변동성: Tenth-Kelly (10%)
+        # detect_regime() 별칭
+        "BULL":       0.25,
+        "BEAR":       0.15,
+        "CRISIS":     0.10,  # 위기: 최소 포지션
+    }
+    _DEFAULT_REGIME_FRACTION: float = 0.20  # 알 수 없는 레짐: Fifth-Kelly
+
+    def get_dynamic_fraction(self, regime: str) -> float:
+        """레짐에 따른 절대 Kelly fraction 반환.
+
+        현재 인스턴스의 fraction과 무관하게 레짐별 절대 fraction을 반환한다.
+        Quarter-Kelly(25%) 실무 표준 기반으로 레짐별 차등 적용.
+
+        Args:
+            regime: 레짐 문자열 ("HIGH_VOL", "TREND_UP", "BULL", "CRISIS" 등).
+
+        Returns:
+            절대 Kelly fraction (e.g. 0.10 = 10%, 0.25 = 25%).
+        """
+        return self._REGIME_FRACTION.get(regime.upper(), self._DEFAULT_REGIME_FRACTION)
+
+    def update_fraction_for_regime(self, regime: str) -> float:
+        """레짐 기반으로 self.fraction을 동적으로 갱신하고 새 값을 반환.
+
+        compute()를 호출하기 전에 이 메서드를 호출하면 레짐에 맞는
+        절대 fraction이 자동으로 적용된다.
+
+        Args:
+            regime: 현재 시장 레짐 문자열.
+
+        Returns:
+            갱신된 self.fraction 값.
+        """
+        new_fraction = self.get_dynamic_fraction(regime)
+        if new_fraction != self.fraction:
+            logger.debug(
+                "KellySizer: fraction updated %.2f→%.2f (regime=%s)",
+                self.fraction, new_fraction, regime,
+            )
+            self.fraction = new_fraction
+        return self.fraction
+
     def adjust_for_regime(self, regime: str) -> float:
         """레짐에 따른 Kelly fraction 스케일 팩터 반환.
 

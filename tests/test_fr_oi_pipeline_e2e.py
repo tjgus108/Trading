@@ -56,40 +56,41 @@ class TestFeatureCountDiff:
     """FR/OI 컬럼 유/무에 따른 피처 수 차이 확인."""
 
     def test_no_fr_oi_base_14_features(self):
-        """FR/OI 없이 base 14 피처만 생성."""
+        """FR/OI 없이 base 피처만 생성 (VPIN 포함 15개)."""
         fb = FeatureBuilder()
         df = _make_ohlcv(100)
         X, y = fb.build(df)
-        assert len(X.columns) == 14
+        assert len(X.columns) == 15  # base 14 + vpin_50
         assert "delta_fr" not in X.columns
         assert "fr_oi_interaction" not in X.columns
+        assert "vpin_50" in X.columns
 
     def test_fr_only_15_features(self):
-        """funding_rate만 있으면 base 14 + delta_fr = 15."""
+        """funding_rate만 있으면 base 15 + delta_fr = 16."""
         fb = FeatureBuilder()
         df = _make_ohlcv(100)
         df["funding_rate"] = np.random.uniform(-0.001, 0.001, len(df))
         X, y = fb.build(df)
-        assert len(X.columns) == 15
+        assert len(X.columns) == 16  # base 15 + delta_fr
         assert "delta_fr" in X.columns
         assert "fr_oi_interaction" not in X.columns
 
     def test_fr_and_oi_16_features(self):
-        """funding_rate + open_interest 둘 다 있으면 base 14 + 2 = 16."""
+        """funding_rate + open_interest 둘 다 있으면 base 15 + 2 = 17."""
         fb = FeatureBuilder()
         df = _add_fr_oi(_make_ohlcv(100))
         X, y = fb.build(df)
-        assert len(X.columns) == 16
+        assert len(X.columns) == 17  # base 15 + delta_fr + fr_oi_interaction
         assert "delta_fr" in X.columns
         assert "fr_oi_interaction" in X.columns
 
     def test_btc_close_plus_fr_oi_17_features(self):
-        """btc_close + funding_rate + open_interest → 17 피처."""
+        """btc_close + funding_rate + open_interest → 18 피처."""
         fb = FeatureBuilder()
         df = _add_fr_oi(_make_ohlcv(100))
         df["btc_close"] = df["close"] * 1.1  # dummy BTC close
         X, y = fb.build(df)
-        assert len(X.columns) == 17
+        assert len(X.columns) == 18  # base 15 + btc_close_lag1 + delta_fr + fr_oi
         assert "btc_close_lag1" in X.columns
         assert "delta_fr" in X.columns
         assert "fr_oi_interaction" in X.columns
@@ -112,10 +113,10 @@ class TestTrainerWithFrOi:
         assert isinstance(result, TrainingResult)
         assert "delta_fr" in result.feature_importances
         assert "fr_oi_interaction" in result.feature_importances
-        assert result.n_features == 16
+        assert result.n_features == 17  # base 15 + delta_fr + fr_oi_interaction
 
     def test_train_without_fr_oi_features(self):
-        """FR/OI 없는 데이터로 학습 시 base 14 피처만."""
+        """FR/OI 없는 데이터로 학습 시 base 피처만 (vpin_50 포함 15개)."""
         trainer = WalkForwardTrainer(
             symbol="TEST/USDT", n_estimators=10, max_depth=3,
         )
@@ -124,7 +125,7 @@ class TestTrainerWithFrOi:
         assert isinstance(result, TrainingResult)
         assert "delta_fr" not in result.feature_importances
         assert "fr_oi_interaction" not in result.feature_importances
-        assert result.n_features == 14
+        assert result.n_features == 15  # base 14 + vpin_50
 
     def test_feature_count_diff_trainer_level(self):
         """Trainer 레벨에서 FR/OI 유무에 따른 n_features 차이 = 2."""

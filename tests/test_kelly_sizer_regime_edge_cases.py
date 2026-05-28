@@ -355,3 +355,72 @@ class TestKellySizerFromTradeHistory:
             price=100
         )
         assert size == 0.0
+
+
+class TestKellySizerDynamicFraction:
+    """KellySizer 레짐별 동적 fraction 테스트 (Cycle 232)."""
+
+    def test_get_dynamic_fraction_high_vol(self):
+        """HIGH_VOL → 10% fraction."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("HIGH_VOL") == pytest.approx(0.10)
+
+    def test_get_dynamic_fraction_trend_up(self):
+        """TREND_UP → 25% fraction (Quarter-Kelly 표준)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("TREND_UP") == pytest.approx(0.25)
+
+    def test_get_dynamic_fraction_trend_down(self):
+        """TREND_DOWN → 15% (보수적)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("TREND_DOWN") == pytest.approx(0.15)
+
+    def test_get_dynamic_fraction_crisis(self):
+        """CRISIS → 10% (최소 포지션)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("CRISIS") == pytest.approx(0.10)
+
+    def test_get_dynamic_fraction_bull_alias(self):
+        """BULL 별칭 → TREND_UP 동일 (25%)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("BULL") == pytest.approx(0.25)
+
+    def test_get_dynamic_fraction_unknown(self):
+        """알 수 없는 레짐 → 기본값(20%, 보수적)."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("UNKNOWN_REGIME") == pytest.approx(0.20)
+
+    def test_get_dynamic_fraction_case_insensitive(self):
+        """소문자 입력도 처리."""
+        sizer = KellySizer()
+        assert sizer.get_dynamic_fraction("high_vol") == pytest.approx(0.10)
+        assert sizer.get_dynamic_fraction("trend_up") == pytest.approx(0.25)
+
+    def test_update_fraction_for_regime_changes_fraction(self):
+        """update_fraction_for_regime() → self.fraction 갱신."""
+        sizer = KellySizer(fraction=0.5)
+        new_frac = sizer.update_fraction_for_regime("HIGH_VOL")
+        assert new_frac == pytest.approx(0.10)
+        assert sizer.fraction == pytest.approx(0.10)
+
+    def test_update_fraction_for_regime_returns_new_value(self):
+        """반환값 = 갱신된 fraction."""
+        sizer = KellySizer(fraction=0.5)
+        result = sizer.update_fraction_for_regime("TREND_UP")
+        assert result == pytest.approx(0.25)
+
+    def test_update_fraction_no_change_same_regime(self):
+        """동일 레짐 반복 호출 시 fraction 유지."""
+        sizer = KellySizer(fraction=0.25)
+        sizer.update_fraction_for_regime("TREND_UP")
+        sizer.update_fraction_for_regime("TREND_UP")
+        assert sizer.fraction == pytest.approx(0.25)
+
+    def test_dynamic_fraction_high_vol_smaller_position(self):
+        """HIGH_VOL 레짐 → TREND_UP 대비 포지션 사이즈 작음."""
+        sizer_hv = KellySizer(fraction=0.10)
+        sizer_up = KellySizer(fraction=0.25)
+        kwargs = dict(win_rate=0.55, avg_win=0.02, avg_loss=0.01, capital=10000, price=100)
+        size_hv = sizer_hv.compute(**kwargs)
+        size_up = sizer_up.compute(**kwargs)
+        assert size_hv < size_up

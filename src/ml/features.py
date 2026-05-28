@@ -257,6 +257,22 @@ class FeatureBuilder:
             total = bid + ask
             feat["bid_ask_depth_imbalance"] = (bid - ask) / (total + 1e-9)
 
+        # VPIN (Volume-Synchronized Probability of Informed Trading) — Cycle 232
+        # OHLCV만으로 계산 가능: close>open → BUY fraction, close<open → SELL fraction
+        # 50봉 롤링 윈도우, [0, 1] 범위. 0.5=중립, 0.8+= 강한 방향성 주문 흐름
+        # 연구: Easley et al. (2012) VPIN이 플래시 크래시 선행 지표임을 확인
+        if "volume" in df.columns and len(df) >= 10:
+            _vol = volume.fillna(0.0).clip(lower=0.0)
+            _buy_frac = pd.Series(0.5, index=df.index, dtype=float)
+            _buy_frac[close > df["open"]] = 1.0
+            _buy_frac[close < df["open"]] = 0.0
+            _buy_frac[_vol == 0] = 0.5
+            _imbalance = (_vol * _buy_frac - _vol * (1.0 - _buy_frac)).abs()
+            _roll_vol = _vol.rolling(50, min_periods=10).sum()
+            _roll_imb = _imbalance.rolling(50, min_periods=10).sum()
+            _vpin = (_roll_imb / _roll_vol.replace(0, float("nan"))).fillna(0.5).clip(0.0, 1.0)
+            feat["vpin_50"] = _vpin
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 

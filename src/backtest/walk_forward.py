@@ -319,7 +319,8 @@ class WalkForwardOptimizer:
                 oos_result.total_trades, best_params,
             )
 
-        # 최종 파라미터 선택: OOS Sharpe 평균 가장 높은 파라미터
+        # 최종 파라미터 선택: Sharpe Information Criterion (avg - 0.5 * std)
+        # 평균만 최대화하면 고분산 파라미터를 선택할 수 있음 → 안정성 가중 선택
         if not param_oos_map:
             return WalkForwardResult(
                 strategy_name=self.strategy_name,
@@ -331,7 +332,16 @@ class WalkForwardOptimizer:
                 overfit_windows=0,
                 fail_reasons=["유효 윈도우 없음 (데이터 부족)"],
             )
-        best_key = max(param_oos_map, key=lambda k: sum(param_oos_map[k]) / len(param_oos_map[k]))
+
+        import statistics as _stat
+
+        def _sharpe_ic(sharpes: list) -> float:
+            """Sharpe Information Criterion = avg - 0.5 * std (안정성 가중)."""
+            avg = sum(sharpes) / len(sharpes)
+            std = _stat.stdev(sharpes) if len(sharpes) > 1 else 0.0
+            return avg - 0.5 * std
+
+        best_key = max(param_oos_map, key=lambda k: _sharpe_ic(param_oos_map[k]))
         import ast
         best_final_params = dict(ast.literal_eval(best_key))  # str → dict 복원
 

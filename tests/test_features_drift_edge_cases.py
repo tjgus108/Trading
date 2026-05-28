@@ -207,13 +207,87 @@ class TestDriftDetectorEdgeCases:
     def test_drift_detector_reset(self):
         """Drift detector 초기화 후 상태 리셋."""
         detector = PageHinkleyDriftDetector(lambda_=5, delta=0.005)
-        
+
         for _ in range(20):
             detector.update(0.8)
-        
+
         # 일부 상태 변경 가능
         detector.reset()
         result = detector.update(0.8)
-        
+
         # reset 후 다시 새로운 상태로 시작
         assert result is False
+
+
+class TestFeatureBuilderVPIN:
+    """FeatureBuilder VPIN 피처 테스트 (Cycle 232)."""
+
+    def _make_df(self, n: int = 100, trend: str = "up") -> pd.DataFrame:
+        np.random.seed(42)
+        closes = 100.0 + np.cumsum(np.random.randn(n) * 0.5)
+        closes = np.abs(closes) + 1.0
+        if trend == "up":
+            opens = closes * 0.999
+        elif trend == "down":
+            opens = closes * 1.001
+        else:
+            opens = closes + np.random.randn(n) * 0.1
+        return pd.DataFrame({
+            "open": opens,
+            "high": closes * 1.002,
+            "low": closes * 0.998,
+            "close": closes,
+            "volume": np.random.uniform(100, 1000, n),
+        })
+
+    def test_vpin_feature_present(self):
+        """VPIN 피처가 X에 포함됨."""
+        df = self._make_df(100)
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        assert "vpin_50" in X.columns
+
+    def test_vpin_range_zero_to_one(self):
+        """VPIN 값이 [0, 1] 범위."""
+        df = self._make_df(100)
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        vpin_col = X["vpin_50"]
+        assert vpin_col.min() >= 0.0
+        assert vpin_col.max() <= 1.0
+
+    def test_vpin_all_buy_candles(self):
+        """모두 상승봉(close > open) → VPIN 높음 (>= 0.5)."""
+        n = 60
+        closes = np.linspace(100, 110, n)
+        opens = closes * 0.999  # 항상 close > open
+        df = pd.DataFrame({
+            "open": opens, "high": closes * 1.001,
+            "low": closes * 0.999, "close": closes,
+            "volume": np.ones(n) * 500,
+        })
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        if "vpin_50" in X.columns and len(X) > 0:
+            assert X["vpin_50"].mean() >= 0.5
+
+    def test_vpin_no_crash_empty_volume(self):
+        """볼륨 0인 데이터에서도 크래시 없음."""
+        n = 60
+        closes = np.linspace(100, 110, n)
+        df = pd.DataFrame({
+            "open": closes * 0.999, "high": closes * 1.001,
+            "low": closes * 0.999, "close": closes,
+            "volume": np.zeros(n),
+        })
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        # 크래시 없이 완료되면 OK (VPIN 컬럼 있어도 없어도 됨)
+        assert isinstance(X, pd.DataFrame)
+
+    def test_vpin_no_crash_short_df(self):
+        """행 수 < 10 → VPIN 계산 스킵, 크래시 없음."""
+        df = self._make_df(8)
+        builder = FeatureBuilder()
+        X, _ = builder.build(df)
+        assert isinstance(X, pd.DataFrame)

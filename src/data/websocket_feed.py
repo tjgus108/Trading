@@ -184,7 +184,7 @@ class BinanceWebSocketFeed:
     - max_retry: 5회 (약 62초 누적)
     """
 
-    def __init__(self, symbol: str = "btcusdt", interval: str = "1h", stale_timeout: float = 300.0):
+    def __init__(self, symbol: str = "btcusdt", interval: str = "1h", stale_timeout: Optional[float] = None):
         self.symbol = symbol.lower().replace("/", "")
         self.interval = interval
         # Cycle 229: 타임프레임 기반 동적 타임아웃 계산
@@ -195,9 +195,9 @@ class BinanceWebSocketFeed:
             "1h": 3600, "4h": 14400, "1d": 86400
         }
         base_interval = tf_intervals.get(interval, 3600)
-        # 명시적 stale_timeout 지정이 없으면 타임프레임 기반 계산 (stale_timeout > 0)
-        if stale_timeout > 0:
-            self._stale_timeout = stale_timeout  # 명시적 설정값 사용
+        # None이면 타임프레임 기반 동적 계산, 명시적 값(0 포함)이면 그대로 사용
+        if stale_timeout is not None:
+            self._stale_timeout = stale_timeout  # 명시적 설정값 사용 (0도 유효)
         else:
             self._stale_timeout = base_interval * 1.5  # 동적 계산 (타임프레임 * 1.5)
         self._base_interval = base_interval  # 타임프레임 기간 저장 (나중에 재조정용)

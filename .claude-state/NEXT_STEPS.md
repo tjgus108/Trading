@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 228-231 세션 완료)_
+_Last updated: 2026-05-28 (Cycle 232 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 228 → 231 (4사이클)
+### 이번 세션 완료 사이클: 228 → 232 (5사이클)
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -14,35 +14,37 @@ _Last updated: 2026-05-28 (Cycle 228-231 세션 완료)_
 | 229 | C+B+SIM+F | order_book_depth, 동적 타임아웃, --mc-p-threshold 옵션 |
 | 230 | D+E+SIM+F | depth_imbalance 피처, TWAP 동적 슬라이스, SPA 분석 |
 | 231 | A+C+SIM+F | 테스트 32개 추가, OFICalculator, MC block_size, Fractional Kelly |
+| 232 | B+D+SIM+F | KellySizer dynamic fraction, VPIN 피처, Sharpe IC, 버그 1건 수정 |
 
-### 🎯 Cycle 232 작업 방향 (232 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 233 작업 방향 (233 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): KellySizer 동적 fraction
-- Quarter-Kelly(25%) 실무 표준 (리서치 Cycle 231)
-- 현재 CF 클리핑은 있으나 fraction 동적 조정 미구현
-- 레짐별 Kelly fraction: 고변동성→10%, 저변동성→25%
-- Risk-Constrained Kelly (drawdown 확률 제약 결합) 검토
+#### C(데이터): WebSocket 피드 안정성 + 온체인 피처
+- stale_timeout=None 기본값 변경 후 기존 REST fallback 경로 검증
+- OFI + VPIN 상관성 분석: OFICalculator vs bid_ask_depth_imbalance vs vpin_50
+  - 세 피처의 Pearson/Spearman 상관계수 계산 (중복 제거 여부 판단)
+- exchange_netflow / sopr 온체인 피처 파이프라인 검증
 
-#### D(ML): OFI + VPIN + depth_imbalance 통합
-- OFICalculator(Cycle 231) + VPIN 극단감지 연동
-- bid_ask_depth_imbalance 피처와 OFI의 상관성 분석
-- 피처 중요도 비교: compare_feature_importance() 활용
+#### B(리스크): DrawdownMonitor + 레짐 통합
+- DrawdownMonitor.get_mdd_size_multiplier() + KellySizer.update_fraction_for_regime() 통합
+  - 레짐 HIGH_VOL 시: Kelly fraction 10% + MDD multiplier 동시 적용
+  - RiskManager에서 두 모듈 연결하는 코드 추가
+- VaR/CVaR 일일 리포트 자동화: DrawdownStatus에 cf_var 필드 추가 검토
 
-#### SIM: block_size 효과 측정
-- MC permutation block_size=5로 시뮬레이션 실행
-- 기존 0/22 PASS에서 개선도 측정
-- mc_p_threshold=0.10 + block_size=5 조합 테스트
+#### SIM: Sharpe IC 효과 측정
+- walk_forward.py Sharpe IC 변경 후 OOS Sharpe std 변화 측정
+- narrow_range, value_area 재시뮬레이션 (3/9 fold PASS → 개선 여부)
+- paper_simulation.py에서 consistency 기준 완화 테스트 (50% → 33%)
 
-#### F(리서치): CPCV + Stationary Bootstrap
-- CPCV 구현 라이브러리 조사 (mlfinlab 등)
-- Stationary Bootstrap + Politis-White 자동 블록 크기
-- arch 라이브러리 설치 → SPA test 적용
+#### F(리서치): 레짐 이질성 + 피처 중복 제거
+- OOS Sharpe std 원인: IS/OOS 레짐 불일치 → 레짐 조건부 fold 가중 선택
+- 피처 중복: OFI ≈ bid_ask_depth_imbalance ≈ VPIN의 상관성 분석
+  - Cycle 233에서 PFI 비교로 중복 피처 제거 여부 결정
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
 - 합성 데이터 결과는 방향성 참고만
 
 ### 핵심 메트릭
-- 상위 3: supertrend_multi(Sharpe 7.39), momentum_quality(6.25), price_action_momentum(6.58)
-- 테스트: ~7,900+ passed (이번 세션 +55개 이상 추가)
-- 새로 추가된 인프라: OFICalculator, TTL 검증, MC block_size, TWAP 동적 슬라이스
+- 상위 3: price_action_momentum(Sharpe 3.81, +49%), momentum_quality(Sharpe 3.91), supertrend_multi
+- 테스트: 8,101 passed (Cycle 232 +146개)
+- 새로 추가된 인프라: KellySizer dynamic fraction, VPIN 피처, Sharpe IC 파라미터 선택
