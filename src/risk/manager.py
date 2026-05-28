@@ -336,6 +336,70 @@ class RiskManager:
         if self.circuit_breaker:
             self.circuit_breaker.reset_daily()
 
+    # ── Kill Switch 연동 ─────────────────────────────────────────────────────
+
+    def check_strategy_health(
+        self,
+        strategy_name: str,
+        current_mdd: float,
+        backtest_mdd: float,
+    ) -> dict:
+        """전략의 MDD 건강 상태를 확인하고 KILL/CONTINUE 판정을 반환.
+
+        DrawdownMonitor.should_kill_strategy()를 내부에서 호출하여
+        현재 MDD가 백테스트 MDD의 1.5배를 초과하면 KILL 권장.
+
+        Args:
+            strategy_name: 전략 이름 (로깅용).
+            current_mdd: 현재 실시간 MDD (0~1 비율).
+            backtest_mdd: 백테스트에서 관측된 MDD (0~1 비율).
+
+        Returns:
+            {"action": "KILL", "reason": ..., "strategy": ..., "current_mdd": ..., "threshold": ...}
+            또는
+            {"action": "CONTINUE", "strategy": ..., "current_mdd": ..., "threshold": ...}
+        """
+        if self.drawdown_monitor is None:
+            logger.warning(
+                "check_strategy_health: drawdown_monitor not set — defaulting to CONTINUE"
+            )
+            return {
+                "action": "CONTINUE",
+                "strategy": strategy_name,
+                "current_mdd": abs(current_mdd),
+                "threshold": abs(backtest_mdd) * 1.5,
+                "reason": "drawdown_monitor not configured",
+            }
+
+        status = self.drawdown_monitor.get_kill_switch_status(
+            current_mdd=current_mdd,
+            backtest_mdd=backtest_mdd,
+        )
+
+        if status["should_kill"]:
+            logger.warning(
+                "check_strategy_health: KILL %s — MDD %.2f%% > threshold %.2f%%",
+                strategy_name, status["current_mdd"] * 100, status["threshold"] * 100,
+            )
+            return {
+                "action": "KILL",
+                "reason": "MDD exceeded threshold",
+                "strategy": strategy_name,
+                "current_mdd": status["current_mdd"],
+                "threshold": status["threshold"],
+            }
+
+        logger.debug(
+            "check_strategy_health: CONTINUE %s — MDD %.2f%% < threshold %.2f%%",
+            strategy_name, status["current_mdd"] * 100, status["threshold"] * 100,
+        )
+        return {
+            "action": "CONTINUE",
+            "strategy": strategy_name,
+            "current_mdd": status["current_mdd"],
+            "threshold": status["threshold"],
+        }
+
     # Confidence → 포지션 사이징 배율 (HIGH=1.5x, MEDIUM=1.0x, LOW=0.5x)
     CONFIDENCE_MULTIPLIER = {"HIGH": 1.5, "MEDIUM": 1.0, "LOW": 0.5}
 

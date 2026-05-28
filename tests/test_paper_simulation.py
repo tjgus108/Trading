@@ -261,3 +261,90 @@ class TestBlockSizeCLIArg:
         # 다른 block_size는 다른 데이터를 생성해야 함
         assert not df_36["close"].equals(df_72["close"])
         assert not df_36["close"].equals(df_144["close"])
+
+
+# ── 리포트 헬퍼 ──────────────────────────────────────────────
+
+def _make_report_df(periods: int = 100):
+    """generate_report 테스트용 최소 DataFrame 생성."""
+    import pandas as pd
+    import numpy as np
+    idx = pd.date_range("2024-01-01", periods=periods, freq="h")
+    df = pd.DataFrame({"close": np.linspace(100, 110, periods)}, index=idx)
+    df["open"] = df["close"]
+    df["high"] = df["close"] * 1.01
+    df["low"] = df["close"] * 0.99
+    df["volume"] = 1000.0
+    return df
+
+
+class TestGenerateReportEdgeCases:
+    """generate_report 엣지케이스 테스트."""
+
+    def test_empty_results_list(self):
+        """빈 결과 리스트로 리포트 생성 시 에러 없이 기본 섹션이 포함."""
+        import scripts.paper_simulation as ps
+        df = _make_report_df()
+        report = ps.generate_report([], "Synthetic", df, 3)
+        # 헤더와 요약 섹션은 존재
+        assert "# Paper Trading" in report
+        assert "## 요약" in report
+        assert "테스트 전략 | 0개" in report
+        assert "PASS" in report and "0개" in report
+        # 포트폴리오 섹션은 없어야 함 (results가 비어서 if results: 분기에 안 들어감)
+        assert "포트폴리오 가상 배분" not in report
+        # TOP 10 헤더는 존재하지만 데이터 행은 없음
+        assert "## TOP 10" in report
+
+    def test_all_strategies_fail(self):
+        """모든 전략이 FAIL인 경우 리포트에 FAIL 분석 섹션 포함."""
+        import scripts.paper_simulation as ps
+        df = _make_report_df()
+        results = [
+            {**_make_result("strat_a", avg_return=-0.05, overall_passed=False),
+             "top_fail_reasons": [("sharpe < 1.0", 3), ("trades < 15", 2)]},
+            {**_make_result("strat_b", avg_return=-0.10, overall_passed=False),
+             "top_fail_reasons": [("sharpe < 1.0", 4)]},
+            {**_make_result("strat_c", avg_return=-0.02, overall_passed=False),
+             "top_fail_reasons": [("MDD > 20%", 2), ("PF < 1.5", 1)]},
+        ]
+        report = ps.generate_report(results, "Synthetic", df, 3)
+        # PASS 0개
+        assert "PASS (일관성 50%+) | 0개" in report
+        assert "FAIL | 3개" in report
+        # FAIL 원인 분석 섹션 존재
+        assert "## FAIL 원인 분석" in report
+        assert "전체 FAIL 원인 빈도" in report
+        # 포트폴리오 섹션은 존재하되 PASS 배분은 없음
+        assert "포트폴리오 가상 배분" in report
+        assert "PASS" not in report.split("포트폴리오 가상 배분")[1].split("\n")[1]
+
+    def test_report_with_robustness_labels(self):
+        """robustness_label이 설정된 결과가 있으면 Robust 열이 표시."""
+        import scripts.paper_simulation as ps
+        df = _make_report_df()
+        results = [
+            {**_make_result("robust_strat", avg_return=0.05, overall_passed=True),
+             "robustness_label": "ROBUST", "top_fail_reasons": []},
+            {**_make_result("fragile_strat", avg_return=0.01, overall_passed=False),
+             "robustness_label": "FRAGILE", "top_fail_reasons": [("sharpe < 1.0", 2)]},
+        ]
+        report = ps.generate_report(results, "Synthetic", df, 3)
+        assert "| Robust |" in report or "Robust" in report
+        assert "ROBUST" in report
+        assert "FRAGILE" in report
+
+    def test_report_with_rank_scores(self):
+        """rank_score가 결과에 포함되면 상대 순위 섹션이 출력."""
+        import scripts.paper_simulation as ps
+        df = _make_report_df()
+        results = [
+            {**_make_result("top", avg_return=0.10, avg_sharpe=2.0),
+             "rank_score": 90.0, "percentile": "p90", "top_fail_reasons": []},
+            {**_make_result("mid", avg_return=0.02, avg_sharpe=0.5),
+             "rank_score": 45.0, "percentile": "p45", "top_fail_reasons": []},
+        ]
+        report = ps.generate_report(results, "Synthetic", df, 3)
+        assert "## 상대 순위 (Composite Rank Score)" in report
+        assert "p90" in report
+        assert "p45" in report

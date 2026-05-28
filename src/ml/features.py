@@ -636,6 +636,86 @@ class RegimeAwareFeatureBuilder:
         importances = rf.feature_importances_
         return {col: round(float(imp), 4) for col, imp in zip(X.columns, importances)}
 
+    def get_feature_importance_by_regime(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        regime_labels: pd.Series,
+        min_samples: int = 30,
+    ) -> Dict[str, Dict[str, float]]:
+        """레짐별로 분리된 피처 중요도를 반환.
+
+        각 레짐에 해당하는 샘플만 필터링하여 독립적으로
+        RandomForestClassifier를 학습시키고 feature_importances_를 추출한다.
+
+        Args:
+            X: 피처 행렬 (build() 결과의 X)
+            y: 레이블 시리즈 (build() 결과의 y)
+            regime_labels: 각 행에 대응하는 레짐 레이블 (예: "bull", "TREND" 등).
+                          X, y와 동일 인덱스여야 함.
+            min_samples: 레짐별 최소 샘플 수. 미달 시 해당 레짐 스킵. 기본 30.
+
+        Returns:
+            dict[regime_label, dict[feature_name, importance]]
+            각 레짐별 {피처명: 중요도} 딕셔너리. 중요도 합계 ≈ 1.0.
+            샘플 부족 레짐은 결과에서 제외.
+        """
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+        except ImportError:
+            return {}
+
+        if X.empty or y.empty:
+            return {}
+
+        # 인덱스 정렬
+        common_idx = X.index.intersection(y.index).intersection(regime_labels.index)
+        X_aligned = X.loc[common_idx]
+        y_aligned = y.loc[common_idx]
+        regime_aligned = regime_labels.loc[common_idx]
+
+        # NaN 제거
+        valid = y_aligned.notna()
+        X_aligned = X_aligned.loc[valid]
+        y_aligned = y_aligned.loc[valid]
+        regime_aligned = regime_aligned.loc[valid]
+
+        result: Dict[str, Dict[str, float]] = {}
+
+        for regime_label in regime_aligned.unique():
+            mask = regime_aligned == regime_label
+            X_regime = X_aligned.loc[mask]
+            y_regime = y_aligned.loc[mask]
+
+            if len(X_regime) < min_samples:
+                logger.debug(
+                    "get_feature_importance_by_regime: skip regime '%s' "
+                    "(samples=%d < min=%d)",
+                    regime_label, len(X_regime), min_samples,
+                )
+                continue
+
+            # y에 1개 클래스만 있으면 RF 학습 불가 → 스킵
+            if y_regime.nunique() < 2:
+                logger.debug(
+                    "get_feature_importance_by_regime: skip regime '%s' "
+                    "(only %d class)",
+                    regime_label, y_regime.nunique(),
+                )
+                continue
+
+            rf = RandomForestClassifier(
+                n_estimators=50, max_depth=4, random_state=42, n_jobs=1,
+            )
+            rf.fit(X_regime.values, y_regime.astype(int).values)
+            importances = rf.feature_importances_
+            result[regime_label] = {
+                col: round(float(imp), 4)
+                for col, imp in zip(X_regime.columns, importances)
+            }
+
+        return result
+
     # 기존 FeatureBuilder API 위임 (기존 코드와 호환)
     def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """기존 FeatureBuilder.build() 호환 — 레짐 감지 없이 전체 피처 반환."""

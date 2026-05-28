@@ -1,39 +1,38 @@
 # Next Steps
 
-_Last updated: 2026-05-29 (Cycle 239 완료)_
+_Last updated: 2026-05-29 (Cycle 240 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 238, 239
+### 이번 세션 완료 사이클: 238, 239, 240
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
 | 238 | E+A+SIM+F | rolling Sharpe 모니터, perturbation_check, block_size 24, regime death 리서치 |
 | 239 | C+B+SIM+F | reconnect_gaps, cache_stats, MDD kill switch, vol_scaling, --perturbation-check CLI |
+| 240 | D+E+SIM+F | regime별 importance, feature drift, check_strategy_health, max_position_by_orderbook |
 
-### 🎯 Cycle 240 작업 방향 (240 mod 5 = 0 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 241 작업 방향 (241 mod 5 = 1 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): 레짐별 SHAP 피처 중요도 분리
-- features.py 피처 중요도를 레짐 레이블별 분리 추적
-  - TREND에서 모멘텀 피처 우세 vs HIGH_VOL에서 VPIN/OFI 우세 확인
-- ACF 기반 자동 block_size 선택 검토
-- ML 모델 health 모니터링 개선
+#### A(품질): KS-test 기반 분포 drift 모니터 구현
+- 리서치 결과 적용: ks_2samp으로 baseline vs recent 수익률 분포 비교
+- PerformanceTracker 또는 별도 모듈에 `check_distribution_drift(baseline_returns, recent_returns)` 구현
+- 2-signal 합의: KS p<0.05 + rolling Sharpe < 0.5 동시 충족 시 경고
+- 파라미터 5개 이하 전략 필터링 유틸리티 검토
 
-#### E(실행): Orchestrator에 kill_switch 연동
-- RiskManager/Orchestrator에서 should_kill_strategy() 호출 연동
-- apply_volatility_scaling()을 KellySizer 메인 로직에 통합
-- 오더북 깊이 기반 포지션 사이즈 제한 검토 (리서치 기반)
+#### C(데이터): OFICalculator 극단값 로직 검증
+- OFICalculator 극단 감지 로직 리뷰 및 엣지케이스 테스트 보강
+- DataFeed 캐시 통계(get_cache_stats) 활용 패턴 검증
 
-#### SIM: --block-size 비교 시뮬
-- --block-size 12 / 24 / 36 비교 (합성 데이터)
-- --perturbation-check 활성화하여 Top 전략 ROBUST/FRAGILE 판정
+#### SIM: --perturbation-check 단독 실행
+- CPU 경합 없이 단독으로 --perturbation-check 실행
+- Top 전략 ROBUST/FRAGILE 판정 확인
 
-#### F(리서치): KS-test 분포 drift + equity curve std
-- scipy.stats.ks_2samp 기반 수익률 분포 변화 감지
-- equity curve rolling std 이상 감지 패턴
-- 오더북 깊이 기반 동적 포지션 사이즈 산식 조사
+#### F(리서치): 실전 봇 모니터링 대시보드 패턴
+- 실전 트레이딩 봇의 모니터링 대시보드 best practice
+- 어떤 메트릭을 실시간으로 추적하는지
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
@@ -41,5 +40,5 @@ _Last updated: 2026-05-29 (Cycle 239 완료)_
 
 ### 핵심 메트릭
 - 상위 3: momentum_quality(Sharpe 7.67), price_action_momentum(Sharpe 6.98), supertrend_multi(Sharpe 6.57)
-- 테스트: 8,240+ passed (Cycle 239 +42개)
-- 신규: MDD kill switch, vol_scaling, reconnect_gaps, cache_stats, --perturbation-check CLI
+- 테스트: 8,280+ passed (Cycle 240 +31개)
+- 신규: regime별 importance, feature drift, check_strategy_health, max_position_by_orderbook

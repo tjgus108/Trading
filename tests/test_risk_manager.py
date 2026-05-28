@@ -1188,3 +1188,130 @@ class TestKellyDrawdownIntegration:
         )
         assert res.status == RiskStatus.APPROVED
         assert abs(res.position_size - base) < 1e-6
+
+
+# ── check_strategy_health 테스트 (작업1) ────────────────────────────────────
+
+class TestCheckStrategyHealth:
+    """RiskManager.check_strategy_health() + DrawdownMonitor.should_kill_strategy() 연동."""
+
+    def _make_rm_with_dd(self, **dd_kwargs):
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dd = DrawdownMonitor(**dd_kwargs)
+        return RiskManager(
+            risk_per_trade=0.01,
+            atr_multiplier_sl=1.5,
+            atr_multiplier_tp=3.0,
+            max_position_size=0.10,
+            drawdown_monitor=dd,
+        )
+
+    def test_kill_when_mdd_exceeds_threshold(self):
+        """current_mdd > backtest_mdd * 1.5 → action=KILL."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("TestStrat", current_mdd=0.20, backtest_mdd=0.10)
+        assert result["action"] == "KILL"
+        assert result["reason"] == "MDD exceeded threshold"
+        assert result["strategy"] == "TestStrat"
+        assert result["current_mdd"] == pytest.approx(0.20)
+        assert result["threshold"] == pytest.approx(0.15)
+
+    def test_continue_when_mdd_below_threshold(self):
+        """current_mdd < backtest_mdd * 1.5 → action=CONTINUE."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("SafeStrat", current_mdd=0.05, backtest_mdd=0.10)
+        assert result["action"] == "CONTINUE"
+        assert result["strategy"] == "SafeStrat"
+        assert result["current_mdd"] == pytest.approx(0.05)
+
+    def test_continue_when_mdd_exactly_at_threshold(self):
+        """current_mdd == backtest_mdd * 1.5 → should_kill은 False (> 아닌 초과만)."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("EdgeStrat", current_mdd=0.15, backtest_mdd=0.10)
+        assert result["action"] == "CONTINUE"  # 정확히 같으면 초과가 아님
+
+    def test_kill_with_negative_mdd_values(self):
+        """음수 MDD 값도 abs() 처리되어 올바르게 판정."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("NegStrat", current_mdd=-0.25, backtest_mdd=-0.10)
+        assert result["action"] == "KILL"
+        assert result["current_mdd"] == pytest.approx(0.25)
+
+    def test_continue_when_no_drawdown_monitor(self):
+        """drawdown_monitor가 None이면 CONTINUE 반환 (안전 기본값)."""
+        rm = RiskManager(
+            risk_per_trade=0.01,
+            atr_multiplier_sl=1.5,
+            atr_multiplier_tp=3.0,
+            max_position_size=0.10,
+            drawdown_monitor=None,
+        )
+        result = rm.check_strategy_health("NoMonStrat", current_mdd=0.50, backtest_mdd=0.10)
+        assert result["action"] == "CONTINUE"
+        assert "not configured" in result.get("reason", "")
+
+    def test_kill_with_zero_backtest_mdd(self):
+        """backtest_mdd=0 → threshold=0, current_mdd>0이면 KILL."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("ZeroBT", current_mdd=0.01, backtest_mdd=0.0)
+        assert result["action"] == "KILL"
+
+    def test_continue_with_both_zero(self):
+        """current_mdd=0 and backtest_mdd=0 → CONTINUE."""
+        rm = self._make_rm_with_dd()
+        result = rm.check_strategy_health("ZeroZero", current_mdd=0.0, backtest_mdd=0.0)
+        assert result["action"] == "CONTINUE"
+
+
+# ── max_position_by_orderbook 테스트 (작업2) ────────────────────────────────
+
+class TestMaxPositionByOrderbook:
+    """position_sizer.max_position_by_orderbook() 단위 테스트."""
+
+    def test_normal_depth(self):
+        """depth $100K, max_impact 5% → max $5,000."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(100_000, max_impact_pct=0.05)
+        assert result == pytest.approx(5_000.0)
+
+    def test_none_depth_returns_default(self):
+        """depth=None → default_min_usd 반환."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(None)
+        assert result == pytest.approx(100.0)
+
+    def test_zero_depth_returns_default(self):
+        """depth=0 → default_min_usd 반환."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(0)
+        assert result == pytest.approx(100.0)
+
+    def test_negative_depth_returns_default(self):
+        """depth=-1000 → default_min_usd 반환."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(-1000)
+        assert result == pytest.approx(100.0)
+
+    def test_small_depth_clamps_to_default_min(self):
+        """depth $500, impact 10% → $50 < default $100 → $100 반환."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(500, max_impact_pct=0.10)
+        assert result == pytest.approx(100.0)
+
+    def test_custom_default_min(self):
+        """custom default_min_usd=50 → depth None 시 50 반환."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(None, default_min_usd=50.0)
+        assert result == pytest.approx(50.0)
+
+    def test_large_depth_large_order(self):
+        """depth $10M, impact 5% → max $500K."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(10_000_000, max_impact_pct=0.05)
+        assert result == pytest.approx(500_000.0)
+
+    def test_custom_impact_pct(self):
+        """depth $200K, impact 10% → max $20K."""
+        from src.risk.position_sizer import max_position_by_orderbook
+        result = max_position_by_orderbook(200_000, max_impact_pct=0.10)
+        assert result == pytest.approx(20_000.0)

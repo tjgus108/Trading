@@ -966,6 +966,70 @@ class DualGateADWINMonitor:
             "should_retrain": self.should_retrain,
         }
 
+    def check_feature_drift(
+        self,
+        baseline_stats: Dict[str, Dict[str, float]],
+        current_stats: Dict[str, Dict[str, float]],
+        threshold: float = 2.0,
+    ) -> Dict[str, object]:
+        """피처별 mean/std 비교로 feature drift 감지.
+
+        각 피처의 baseline(학습 시점) mean/std와 current(실시간) mean/std를 비교하여
+        ``abs(current_mean - baseline_mean) / baseline_std > threshold`` 이면
+        해당 피처를 drifted로 판정한다.
+
+        Args:
+            baseline_stats: 학습 시점 통계.
+                {feature_name: {"mean": float, "std": float}, ...}
+            current_stats: 현재 시점 통계. baseline_stats와 동일 형식.
+            threshold: 드리프트 판정 기준 (기본 2.0 = 2-sigma).
+
+        Returns:
+            dict with keys:
+              - drifted_features (list[str]): drift 감지된 피처명 목록
+              - drift_scores (dict[str, float]): 각 피처의 drift score
+              - is_drifting (bool): 하나라도 drift 시 True
+        """
+        drifted: List[str] = []
+        scores: Dict[str, float] = {}
+
+        for feat_name, b_stat in baseline_stats.items():
+            if feat_name not in current_stats:
+                continue
+
+            b_mean = b_stat.get("mean", 0.0)
+            b_std = b_stat.get("std", 0.0)
+            c_mean = current_stats[feat_name].get("mean", 0.0)
+
+            # std=0이면 상수 피처 → mean 차이가 있으면 drift, 없으면 안정
+            if b_std == 0.0:
+                score = abs(c_mean - b_mean)
+                # 상수 피처가 변했으면 threshold 이상으로 간주
+                if score > 0.0:
+                    score = threshold + 1.0
+                else:
+                    score = 0.0
+            else:
+                score = abs(c_mean - b_mean) / b_std
+
+            scores[feat_name] = round(score, 4)
+            if score > threshold:
+                drifted.append(feat_name)
+
+        is_drifting = len(drifted) > 0
+
+        if is_drifting:
+            logger.warning(
+                "check_feature_drift: %d/%d features drifted (threshold=%.1f): %s",
+                len(drifted), len(scores), threshold, drifted,
+            )
+
+        return {
+            "drifted_features": drifted,
+            "drift_scores": scores,
+            "is_drifting": is_drifting,
+        }
+
     def update_model_output(self, proba: float) -> bool:
         """
         모델 출력 게이트 업데이트.

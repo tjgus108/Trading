@@ -215,3 +215,51 @@ def kelly_with_vol_targeting(
     )
 
     return final_size
+
+
+def max_position_by_orderbook(
+    order_book_depth_usd: float | None,
+    max_impact_pct: float = 0.05,
+    default_min_usd: float = 100.0,
+) -> float:
+    """오더북 깊이 기반 최대 주문 크기(USD) 계산.
+
+    시장 충격(market impact)을 max_impact_pct 이내로 제한하기 위해
+    오더북 깊이의 일정 비율만 주문한다.
+
+    공식: max_order_usd = order_book_depth_usd * max_impact_pct
+
+    Args:
+        order_book_depth_usd: 오더북 한쪽(bid 또는 ask)의 총 유동성 (USD).
+            None이나 0 이하이면 default_min_usd 반환.
+        max_impact_pct: 최대 시장 충격 비율 (기본 5%). 0 < pct <= 1.
+        default_min_usd: depth 정보가 없을 때 반환할 기본 최소값 (기본 $100).
+
+    Returns:
+        최대 주문 크기 (USD). 항상 >= default_min_usd.
+
+    Examples:
+        >>> max_position_by_orderbook(100_000)     # depth $100K, 5% → $5,000
+        5000.0
+        >>> max_position_by_orderbook(None)         # depth 없음 → $100
+        100.0
+        >>> max_position_by_orderbook(0)            # depth 0 → $100
+        100.0
+        >>> max_position_by_orderbook(500, 0.10)    # depth $500, 10% → $50 < $100 → $100
+        100.0
+    """
+    if order_book_depth_usd is None or order_book_depth_usd <= 0:
+        logger.warning(
+            "max_position_by_orderbook: depth=%s — returning default_min $%.0f",
+            order_book_depth_usd, default_min_usd,
+        )
+        return default_min_usd
+
+    max_order = order_book_depth_usd * max_impact_pct
+    result = max(max_order, default_min_usd)
+
+    logger.debug(
+        "max_position_by_orderbook: depth=$%.0f impact=%.1f%% → max_order=$%.2f",
+        order_book_depth_usd, max_impact_pct * 100, result,
+    )
+    return result

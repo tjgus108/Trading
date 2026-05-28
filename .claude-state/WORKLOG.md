@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-29] Cycle 240 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — 레짐별 피처 중요도 + Feature Drift:**
+- `src/ml/features.py`: RegimeAwareFeatureBuilder에 `get_feature_importance_by_regime(X, y, regime_labels, min_samples=30)` 추가
+  - 레짐별 샘플 필터링 → RF importance 독립 계산, 단일 클래스/소수 샘플 스킵
+- `src/ml/drift_detector.py`: DualGateADWINMonitor에 `check_feature_drift(baseline_stats, current_stats, threshold=2.0)` 추가
+  - abs(current_mean - baseline_mean) / baseline_std > threshold → drift 감지
+  - 반환: drifted_features, drift_scores, is_drifting
+- 테스트 12개 추가 (importance 6개 + drift 6개)
+
+**[E] 실행 — Kill Switch 연동 + 오더북 포지션 제한:**
+- `src/risk/manager.py`: `check_strategy_health(strategy_name, current_mdd, backtest_mdd)` 추가
+  - DrawdownMonitor.should_kill_strategy() 호출 → KILL/CONTINUE 판정 반환
+- `src/risk/position_sizer.py`: `max_position_by_orderbook(depth_usd, max_impact_pct=0.05, default_min=100)` 추가
+  - depth × max_impact = 최대 주문 크기, None/0/음수 depth → default_min
+- 테스트 15개 추가 (kill switch 7개 + orderbook 8개)
+
+**[SIM] block_size 비교 + generate_report 테스트:**
+- block_size 12/24/36 비교 시뮬 (합성 데이터):
+  - block=12: engulfing_zone(73.8), momentum_quality(73.2)
+  - block=24: supertrend_multi(82.4), momentum_quality(75.2)
+  - block=36: price_action_momentum(66.5), momentum_quality(63.6)
+  - 3개 공통: momentum_quality 상위권, 모두 0/22 PASS (합성 한계)
+- generate_report 엣지케이스 테스트 4개 추가 (빈 결과, 전체FAIL, robustness, rank_score)
+
+**[F] 리서치 요약:**
+- 과적합: 파라미터 12→5개 축소가 최효과적, PBO(Probability of Backtest Overfitting) 지표 가치
+- 과적합 감지: ±10-20% 섭동 시 PF 1.5 미만 → 과적합, multi-pair 테스트 필수
+- KS-test 모니터링: ks_2samp p<0.05 경고, 최소 30거래, 권장 50거래+
+- false positive 방지: KS + rolling Sharpe + MDD + 연속손실 중 2개 이상 동시 충족 시만 정지
+- 권장: 355개 중 파라미터 5개 이하 + multi-pair PASS만 라이브 후보
+
 ## [2026-05-29] Cycle 239 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[C] 데이터 — WebSocket 갭 감지 + DataFeed 캐시 통계:**
@@ -19433,3 +19465,6 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-28 22:49 UTC] Cycle 239 Dispatched — C + B + SIM + F
 Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 22:57 UTC] Cycle 240 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
