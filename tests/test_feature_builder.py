@@ -564,3 +564,31 @@ def test_bid_depth_not_in_regime_features():
     assert "bid_ask_depth_imbalance" not in X.columns, (
         "bid_ask_depth_imbalance must not be generated even when bid_depth/ask_depth are present"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 237 D(ML) — get_all_regime_importances() 검증
+# ---------------------------------------------------------------------------
+
+def test_get_all_regime_importances_returns_all_regimes():
+    """get_all_regime_importances()가 bull/bear/ranging/crisis 모두 반환해야 함."""
+    from src.ml.features import RegimeAwareFeatureBuilder
+    builder = RegimeAwareFeatureBuilder()
+    df = _make_ohlcv(200)
+    result = builder.get_all_regime_importances(df)
+    assert isinstance(result, dict)
+    for regime in ("bull", "bear", "ranging", "crisis"):
+        assert regime in result, f"Missing regime: {regime}"
+
+
+def test_get_all_regime_importances_values_are_dicts():
+    """각 레짐 중요도가 dict 형태여야 함 (빈 dict도 허용)."""
+    from src.ml.features import RegimeAwareFeatureBuilder
+    builder = RegimeAwareFeatureBuilder()
+    df = _make_ohlcv(200)
+    result = builder.get_all_regime_importances(df)
+    for regime, importance in result.items():
+        assert isinstance(importance, dict), f"Regime {regime} importance not dict"
+        for feat, val in importance.items():
+            assert isinstance(val, float), f"Importance value not float: {val}"
+            assert 0.0 <= val <= 1.0, f"Importance out of range: {val}"

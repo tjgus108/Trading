@@ -6,7 +6,7 @@ backtest-agent가 이 모듈을 사용한다.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, List
+from typing import Callable, Dict, Optional, Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -489,3 +489,73 @@ class BacktestEngine:
                 n_better += 1
 
         return n_better / MC_N_PERMUTATIONS
+
+    @staticmethod
+    def perturbation_check(
+        params: Dict[str, float],
+        eval_fn: Callable[[Dict[str, float]], float],
+        deltas: Tuple[float, ...] = (0.10, 0.20),
+        fragile_threshold: float = MIN_SHARPE,
+        robust_ratio: float = 0.80,
+    ) -> Dict:
+        """파라미터 섭동 테스트 — 전략 견고성 평가.
+
+        Args:
+            params: 기준 파라미터 dict (수치형 값만 섭동).
+            eval_fn: params dict → Sharpe float 반환 함수.
+            deltas: 섭동 비율 튜플 (기본 ±10%, ±20%).
+            fragile_threshold: ±10%에서 Sharpe < 이 값이면 FRAGILE 판정.
+            robust_ratio: mean_perturb_sharpe / baseline >= 이 값이면 ROBUST.
+
+        Returns:
+            {
+              "baseline_sharpe": float,
+              "mean_perturb_sharpe": float,
+              "robust_ratio_actual": float,
+              "is_robust": bool,
+              "is_fragile": bool,
+              "fragile_params": list[str],
+              "perturb_results": {param: {"+10%": sharpe, ...}},
+            }
+        """
+        baseline_sharpe = eval_fn(params)
+
+        perturb_results: Dict[str, Dict[str, float]] = {}
+        all_sharpes: List[float] = []
+        fragile_params: List[str] = []
+
+        numeric_params = {k: v for k, v in params.items() if isinstance(v, (int, float))}
+
+        for param, base_val in numeric_params.items():
+            perturb_results[param] = {}
+            param_is_fragile = False
+            for delta in deltas:
+                for sign, label in ((1, f"+{int(delta*100)}%"), (-1, f"-{int(delta*100)}%")):
+                    perturbed = dict(params)
+                    perturbed[param] = base_val * (1.0 + sign * delta)
+                    try:
+                        s = eval_fn(perturbed)
+                    except Exception:
+                        s = 0.0
+                    perturb_results[param][label] = round(s, 4)
+                    all_sharpes.append(s)
+                    # ±10% (first delta) 에서 fragile 판정
+                    if delta == deltas[0] and s < fragile_threshold:
+                        param_is_fragile = True
+            if param_is_fragile:
+                fragile_params.append(param)
+
+        mean_perturb = float(np.mean(all_sharpes)) if all_sharpes else 0.0
+        robust_ratio_actual = (mean_perturb / baseline_sharpe) if baseline_sharpe > 1e-9 else 0.0
+        is_robust = robust_ratio_actual >= robust_ratio
+        is_fragile = len(fragile_params) > 0
+
+        return {
+            "baseline_sharpe": round(baseline_sharpe, 4),
+            "mean_perturb_sharpe": round(mean_perturb, 4),
+            "robust_ratio_actual": round(robust_ratio_actual, 4),
+            "is_robust": is_robust,
+            "is_fragile": is_fragile,
+            "fragile_params": fragile_params,
+            "perturb_results": perturb_results,
+        }

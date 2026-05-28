@@ -636,6 +636,21 @@ class RegimeAwareFeatureBuilder:
         importances = rf.feature_importances_
         return {col: round(float(imp), 4) for col, imp in zip(X.columns, importances)}
 
+    def get_all_regime_importances(
+        self, df: pd.DataFrame
+    ) -> Dict[str, Dict[str, float]]:
+        """모든 레짐별 피처 중요도 비교 반환.
+
+        각 레짐(bull/bear/ranging/crisis)에 대해 get_feature_importance()를
+        실행하고 결과를 통합한다.
+
+        Returns:
+            {regime: {feature: importance}} — 레짐별 RF 피처 중요도.
+            데이터 부족한 레짐은 빈 dict.
+        """
+        regimes = ["bull", "bear", "ranging", "crisis"]
+        return {r: self.get_feature_importance(df, regime=r) for r in regimes}
+
     # 기존 FeatureBuilder API 위임 (기존 코드와 호환)
     def build(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """기존 FeatureBuilder.build() 호환 — 레짐 감지 없이 전체 피처 반환."""
