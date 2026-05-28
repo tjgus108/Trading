@@ -760,7 +760,7 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     return report, results
 
 
-def run_simulation(mc_p_threshold: float = 0.05):
+def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)}")
@@ -771,6 +771,12 @@ def run_simulation(mc_p_threshold: float = 0.05):
     _engine_mod.MC_P_THRESHOLD = mc_p_threshold
     if mc_p_threshold != 0.05:
         print(f"[CONFIG] MC p-value threshold overridden: {mc_p_threshold}", flush=True)
+
+    # 일관성 통과 비율 패치 (기본 0.5, --pass-ratio로 완화 가능)
+    global PASS_RATIO
+    if pass_ratio != PASS_RATIO:
+        PASS_RATIO = pass_ratio
+        print(f"[CONFIG] Pass ratio overridden: {pass_ratio:.0%}", flush=True)
 
     pass_list = load_pass_strategies()
     if not pass_list:
@@ -838,5 +844,11 @@ if __name__ == "__main__":
         default=0.05,
         help="MC permutation test p-value 상한 (기본 0.05, 예: 0.10으로 완화 가능)",
     )
+    parser.add_argument(
+        "--pass-ratio",
+        type=float,
+        default=0.5,
+        help="일관성 통과 비율 (기본 0.50 = 50%%, 예: 0.33으로 완화 가능)",
+    )
     args = parser.parse_args()
-    sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold))
+    sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

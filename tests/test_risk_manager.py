@@ -1063,3 +1063,128 @@ def test_full_cb_adapter_with_risk_manager():
                        last_candle_pct_change=-0.04)
     assert res2.status == RiskStatus.BLOCKED
     assert "Circuit breaker" in res2.reason
+
+
+# ── Kelly + DrawdownMonitor 통합 (Cycle 233) ─────────────────────────────────
+
+class TestKellyDrawdownIntegration:
+    """KellySizer.update_fraction_for_regime() + DrawdownMonitor.get_size_multiplier() 통합."""
+
+    def _make_rm(self, kelly_sizer=None, drawdown_monitor=None):
+        from src.risk.manager import RiskManager
+        return RiskManager(
+            risk_per_trade=0.01,
+            atr_multiplier_sl=1.5,
+            atr_multiplier_tp=3.0,
+            max_position_size=0.10,
+            kelly_sizer=kelly_sizer,
+            drawdown_monitor=drawdown_monitor,
+        )
+
+    def _base_size(self):
+        """기준 포지션 사이즈 (kelly/dd 없을 때)."""
+        rm = self._make_rm()
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000)
+        return res.position_size
+
+    def test_kelly_high_vol_scales_down(self):
+        """HIGH_VOL 레짐: Kelly fraction 0.10 → scale 0.4 → 포지션 축소."""
+        from src.risk.kelly_sizer import KellySizer
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks)
+
+        base = self._base_size()
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500,
+            account_balance=10_000, regime="HIGH_VOL",
+        )
+        assert res.status == RiskStatus.APPROVED
+        # HIGH_VOL fraction=0.10, scale=0.10/0.25=0.4
+        expected_scale = 0.10 / 0.25
+        assert abs(res.position_size - base * expected_scale) < 1e-6
+
+    def test_kelly_trend_up_no_change(self):
+        """TREND_UP 레짐: Kelly fraction 0.25 = Quarter-Kelly 기준 → scale 1.0 → 포지션 그대로."""
+        from src.risk.kelly_sizer import KellySizer
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks)
+
+        base = self._base_size()
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500,
+            account_balance=10_000, regime="TREND_UP",
+        )
+        assert res.status == RiskStatus.APPROVED
+        # TREND_UP fraction=0.25 → scale=1.0 → no change
+        assert abs(res.position_size - base) < 1e-6
+
+    def _make_warn_dd(self):
+        """MDD WARN 단계 + trailing_stop 미발동 DrawdownMonitor 생성.
+
+        40봉 점진적 하락(10000→9450) 후 10봉 안정화 → short window rate < long window rate.
+        """
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dd = DrawdownMonitor(mdd_warn_pct=0.05, mdd_block_pct=0.10, rolling_window=50)
+        step = (10_000 - 9_450) / 40  # 13.75 per step
+        for i in range(40):
+            dd.update(10_000 - i * step)
+        for _ in range(10):
+            dd.update(9_450)
+        return dd
+
+    def test_drawdown_mdd_warn_scales_down(self):
+        """DrawdownMonitor MDD WARN 단계 → size_mult=0.5 → 포지션 50% 축소."""
+        dd = self._make_warn_dd()
+        assert not dd.trailing_stop_signal()  # 안정화 구간이라 trailing_stop 미발동 확인
+
+        base = self._base_size()
+        rm = self._make_rm(drawdown_monitor=dd)
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500, account_balance=10_000,
+        )
+        assert res.status == RiskStatus.APPROVED
+        assert abs(res.position_size - base * 0.5) < 1e-6
+
+    def test_high_vol_plus_mdd_warn_compound(self):
+        """HIGH_VOL + MDD WARN: Kelly 0.4x * MDD 0.5x = 0.2x 복합 축소."""
+        from src.risk.kelly_sizer import KellySizer
+        ks = KellySizer(fraction=0.5)
+        dd = self._make_warn_dd()
+        assert not dd.trailing_stop_signal()
+
+        base = self._base_size()
+        rm = self._make_rm(kelly_sizer=ks, drawdown_monitor=dd)
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500,
+            account_balance=10_000, regime="HIGH_VOL",
+        )
+        assert res.status == RiskStatus.APPROVED
+        expected = base * 0.4 * 0.5  # kelly_scale * mdd_mult
+        assert abs(res.position_size - expected) < 1e-6
+
+    def test_drawdown_cooldown_blocks_trade(self):
+        """DrawdownMonitor 단일 손실 쿨다운 중 → size_mult=0.0 → BLOCKED."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dd = DrawdownMonitor(single_loss_halt_pct=0.02, cooldown_seconds=3600)
+        dd.update(10_000)
+        dd.record_trade_result(pnl=-300.0, equity=9_700)  # 3% 손실 → 쿨다운
+
+        rm = self._make_rm(drawdown_monitor=dd)
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500, account_balance=9_700,
+        )
+        # position_size = 0 → BLOCKED by < 1e-8 check
+        assert res.status == RiskStatus.BLOCKED
+
+    def test_kelly_no_regime_no_scale(self):
+        """regime=None 이면 Kelly 스케일 미적용 (기준값 그대로)."""
+        from src.risk.kelly_sizer import KellySizer
+        ks = KellySizer(fraction=0.5)
+        base = self._base_size()
+        rm = self._make_rm(kelly_sizer=ks)
+        res = rm.evaluate(
+            action="BUY", entry_price=50_000, atr=500, account_balance=10_000,
+            regime=None,
+        )
+        assert res.status == RiskStatus.APPROVED
+        assert abs(res.position_size - base) < 1e-6

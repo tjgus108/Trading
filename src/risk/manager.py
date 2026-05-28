@@ -464,14 +464,37 @@ class RiskManager:
                     position_size *= cf_mult
                     max_size *= cf_mult  # 후속 클램프 기준도 동기화
 
-        # trailing_stop_signal: 낙폭 가속 감지 시 포지션 50% 축소
+        # 레짐별 Kelly fraction 적용: Quarter-Kelly(0.25) 기준 정규화
+        # HIGH_VOL=0.10→0.4x, TREND_DOWN=0.15→0.6x, TREND_UP/BULL=0.25→1.0x
+        _kelly_scale = 1.0
+        if self.kelly_sizer is not None and regime is not None:
+            _kelly_frac = self.kelly_sizer.update_fraction_for_regime(regime)
+            _kelly_scale = _kelly_frac / 0.25
+            position_size *= _kelly_scale
+            max_size *= _kelly_scale
+            logger.debug(
+                "Kelly regime scale: regime=%s fraction=%.2f scale=%.2f",
+                regime, _kelly_frac, _kelly_scale,
+            )
+
+        # DrawdownMonitor 통합: MDD 단계별 사이즈 + 연속 손실 쿨다운 + 낙폭 가속 동시 반영
         if self.drawdown_monitor is not None:
-            if self.drawdown_monitor.trailing_stop_signal():
+            _size_mult = self.drawdown_monitor.get_size_multiplier()
+            if _size_mult < 1.0:
+                position_size *= _size_mult
+                max_size *= _size_mult
                 logger.warning(
-                    "DrawdownMonitor trailing_stop_signal triggered — position_size halved"
+                    "DrawdownMonitor size_mult=%.2f applied (streak/MDD)", _size_mult
                 )
+                if regime and regime.upper() in ("HIGH_VOL", "CRISIS") and _kelly_scale < 1.0:
+                    logger.warning(
+                        "HIGH_VOL compound: kelly_scale=%.2f MDD_mult=%.2f net=%.2f",
+                        _kelly_scale, _size_mult, _kelly_scale * _size_mult,
+                    )
+            if self.drawdown_monitor.trailing_stop_signal():
                 position_size *= 0.5
-                max_size *= 0.5  # 후속 클램프 기준도 동기화
+                max_size *= 0.5
+                logger.warning("DrawdownMonitor trailing_stop_signal — position_size halved")
 
         # ATR이 매우 커서 포지션 사이즈가 사실상 0인 경우 BLOCK (< 1e-8 단위)
         if position_size < 1e-8:

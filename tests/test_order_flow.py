@@ -601,3 +601,71 @@ class TestOFICalculator(unittest.TestCase):
         self.assertFalse(result['has_extreme'])
         self.assertEqual(result['extreme_count'], 0)
 
+
+class TestOFIVPINCorrelation(unittest.TestCase):
+    """compute_ofi_vpin_correlation() 단위 테스트 (Cycle 233 — 피처 중복 분석)."""
+
+    def _make_df(self, n: int = 120) -> "pd.DataFrame":
+        import numpy as np
+        import pandas as pd
+        rng = np.random.default_rng(42)
+        close = 50_000 + np.cumsum(rng.normal(0, 50, n))
+        open_ = close - rng.normal(0, 30, n)
+        vol = rng.uniform(10, 100, n)
+        return pd.DataFrame({"open": open_, "close": close,
+                             "high": close + 50, "low": close - 50, "volume": vol})
+
+    def test_returns_required_keys(self):
+        """반환 딕셔너리에 필수 키가 존재해야 한다."""
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        df = self._make_df(120)
+        result = compute_ofi_vpin_correlation(df)
+        assert "pearson" in result
+        assert "spearman" in result
+        assert "n_samples" in result
+        assert "redundant" in result
+
+    def test_pearson_range(self):
+        """Pearson 상관계수는 [-1, 1] 범위이어야 한다."""
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        import math
+        df = self._make_df(120)
+        result = compute_ofi_vpin_correlation(df)
+        for val in result["pearson"].values():
+            if not math.isnan(val):
+                assert -1.0 <= val <= 1.0
+
+    def test_empty_dataframe(self):
+        """빈 DataFrame → n_samples=0, 빈 pearson/spearman."""
+        import pandas as pd
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        df = pd.DataFrame(columns=["open", "close", "high", "low", "volume"])
+        result = compute_ofi_vpin_correlation(df)
+        assert result["n_samples"] == 0
+        assert result["pearson"] == {}
+
+    def test_insufficient_data(self):
+        """데이터 부족(10봉 미만) → 빈 결과."""
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        df = self._make_df(5)
+        result = compute_ofi_vpin_correlation(df)
+        assert result["n_samples"] == 0
+
+    def test_redundant_ofi_depth(self):
+        """OFI ≈ depth_imbalance (같은 공식) → ofi_depth 상관계수 = 1.0."""
+        import math
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        df = self._make_df(120)
+        result = compute_ofi_vpin_correlation(df)
+        # ofi와 depth_imbalance는 완전히 동일한 값 → 상관계수 1.0 또는 NaN (std=0)
+        ofi_depth = result["pearson"].get("ofi_depth", float("nan"))
+        if not math.isnan(ofi_depth):
+            assert abs(ofi_depth - 1.0) < 1e-9
+
+    def test_redundant_list(self):
+        """redundant 목록은 list 타입이어야 한다."""
+        from src.data.order_flow import compute_ofi_vpin_correlation
+        df = self._make_df(120)
+        result = compute_ofi_vpin_correlation(df)
+        assert isinstance(result["redundant"], list)
+

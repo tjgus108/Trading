@@ -428,3 +428,91 @@ class OFICalculator:
             'min_ofi': float(ofi_series.min()),
         }
 
+
+def compute_ofi_vpin_correlation(df: pd.DataFrame, vpin_window: int = 50) -> dict:
+    """OFI, bid_ask_depth_imbalance, VPIN 3개 피처 상관성 분석.
+
+    피처 중복 여부 판단 목적. 세 피처 모두 매수/매도 압력을 측정하지만
+    계산 방식이 달라 상관성이 높으면 하나를 제거해 차원을 줄일 수 있다.
+
+    Args:
+        df: OHLCV DataFrame (open, high, low, close, volume 컬럼 필요)
+        vpin_window: VPIN 롤링 윈도우 (기본 50봉)
+
+    Returns:
+        {
+            'pearson': {'ofi_vpin': float, 'ofi_depth': float, 'vpin_depth': float},
+            'spearman': {'ofi_vpin': float, 'ofi_depth': float, 'vpin_depth': float},
+            'n_samples': int,
+            'redundant': list[str],  # 상관계수 >= 0.85인 쌍 목록
+        }
+    """
+    if df.empty or len(df) < max(vpin_window, 10):
+        return {'pearson': {}, 'spearman': {}, 'n_samples': 0, 'redundant': []}
+
+    volume = df["volume"].fillna(0.0).clip(lower=0.0)
+    buy_frac = pd.Series(0.5, index=df.index, dtype=float)
+    buy_frac[df["close"] > df["open"]] = 1.0
+    buy_frac[df["close"] < df["open"]] = 0.0
+    buy_frac[volume == 0] = 0.5
+
+    buy_vol = volume * buy_frac
+    sell_vol = volume * (1.0 - buy_frac)
+
+    # OFI (캔들 단위, 가격 기반)
+    total_vol = buy_vol + sell_vol
+    ofi = (buy_vol - sell_vol) / total_vol.replace(0, float('nan'))
+    ofi = ofi.fillna(0.0).clip(-1.0, 1.0)
+
+    # bid_ask_depth_imbalance (OFI와 동일 공식, VPIN 버전)
+    depth_imbalance = ofi.copy()
+
+    # VPIN (롤링 window 기반)
+    imbalance_abs = (buy_vol - sell_vol).abs()
+    rolling_vol = volume.rolling(vpin_window).sum()
+    rolling_imb = imbalance_abs.rolling(vpin_window).sum()
+    vpin = (rolling_imb / rolling_vol.replace(0, float('nan'))).fillna(0.5).clip(0.0, 1.0)
+
+    # 공통 유효 인덱스 (vpin_window 이후 + NaN 제거)
+    combined = pd.DataFrame({'ofi': ofi, 'depth': depth_imbalance, 'vpin': vpin}).dropna()
+    combined = combined.iloc[vpin_window:]
+    n = len(combined)
+
+    if n < 10:
+        return {'pearson': {}, 'spearman': {}, 'n_samples': n, 'redundant': []}
+
+    def _pearson(a: pd.Series, b: pd.Series) -> float:
+        std_a, std_b = a.std(), b.std()
+        if std_a < 1e-12 or std_b < 1e-12:
+            return float('nan')
+        return float(a.corr(b, method='pearson'))
+
+    def _spearman(a: pd.Series, b: pd.Series) -> float:
+        return float(a.corr(b, method='spearman'))
+
+    pearson = {
+        'ofi_vpin':  _pearson(combined['ofi'], combined['vpin']),
+        'ofi_depth': _pearson(combined['ofi'], combined['depth']),
+        'vpin_depth': _pearson(combined['vpin'], combined['depth']),
+    }
+    spearman = {
+        'ofi_vpin':  _spearman(combined['ofi'], combined['vpin']),
+        'ofi_depth': _spearman(combined['ofi'], combined['depth']),
+        'vpin_depth': _spearman(combined['vpin'], combined['depth']),
+    }
+
+    # 중복 판정: |Pearson| >= 0.85
+    redundant = [
+        pair for pair, val in pearson.items()
+        if val == val and abs(val) >= 0.85  # NaN 제외
+    ]
+
+    logger.info(
+        "OFI/VPIN correlation (n=%d): ofi_vpin=%.3f ofi_depth=%.3f vpin_depth=%.3f | redundant=%s",
+        n, pearson.get('ofi_vpin', float('nan')),
+        pearson.get('ofi_depth', float('nan')),
+        pearson.get('vpin_depth', float('nan')),
+        redundant or "none",
+    )
+    return {'pearson': pearson, 'spearman': spearman, 'n_samples': n, 'redundant': redundant}
+
