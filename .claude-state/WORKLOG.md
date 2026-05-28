@@ -1,5 +1,34 @@
 # Work Log
 
+## [2026-05-29] Cycle 235 — A(품질) + C(데이터) + SIM + F(리서치)
+
+**[A] 품질 — MC permutation test 버그 수정:**
+- `src/backtest/engine.py` `_mc_permutation_test()`: block_size>1 경로 버그 수정
+  - 기존: block shuffling (평균 불변 → perm_sharpe ≈ original → p≈1.0)
+  - 수정: block sign randomization (intra-block 상관 보존 + 올바른 null test)
+  - empty trades guard + block_size>n clamping 추가
+- narrow_range 전략 엣지케이스 14개 + MC 통합 13개 = 27개 테스트 추가 (test_mc_narrow_range.py)
+
+**[C] 데이터 — BlockBootstrap 블록 크기 설정 + WebSocket backoff:**
+- `scripts/paper_simulation.py`: `--block-size` CLI arg 추가 (36/72/144 테스트 가능)
+- `src/data/websocket_feed.py`: MAX_BACKOFF=60s 상한 추가 (exponential backoff cap)
+- 테스트: paper_simulation 4개 + websocket_buffer 2개 추가
+
+**[SIM] regime weighting A/B 비교:**
+- paper_simulation.py에 `--regime-weights` CLI + `PAPER_SIM_REGIME_WEIGHTS` env var 추가
+- A/B (seed=42, BTC 22전략 x 4윈도우): sharpe_std OFF=1.265 → ON=1.256 (delta=-0.7%)
+- 효과 미미: 합성 데이터에서 변동성 분산 작아 다운웨이팅 효과 제한적
+- Top: momentum_quality(Sharpe 7.67, PF 2.22), price_action_momentum(Sharpe 6.98)
+- 모든 전략 FAIL 원인: mc_p_value > 0.05 (합성 데이터에 실제 alpha 부재)
+
+**[F] 리서치 요약:**
+- Block Bootstrap: 최적 block_size = O(n^(1/3)), 1h data에 block_size 12-24 권장 (현재 36은 과대)
+- 파라미터 섭동: ±10% 변경 시 Sharpe 30-40% 이상 하락 → FRAGILE 판정 (Build Alpha 기준)
+- GBM 한계: GBM은 fat tail/volatility clustering 재현 불가 → MC test 실패는 예상 결과
+  - MC permutation test는 real block-bootstrap 데이터에서만 유의미
+- 트레이딩봇 실패: SOL 모멘텀봇 +40%→-% (레짐 전환), rolling 30일 Sharpe 모니터링 권장
+- 핵심 권고: MC test를 GBM 합성에서 빼고, real block-bootstrap에서만 적용
+
 ## [2026-05-29] Cycle 233 — E(실행) + A(품질) + SIM + F(리서치)
 
 **[E] 실행 — PaperTrader 실행 리포트 + HealthChecker 업타임:**
@@ -19327,3 +19356,6 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-28 14:49 UTC] Cycle 233 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 15:47 UTC] Cycle 235 Dispatched — D + E + SIM + F
+Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

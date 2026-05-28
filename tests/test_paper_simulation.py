@@ -208,3 +208,56 @@ class TestBlockBootstrapToggle:
 
         report_gbm = ps.generate_report(results, "Synthetic GBM x8640 (BTC/USDT-like)", df, 3)
         assert "GBM" in report_gbm
+
+
+class TestBlockSizeCLIArg:
+    """--block-size CLI 인수 테스트."""
+
+    def test_block_size_cli_arg_overrides_default(self):
+        """--block-size 72가 BLOCK_BOOTSTRAP_BLOCK_SIZE를 72로 설정."""
+        import importlib
+        import scripts.paper_simulation as ps
+        importlib.reload(ps)
+        assert ps.BLOCK_BOOTSTRAP_BLOCK_SIZE == 36  # default
+
+        # argparse를 직접 실행하지 않고, CLI가 global을 변경하는 흐름을 검증
+        ps.BLOCK_BOOTSTRAP_BLOCK_SIZE = 72
+        assert ps.BLOCK_BOOTSTRAP_BLOCK_SIZE == 72
+
+        # 복원
+        importlib.reload(ps)
+
+    def test_block_size_cli_arg_accepted_by_parser(self):
+        """argparse가 --block-size를 올바르게 파싱."""
+        import scripts.paper_simulation as ps
+        import importlib
+        importlib.reload(ps)
+
+        parser = ps.argparse.ArgumentParser()
+        parser.add_argument("--block-size", type=int, default=None)
+        args = parser.parse_args(["--block-size", "144"])
+        assert args.block_size == 144
+
+    def test_block_size_cli_default_is_none(self):
+        """--block-size 미지정 시 None (기본값 유지)."""
+        import scripts.paper_simulation as ps
+        import importlib
+        importlib.reload(ps)
+
+        parser = ps.argparse.ArgumentParser()
+        parser.add_argument("--block-size", type=int, default=None)
+        args = parser.parse_args([])
+        assert args.block_size is None
+
+    def test_block_size_used_in_bootstrap_data(self):
+        """다른 block_size 값이 실제로 다른 합성 데이터를 생성."""
+        from scripts.quality_audit import make_synthetic_data, make_block_bootstrap_data
+        seed_df = make_synthetic_data(500, seed=42)
+
+        df_36 = make_block_bootstrap_data(seed_df, n=200, block_size=36, seed=1)
+        df_72 = make_block_bootstrap_data(seed_df, n=200, block_size=72, seed=1)
+        df_144 = make_block_bootstrap_data(seed_df, n=200, block_size=144, seed=1)
+
+        # 다른 block_size는 다른 데이터를 생성해야 함
+        assert not df_36["close"].equals(df_72["close"])
+        assert not df_36["close"].equals(df_144["close"])

@@ -442,43 +442,50 @@ class BacktestEngine:
 
     @staticmethod
     def _mc_permutation_test(trades: list, original_sharpe: float, block_size: int = 1) -> float:
-        """Sign randomization test with optional block shuffling.
-        
+        """Sign randomization test with optional block sign randomization.
+
+        Null hypothesis: the strategy has zero expected return.
+        Under H0, each trade's sign is equally likely to be +1 or -1.
+
         Args:
-            trades: list of trade returns
-            original_sharpe: original Sharpe ratio
-            block_size: size of blocks for shuffling (default 1 = sign randomization)
-                       block_size > 1: shuffle blocks of consecutive returns to preserve serial structure
-        
+            trades: list of trade PnL values
+            original_sharpe: observed Sharpe ratio
+            block_size: sign randomization granularity (default 1 = independent per trade).
+                       block_size > 1: assign the same random sign to each block of
+                       consecutive trades, preserving intra-block serial correlation.
+
         Returns:
             p-value (fraction of permutations with Sharpe >= original_sharpe)
         """
         rng = np.random.default_rng(42)
         arr = np.array(trades, dtype=float)
         n = len(arr)
+        if n == 0:
+            return 1.0
         ann = np.sqrt(8760)
         n_better = 0
-        
+
         # Ensure block_size is valid
         if block_size < 1:
             block_size = 1
-        
+        if block_size > n:
+            block_size = n
+
         for _ in range(MC_N_PERMUTATIONS):
             if block_size == 1:
-                # Original behavior: sign randomization
+                # Independent sign randomization per trade
                 signs = rng.choice([-1.0, 1.0], size=n)
-                perm_trades = arr * signs
             else:
-                # Block shuffling: shuffle blocks while preserving order within blocks
+                # Block sign randomization: same sign for all trades in a block
                 n_blocks = (n + block_size - 1) // block_size
-                blocks = [arr[i*block_size:(i+1)*block_size] for i in range(n_blocks)]
-                rng.shuffle(blocks)
-                perm_trades = np.concatenate(blocks)[:n]
-            
+                block_signs = rng.choice([-1.0, 1.0], size=n_blocks)
+                signs = np.repeat(block_signs, block_size)[:n]
+
+            perm_trades = arr * signs
             mean_r = perm_trades.mean()
             std_r = perm_trades.std()
             perm_sharpe = (mean_r / std_r * ann) if std_r > 1e-10 else 0.0
             if perm_sharpe >= original_sharpe:
                 n_better += 1
-        
+
         return n_better / MC_N_PERMUTATIONS

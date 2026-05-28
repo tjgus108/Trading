@@ -41,6 +41,7 @@ MAX_CANDLES = 1000      # 보유 최대 캔들 수
 MAX_RETRY = 5
 RETRY_BASE = 2.0        # 재연결 대기 기본 (초)
 RETRY_JITTER = 0.1      # 지터 계수 (0~10%의 랜덤 지연 추가)
+MAX_BACKOFF = 60.0      # 최대 백오프 (초) — 지수 증가 상한
 
 
 @dataclass
@@ -354,15 +355,16 @@ class BinanceWebSocketFeed:
 
     def _calculate_backoff_with_jitter(self, retry_count: int) -> float:
         """
-        지수 백오프 + 지터 계산.
-        
-        공식: backoff = base^retry_count * (1 + jitter * random_factor)
-        예: base=2, jitter=0.1
+        지수 백오프 + 지터 계산 (MAX_BACKOFF 상한 적용).
+
+        공식: backoff = min(base^retry_count, MAX_BACKOFF) * (1 + jitter * random_factor)
+        예: base=2, jitter=0.1, max=60
           - retry=1: 2 * (1 ± 0.1) = 1.8 ~ 2.2초
           - retry=2: 4 * (1 ± 0.1) = 3.6 ~ 4.4초
           - retry=5: 32 * (1 ± 0.1) = 28.8 ~ 35.2초
+          - retry=7: min(128, 60) * (1 ± 0.1) = 54 ~ 66초
         """
-        base_delay = RETRY_BASE ** retry_count
+        base_delay = min(RETRY_BASE ** retry_count, MAX_BACKOFF)
         jitter_factor = 1.0 + (random.random() * 2 - 1) * RETRY_JITTER
         return base_delay * jitter_factor
 

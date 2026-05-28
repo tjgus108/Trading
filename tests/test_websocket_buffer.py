@@ -356,19 +356,42 @@ class TestWebSocketBackoffJitter:
         """지수 증가: retry_count가 높을수록 대기시간 길어짐."""
         from src.data.websocket_feed import BinanceWebSocketFeed
         feed = BinanceWebSocketFeed("btcusdt", "1h")
-        
+
         # 지터 최소화 위해 여러 번 샘플
         base_delays = []
         for i in range(1, 6):
             samples = [feed._calculate_backoff_with_jitter(i) for _ in range(50)]
             avg = sum(samples) / len(samples)
             base_delays.append(avg)
-        
+
         # 각 단계가 약 2배씩 증가해야 함
         for i in range(1, len(base_delays)):
             ratio = base_delays[i] / base_delays[i-1]
             # jitter 때문에 정확히 2배는 아니지만 1.8~2.2 범위
             assert 1.8 <= ratio <= 2.2, f"Step {i}: expected ~2x, got {ratio:.2f}x"
+
+    def test_backoff_capped_at_max(self):
+        """MAX_BACKOFF 상한: 높은 retry에서도 60초 + jitter를 초과하지 않음."""
+        from src.data.websocket_feed import BinanceWebSocketFeed, MAX_BACKOFF
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+
+        # retry=10 → 2^10 = 1024초이지만 MAX_BACKOFF=60 cap 적용
+        for _ in range(50):
+            delay = feed._calculate_backoff_with_jitter(10)
+            # MAX_BACKOFF * (1 + RETRY_JITTER) = 60 * 1.1 = 66
+            assert delay <= MAX_BACKOFF * 1.15, f"Delay {delay:.1f}s exceeds max cap"
+            # 최소한 MAX_BACKOFF * 0.9 이상이어야 함 (cap에 걸린 상태)
+            assert delay >= MAX_BACKOFF * 0.85, f"Delay {delay:.1f}s unexpectedly low"
+
+    def test_backoff_cap_not_applied_for_low_retry(self):
+        """낮은 retry에서는 cap이 적용되지 않음 (2^1=2 < 60)."""
+        from src.data.websocket_feed import BinanceWebSocketFeed, MAX_BACKOFF
+        feed = BinanceWebSocketFeed("btcusdt", "1h")
+
+        delay = feed._calculate_backoff_with_jitter(1)
+        # retry=1 → 2초 근처 (cap 미적용)
+        assert delay < MAX_BACKOFF, f"Delay {delay:.1f}s should be well below cap"
+        assert delay < 3.0, f"Delay {delay:.1f}s too high for retry=1"
 
 
 class TestConnectionHealthMonitor:

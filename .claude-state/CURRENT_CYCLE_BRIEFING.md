@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 233 — 2026-05-28T14:49:25.361483Z
+🔄 CYCLE 235 — 2026-05-28T15:47:54.023769Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
+### [D] ML & Signals
+- **Agent**: ml-agent
+- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+
 ### [E] Execution
 - **Agent**: execution-agent
 - **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
-
-### [A] Quality Assurance
-- **Agent**: backtest-agent
-- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent

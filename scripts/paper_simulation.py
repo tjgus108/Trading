@@ -311,6 +311,8 @@ def evaluate_strategy_walk_forward(
     strategy = strategy_cls()
     name = strategy.name
 
+    window_vols = []  # 윈도우별 변동성 (regime weighting용)
+
     for i, (train_df, test_df) in enumerate(windows):
         try:
             # 테스트 구간에서 백테스트 (훈련 데이터는 지표 warmup 용도로 앞에 붙임)
@@ -320,6 +322,15 @@ def evaluate_strategy_walk_forward(
 
             strategy_inst = strategy_cls()
             bt = engine.run(strategy_inst, eval_df)
+
+            # 테스트 구간 변동성 계산 (ATR/close 평균)
+            if all(c in test_df.columns for c in ["high", "low", "close"]):
+                _atr = (test_df["high"] - test_df["low"]) / (test_df["close"] + 1e-9)
+                win_vol = float(_atr.mean())
+            else:
+                win_vol = 0.0
+            window_vols.append(win_vol)
+
             window_results.append({
                 "window": i + 1,
                 "sharpe": bt.sharpe_ratio,
@@ -332,13 +343,16 @@ def evaluate_strategy_walk_forward(
                 "fail_reasons": list(bt.fail_reasons) if bt.fail_reasons else [],
                 "final_balance": 10_000 * (1 + bt.total_return),
                 "fail_reasons": bt.fail_reasons,
+                "volatility": win_vol,
             })
         except Exception as e:
+            window_vols.append(0.0)
             window_results.append({
                 "window": i + 1, "sharpe": 0, "total_return": 0, "max_dd": 0,
                 "profit_factor": 0, "trades": 0, "win_rate": 0, "passed": False,
                 "final_balance": 10_000, "error": str(e)[:100],
                 "fail_reasons": [f"exception: {str(e)[:80]}"],
+                "volatility": 0.0,
             })
 
     # 일관성 점수: 통과한 윈도우 비율
@@ -347,15 +361,39 @@ def evaluate_strategy_walk_forward(
 
     # 평균 지표 (에러 제외)
     valid = [wr for wr in window_results if "error" not in wr]
-    avg_sharpe = np.mean([wr["sharpe"] for wr in valid]) if valid else 0
-    avg_return = np.mean([wr["total_return"] for wr in valid]) if valid else 0
-    avg_dd = np.mean([wr["max_dd"] for wr in valid]) if valid else 0
-    avg_pf = np.mean([wr["profit_factor"] for wr in valid]) if valid else 0
-    avg_trades = np.mean([wr["trades"] for wr in valid]) if valid else 0
-    avg_wr = np.mean([wr["win_rate"] for wr in valid]) if valid else 0
+    valid_vols = [wr.get("volatility", 0.0) for wr in valid]
+
+    # Regime weighting: HIGH_VOL fold 다운웨이팅 (walk_forward.py와 동일 로직)
+    if USE_REGIME_WEIGHTS and valid and valid_vols and sum(valid_vols) > 0:
+        mean_vol = sum(valid_vols) / len(valid_vols)
+        raw_weights = [1.0 / (1.0 + v / (mean_vol + 1e-9)) for v in valid_vols]
+        total_w = sum(raw_weights)
+        weights = [w / total_w for w in raw_weights]
+
+        avg_sharpe = sum(w * wr["sharpe"] for w, wr in zip(weights, valid))
+        avg_return = sum(w * wr["total_return"] for w, wr in zip(weights, valid))
+        avg_dd = sum(w * wr["max_dd"] for w, wr in zip(weights, valid))
+        avg_pf = sum(w * wr["profit_factor"] for w, wr in zip(weights, valid))
+        avg_trades = sum(w * wr["trades"] for w, wr in zip(weights, valid))
+        avg_wr = sum(w * wr["win_rate"] for w, wr in zip(weights, valid))
+    else:
+        weights = None
+        avg_sharpe = np.mean([wr["sharpe"] for wr in valid]) if valid else 0
+        avg_return = np.mean([wr["total_return"] for wr in valid]) if valid else 0
+        avg_dd = np.mean([wr["max_dd"] for wr in valid]) if valid else 0
+        avg_pf = np.mean([wr["profit_factor"] for wr in valid]) if valid else 0
+        avg_trades = np.mean([wr["trades"] for wr in valid]) if valid else 0
+        avg_wr = np.mean([wr["win_rate"] for wr in valid]) if valid else 0
 
     # 윈도우 간 Sharpe 표준편차 (일관성 보조 지표)
-    sharpe_std = float(np.std([wr["sharpe"] for wr in valid])) if len(valid) > 1 else 0.0
+    # Regime weights 적용 시 가중 표준편차 사용
+    if USE_REGIME_WEIGHTS and weights and len(valid) > 1:
+        sharpes = [wr["sharpe"] for wr in valid]
+        w_mean = sum(w * s for w, s in zip(weights, sharpes))
+        w_var = sum(w * (s - w_mean) ** 2 for w, s in zip(weights, sharpes))
+        sharpe_std = float(np.sqrt(w_var))
+    else:
+        sharpe_std = float(np.std([wr["sharpe"] for wr in valid])) if len(valid) > 1 else 0.0
 
     # fail_reasons 집계: 윈도우별 실패 이유를 카운트하여 빈도순 정렬
     from collections import Counter
@@ -644,6 +682,10 @@ import os as _os
 USE_BLOCK_BOOTSTRAP = _os.environ.get("PAPER_SIM_BOOTSTRAP", "1") != "0"
 BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "36"))
 
+# Regime weighting: HIGH_VOL fold 다운웨이팅 (Cycle 234 walk_forward.py와 동일 로직)
+# 환경변수 PAPER_SIM_REGIME_WEIGHTS=1 로 활성화
+USE_REGIME_WEIGHTS = _os.environ.get("PAPER_SIM_REGIME_WEIGHTS", "0") == "1"
+
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
@@ -764,6 +806,7 @@ def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)}")
+    print(f"Regime Weights: {'ON' if USE_REGIME_WEIGHTS else 'OFF'}")
     print("=" * 70)
 
     # MC p-value 임계값 패치 (기본 0.05, --mc-p-threshold로 조절 가능)
@@ -827,6 +870,7 @@ def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
             "slippage_pct": 0.0005,
             "synthetic_data_mode": "BlockBootstrap" if USE_BLOCK_BOOTSTRAP else "GBM",
             "block_bootstrap_block_size": BLOCK_BOOTSTRAP_BLOCK_SIZE if USE_BLOCK_BOOTSTRAP else None,
+            "regime_weights": USE_REGIME_WEIGHTS,
         }
         export_results_json(all_symbol_results, metadata)
         export_results_csv(all_symbol_results)
@@ -850,5 +894,25 @@ if __name__ == "__main__":
         default=0.5,
         help="일관성 통과 비율 (기본 0.50 = 50%%, 예: 0.33으로 완화 가능)",
     )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=None,
+        help="Block Bootstrap 블록 크기 (기본 36, 예: 72 또는 144로 트렌드 보존 강화)",
+    )
+    parser.add_argument(
+        "--regime-weights",
+        action="store_true",
+        default=False,
+        help="HIGH_VOL fold 다운웨이팅 활성화 (Cycle 234 regime weighting)",
+    )
     args = parser.parse_args()
+    # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
+    _this = sys.modules[__name__]
+    if args.block_size is not None:
+        _this.BLOCK_BOOTSTRAP_BLOCK_SIZE = args.block_size
+        print(f"[CONFIG] Block Bootstrap block_size overridden: {args.block_size}", flush=True)
+    if args.regime_weights:
+        _this.USE_REGIME_WEIGHTS = True
+        print(f"[CONFIG] Regime weights enabled (HIGH_VOL fold downweighting)", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))
