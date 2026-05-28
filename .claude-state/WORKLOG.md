@@ -1,5 +1,49 @@
 # Work Log
 
+## [2026-05-28] Cycle 234 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — bid_ask_depth_imbalance 제거 + regime 조건부 fold 가중**:
+- `src/ml/features.py`: bid_ask_depth_imbalance 완전 제거
+  - Cycle 233에서 OFI와 Pearson=1.0 확인된 중복 피처 삭제
+  - _compute_features() 계산 블록 제거 (bid_depth/ask_depth → 미사용)
+  - REGIME_OPTIONAL_FEATURES bull/bear/ranging에서 제거
+  - source_col 매핑 항목 제거 → 피처 수 -1
+- `src/backtest/walk_forward.py`: use_regime_weights 파라미터 추가
+  - fold_weight = 1/(1 + vol/mean_vol): HIGH_VOL fold 다운웨이팅
+  - OOS ATR (high-low/close) 기반 볼라틸리티 per-fold 계산
+  - weighted_oos_sharpe에 반영 (PASS/FAIL 기준 avg_oos_sharpe는 그대로)
+  - 목표: OOS Sharpe std 3.4~6.4 → < 2.0 (다음 시뮬에서 검증 예정)
+- 테스트: 4개 추가 (bid_ask_removal 2개 + regime_weights 2개)
+
+**[E] 실행 — TWAP 거래량 가중 슬라이스**:
+- `src/exchange/twap.py`: volume_weights 파라미터 추가
+  - execute(volume_weights=[...]) → 거래량 가중 슬라이스 크기
+  - 고거래량 구간 → 큰 슬라이스 (시장 유동성 활용)
+  - 잘못된 길이/None → 균등 슬라이스 fallback (하위 호환 100%)
+  - _calculate_dynamic_slice_qty() per-slice 적용
+- `tests/test_twap.py`: TestVolumeWeightedSlices 10개 추가
+
+**[SIM] 시뮬레이션 결과 (Cycle 234, 합성 데이터)**:
+- Paper (Walk-Forward 1h봉): 0/22 PASS
+  - 상위: momentum_quality (Sharpe 5.08, PF 1.74, +55%), price_action_momentum (Sharpe 3.74, +47%)
+  - narrow_range: Sharpe 3.35, PF 1.49 (기준 1.5에 -0.01 미달)
+  - 전 전략 Consistency 0/4 — mc_p_value 0.28~0.50 (GBM 합성 한계)
+- OOS Bundle (4h봉): 0/5 PASS, std 3.4~6.4
+  - narrow_range: 3/9 fold PASS (folds 4,6,7), std=6.35
+  - wick_reversal: 2/9 fold PASS (folds 1,8)
+  - value_area: 최고 rank score(76.3), 저거래 fold 다수 (trades<3)
+  - elder_impulse fold 1: OOS Sharpe 3.794, PF 1.901 (단독 우수)
+  - IS Sharpe 음수 100%: cmf, wick_reversal → GBM 합성 데이터 한계 명확
+
+**[F] 리서치 — regime 가중치 & OOS std 분석**:
+- use_regime_weights 구현: HIGH_VOL fold 다운웨이팅으로 weighted_oos_sharpe 개선
+- narrow_range PF 1.49 분석: 신호 임계값 0.5% 완화 시 PF 1.5 달성 가능성 검토
+- Cycle 235(A+C) 방향: mc_p_value 계산 개선 vs GBM 데이터 자체 한계 구분 필요
+
+**테스트:** 8127 passed (이전 8113 → +14)
+
+---
+
 ## [2026-05-28] Cycle 233 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[B] 리스크 — KellySizer + DrawdownMonitor 통합 (RiskManager.evaluate())**:

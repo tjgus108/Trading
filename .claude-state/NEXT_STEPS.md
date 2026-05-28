@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-05-28 (Cycle 234 D 완료)_
+_Last updated: 2026-05-28 (Cycle 234 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 228 → 233 (6사이클)
+### 이번 세션 완료 사이클: 228 → 234 (7사이클)
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -16,53 +16,42 @@ _Last updated: 2026-05-28 (Cycle 234 D 완료)_
 | 231 | A+C+SIM+F | 테스트 32개 추가, OFICalculator, MC block_size, Fractional Kelly |
 | 232 | B+D+SIM+F | KellySizer dynamic fraction, VPIN 피처, Sharpe IC, 버그 1건 수정 |
 | 233 | C+B+SIM+F | OFI/VPIN 상관성 분석, Kelly+MDD 통합, --pass-ratio 인자 추가 |
+| 234 | D+E+SIM+F | bid_ask_depth_imbalance 제거, regime fold weighting, TWAP volume-weights |
 
-### 🎯 Cycle 234 작업 방향 (234 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 235 작업 방향 (235 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): 피처 중복 제거 + 레짐 조건부 fold 가중 — ✅ COMPLETED
-- `src/ml/features.py`: `bid_ask_depth_imbalance` 완전 제거 확인 (이미 반영됨)
-  - REGIME_OPTIONAL_FEATURES, source_col 매핑, compute 블록 모두 없음
-- `src/backtest/walk_forward.py`: `use_regime_weights` + `oos_vols` + 가중치 로직 모두 반영됨
-- 테스트 4개 추가 (tests/test_feature_builder.py 2개, tests/test_walk_forward.py 2개):
-  - test_bid_ask_depth_imbalance_removed
-  - test_bid_depth_not_in_regime_features
-  - test_regime_weights_high_vol_downweighted
-  - test_regime_weights_equal_vol_equals_avg
-- 결과: 111 passed (0 failed)
+#### A(품질): mc_p_value 계산 개선 + narrow_range PF 미달 분석
+- Cycle 234 Paper SIM: narrow_range PF 1.49 (기준 1.5에 -0.01 미달)
+  - `src/strategy/narrow_range.py` 신호 임계값 확인
+  - exit_pct 또는 min_range_ratio 파라미터 소폭 조정 검토
+  - 단, 합성 데이터 기준이므로 실거래소 검증 후 확정
+- momentum_quality: Sharpe 5.08이지만 mc_p_value > 0.05 → Consistency 0/4
+  - `scripts/paper_simulation.py` mc_p_value 계산 로직 점검
+  - Monte Carlo block bootstrap block_size 영향도 분석
 
-#### E(실행): TWAP + 체결 품질 개선
-- ✅ **COMPLETED**: TWAP 거래량 가중 슬라이스 크기
-  - volume_weights: Optional[List[float]] 파라미터 추가 (execute() 시그니처)
-  - 구현: weights 정규화 → 비례 슬라이스 크기 배정 → 깊이 조정 적용
-  - 테스트: TestVolumeWeightedSlices 클래스 10개 추가
-    - test_equal_weights_behaves_like_uniform
-    - test_volume_weights_distribute_qty_proportionally
-    - test_volume_weights_wrong_length_falls_back_to_equal
-    - test_volume_weights_none_equal_slicing
-    - test_volume_weights_zero_sum_falls_back
-    - test_volume_weights_single_slice
-    - test_volume_weights_skewed_distribution
-    - test_volume_weights_fractional_values
-    - test_volume_weights_very_small_values
-    - test_volume_weights_large_values
-  - 회귀 테스트: 61/61 PASS (기존 기능 보존)
-  - 코드 변경: twap.py 라인 167 (volume_weights 파라미터), 203-219 (가중 슬라이스 로직), 245 (slice_qtys[i] 사용)
+#### C(데이터): BlockBootstrap 블록 크기 확대 + WebSocket 안정성
+- IS Sharpe 100% 음수(cmf, wick_reversal): GBM block_size=36봉이 너무 짧아 추세 소실
+  - `scripts/paper_simulation.py`: block_size 36 → 72봉 (72h = 3일) 검토
+  - 72봉 블록으로 추세 성분 보존 → IS Sharpe 음수 비율 감소 기대
+- `src/data/websocket_feed.py`: 재연결 exponential backoff 검증
 
-#### SIM: --pass-ratio 0.33 + --mc-p-threshold 0.10 조합 효과
-- narrow_range: 3/9 fold PASS → 33% 기준이면 PASS 가능성
-- momentum_quality, price_action_momentum: mc_p_value 완화 시 PASS 가능성 분석
-- 결과를 NEXT_STEPS에 반영 (완화 기준 유지 여부 결정)
+#### SIM: use_regime_weights=True 효과 검증
+- 이번 사이클(234) walk_forward에 use_regime_weights 추가됨
+- 다음 SIM에서 OOS Sharpe std 감소 확인 (목표: 3.4~6.4 → < 2.0)
+- run_bundle_oos.py에 --use-regime-weights 플래그 추가 검토
 
-#### F(리서치): 레짐 이질성 해결책 + ML 피처 중요도
-- IS/OOS 레짐 불일치: CPCV(Combinatorial Purged Cross-Validation) 적용 연구
-  - 기존 walk-forward 대신 CPCV로 레짐 불일치 줄이기
-- RF 모델 피처 중요도: bid_ask_depth_imbalance vs OFI 중요도 비교 (PFI)
+#### F(리서치): GBM 합성 데이터 vs 실거래소 乖離 + 블록 크기 영향
+- GBM block_size 감도 분석: 36/72/144봉 비교 → IS Sharpe 분포 변화
+- narrow_range fold 8: OOS Sharpe -14.1 극단값 → IS/OOS 레짐 불일치 원인 분석
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
 - 합성 데이터 결과는 방향성 참고만
 
 ### 핵심 메트릭
-- 상위 3: price_action_momentum(Sharpe 3.74, +47%), momentum_quality(Sharpe 5.08, +55%), narrow_range(3/9 PASS)
-- 테스트: 8,113 → 8,124 passed (+11개, TestVolumeWeightedSlices)
-- 새로 추가된 인프라: Kelly+MDD compound scaling, OFI/VPIN 상관성 분석, --pass-ratio 옵션, TWAP volume_weights
+- 상위 3: momentum_quality(Sharpe 5.08, +55%), price_action_momentum(Sharpe 3.74, +47%), narrow_range(Sharpe 3.35, PF 1.49)
+- 테스트: 8,127 passed (Cycle 234 +14개)
+- 새로 추가된 인프라:
+  - bid_ask_depth_imbalance 중복 제거 (features.py)
+  - regime 조건부 fold 가중치 (walk_forward.py use_regime_weights)
+  - TWAP volume-weighted slices (twap.py volume_weights)

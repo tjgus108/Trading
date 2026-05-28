@@ -1,46 +1,46 @@
 ======================================================================
-🔄 CYCLE 233 — 2026-05-28
+🔄 CYCLE 234 — 2026-05-28
 ======================================================================
 
 ## 이번 사이클 배정 카테고리
 
-### [C] Data & Infrastructure
-- **Focus**: OFI/VPIN 피처 중복 분석 + paper_simulation 일관성 기준 개선
+### [D] ML & Signals
+- **Focus**: 중복 피처 제거 + regime 조건부 fold 가중치
 - **완료**:
-  - `src/data/order_flow.py`: `compute_ofi_vpin_correlation()` 추가 (~60줄)
-    - OFI, bid_ask_depth_imbalance, VPIN Pearson/Spearman 상관계수
-    - 결과: OFI ≈ depth_imbalance (Pearson=1.0) → 중복 확인
-    - VPIN vs OFI: 낮은 상관성 → 상호보완적 유지
-  - `scripts/paper_simulation.py`: `--pass-ratio` 인자 추가
-    - 기본 0.50, 완화 시 0.33 사용 가능 (narrow_range 3/9 → PASS 가능)
-- **테스트**: 6개 신규 (TestOFIVPINCorrelation)
+  - `src/ml/features.py`: bid_ask_depth_imbalance 완전 제거 (OFI Pearson=1.0 중복)
+  - `src/backtest/walk_forward.py`: use_regime_weights 파라미터 추가
+    - HIGH_VOL fold 다운웨이팅: weight = 1/(1 + vol/mean_vol)
+    - weighted_oos_sharpe에 반영 (PASS/FAIL 기준 avg_oos_sharpe는 변경 없음)
+- **테스트**: 4개 신규
 
-### [B] Risk Management
-- **Focus**: DrawdownMonitor + KellySizer → RiskManager.evaluate() 통합
+### [E] Execution
+- **Focus**: TWAP 거래량 가중 슬라이스
 - **완료**:
-  - `src/risk/manager.py`: evaluate()에 두 모듈 연결
-    - Kelly regime fraction scale (HIGH_VOL=0.4x, TREND_DOWN=0.6x, TREND_UP=1.0x)
-    - DrawdownMonitor.get_size_multiplier() 적용 (MDD 단계 + 연속손실 + 쿨다운)
-    - HIGH_VOL + MDD WARN 동시 발생 시 compound 경고: "net=0.20"
-    - trailing_stop_signal() 하위 호환 유지 (get_size_multiplier() 이후 추가)
-- **테스트**: 6개 신규 (TestKellyDrawdownIntegration)
+  - `src/exchange/twap.py`: volume_weights 파라미터 추가
+    - 비례 슬라이스: slice_qty[i] = total_qty * weights[i] / sum(weights)
+    - 잘못된 길이/None → 균등 슬라이스 fallback
+  - `tests/test_twap.py`: TestVolumeWeightedSlices 10개 추가
+- **테스트**: 10개 신규
 
-### [SIM] 시뮬레이션 (Cycle 232 결과 활용)
-- Paper: 0/22 PASS (합성 GBM 한계)
-  - 주 실패: mc_p_value 0.28~0.50 (합성 데이터), PF 1.46~1.49 (기준 1.5 근접)
-  - 개선 방향: --pass-ratio 0.33 + --mc-p-threshold 0.10 (Cycle 234에서 테스트)
-- OOS Bundle: 0/5 PASS, OOS Sharpe std 3.4~6.4
-  - narrow_range 최선: 3/9 PASS, std=6.35 (극단 fold로 불안정)
+## SIM 결과 요약
 
-### [F] Research
-- OFI/VPIN 중복 분석 완료: bid_ask_depth_imbalance = OFI (완전 동일)
-  - → Cycle 234에서 ML features.py에서 depth_imbalance 제거 예정
-- 레짐 이질성 원인: IS/OOS 레짐 불일치 → CPCV 검토 (Cycle 234+)
-- Kelly compound 성공 사례: Citadel HIGH_VOL Tenth-Kelly 확인
+### Paper (Walk-Forward 1h봉)
+- **0/22 PASS** (합성 GBM 데이터 한계)
+- 상위: momentum_quality (Sharpe 5.08), price_action_momentum (Sharpe 3.74), narrow_range (Sharpe 3.35, PF 1.49)
+- 공통 실패 원인: Consistency 0/4, mc_p_value > 0.05
+
+### OOS Bundle (4h봉)
+- **0/5 PASS**, OOS Sharpe std 3.4~6.4
+- narrow_range: 3/9 fold PASS (최다)
+- wick_reversal: 2/9 fold PASS
+- IS Sharpe 100% 음수: cmf, wick_reversal (GBM 블록 크기 문제)
 
 ## 테스트 현황
-- 8,113 passed, 23 skipped (Cycle 232: 8,101 → +12)
+- **8,127 passed** (+14 from Cycle 233)
+- 회귀: 없음
 
-## 다음 사이클
-- 234 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
-- 핵심: bid_ask_depth_imbalance 제거, 레짐 조건부 fold 가중, TWAP 개선
+## 다음 사이클: 235 (235 mod 5 = 0 → A(품질) + C(데이터) + F)
+- A: narrow_range PF 1.49→1.5 분석, mc_p_value 로직 점검
+- C: BlockBootstrap block_size 36→72 검토 (IS Sharpe 음수 개선)
+- F: GBM 합성 vs 실거래소 데이터 乖離 분석
+======================================================================
