@@ -697,6 +697,32 @@ class KellySizer:
 
         return base_fraction * vol_scalar
 
+    def apply_volatility_scaling(
+        self,
+        fraction: float,
+        realized_vol: float,
+        target_vol: float = 0.15,
+    ) -> float:
+        """변동성 스케일링을 Kelly fraction에 적용.
+
+        scaled = fraction * (target_vol / realized_vol)
+
+        Args:
+            fraction: 입력 Kelly fraction (e.g. 0.05).
+            realized_vol: 현재 실현 변동성 (연환산).
+                          0이나 매우 작으면(< 0.001) fraction을 그대로 반환.
+            target_vol: 목표 변동성 (기본 0.15 = 15%).
+
+        Returns:
+            스케일링된 fraction.
+            결과가 원래 fraction의 2x를 초과하지 않도록 cap.
+        """
+        if realized_vol < 0.001:
+            return fraction
+        scaled = fraction * (target_vol / realized_vol)
+        # 원래 fraction의 2배 cap
+        return min(scaled, fraction * 2.0)
+
     def adjust_for_regime(self, regime: str) -> float:
         """레짐에 따른 Kelly fraction 스케일 팩터 반환.
 

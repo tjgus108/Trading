@@ -552,3 +552,53 @@ class TestKellyVolScaledFraction:
         # realized=0.15 → scalar=1.0
         result = sizer.get_vol_scaled_fraction(realized_vol=0.15)
         assert result == pytest.approx(0.20)
+
+
+class TestApplyVolatilityScaling:
+    """apply_volatility_scaling() 메서드 테스트."""
+
+    def test_basic_scaling(self):
+        """target_vol / realized_vol 비율로 스케일링."""
+        sizer = KellySizer()
+        # fraction=0.10, target=0.15, realized=0.30 → 0.10 * 0.5 = 0.05
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.30, target_vol=0.15)
+        assert result == pytest.approx(0.05)
+
+    def test_no_scaling_when_equal(self):
+        """target == realized → fraction 그대로."""
+        sizer = KellySizer()
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.15, target_vol=0.15)
+        assert result == pytest.approx(0.10)
+
+    def test_zero_realized_vol_returns_fraction(self):
+        """realized_vol=0 → fraction 그대로 반환."""
+        sizer = KellySizer()
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.0, target_vol=0.15)
+        assert result == pytest.approx(0.10)
+
+    def test_very_small_realized_vol_returns_fraction(self):
+        """realized_vol < 0.001 → fraction 그대로 반환."""
+        sizer = KellySizer()
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.0005, target_vol=0.15)
+        assert result == pytest.approx(0.10)
+
+    def test_cap_at_2x_fraction(self):
+        """스케일링 결과가 2x 초과 시 cap."""
+        sizer = KellySizer()
+        # fraction=0.10, target=0.15, realized=0.01 → 0.10 * 15 = 1.5 → cap to 0.20
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.01, target_vol=0.15)
+        assert result == pytest.approx(0.20)
+
+    def test_high_vol_reduces_fraction(self):
+        """높은 실현 변동성 → fraction 축소."""
+        sizer = KellySizer()
+        # fraction=0.20, target=0.15, realized=0.60 → 0.20 * 0.25 = 0.05
+        result = sizer.apply_volatility_scaling(0.20, realized_vol=0.60, target_vol=0.15)
+        assert result == pytest.approx(0.05)
+
+    def test_moderate_upscale_within_cap(self):
+        """적당한 스케일업(< 2x)은 cap 미적용."""
+        sizer = KellySizer()
+        # fraction=0.10, target=0.15, realized=0.10 → 0.10 * 1.5 = 0.15 < 0.20
+        result = sizer.apply_volatility_scaling(0.10, realized_vol=0.10, target_vol=0.15)
+        assert result == pytest.approx(0.15)

@@ -421,6 +421,7 @@ def evaluate_strategy_walk_forward(
         "avg_final_balance": 10_000 * (1 + avg_return),
         "sharpe_std": sharpe_std,
         "top_fail_reasons": top_fail_reasons,
+        "robustness_label": "",  # perturbation_check 결과 (빈 문자열 = 미실행)
     }
 
 
@@ -517,16 +518,26 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     lines.append("")
 
     # TOP 10
+    has_robustness = any(r.get("robustness_label", "") for r in results)
     lines.append("## TOP 10 전략 (평균 수익률 기준)\n")
-    lines.append("| # | Name | AvgReturn | AvgSharpe | AvgWR | AvgPF | AvgTrades | AvgMDD | Consistency | Pass |")
-    lines.append("|---|------|-----------|-----------|-------|-------|-----------|--------|-------------|------|")
+    if has_robustness:
+        lines.append("| # | Name | AvgReturn | AvgSharpe | AvgWR | AvgPF | AvgTrades | AvgMDD | Consistency | Robust | Pass |")
+        lines.append("|---|------|-----------|-----------|-------|-------|-----------|--------|-------------|--------|------|")
+    else:
+        lines.append("| # | Name | AvgReturn | AvgSharpe | AvgWR | AvgPF | AvgTrades | AvgMDD | Consistency | Pass |")
+        lines.append("|---|------|-----------|-----------|-------|-------|-----------|--------|-------------|------|")
     for i, r in enumerate(results[:10], 1):
         p = "PASS" if r["overall_passed"] else "FAIL"
-        lines.append(
+        base = (
             f"| {i} | `{r['name']}` | {r['avg_return']:+.2%} | {r['avg_sharpe']:.2f} | "
             f"{r['avg_win_rate']:.1%} | {r['avg_profit_factor']:.2f} | {r['avg_trades']:.0f} | "
-            f"{r['avg_max_dd']:.1%} | {r['passed_windows']}/{r['total_windows']} | {p} |"
+            f"{r['avg_max_dd']:.1%} | {r['passed_windows']}/{r['total_windows']}"
         )
+        if has_robustness:
+            rob = r.get("robustness_label", "")
+            lines.append(f"{base} | {rob} | {p} |")
+        else:
+            lines.append(f"{base} | {p} |")
     lines.append("")
 
     # 상대 순위 (Composite Rank Score)
@@ -550,15 +561,24 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
 
     # 전체 결과
     lines.append("## 전체 결과\n")
-    lines.append("| Name | AvgReturn | AvgSharpe | AvgPF | AvgTrades | Consistency | Pass |")
-    lines.append("|------|-----------|-----------|-------|-----------|-------------|------|")
+    if has_robustness:
+        lines.append("| Name | AvgReturn | AvgSharpe | AvgPF | AvgTrades | Consistency | Robust | Pass |")
+        lines.append("|------|-----------|-----------|-------|-----------|-------------|--------|------|")
+    else:
+        lines.append("| Name | AvgReturn | AvgSharpe | AvgPF | AvgTrades | Consistency | Pass |")
+        lines.append("|------|-----------|-----------|-------|-----------|-------------|------|")
     for r in results:
         p = "PASS" if r["overall_passed"] else "FAIL"
-        lines.append(
+        base = (
             f"| `{r['name']}` | {r['avg_return']:+.2%} | {r['avg_sharpe']:.2f} | "
             f"{r['avg_profit_factor']:.2f} | {r['avg_trades']:.0f} | "
-            f"{r['passed_windows']}/{r['total_windows']} | {p} |"
+            f"{r['passed_windows']}/{r['total_windows']}"
         )
+        if has_robustness:
+            rob = r.get("robustness_label", "")
+            lines.append(f"{base} | {rob} | {p} |")
+        else:
+            lines.append(f"{base} | {p} |")
     lines.append("")
 
     # FAIL 원인 분석
@@ -633,6 +653,7 @@ def export_results_json(all_symbol_results: Dict[str, List[dict]], metadata: dic
                 "sharpe_std": round(r.get("sharpe_std", 0.0), 4),
                 "rank_score": r.get("rank_score", 0.0),
                 "percentile": r.get("percentile", ""),
+                "robustness_label": r.get("robustness_label", ""),
                 "top_fail_reasons": r.get("top_fail_reasons", []),
                 "window_results": r["window_results"],
             }
@@ -665,6 +686,7 @@ def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
                 "sharpe_std": round(r.get("sharpe_std", 0.0), 4),
                 "rank_score": r.get("rank_score", 0.0),
                 "percentile": r.get("percentile", ""),
+                "robustness_label": r.get("robustness_label", ""),
             })
 
     if rows:
@@ -685,6 +707,9 @@ BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "24"))
 # Regime weighting: HIGH_VOL fold 다운웨이팅 (Cycle 234 walk_forward.py와 동일 로직)
 # 환경변수 PAPER_SIM_REGIME_WEIGHTS=1 로 활성화
 USE_REGIME_WEIGHTS = _os.environ.get("PAPER_SIM_REGIME_WEIGHTS", "0") == "1"
+
+# Perturbation check: 각 전략의 파라미터 섭동 안정성 검증 (--perturbation-check로 활성화)
+USE_PERTURBATION_CHECK = False
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
@@ -744,6 +769,53 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     if load_failures or eval_errors:
         print(f"[{symbol}][WARN] load_failures={load_failures}, eval_errors={eval_errors} "
               f"(of {len(pass_list)} total)")
+
+    # Perturbation check (--perturbation-check 활성화 시)
+    if USE_PERTURBATION_CHECK and results:
+        print(f"[{symbol}][PERTURBATION] Running perturbation check on {len(results)} strategies...", flush=True)
+        perturb_params = {
+            "atr_multiplier_sl": engine.atr_multiplier_sl,
+            "atr_multiplier_tp": engine.atr_multiplier_tp,
+        }
+        fragile_count = 0
+        for idx_r, r in enumerate(results):
+            mod_name = None
+            cls_name = None
+            # pass_list에서 매칭되는 전략 찾기
+            for mn, cn in pass_list:
+                loaded = load_strategy_class(mn, cn)
+                if loaded is not None:
+                    try:
+                        inst = loaded()
+                        if inst.name == r["name"]:
+                            mod_name, cls_name = mn, cn
+                            break
+                    except Exception:
+                        continue
+            if mod_name is None:
+                r["robustness_label"] = "N/A"
+                continue
+            strategy_cls = load_strategy_class(mod_name, cls_name)
+            if strategy_cls is None:
+                r["robustness_label"] = "N/A"
+                continue
+            try:
+                strategy_inst = strategy_cls()
+                # 전체 데이터 중 마지막 TEST_HOURS 구간 사용 (빠른 평가)
+                eval_len = min(TEST_HOURS + 100, len(df))
+                eval_df = df.iloc[-eval_len:]
+                pc = engine.perturbation_check(
+                    strategy_inst, perturb_params, eval_df, perturbation_pcts=[0.1],
+                )
+                r["robustness_label"] = pc["robustness_label"]
+                if pc["robustness_label"] == "FRAGILE":
+                    fragile_count += 1
+                    fragile_info = ", ".join(pc.get("fragile_params", []))
+                    print(f"  [WARN] {r['name']}: FRAGILE (fragile params: {fragile_info})", flush=True)
+            except Exception as e:
+                r["robustness_label"] = "ERROR"
+                print(f"  [ERROR] {r['name']}: perturbation_check failed: {str(e)[:80]}", flush=True)
+        print(f"[{symbol}][PERTURBATION] Done. FRAGILE: {fragile_count}/{len(results)}", flush=True)
 
     # 상대 순위 계산 (0/N PASS 상황에서도 전략 간 우위 파악 가능)
     compute_rank_scores(results)
@@ -906,6 +978,12 @@ if __name__ == "__main__":
         default=False,
         help="HIGH_VOL fold 다운웨이팅 활성화 (Cycle 234 regime weighting)",
     )
+    parser.add_argument(
+        "--perturbation-check",
+        action="store_true",
+        default=False,
+        help="각 전략의 파라미터 섭동 안정성 검증 (ROBUST/MODERATE/FRAGILE 판정)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -915,4 +993,7 @@ if __name__ == "__main__":
     if args.regime_weights:
         _this.USE_REGIME_WEIGHTS = True
         print(f"[CONFIG] Regime weights enabled (HIGH_VOL fold downweighting)", flush=True)
+    if args.perturbation_check:
+        _this.USE_PERTURBATION_CHECK = True
+        print(f"[CONFIG] Perturbation check enabled (ROBUST/MODERATE/FRAGILE)", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

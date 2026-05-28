@@ -214,6 +214,8 @@ class DataFeed:
         self._max_retries = max_retries
         self._hit_count = 0          # 캐시 히트 수
         self._miss_count = 0         # 캐시 미스 수
+        self._cache_hits: int = 0    # 캐시 히트 카운터 (get_cache_stats용, Cycle 239)
+        self._cache_misses: int = 0  # 캐시 미스 카운터 (get_cache_stats용, Cycle 239)
         self._regime_cache: dict = {}  # symbol -> (regime_value, timestamp)
         self._circuit_breaker = CircuitBreaker()  # Cascading failure prevention
         # ─ Stale cache fallback (Cycle 176 개선)
@@ -384,6 +386,7 @@ class DataFeed:
             cached_summary, ts = self._cache[key]
             if now - ts < effective_ttl:
                 self._hit_count += 1
+                self._cache_hits += 1
                 logger.debug(
                     "Cache HIT: %s %s (ttl=%.1fs, regime=%s)",
                     symbol, timeframe, effective_ttl,
@@ -392,6 +395,7 @@ class DataFeed:
                 return cached_summary  # 캐시 히트
         # 캐시 미스: 실제 fetch (retry 포함)
         self._miss_count += 1
+        self._cache_misses += 1
         logger.debug(
             "Cache MISS: %s %s (ttl=%.1fs, regime=%s)",
             symbol, timeframe, effective_ttl,
@@ -578,6 +582,22 @@ class DataFeed:
             'volume_unit': self._volume_unit,
         }
 
+
+    def get_cache_stats(self) -> dict:
+        """
+        캐시 hit/miss 통계 조회 (Cycle 239).
+
+        Returns:
+            {"hits": int, "misses": int, "hit_rate": float}
+            hit_rate: 0.0 ~ 1.0 (총 요청이 0이면 0.0)
+        """
+        total = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total if total > 0 else 0.0
+        return {
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": hit_rate,
+        }
 
     def circuit_breaker_status(self) -> dict:
         """

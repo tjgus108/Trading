@@ -790,3 +790,80 @@ def test_reset_monthly_updates_start_only():
     # force_resume으로만 해제 가능
     m.force_resume()
     assert m.is_halted() is False
+
+
+# ── MDD Kill Switch 테스트 ────────────────────────────────────
+
+
+class TestMddKillSwitch:
+    """should_kill_strategy / get_kill_switch_status 테스트."""
+
+    def test_kill_when_exceeds_multiplier(self):
+        """current_mdd > backtest_mdd * 1.5 → kill."""
+        m = DrawdownMonitor()
+        # backtest_mdd=0.10, current_mdd=0.16 → 0.16 > 0.15 → True
+        assert m.should_kill_strategy(0.16, 0.10, multiplier=1.5) is True
+
+    def test_no_kill_when_below_multiplier(self):
+        """current_mdd <= backtest_mdd * 1.5 → no kill."""
+        m = DrawdownMonitor()
+        # backtest_mdd=0.10, current_mdd=0.14 → 0.14 < 0.15 → False
+        assert m.should_kill_strategy(0.14, 0.10, multiplier=1.5) is False
+
+    def test_no_kill_at_exact_threshold(self):
+        """current_mdd == backtest_mdd * multiplier → False (> 가 아닌 ==)."""
+        m = DrawdownMonitor()
+        assert m.should_kill_strategy(0.15, 0.10, multiplier=1.5) is False
+
+    def test_negative_inputs_abs_processed(self):
+        """음수 입력은 abs() 처리."""
+        m = DrawdownMonitor()
+        # abs(-0.16) > abs(-0.10) * 1.5 → 0.16 > 0.15 → True
+        assert m.should_kill_strategy(-0.16, -0.10, multiplier=1.5) is True
+
+    def test_zero_backtest_mdd(self):
+        """backtest_mdd=0이면 threshold=0, current_mdd>0이면 kill."""
+        m = DrawdownMonitor()
+        assert m.should_kill_strategy(0.01, 0.0) is True
+        assert m.should_kill_strategy(0.0, 0.0) is False
+
+    def test_custom_multiplier(self):
+        """multiplier=2.0 기준."""
+        m = DrawdownMonitor()
+        # backtest_mdd=0.10, threshold=0.20
+        assert m.should_kill_strategy(0.21, 0.10, multiplier=2.0) is True
+        assert m.should_kill_strategy(0.19, 0.10, multiplier=2.0) is False
+
+    def test_get_kill_switch_status_basic(self):
+        """get_kill_switch_status dict 구조 및 값 검증."""
+        m = DrawdownMonitor()
+        status = m.get_kill_switch_status(0.16, 0.10, multiplier=1.5)
+        assert status["should_kill"] is True
+        assert abs(status["current_mdd"] - 0.16) < 1e-9
+        assert abs(status["threshold"] - 0.15) < 1e-9
+        assert abs(status["ratio"] - 1.6) < 1e-9
+
+    def test_get_kill_switch_status_no_kill(self):
+        """threshold 미달 시 should_kill=False."""
+        m = DrawdownMonitor()
+        status = m.get_kill_switch_status(0.10, 0.10, multiplier=1.5)
+        assert status["should_kill"] is False
+        assert abs(status["ratio"] - 1.0) < 1e-9
+
+    def test_get_kill_switch_status_zero_backtest(self):
+        """backtest_mdd=0일 때 ratio=inf (current>0) 또는 0 (current=0)."""
+        m = DrawdownMonitor()
+        status = m.get_kill_switch_status(0.05, 0.0)
+        assert status["should_kill"] is True
+        assert status["ratio"] == float('inf')
+
+        status2 = m.get_kill_switch_status(0.0, 0.0)
+        assert status2["should_kill"] is False
+        assert status2["ratio"] == 0.0
+
+    def test_get_kill_switch_status_negative_inputs(self):
+        """음수 입력이 abs() 처리되어 dict에 양수로 반환."""
+        m = DrawdownMonitor()
+        status = m.get_kill_switch_status(-0.16, -0.10, multiplier=1.5)
+        assert status["current_mdd"] == pytest.approx(0.16)
+        assert status["threshold"] == pytest.approx(0.15)

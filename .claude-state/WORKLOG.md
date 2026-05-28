@@ -1,5 +1,37 @@
 # Work Log
 
+## [2026-05-29] Cycle 239 — C(데이터) + B(리스크) + SIM + F(리서치)
+
+**[C] 데이터 — WebSocket 갭 감지 + DataFeed 캐시 통계:**
+- `src/data/websocket_feed.py`: `get_reconnect_gaps()` 추가
+  - reconnect 시 (gap_start, gap_end, gap_seconds) 기록, FIFO 100개
+  - `_connect_with_retry()`에서 pending_gap_start 설정, `_process_message()`에서 갭 완료 기록
+- `src/data/feed.py`: `get_cache_stats()` 추가
+  - _cache_hits/_cache_misses 카운터 + hit_rate 계산
+  - 기존 _hit_count/_miss_count와 동기화
+- 테스트 14개 추가: reconnect_gaps 8개 + cache_stats 6개
+
+**[B] 리스크 — MDD Kill Switch + Volatility Scaling:**
+- `src/risk/drawdown_monitor.py`: `should_kill_strategy(current_mdd, backtest_mdd, multiplier=1.5)` + `get_kill_switch_status()` 추가
+  - current_mdd > backtest_mdd * multiplier → True (전략 kill 권장)
+  - 음수 입력 abs() 처리, backtest_mdd=0 시 ratio=inf 처리
+- `src/risk/kelly_sizer.py`: `apply_volatility_scaling(fraction, realized_vol, target_vol=0.15)` 추가
+  - fraction × (target_vol / realized_vol), vol < 0.001이면 fraction 반환, 2x cap
+- 테스트 17개 추가: kill_switch 10개 + vol_scaling 7개
+
+**[SIM] perturbation_check 통합 + paper_simulation 연동:**
+- `tests/test_perturbation_integration.py` 생성: 통합 테스트 8개 (빈 params, 단일/다중 파라미터, robustness 판정)
+- `scripts/paper_simulation.py`: `--perturbation-check` CLI flag 추가
+  - 각 전략 백테스트 후 perturbation_check() 호출, robustness_label 리포트/JSON/CSV 반영
+  - FRAGILE 전략 경고 출력
+- 테스트 3개 추가 (CLI flag, 결과 dict 키, 리포트 컬럼)
+
+**[F] 리서치 요약:**
+- 슬리피지 실패: dogwifhat $9M→$5.7M 손실, AI 봇 집단 패닉셀 $2B 청산, 2024 슬리피지 $2.7B(+34%)
+- 성공 패턴: 5-레이어 kill switch (일별손실→MDD→변동성→오더북깊이→연결오류)
+- GAN 합성: TimeGAN(MMD 1.84e-3), SFAG(stylized facts), Diffusion+Wavelet(최우수 fat tail)
+- 권장: GAN은 실데이터 PASS 확보 후 검토. 오더북 깊이 기반 포지션 사이즈 즉시 적용 가능
+
 ## [2026-05-29] Cycle 238 — E(실행) + A(품질) + SIM + F(리서치)
 
 **[E] 실행 — rolling Sharpe 모니터 + TWAP 검증:**
@@ -19398,3 +19430,6 @@ Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-28 22:32 UTC] Cycle 238 Dispatched — E + A + SIM + F
 Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 22:49 UTC] Cycle 239 Dispatched — C + B + SIM + F
+Categories: C + B + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

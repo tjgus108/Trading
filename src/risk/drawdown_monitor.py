@@ -633,6 +633,66 @@ class DrawdownMonitor:
 
     # ── 수동 제어 ──────────────────────────────────────────────
 
+    # ── MDD Kill Switch ────────────────────────────────────────
+
+    def should_kill_strategy(
+        self,
+        current_mdd: float,
+        backtest_mdd: float,
+        multiplier: float = 1.5,
+    ) -> bool:
+        """현재 MDD가 백테스트 MDD의 multiplier배를 초과하면 전략 kill 권장.
+
+        Args:
+            current_mdd: 현재 실시간 MDD (0~1 비율). 음수이면 abs() 처리.
+            backtest_mdd: 백테스트에서 관측된 MDD (0~1 비율). 음수이면 abs() 처리.
+            multiplier: 초과 배수 기준 (기본 1.5).
+
+        Returns:
+            True이면 전략 kill 권장.
+        """
+        current_mdd = abs(current_mdd)
+        backtest_mdd = abs(backtest_mdd)
+        threshold = backtest_mdd * multiplier
+        return current_mdd > threshold
+
+    def get_kill_switch_status(
+        self,
+        current_mdd: float,
+        backtest_mdd: float,
+        multiplier: float = 1.5,
+    ) -> dict:
+        """Kill switch 상태를 dict로 반환.
+
+        Args:
+            current_mdd: 현재 실시간 MDD (0~1 비율). 음수이면 abs() 처리.
+            backtest_mdd: 백테스트에서 관측된 MDD (0~1 비율). 음수이면 abs() 처리.
+            multiplier: 초과 배수 기준 (기본 1.5).
+
+        Returns:
+            {
+                "should_kill": bool,
+                "current_mdd": float,
+                "threshold": float,
+                "ratio": float,   # current_mdd / backtest_mdd (backtest_mdd=0이면 inf 또는 0)
+            }
+        """
+        current_mdd = abs(current_mdd)
+        backtest_mdd = abs(backtest_mdd)
+        threshold = backtest_mdd * multiplier
+        if backtest_mdd > 0:
+            ratio = current_mdd / backtest_mdd
+        else:
+            ratio = float('inf') if current_mdd > 0 else 0.0
+        return {
+            "should_kill": current_mdd > threshold,
+            "current_mdd": current_mdd,
+            "threshold": threshold,
+            "ratio": ratio,
+        }
+
+    # ── 수동 제어 ──────────────────────────────────────────────
+
     def force_halt(self, reason: str = "Manual halt") -> None:
         """수동으로 거래 차단."""
         self._halted = True

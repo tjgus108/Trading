@@ -29,7 +29,7 @@ import time
 import random
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional, Deque, Dict, Any
+from typing import Optional, Deque, Dict, Any, List
 
 import pandas as pd
 import numpy as np
@@ -222,6 +222,11 @@ class BinanceWebSocketFeed:
         self._total_candles_received = 0
         self._consecutive_failures = 0
 
+        # Reconnect gap tracking (Cycle 239)
+        self._reconnect_gaps: Deque[Dict[str, Any]] = deque(maxlen=100)
+        self._last_recv_ts: Optional[float] = None  # 마지막 데이터 수신 시각 (wall clock)
+        self._pending_gap_start: Optional[float] = None  # reconnect 시 갭 시작 시점
+
     @staticmethod
     def is_websocket_available() -> bool:
         try:
@@ -327,6 +332,33 @@ class BinanceWebSocketFeed:
             consecutive_failures=self._consecutive_failures,
         )
 
+    def get_reconnect_gaps(self) -> List[Dict[str, Any]]:
+        """
+        Reconnect 발생 시 기록된 데이터 갭 목록 반환 (Cycle 239).
+
+        각 reconnect 이벤트에서 마지막 수신 타임스탬프와 재연결 후 첫 수신
+        타임스탬프 사이의 갭을 계산하여 기록한다.
+
+        Returns:
+            List[dict]: 각 dict는 {"start": float, "end": float, "gap_seconds": float}
+                        start/end는 UNIX epoch (time.time()) 기준.
+            최대 100개까지 보관 (FIFO).
+        """
+        return list(self._reconnect_gaps)
+
+    def _record_reconnect_gap(self, gap_start: float, gap_end: float) -> None:
+        """reconnect 갭 기록 (내부용)."""
+        gap_seconds = gap_end - gap_start
+        self._reconnect_gaps.append({
+            "start": gap_start,
+            "end": gap_end,
+            "gap_seconds": gap_seconds,
+        })
+        logger.info(
+            "Reconnect gap recorded: %.1fs (start=%.1f, end=%.1f)",
+            gap_seconds, gap_start, gap_end,
+        )
+
     def validate_timeout_config(self) -> dict:
         """
         현재 타임아웃 설정 검증 (Cycle 229).
@@ -379,6 +411,11 @@ class BinanceWebSocketFeed:
                 self._retry_count += 1
                 self._consecutive_failures += 1
                 self._health_monitor.record_reconnection(reason=str(e))
+
+                # Reconnect gap tracking: 이전에 데이터를 수신한 적이 있으면
+                # 갭 시작 시점 기록 → 다음 캔들 수신 시 갭 완결
+                if self._last_recv_ts is not None:
+                    self._pending_gap_start = self._last_recv_ts
 
                 wait = self._calculate_backoff_with_jitter(self._retry_count)
                 logger.warning(
@@ -472,11 +509,19 @@ class BinanceWebSocketFeed:
             close=float(k["c"]),
             volume=float(k["v"]),
         )
+        now = time.time()
         with self._lock:
             self._candles.append(bar)
             self._last_candle_timestamp_ms = ts_ms
-            self._last_candle_ts = time.time()
+            self._last_candle_ts = now
             self._total_candles_received += 1
+
+            # Reconnect gap detection: 이전 수신 이력이 있고 reconnect 직후
+            # 첫 캔들이면 갭 기록 (_pending_gap_start가 설정된 상태)
+            if getattr(self, "_pending_gap_start", None) is not None:
+                self._record_reconnect_gap(self._pending_gap_start, now)
+                self._pending_gap_start = None
+            self._last_recv_ts = now
         self._health_monitor.record_candle()
 
         logger.debug(
