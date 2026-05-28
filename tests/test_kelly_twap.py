@@ -586,3 +586,135 @@ class TestKellyTWAPPipelineIntegration:
         )
         assert result.timeout_occurred is False
 
+
+# ---------------------------------------------------------------------------
+# TWAP unfilled_qty 재시도 로직 엣지케이스 테스트
+# ---------------------------------------------------------------------------
+
+
+class TestTWAPUnfilledRetryEdgeCases:
+    """TWAP executor의 unfilled_qty 누적 재시도 로직 엣지케이스."""
+
+    def test_all_slices_fail_live_mode(self):
+        """라이브 모드에서 모든 슬라이스 실패 → filled_qty=0, errors==n_slices."""
+
+        class FailConnector:
+            def place_order(self, **kwargs):
+                raise RuntimeError("Exchange down")
+
+        executor = TWAPExecutor(
+            n_slices=3, interval_seconds=0, dry_run=False,
+            max_retries_per_slice=1,
+        )
+        result = executor.execute(
+            connector=FailConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=3.0,
+            price_limit=50_000.0,
+        )
+        assert result.filled_qty == 0.0, "All slices failed → 0 filled"
+        assert result.errors == 3, f"Expected 3 errors, got {result.errors}"
+        # unfilled_qty는 누적되어야 하므로 마지막 슬라이스의 current_slice_qty가 전체 수량
+        # (slice 1: 1.0 fail → unfilled=1.0, slice 2: 1.0+1.0=2.0 fail → unfilled=2.0,
+        #  slice 3: 1.0+2.0=3.0 fail → unfilled=3.0)
+        assert result.total_qty == 3.0
+
+    def test_last_slice_only_partial_fill_live_mode(self):
+        """라이브 모드에서 마지막 슬라이스만 partial fill."""
+
+        call_count = 0
+
+        class PartialLastConnector:
+            def place_order(self, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                qty = kwargs.get("qty", 1.0)
+                if call_count < 3:
+                    # 처음 2 슬라이스는 완전 체결
+                    return {"price": 50_000.0, "filled": qty}
+                else:
+                    # 마지막 슬라이스: 50% partial fill
+                    return {"price": 50_000.0, "filled": qty * 0.5}
+
+        executor = TWAPExecutor(
+            n_slices=3, interval_seconds=0, dry_run=False,
+            max_retries_per_slice=1,
+        )
+        result = executor.execute(
+            connector=PartialLastConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=3.0,
+            price_limit=50_000.0,
+        )
+        # slice 1: 1.0 fully filled, slice 2: 1.0 fully filled
+        # slice 3: 1.0 requested, 0.5 filled → partial
+        assert result.slices_executed == 3
+        assert result.partial_fills == 1
+        expected_filled = 1.0 + 1.0 + 0.5
+        assert abs(result.filled_qty - expected_filled) < 1e-6, (
+            f"Expected {expected_filled}, got {result.filled_qty}"
+        )
+
+    def test_first_slice_fail_unfilled_carries_to_second(self):
+        """첫 슬라이스 실패 → unfilled_qty가 두 번째 슬라이스에 누적."""
+
+        call_count = 0
+
+        class FailThenSucceedConnector:
+            def place_order(self, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                if call_count == 1:
+                    raise RuntimeError("Temporary failure")
+                qty = kwargs.get("qty", 1.0)
+                return {"price": 50_000.0, "filled": qty}
+
+        executor = TWAPExecutor(
+            n_slices=2, interval_seconds=0, dry_run=False,
+            max_retries_per_slice=1,
+        )
+        result = executor.execute(
+            connector=FailThenSucceedConnector(),
+            symbol="BTC/USDT",
+            side="buy",
+            total_qty=2.0,
+            price_limit=50_000.0,
+        )
+        # slice 1: 1.0 fail → unfilled=1.0, errors=1
+        # slice 2: 1.0 + 1.0 = 2.0 → fully filled
+        assert result.errors == 1
+        assert abs(result.filled_qty - 2.0) < 1e-6, (
+            f"Expected 2.0 filled (carry-over), got {result.filled_qty}"
+        )
+
+    def test_all_slices_partial_fill_unfilled_accumulates(self):
+        """모든 슬라이스 partial fill → unfilled_qty가 계속 누적."""
+
+        class AlwaysPartialConnector:
+            def place_order(self, **kwargs):
+                qty = kwargs.get("qty", 1.0)
+                # 항상 50% 체결
+                return {"price": 50_000.0, "filled": qty * 0.5}
+
+        executor = TWAPExecutor(
+            n_slices=3, interval_seconds=0, dry_run=False,
+            max_retries_per_slice=1,
+        )
+        result = executor.execute(
+            connector=AlwaysPartialConnector(),
+            symbol="BTC/USDT",
+            side="sell",
+            total_qty=3.0,
+            price_limit=50_000.0,
+        )
+        # slice 1: request=1.0, filled=0.5, unfilled=0.5
+        # slice 2: request=1.0+0.5=1.5, filled=0.75, unfilled=0.75
+        # slice 3: request=1.0+0.75=1.75, filled=0.875, unfilled=0.875
+        expected_filled = 0.5 + 0.75 + 0.875
+        assert abs(result.filled_qty - expected_filled) < 1e-6, (
+            f"Expected {expected_filled}, got {result.filled_qty}"
+        )
+        assert result.partial_fills == 3
+

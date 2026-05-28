@@ -1,5 +1,35 @@
 # Work Log
 
+## [2026-05-29] Cycle 238 — E(실행) + A(품질) + SIM + F(리서치)
+
+**[E] 실행 — rolling Sharpe 모니터 + TWAP 검증:**
+- `src/risk/performance_tracker.py`: `get_rolling_sharpe(strategy, window_days=30)` 메서드 추가
+  - daily PnL 기반 연환산 Sharpe 계산, 비제로 일수 < 2이면 None 반환
+  - 기존 `check_regime_death()`와 일관된 계산 로직
+- TWAP unfilled_qty 누적 재시도 로직 검증 완료 (정상 동작 확인)
+- 테스트 11개 추가: rolling Sharpe 7개 + TWAP 엣지케이스 4개
+
+**[A] 품질 — 파라미터 섭동 테스트 구현 + health_check 보강:**
+- `src/backtest/engine.py`: `perturbation_check()` 메서드 추가
+  - 각 파라미터 ±pct 독립 변동 → Sharpe 안정성 측정
+  - robustness_label: ROBUST (mean≥80%) / MODERATE / FRAGILE (±10%에서 30%+ 하락)
+  - `_build_engine()` 헬퍼 (params dict → 유효 키 필터링)
+- `tests/test_health_check.py`: get_uptime_pct 엣지케이스 8개 추가
+- 테스트 16개 추가: perturbation 8개 + health_check 8개
+
+**[SIM] block_size 최적화:**
+- `scripts/paper_simulation.py`: block_size 기본값 36→24 변경 (O(n^1/3) 리서치 기반)
+- MC permutation test는 block_size=1 (sign randomization), 별개 파라미터로 변경 불필요
+- BTC/USDT 합성 데이터 시뮬(block_size=24): 0/22 PASS (합성 데이터 한계)
+- Top: supertrend_multi(82.4), momentum_quality(75.2), price_action_momentum(67.9)
+
+**[F] 리서치 요약:**
+- 실패 사례: (1) 무료 API 지연 데이터 + 과적합, (2) dogwifhat $9M 시장가 → $5.7M 슬리피지 손실
+- 성공 사례: Freqtrade — 지표 3개 이하 단순 전략, 전 레짐 백테스트, 2주 페이퍼 필수
+- Regime Death Detection 4 방법론: Rolling equity curve std, MDD circuit breaker(1.5x), KS-test, VPIN/FR+OI 레짐 분류
+- 핵심: drawdown + 프로세스 붕괴 + 유동성 불일치 3중 감지 시 kill switch (arxiv 2402.05272)
+- 권장: MDD 1.5x kill → rolling Sharpe + equity std → 월 1회 KS-test
+
 ## [2026-05-29] Cycle 235 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] 품질 — MC permutation test 버그 수정:**
@@ -19362,3 +19392,9 @@ Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-28 16:18 UTC] Cycle 236 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 22:31 UTC] Cycle 237 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 22:32 UTC] Cycle 238 Dispatched — E + A + SIM + F
+Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

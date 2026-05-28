@@ -6,7 +6,7 @@ backtest-agent가 이 모듈을 사용한다.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -489,3 +489,107 @@ class BacktestEngine:
                 n_better += 1
 
         return n_better / MC_N_PERMUTATIONS
+
+    def perturbation_check(
+        self,
+        strategy: BaseStrategy,
+        params: Dict[str, float],
+        data: pd.DataFrame,
+        perturbation_pcts: Optional[List[float]] = None,
+    ) -> Dict:
+        """파라미터 섭동 테스트: 각 파라미터를 ±pct 변동하여 Sharpe 안정성 검증.
+
+        각 파라미터를 독립적으로 ±pct 변동시킨 후 backtest를 실행하여
+        Sharpe Ratio의 변화를 측정한다.
+
+        Args:
+            strategy: 테스트할 전략 인스턴스 (generate 메서드 보유)
+            params: 엔진 파라미터 dict (예: {"atr_multiplier_sl": 1.5, "atr_multiplier_tp": 3.0})
+                    BacktestEngine.__init__에 전달 가능한 키만 사용.
+            data: backtest용 DataFrame
+            perturbation_pcts: 변동 비율 리스트 (기본 [0.1, 0.2] = ±10%, ±20%)
+
+        Returns:
+            {
+              "baseline_sharpe": float,
+              "perturbations": {
+                param_name: {
+                  "+10%": sharpe, "-10%": sharpe,
+                  "+20%": sharpe, "-20%": sharpe,
+                },
+                ...
+              },
+              "fragile_params": [param_name, ...],   # ±10%에서 30%+ 하락
+              "mean_sharpe": float,                   # 전 변동 평균 Sharpe
+              "robustness_ratio": float,              # mean_sharpe / baseline
+              "robustness_label": "ROBUST" | "MODERATE" | "FRAGILE",
+            }
+        """
+        if perturbation_pcts is None:
+            perturbation_pcts = [0.1, 0.2]
+
+        # 1. Baseline: 원래 파라미터로 backtest
+        baseline_engine = self._build_engine(params)
+        baseline_result = baseline_engine.run(strategy, data)
+        baseline_sharpe = baseline_result.sharpe_ratio
+
+        # 2. 각 파라미터에 대해 ±pct 변동 적용
+        perturbations: Dict[str, Dict[str, float]] = {}
+        all_sharpes: List[float] = []
+        fragile_params: List[str] = []
+
+        for param_name, original_value in params.items():
+            param_results: Dict[str, float] = {}
+            for pct in perturbation_pcts:
+                for sign, label in [(1, f"+{int(pct*100)}%"), (-1, f"-{int(pct*100)}%")]:
+                    perturbed_value = original_value * (1 + sign * pct)
+                    perturbed_params = dict(params)
+                    perturbed_params[param_name] = perturbed_value
+                    eng = self._build_engine(perturbed_params)
+                    result = eng.run(strategy, data)
+                    param_results[label] = result.sharpe_ratio
+                    all_sharpes.append(result.sharpe_ratio)
+            perturbations[param_name] = param_results
+
+            # FRAGILE 판정: ±10% 변동에서 baseline 대비 30% 이상 하락
+            if baseline_sharpe > 0:
+                for label_key in ["+10%", "-10%"]:
+                    if label_key in param_results:
+                        drop = (baseline_sharpe - param_results[label_key]) / baseline_sharpe
+                        if drop > 0.3:
+                            if param_name not in fragile_params:
+                                fragile_params.append(param_name)
+                            break
+
+        # 3. Robustness 판정
+        mean_sharpe = float(np.mean(all_sharpes)) if all_sharpes else 0.0
+        robustness_ratio = mean_sharpe / baseline_sharpe if baseline_sharpe > 0 else 0.0
+
+        if robustness_ratio >= 0.8:
+            robustness_label = "ROBUST"
+        elif len(fragile_params) > 0:
+            robustness_label = "FRAGILE"
+        else:
+            robustness_label = "MODERATE"
+
+        return {
+            "baseline_sharpe": baseline_sharpe,
+            "perturbations": perturbations,
+            "fragile_params": fragile_params,
+            "mean_sharpe": round(mean_sharpe, 4),
+            "robustness_ratio": round(robustness_ratio, 4),
+            "robustness_label": robustness_label,
+        }
+
+    @staticmethod
+    def _build_engine(params: Dict[str, float]) -> "BacktestEngine":
+        """파라미터 dict로 BacktestEngine 인스턴스를 생성."""
+        valid_keys = {
+            "initial_balance", "commission", "fee_rate",
+            "atr_multiplier_sl", "atr_multiplier_tp",
+            "slippage", "slippage_pct", "timeframe",
+            "funding_cost_per_candle", "dsr_threshold",
+            "adaptive_slippage",
+        }
+        filtered = {k: v for k, v in params.items() if k in valid_keys}
+        return BacktestEngine(**filtered)

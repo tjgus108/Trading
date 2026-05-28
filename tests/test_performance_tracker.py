@@ -747,3 +747,81 @@ def test_regime_death_strategies_independent():
 
     # strat_b는 별도 카운터
     assert t._regime_death_consecutive["strat_b"] == 0
+
+
+# --- get_rolling_sharpe 테스트 ---
+
+
+def test_rolling_sharpe_insufficient_data():
+    """비제로 일수 < 2이면 None 반환."""
+    t = make_tracker()
+    assert t.get_rolling_sharpe("strat", window_days=30) is None
+
+
+def test_rolling_sharpe_single_day_returns_none():
+    """1일만 거래 → 비제로 일수 1 → None."""
+    import time
+    t = make_tracker()
+    t.record_trade("strat", 50.0, 100.0, 150.0, timestamp=time.time())
+    assert t.get_rolling_sharpe("strat", window_days=30) is None
+
+
+def test_rolling_sharpe_returns_float_with_enough_data():
+    """충분한 일별 데이터가 있으면 float 반환."""
+    daily_pnls = [10.0, -5.0, 8.0, -3.0, 12.0, -1.0, 7.0, -2.0, 9.0, 4.0]
+    t = _build_regime_tracker(daily_pnls)
+    result = t.get_rolling_sharpe("strat", window_days=10)
+    assert result is not None
+    assert isinstance(result, float)
+
+
+def test_rolling_sharpe_positive_for_profitable_strategy():
+    """꾸준한 수익 전략은 양수 Sharpe."""
+    daily_pnls = [10.0 + i * 0.5 for i in range(30)]
+    t = _build_regime_tracker(daily_pnls)
+    result = t.get_rolling_sharpe("strat", window_days=30)
+    assert result is not None
+    assert result > 0, f"Expected positive Sharpe, got {result}"
+
+
+def test_rolling_sharpe_negative_for_losing_strategy():
+    """꾸준한 손실 전략은 음수 Sharpe."""
+    daily_pnls = [-10.0 - i * 0.5 for i in range(30)]
+    t = _build_regime_tracker(daily_pnls)
+    result = t.get_rolling_sharpe("strat", window_days=30)
+    assert result is not None
+    assert result < 0, f"Expected negative Sharpe, got {result}"
+
+
+def test_rolling_sharpe_uses_window_days():
+    """window_days 파라미터가 올바르게 적용되는지 확인."""
+    import time
+    t = make_tracker()
+    now = time.time()
+    # 최근 5일: 큰 수익
+    for i in range(5):
+        t.record_trade("strat", 100.0, 100.0, 200.0, timestamp=now - i * 86400)
+    # 6~15일 전: 큰 손실
+    for i in range(5, 15):
+        t.record_trade("strat", -100.0, 200.0, 100.0, timestamp=now - i * 86400)
+
+    sharpe_5d = t.get_rolling_sharpe("strat", window_days=5)
+    sharpe_15d = t.get_rolling_sharpe("strat", window_days=15)
+
+    # 5일 윈도우는 수익만 → 높은 Sharpe (또는 None if std=0)
+    # 15일 윈도우는 손실 포함 → 낮은 Sharpe
+    if sharpe_5d is not None and sharpe_15d is not None:
+        assert sharpe_5d > sharpe_15d
+
+
+def test_rolling_sharpe_consistent_with_check_regime_death():
+    """get_rolling_sharpe와 check_regime_death의 live_sharpe가 일치."""
+    daily_pnls = [10.0, -5.0, 8.0, -3.0, 12.0, -1.0, 7.0, -2.0, 9.0, 4.0]
+    t = _build_regime_tracker(daily_pnls)
+
+    rolling = t.get_rolling_sharpe("strat", window_days=10)
+    regime = t.check_regime_death("strat", backtest_sharpe=2.0, window_days=10)
+
+    assert rolling is not None
+    assert regime["live_sharpe"] is not None
+    assert abs(rolling - regime["live_sharpe"]) < 0.01

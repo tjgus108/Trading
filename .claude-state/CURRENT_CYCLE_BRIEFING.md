@@ -1,16 +1,16 @@
 ======================================================================
-🔄 CYCLE 236 — 2026-05-28T16:18:02.224382Z
+🔄 CYCLE 238 — 2026-05-28T22:32:03.886684Z
 ======================================================================
 
 ## 이번 사이클 배정 카테고리 (병렬 3개)
 
+### [E] Execution
+- **Agent**: execution-agent
+- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+
 ### [A] Quality Assurance
 - **Agent**: backtest-agent
 - **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
-
-### [C] Data & Infrastructure
-- **Agent**: data-agent
-- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
 ### [SIM] Paper Simulation & Auto-improve
 - **Agent**: backtest-agent

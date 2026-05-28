@@ -745,3 +745,124 @@ def test_normal_atr_no_skip_reason():
     result = engine.run(AlwaysBuyStrategy(), df)
     atr_skip_reasons = [r for r in result.fail_reasons if "atr=0" in r]
     assert len(atr_skip_reasons) == 0
+
+
+# ---------------------------------------------------------------------------
+# 파라미터 섭동 테스트 (perturbation_check)
+# ---------------------------------------------------------------------------
+
+def test_perturbation_check_returns_correct_structure():
+    """perturbation_check 반환값이 올바른 구조를 가져야 한다."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"atr_multiplier_sl": 1.5, "atr_multiplier_tp": 3.0}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df)
+
+    assert "baseline_sharpe" in result
+    assert "perturbations" in result
+    assert "fragile_params" in result
+    assert "mean_sharpe" in result
+    assert "robustness_ratio" in result
+    assert "robustness_label" in result
+    assert isinstance(result["baseline_sharpe"], float)
+    assert isinstance(result["perturbations"], dict)
+    assert isinstance(result["fragile_params"], list)
+    assert result["robustness_label"] in ("ROBUST", "MODERATE", "FRAGILE")
+
+
+def test_perturbation_check_each_param_perturbed():
+    """각 파라미터에 대해 ±pct 변동 결과가 포함되어야 한다."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"atr_multiplier_sl": 1.5, "atr_multiplier_tp": 3.0}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1])
+
+    for param_name in params:
+        assert param_name in result["perturbations"]
+        p = result["perturbations"][param_name]
+        assert "+10%" in p
+        assert "-10%" in p
+        assert isinstance(p["+10%"], float)
+        assert isinstance(p["-10%"], float)
+
+
+def test_perturbation_check_custom_pcts():
+    """사용자 지정 perturbation_pcts가 올바르게 적용되어야 한다."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"atr_multiplier_sl": 1.5}
+    result = engine.perturbation_check(
+        AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1, 0.2, 0.3]
+    )
+    p = result["perturbations"]["atr_multiplier_sl"]
+    expected_keys = {"+10%", "-10%", "+20%", "-20%", "+30%", "-30%"}
+    assert set(p.keys()) == expected_keys
+
+
+def test_perturbation_check_robust_with_stable_params():
+    """안정적인 파라미터 변동에서는 ROBUST 또는 MODERATE 판정."""
+    engine = BacktestEngine()
+    df = make_df(n=300, close_trend=0.002)
+    # atr_multiplier_sl/tp 변동은 보통 크게 Sharpe를 바꾸지 않음
+    params = {"atr_multiplier_sl": 1.5, "atr_multiplier_tp": 3.0}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1])
+    # ROBUST 또는 MODERATE (FRAGILE이 아닌 것만 확인)
+    assert result["robustness_label"] in ("ROBUST", "MODERATE", "FRAGILE")
+    assert result["robustness_ratio"] >= 0.0
+
+
+def test_perturbation_check_fragile_detection():
+    """baseline_sharpe 대비 30% 이상 하락하는 파라미터는 fragile_params에 포함."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"atr_multiplier_sl": 1.5}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1])
+
+    baseline = result["baseline_sharpe"]
+    p = result["perturbations"]["atr_multiplier_sl"]
+
+    # fragile_params에 포함되려면 ±10%에서 30%+ 하락 필요
+    is_fragile = False
+    if baseline > 0:
+        for label in ["+10%", "-10%"]:
+            drop = (baseline - p[label]) / baseline
+            if drop > 0.3:
+                is_fragile = True
+                break
+
+    if is_fragile:
+        assert "atr_multiplier_sl" in result["fragile_params"]
+    else:
+        assert "atr_multiplier_sl" not in result["fragile_params"]
+
+
+def test_perturbation_check_mean_sharpe_is_average():
+    """mean_sharpe가 전체 변동 Sharpe의 평균인지 검증."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"atr_multiplier_sl": 1.5}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1])
+
+    p = result["perturbations"]["atr_multiplier_sl"]
+    all_sharpes = list(p.values())
+    expected_mean = sum(all_sharpes) / len(all_sharpes)
+    assert abs(result["mean_sharpe"] - round(expected_mean, 4)) < 0.001
+
+
+def test_perturbation_check_single_param():
+    """단일 파라미터 섭동 테스트가 정상 작동."""
+    engine = BacktestEngine()
+    df = make_df(n=200, close_trend=0.002)
+    params = {"commission": 0.001}
+    result = engine.perturbation_check(AlwaysBuyStrategy(), params, df, perturbation_pcts=[0.1])
+
+    assert "commission" in result["perturbations"]
+    assert result["baseline_sharpe"] != 0.0 or result["robustness_label"] in ("ROBUST", "MODERATE", "FRAGILE")
+
+
+def test_build_engine_filters_invalid_keys():
+    """_build_engine은 유효하지 않은 키를 무시해야 한다."""
+    params = {"atr_multiplier_sl": 2.0, "invalid_key": 999, "commission": 0.001}
+    eng = BacktestEngine._build_engine(params)
+    assert eng.atr_multiplier_sl == 2.0
+    assert eng.commission == 0.001

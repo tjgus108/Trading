@@ -95,6 +95,33 @@ class LivePerformanceTracker:
             }
         return {"sharpe": sharpe, "warn": False, "disable": False, "reason": ""}
 
+    def get_rolling_sharpe(self, strategy: str, window_days: int = 30) -> Optional[float]:
+        """Rolling N일 daily-returns 기반 Sharpe ratio 계산.
+
+        일별 PnL을 기반으로 연환산 Sharpe를 반환.
+        비제로 일수가 2 미만이면 None 반환.
+
+        Args:
+            strategy: 전략 이름
+            window_days: 일별 PnL 윈도우 (기본 30일)
+
+        Returns:
+            연환산 Sharpe ratio (sqrt(365) 기준) 또는 None
+        """
+        daily_pnl = self.get_daily_pnl(strategy, days=window_days)
+        non_zero = [d for d in daily_pnl if d != 0.0]
+        if len(non_zero) < 2:
+            return None
+
+        n = len(daily_pnl)
+        mean_d = sum(daily_pnl) / n
+        variance = sum((d - mean_d) ** 2 for d in daily_pnl) / n
+        std_d = variance ** 0.5
+        if std_d <= 0:
+            return None
+
+        return (mean_d / std_d) * sqrt(365)
+
     def check_regime_death(
         self,
         strategy: str,

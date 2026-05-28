@@ -680,7 +680,7 @@ def export_results_csv(all_symbol_results: Dict[str, List[dict]]) -> None:
 # 환경변수 PAPER_SIM_BOOTSTRAP=0 으로 GBM 모드 강제 가능
 import os as _os
 USE_BLOCK_BOOTSTRAP = _os.environ.get("PAPER_SIM_BOOTSTRAP", "1") != "0"
-BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "36"))
+BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "24"))
 
 # Regime weighting: HIGH_VOL fold 다운웨이팅 (Cycle 234 walk_forward.py와 동일 로직)
 # 환경변수 PAPER_SIM_REGIME_WEIGHTS=1 로 활성화
@@ -898,7 +898,7 @@ if __name__ == "__main__":
         "--block-size",
         type=int,
         default=None,
-        help="Block Bootstrap 블록 크기 (기본 36, 예: 72 또는 144로 트렌드 보존 강화)",
+        help="Block Bootstrap 블록 크기 (기본 24, 예: 72 또는 144로 트렌드 보존 강화)",
     )
     parser.add_argument(
         "--regime-weights",

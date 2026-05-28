@@ -218,7 +218,7 @@ class TestBlockSizeCLIArg:
         import importlib
         import scripts.paper_simulation as ps
         importlib.reload(ps)
-        assert ps.BLOCK_BOOTSTRAP_BLOCK_SIZE == 36  # default
+        assert ps.BLOCK_BOOTSTRAP_BLOCK_SIZE == 24  # default
 
         # argparse를 직접 실행하지 않고, CLI가 global을 변경하는 흐름을 검증
         ps.BLOCK_BOOTSTRAP_BLOCK_SIZE = 72

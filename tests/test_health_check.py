@@ -330,6 +330,104 @@ def test_uptime_pct_degraded_counts_as_failure():
     assert abs(checker.get_uptime_pct() - 50.0) < 0.1
 
 
+def test_uptime_pct_single_healthy_check():
+    """check 1회 HEALTHY이면 uptime 100%."""
+    checker = HealthChecker(check_fn=lambda: {"connected": True})
+    checker.run_check()
+    assert checker.get_uptime_pct() == 100.0
+    assert checker.state.total_checks == 1
+    assert checker.state.total_failures == 0
+
+
+def test_uptime_pct_single_failure_check():
+    """check 1회 실패이면 uptime 0%."""
+    checker = HealthChecker(
+        check_fn=lambda: {"connected": False},
+        reconnect_fn=None,
+    )
+    checker.run_check()
+    assert checker.get_uptime_pct() == 0.0
+
+
+def test_uptime_pct_all_unhealthy_various_statuses():
+    """DISCONNECTED, DEGRADED, PROTECTED 모두 failure로 카운트 — 전부 실패 시 0%."""
+    call_count = {"n": 0}
+    def check_fn():
+        call_count["n"] += 1
+        return {"connected": False}
+
+    checker = HealthChecker(
+        check_fn=check_fn,
+        reconnect_fn=lambda: False,
+        max_reconnect_attempts=2,
+        data_stale_threshold=60.0,
+    )
+    # 3번 check → 2 DISCONNECTED + 1 PROTECTED
+    for _ in range(3):
+        checker.run_check()
+    assert checker.get_uptime_pct() == 0.0
+    assert checker.state.total_failures == 3
+
+
+def test_uptime_pct_check_fn_exception_counts_as_failure():
+    """check_fn 예외 발생 시 failure로 카운트, reconnect 성공해도 total_failures 증가."""
+    def bad_check():
+        raise RuntimeError("API down")
+
+    checker = HealthChecker(
+        check_fn=bad_check,
+        reconnect_fn=lambda: True,
+        max_reconnect_attempts=3,
+    )
+    checker.run_check()
+    # reconnect 성공하므로 HEALTHY이지만, total_failures는 1 증가
+    assert checker.state.status == HealthStatus.HEALTHY
+    assert checker.state.total_failures == 1
+    # uptime = (1 - 1) / 1 = 0%
+    assert checker.get_uptime_pct() == 0.0
+
+
+def test_uptime_pct_reconnect_success_after_failure():
+    """실패 후 재연결 성공: 실패 1회 기록 + 이후 healthy."""
+    call_count = {"n": 0}
+    def check_fn():
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return {"connected": False}
+        return {"connected": True}
+
+    checker = HealthChecker(
+        check_fn=check_fn,
+        reconnect_fn=lambda: True,
+        max_reconnect_attempts=3,
+    )
+    # 1st: disconnected → reconnect success → HEALTHY (but failure counted)
+    checker.run_check()
+    # 2nd: connected → HEALTHY
+    checker.run_check()
+    # total_checks=2, total_failures=1 → uptime=50%
+    assert abs(checker.get_uptime_pct() - 50.0) < 0.1
+
+
+def test_uptime_pct_many_checks_precision():
+    """대량 check 시 소수점 4자리 정밀도."""
+    call_count = {"n": 0}
+    def check_fn():
+        call_count["n"] += 1
+        if call_count["n"] <= 7:
+            return {"connected": True}
+        return {"connected": False}
+
+    checker = HealthChecker(
+        check_fn=check_fn,
+        reconnect_fn=None,
+    )
+    for _ in range(10):
+        checker.run_check()
+    # 7 healthy + 3 failures = 70%
+    assert abs(checker.get_uptime_pct() - 70.0) < 0.01
+
+
 # ── LivePaperTrader 통합 ─────────────────────────────────
 
 def test_live_paper_trader_health_check_integration():
