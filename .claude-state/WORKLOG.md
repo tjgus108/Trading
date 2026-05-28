@@ -19359,3 +19359,6 @@ Categories: E + A + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
 
 ## [2026-05-28 15:47 UTC] Cycle 235 Dispatched — D + E + SIM + F
 Categories: D + E + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-28 16:18 UTC] Cycle 236 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

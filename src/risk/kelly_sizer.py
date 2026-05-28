@@ -662,6 +662,41 @@ class KellySizer:
             self.fraction = new_fraction
         return self.fraction
 
+    def get_vol_scaled_fraction(
+        self,
+        realized_vol: float,
+        target_vol: float = 0.15,
+        regime: Optional[str] = None,
+    ) -> float:
+        """변동성 스케일링된 Kelly fraction 반환.
+
+        Kelly fraction × (target_vol / realized_vol) 공식으로
+        변동성 대비 최적 포지션 크기를 산출한다.
+        (arXiv:2508.16598 기반)
+
+        Args:
+            realized_vol: 현재 실현 변동성 (연환산).
+            target_vol: 목표 변동성 (기본 0.15 = 15%).
+            regime: 시장 레짐 문자열 (선택).
+                    None이면 현재 self.fraction 기반 Half-Kelly 사용.
+                    문자열이면 get_dynamic_fraction(regime) 사용.
+
+        Returns:
+            변동성 조정된 Kelly fraction.
+            regime=None이면 self.fraction, 아니면 레짐별 절대 fraction에
+            vol_scalar를 곱한 값.
+        """
+        # 레짐 기반 fraction 결정
+        if regime is not None:
+            base_fraction = self.get_dynamic_fraction(regime)
+        else:
+            base_fraction = self.fraction
+
+        # vol scalar: target_vol / realized_vol, 최대 2x cap
+        vol_scalar = min(target_vol / max(realized_vol, 1e-9), 2.0)
+
+        return base_fraction * vol_scalar
+
     def adjust_for_regime(self, regime: str) -> float:
         """레짐에 따른 Kelly fraction 스케일 팩터 반환.
 

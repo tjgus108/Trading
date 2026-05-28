@@ -469,3 +469,86 @@ class TestKellySizerDynamicFraction:
         """빈 문자열 레짐 → 기본값(0.20)."""
         sizer = KellySizer()
         assert sizer.get_dynamic_fraction("") == pytest.approx(0.20)
+
+
+class TestKellyVolScaledFraction:
+    """get_vol_scaled_fraction() 변동성 스케일링 테스트."""
+
+    def test_vol_scaled_fraction_basic(self):
+        """target_vol == realized_vol → scalar=1.0, fraction 그대로."""
+        sizer = KellySizer(fraction=0.25)
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.15, target_vol=0.15)
+        assert result == pytest.approx(0.25)
+
+    def test_vol_scaled_fraction_low_vol_scales_up(self):
+        """realized_vol < target_vol → scalar > 1, fraction 확대."""
+        sizer = KellySizer(fraction=0.20)
+        # target=0.15, realized=0.10 → scalar = 1.5
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.10, target_vol=0.15)
+        assert result == pytest.approx(0.20 * 1.5)
+
+    def test_vol_scaled_fraction_high_vol_scales_down(self):
+        """realized_vol > target_vol → scalar < 1, fraction 축소."""
+        sizer = KellySizer(fraction=0.20)
+        # target=0.15, realized=0.30 → scalar = 0.5
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.30, target_vol=0.15)
+        assert result == pytest.approx(0.20 * 0.5)
+
+    def test_vol_scaled_fraction_cap_at_2x(self):
+        """극히 낮은 realized_vol → scalar 2x cap."""
+        sizer = KellySizer(fraction=0.20)
+        # target=0.15, realized=0.001 → scalar=150 → capped to 2.0
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.001, target_vol=0.15)
+        assert result == pytest.approx(0.20 * 2.0)
+
+    def test_vol_scaled_fraction_zero_vol_capped(self):
+        """realized_vol=0 → max(0, 1e-9) 방어 → 2x cap."""
+        sizer = KellySizer(fraction=0.20)
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.0, target_vol=0.15)
+        assert result == pytest.approx(0.20 * 2.0)
+
+    def test_vol_scaled_fraction_negative_vol_capped(self):
+        """realized_vol < 0 (비정상) → max 방어 → 2x cap."""
+        sizer = KellySizer(fraction=0.20)
+        result = sizer.get_vol_scaled_fraction(realized_vol=-0.05, target_vol=0.15)
+        assert result == pytest.approx(0.20 * 2.0)
+
+    def test_vol_scaled_fraction_with_regime(self):
+        """regime 전달 시 get_dynamic_fraction() 기반."""
+        sizer = KellySizer(fraction=0.50)  # fraction은 무시됨
+        # HIGH_VOL → 0.10, target=0.15, realized=0.15 → scalar=1.0
+        result = sizer.get_vol_scaled_fraction(
+            realized_vol=0.15, target_vol=0.15, regime="HIGH_VOL"
+        )
+        assert result == pytest.approx(0.10)
+
+    def test_vol_scaled_fraction_regime_with_scaling(self):
+        """regime + vol scaling 결합."""
+        sizer = KellySizer()
+        # TREND_UP → 0.25, target=0.15, realized=0.30 → scalar=0.5
+        result = sizer.get_vol_scaled_fraction(
+            realized_vol=0.30, target_vol=0.15, regime="TREND_UP"
+        )
+        assert result == pytest.approx(0.25 * 0.5)
+
+    def test_vol_scaled_fraction_crisis_high_vol(self):
+        """CRISIS + 고변동성 → 극도로 보수적."""
+        sizer = KellySizer()
+        # CRISIS → 0.10, target=0.15, realized=0.60 → scalar=0.25
+        result = sizer.get_vol_scaled_fraction(
+            realized_vol=0.60, target_vol=0.15, regime="CRISIS"
+        )
+        assert result == pytest.approx(0.10 * 0.25)
+
+    def test_vol_scaled_fraction_no_regime_uses_self_fraction(self):
+        """regime=None → self.fraction 사용."""
+        sizer = KellySizer(fraction=0.33)
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.15, target_vol=0.15)
+        assert result == pytest.approx(0.33)
+
+    def test_vol_scaled_fraction_default_target_vol(self):
+        """target_vol 기본값 = 0.15."""
+        sizer = KellySizer(fraction=0.20)
+        # realized=0.15 → scalar=1.0
+        result = sizer.get_vol_scaled_fraction(realized_vol=0.15)
+        assert result == pytest.approx(0.20)

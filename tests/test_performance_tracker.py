@@ -598,3 +598,152 @@ def test_get_monthly_summary_sharpe_with_multiple_months():
     # 3개월간 비제로 거래 → Sharpe 계산 가능
     assert summary["sharpe"] is not None
     assert isinstance(summary["sharpe"], float)
+
+
+# --- check_regime_death 테스트 ---
+
+def _build_regime_tracker(daily_pnls):
+    """여러 날에 걸친 PnL로 트래커를 구성하는 헬퍼.
+
+    daily_pnls: index 0 = 가장 오래된 날, index -1 = 오늘
+    """
+    import time
+    t = make_tracker()
+    now = time.time()
+    n = len(daily_pnls)
+    for i, pnl in enumerate(daily_pnls):
+        # 가장 오래된 → (n-1) 일 전, 가장 최근 → 0일 전
+        days_ago = n - 1 - i
+        ts = now - days_ago * 86400
+        t.record_trade("strat", pnl, 100.0, 100.0 + pnl, timestamp=ts)
+    return t
+
+
+def test_regime_death_insufficient_data():
+    """거래 데이터 부족 시 is_dead=False, live_sharpe=None."""
+    t = make_tracker()
+    result = t.check_regime_death("strat", backtest_sharpe=2.0)
+    assert result["is_dead"] is False
+    assert result["live_sharpe"] is None
+    assert result["consecutive_below"] == 0
+
+
+def test_regime_death_healthy_strategy():
+    """좋은 성과의 전략은 레짐 사망이 아님."""
+    # 30일간 꾸준한 수익 → 높은 Sharpe
+    daily_pnls = [10.0 + i * 0.1 for i in range(30)]
+    t = _build_regime_tracker(daily_pnls)
+    result = t.check_regime_death("strat", backtest_sharpe=2.0, window_days=30)
+    assert result["is_dead"] is False
+    assert result["live_sharpe"] is not None
+    assert result["consecutive_below"] == 0
+
+
+def test_regime_death_single_below_not_dead():
+    """1번 미달은 아직 레짐 사망이 아님 (consecutive_periods=2)."""
+    # 변동이 크고 평균 손실 → 낮은 Sharpe
+    daily_pnls = [-5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0]
+    t = _build_regime_tracker(daily_pnls)
+
+    result = t.check_regime_death(
+        "strat", backtest_sharpe=3.0, window_days=10, threshold=0.5
+    )
+    # live_sharpe 음수 < 3.0 * 0.5 = 1.5 → 미달
+    assert result["live_sharpe"] is not None
+    assert result["live_sharpe"] < 1.5
+    assert result["consecutive_below"] == 1
+    assert result["is_dead"] is False
+
+
+def test_regime_death_two_consecutive_is_dead():
+    """2번 연속 미달이면 레짐 사망."""
+    daily_pnls = [-5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0]
+    t = _build_regime_tracker(daily_pnls)
+
+    # 첫 번째 체크 → consecutive=1
+    t.check_regime_death("strat", backtest_sharpe=3.0, window_days=10, threshold=0.5)
+    # 두 번째 체크 → consecutive=2 → is_dead
+    result = t.check_regime_death(
+        "strat", backtest_sharpe=3.0, window_days=10, threshold=0.5
+    )
+    assert result["consecutive_below"] == 2
+    assert result["is_dead"] is True
+
+
+def test_regime_death_reset_on_recovery():
+    """Sharpe 회복 시 연속 카운터 리셋."""
+    # 나쁜 성과 → 카운터 1
+    bad_pnls = [-5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0]
+    t = _build_regime_tracker(bad_pnls)
+    t.check_regime_death("strat", backtest_sharpe=3.0, window_days=10, threshold=0.5)
+    assert t._regime_death_consecutive["strat"] == 1
+
+    # 좋은 성과로 교체: 큰 수익 + 약간의 변동으로 높은 Sharpe 유도
+    import time
+    now = time.time()
+    for i in range(30):
+        pnl = 50.0 + (i % 3) * 2.0  # 50, 52, 54 반복 → 양수 평균, 작은 분산
+        ts = now - (29 - i) * 86400  # 최근 30일에 분산 배치
+        t.record_trade("strat", pnl, 100.0, 100.0 + pnl, timestamp=ts)
+
+    result = t.check_regime_death(
+        "strat", backtest_sharpe=0.01, window_days=30, threshold=0.5
+    )
+    # 높은 live_sharpe > 매우 낮은 threshold → 리셋
+    assert result["consecutive_below"] == 0
+    assert result["is_dead"] is False
+
+
+def test_regime_death_custom_consecutive_periods():
+    """consecutive_periods 파라미터 커스텀 값 테스트."""
+    daily_pnls = [-5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0]
+    t = _build_regime_tracker(daily_pnls)
+
+    # consecutive_periods=3 → 3회 미달이어야 사망
+    for i in range(2):
+        result = t.check_regime_death(
+            "strat", backtest_sharpe=3.0, window_days=10,
+            threshold=0.5, consecutive_periods=3,
+        )
+    assert result["consecutive_below"] == 2
+    assert result["is_dead"] is False
+
+    result = t.check_regime_death(
+        "strat", backtest_sharpe=3.0, window_days=10,
+        threshold=0.5, consecutive_periods=3,
+    )
+    assert result["consecutive_below"] == 3
+    assert result["is_dead"] is True
+
+
+def test_regime_death_returns_correct_keys():
+    """반환값에 필수 키가 모두 포함되는지 확인."""
+    daily_pnls = [10.0, -5.0, 8.0, -3.0, 12.0, -1.0, 7.0, -2.0, 9.0, 4.0]
+    t = _build_regime_tracker(daily_pnls)
+    result = t.check_regime_death("strat", backtest_sharpe=2.0, window_days=10)
+    assert "is_dead" in result
+    assert "live_sharpe" in result
+    assert "threshold_sharpe" in result
+    assert "consecutive_below" in result
+
+
+def test_regime_death_threshold_sharpe_value():
+    """threshold_sharpe가 backtest_sharpe * threshold로 올바르게 계산되는지."""
+    t = make_tracker()
+    result = t.check_regime_death(
+        "strat", backtest_sharpe=2.0, threshold=0.5
+    )
+    assert result["threshold_sharpe"] == pytest.approx(1.0)
+
+
+def test_regime_death_strategies_independent():
+    """전략별 레짐 사망 카운터가 독립적."""
+    daily_pnls = [-5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0, -5.0, 1.0]
+    t = _build_regime_tracker(daily_pnls)
+
+    # strat에 대해 카운터 증가
+    t.check_regime_death("strat", backtest_sharpe=3.0, window_days=10, threshold=0.5)
+    assert t._regime_death_consecutive["strat"] == 1
+
+    # strat_b는 별도 카운터
+    assert t._regime_death_consecutive["strat_b"] == 0

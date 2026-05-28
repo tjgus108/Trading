@@ -14,10 +14,12 @@ class LivePerformanceTracker:
     - 백테스트 Sharpe 대비 라이브 Sharpe가 60% 이하로 떨어지면 경고
     - 연속 손실 5회 이상이면 경고
     - 전략별 성과를 별도 추적
+    - Rolling Sharpe 기반 레짐 사망(regime death) 감지
     """
 
     def __init__(self) -> None:
         self._trades: Dict[str, List[dict]] = defaultdict(list)
+        self._regime_death_consecutive: Dict[str, int] = defaultdict(int)
 
     def record_trade(
         self,
@@ -92,6 +94,85 @@ class LivePerformanceTracker:
                 "reason": f"Rolling Sharpe {sharpe:.3f} < warn_threshold {warn_threshold} — 경고",
             }
         return {"sharpe": sharpe, "warn": False, "disable": False, "reason": ""}
+
+    def check_regime_death(
+        self,
+        strategy: str,
+        backtest_sharpe: float,
+        window_days: int = 30,
+        threshold: float = 0.5,
+        consecutive_periods: int = 2,
+    ) -> dict:
+        """Rolling Sharpe 기반 레짐 사망(regime death) 감지.
+
+        최근 window_days일간의 일별 PnL로 Sharpe를 계산하고,
+        backtest_sharpe * threshold 미만이면 연속 카운터를 증가시킨다.
+        연속 카운터가 consecutive_periods 이상이면 레짐 사망으로 판정.
+
+        Args:
+            strategy: 전략 이름
+            backtest_sharpe: 백테스트에서 측정된 Sharpe
+            window_days: 일별 PnL 윈도우 (기본 30일)
+            threshold: backtest_sharpe 대비 비율 (기본 0.5)
+            consecutive_periods: 연속 미달 횟수 (기본 2)
+
+        Returns:
+            {
+              "is_dead": bool,
+              "live_sharpe": float | None,
+              "threshold_sharpe": float,
+              "consecutive_below": int,
+            }
+        """
+        threshold_sharpe = backtest_sharpe * threshold
+
+        # 일별 PnL → Sharpe (연환산)
+        daily_pnl = self.get_daily_pnl(strategy, days=window_days)
+        non_zero = [d for d in daily_pnl if d != 0.0]
+
+        live_sharpe = None  # type: Optional[float]
+        if len(non_zero) >= 2:
+            n = len(daily_pnl)
+            mean_d = sum(daily_pnl) / n
+            variance = sum((d - mean_d) ** 2 for d in daily_pnl) / n
+            std_d = variance ** 0.5
+            if std_d > 0:
+                live_sharpe = (mean_d / std_d) * sqrt(365)
+
+        # 데이터 부족 시 연속 카운터를 리셋하지 않고 현재 상태 반환
+        if live_sharpe is None:
+            return {
+                "is_dead": False,
+                "live_sharpe": None,
+                "threshold_sharpe": round(threshold_sharpe, 4),
+                "consecutive_below": self._regime_death_consecutive[strategy],
+            }
+
+        # 연속 미달 카운터 업데이트
+        if live_sharpe < threshold_sharpe:
+            self._regime_death_consecutive[strategy] += 1
+        else:
+            self._regime_death_consecutive[strategy] = 0
+
+        consecutive_below = self._regime_death_consecutive[strategy]
+        is_dead = consecutive_below >= consecutive_periods
+
+        if is_dead:
+            logger.warning(
+                "Regime death detected for %s: live_sharpe=%.3f < threshold=%.3f, "
+                "consecutive=%d",
+                strategy,
+                live_sharpe,
+                threshold_sharpe,
+                consecutive_below,
+            )
+
+        return {
+            "is_dead": is_dead,
+            "live_sharpe": round(live_sharpe, 4),
+            "threshold_sharpe": round(threshold_sharpe, 4),
+            "consecutive_below": consecutive_below,
+        }
 
     def check_degradation(
         self, strategy: str, backtest_sharpe: float
