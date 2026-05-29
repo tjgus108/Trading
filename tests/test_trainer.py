@@ -374,6 +374,48 @@ class TestComputeEnsembleWeight:
         weights = trainer.compute_ensemble_weight([])
         assert weights == []
 
+    def test_stability_penalty_high_gap_reduces_weight(self):
+        """val-test gap이 크면 안정성 패널티로 가중치 감소."""
+        trainer = WalkForwardTrainer()
+        # r_stable: gap=0.01, r_unstable: gap=0.15 (threshold=0.05, scale=0.10)
+        r_stable = self._make_result(val_acc=0.65, test_acc=0.64)     # gap=0.01
+        r_unstable = self._make_result(val_acc=0.65, test_acc=0.50)   # gap=0.15
+        weights = trainer.compute_ensemble_weight(
+            [r_stable, r_unstable],
+            stability_threshold=0.05,
+            stability_scale=0.10,
+        )
+        assert len(weights) == 2
+        assert abs(sum(weights) - 1.0) < 1e-5
+        # 안정적 모델이 더 큰 가중치
+        assert weights[0] > weights[1]
+
+    def test_stability_penalty_within_threshold_no_penalty(self):
+        """gap이 threshold 이내이면 패널티 없음 — 순수 성능 기반 비교."""
+        trainer = WalkForwardTrainer()
+        r1 = self._make_result(val_acc=0.60, test_acc=0.58)  # gap=0.02
+        r2 = self._make_result(val_acc=0.70, test_acc=0.68)  # gap=0.02
+        weights = trainer.compute_ensemble_weight(
+            [r1, r2],
+            stability_threshold=0.05,
+            stability_scale=0.10,
+        )
+        # 패널티 없음 → r2(높은 성능)가 더 큰 가중치
+        assert weights[1] > weights[0]
+
+    def test_stability_penalty_zero_weight_for_very_unstable(self):
+        """gap >= threshold + scale이면 패널티로 가중치 0."""
+        trainer = WalkForwardTrainer()
+        r_ok = self._make_result(val_acc=0.65, test_acc=0.64)   # gap=0.01
+        r_bad = self._make_result(val_acc=0.80, test_acc=0.65)  # gap=0.15 >= 0.05+0.10
+        weights = trainer.compute_ensemble_weight(
+            [r_ok, r_bad],
+            stability_threshold=0.05,
+            stability_scale=0.10,
+        )
+        assert weights[1] == 0.0
+        assert abs(weights[0] - 1.0) < 1e-5
+
 
 # ---------------------------------------------------------------------------
 # compute_ensemble_weight_recency

@@ -773,25 +773,24 @@ class WalkForwardTrainer:
         self,
         results: List["TrainingResult"],
         baseline: float = 0.50,
+        stability_threshold: float = 0.05,
+        stability_scale: float = 0.10,
     ) -> List[float]:
         """
         여러 TrainingResult로부터 validation 성능 기반 정규화된 앙상블 가중치 계산.
 
         각 모델의 가중치 = (val_acc + test_acc) / 2 - baseline (음수 → 0 클리핑).
+        val-test gap이 stability_threshold를 초과하면 안정성 패널티 적용.
         전체 합이 1이 되도록 정규화. PASS 모델만 가중치 부여.
 
         Args:
-            results: TrainingResult 리스트 (복수 모델 비교 시 활용)
-            baseline: 기준 정확도 (기본 0.50 = 랜덤 수준)
+            results: TrainingResult 리스트
+            baseline: 기준 정확도 (기본 0.50)
+            stability_threshold: val-test gap 허용 임계값 (기본 0.05)
+            stability_scale: gap 패널티 스케일 — gap이 threshold + scale일 때 가중치 0 (기본 0.10)
 
         Returns:
             List[float]: 각 모델의 정규화 가중치 (합=1.0, 또는 전부 0이면 균등 분배)
-
-        Example:
-            r1 = trainer1.train(df1)
-            r2 = trainer2.train(df2)
-            weights = trainer1.compute_ensemble_weight([r1, r2])
-            # → [0.6, 0.4] 등
         """
         raw = []
         for r in results:
@@ -799,11 +798,15 @@ class WalkForwardTrainer:
                 raw.append(0.0)
             else:
                 score = (r.val_accuracy + r.test_accuracy) / 2.0 - baseline
-                raw.append(max(0.0, score))
+                score = max(0.0, score)
+                # 안정성 패널티: val-test gap이 클수록 가중치 감소
+                gap = abs(r.val_accuracy - r.test_accuracy)
+                excess = max(0.0, gap - stability_threshold)
+                stability_factor = max(0.0, 1.0 - excess / stability_scale)
+                raw.append(score * stability_factor)
 
         total = sum(raw)
         if total <= 0.0:
-            # 모두 FAIL이면 균등 분배
             n = len(results)
             return [1.0 / n if n > 0 else 0.0] * n
         return [round(w / total, 6) for w in raw]

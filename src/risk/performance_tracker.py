@@ -719,6 +719,7 @@ class PerformanceMonitor:
         mdd_warn_pct: MDD 경고 임계값 (Telegram 경고)
         mdd_halt_pct: MDD 중단 임계값 (자동 청산)
         check_interval: 체크 간격 (초)
+        baseline_n: 분포 드리프트 검사용 baseline/recent 거래 수
     """
 
     def __init__(
@@ -730,6 +731,7 @@ class PerformanceMonitor:
         mdd_warn_pct: float = 0.10,
         mdd_halt_pct: float = 0.15,
         check_interval: float = 14400.0,
+        baseline_n: int = 30,
     ):
         self.tracker = tracker
         self.on_alert = on_alert
@@ -738,8 +740,14 @@ class PerformanceMonitor:
         self.mdd_warn_pct = mdd_warn_pct
         self.mdd_halt_pct = mdd_halt_pct
         self.check_interval = check_interval
+        self.baseline_n = baseline_n
         self._last_check: float = 0.0
         self._alerted_strategies: Dict[str, float] = {}
+        self._baseline_returns: Dict[str, List[float]] = {}
+
+    def set_baseline(self, strategy: str, returns: List[float]) -> None:
+        """전략별 baseline 수익률 수동 설정 (초기 N 거래 기록용)."""
+        self._baseline_returns[strategy] = list(returns)
 
     def check_all(self, strategies: List[str], window: int = 30) -> Dict[str, dict]:
         """모든 전략의 Rolling 성과를 체크하고 알림 발생."""
@@ -780,6 +788,13 @@ class PerformanceMonitor:
                     f"[{name}] Rolling PF {pf:.2f} < {self.pf_warn}"
                 )
 
+            # 분포 드리프트 검사: baseline vs 최근 baseline_n 거래
+            drift_result = self._check_drift_for(name)
+            if drift_result is not None and drift_result.get("warn"):
+                if level == "INFO":
+                    level = "WARNING"
+                alerts.append(f"[{name}] 분포 드리프트: {drift_result['reason']}")
+
             if alerts and self.on_alert:
                 last_alert = self._alerted_strategies.get(name, 0.0)
                 if now - last_alert > self.check_interval:
@@ -793,10 +808,35 @@ class PerformanceMonitor:
                 "mdd": mdd,
                 "level": level,
                 "alerts": alerts,
+                "drift": drift_result,
             }
 
         self._last_check = now
         return results
+
+    def _check_drift_for(self, strategy: str) -> Optional[dict]:
+        """전략의 분포 드리프트 체크. baseline 데이터가 없거나 거래 부족 시 None 반환."""
+        trades = self.tracker._trades.get(strategy, [])
+        n = len(trades)
+        baseline_n = self.baseline_n
+
+        # 수동 설정 baseline 우선, 없으면 초기 baseline_n 거래에서 자동 추출
+        if strategy in self._baseline_returns:
+            baseline = self._baseline_returns[strategy]
+        elif n >= baseline_n * 2:
+            baseline = [t["pnl"] for t in trades[:baseline_n]]
+        else:
+            return None
+
+        if n < baseline_n:
+            return None
+
+        recent = [t["pnl"] for t in trades[-baseline_n:]]
+        return self.tracker.check_distribution_drift(
+            baseline_returns=baseline,
+            recent_returns=recent,
+            strategy=strategy,
+        )
 
     def regime_change_alert(self, old_regime: str, new_regime: str) -> None:
         """레짐 전환 알림 발송."""

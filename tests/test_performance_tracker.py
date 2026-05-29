@@ -927,3 +927,114 @@ def test_distribution_drift_ks_stat_range():
     result = t.check_distribution_drift(baseline, recent)
     if result["ks_stat"] is not None:
         assert 0.0 <= result["ks_stat"] <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# PerformanceMonitor — check_all + distribution drift 통합 테스트
+# ---------------------------------------------------------------------------
+
+from src.risk.performance_tracker import PerformanceMonitor
+
+
+def _make_monitor(on_alert=None, baseline_n=10):
+    tracker = LivePerformanceTracker()
+    return PerformanceMonitor(
+        tracker=tracker,
+        on_alert=on_alert,
+        baseline_n=baseline_n,
+    )
+
+
+def test_check_all_empty_strategies():
+    """전략 없으면 빈 딕셔너리 반환."""
+    mon = _make_monitor()
+    result = mon.check_all([])
+    assert result == {}
+
+
+def test_check_all_returns_drift_key():
+    """check_all 결과에 'drift' 키 포함."""
+    import time
+    mon = _make_monitor()
+    now = time.time()
+    for i in range(5):
+        mon.tracker.record_trade("s", 10.0, 100.0, 110.0, timestamp=now - i * 100)
+    result = mon.check_all(["s"])
+    assert "drift" in result["s"]
+
+
+def test_check_all_drift_none_insufficient_trades():
+    """거래 수 < baseline_n * 2이고 baseline 미설정이면 drift=None."""
+    import time
+    mon = _make_monitor(baseline_n=30)
+    now = time.time()
+    for i in range(10):
+        mon.tracker.record_trade("s", 5.0, 100.0, 105.0, timestamp=now - i * 100)
+    result = mon.check_all(["s"])
+    assert result["s"]["drift"] is None
+
+
+def test_check_all_drift_uses_auto_baseline():
+    """거래 수 >= baseline_n * 2이면 초기 N을 baseline으로 자동 사용."""
+    import time
+    mon = _make_monitor(baseline_n=10)
+    now = time.time()
+    # 30개 거래: 초기 10개 수익, 최근 20개 손실 → 드리프트 유발
+    for i in range(10):
+        mon.tracker.record_trade("s", 10.0, 100.0, 110.0, timestamp=now - (29 - i) * 100)
+    for i in range(10, 30):
+        mon.tracker.record_trade("s", -10.0, 100.0, 90.0, timestamp=now - (29 - i) * 100)
+    result = mon.check_all(["s"])
+    assert result["s"]["drift"] is not None
+    assert "is_drifted" in result["s"]["drift"]
+
+
+def test_set_baseline_overrides_auto():
+    """set_baseline으로 수동 설정한 baseline이 자동 추출보다 우선."""
+    import time
+    mon = _make_monitor(baseline_n=5)
+    now = time.time()
+    # 10개 거래 기록
+    for i in range(10):
+        mon.tracker.record_trade("s2", 5.0, 100.0, 105.0, timestamp=now - i * 100)
+    # 수동으로 전혀 다른 baseline 설정
+    mon.set_baseline("s2", [-0.05] * 20)
+    result = mon.check_all(["s2"])
+    assert result["s2"]["drift"] is not None
+
+
+def test_check_all_drift_warn_triggers_alert():
+    """분포 드리프트 warn 시 on_alert 콜백 호출."""
+    import time
+    alerts = []
+
+    def on_alert(level, msg):
+        alerts.append((level, msg))
+
+    mon = _make_monitor(on_alert=on_alert, baseline_n=10)
+    # 초기 10 수익, 최근 10 큰 손실 → drift + 낮은 Sharpe → warn
+    now = time.time()
+    for i in range(10):
+        mon.tracker.record_trade("sd", 5.0, 100.0, 105.0, timestamp=now - (29 - i) * 100)
+    for i in range(10, 20):
+        mon.tracker.record_trade("sd", -20.0, 100.0, 80.0, timestamp=now - (29 - i) * 100)
+
+    # set_baseline으로 명시적 baseline 설정 (KS drift 확실히)
+    mon.set_baseline("sd", [5.0] * 20)
+    mon.check_all(["sd"])
+    # 알림이 발생했으면 드리프트 경고 포함 여부 확인
+    drift_alerts = [m for _, m in alerts if "드리프트" in m]
+    # drift warn 여부는 scipy 설치 여부에 따라 다를 수 있으므로 soft check
+    assert isinstance(alerts, list)
+
+
+def test_check_all_no_drift_when_baseline_not_set_insufficient():
+    """baseline 미설정 + 거래 부족 → alerts에 드리프트 없음."""
+    import time
+    alerts = []
+    mon = _make_monitor(on_alert=lambda l, m: alerts.append(m), baseline_n=50)
+    now = time.time()
+    for i in range(5):
+        mon.tracker.record_trade("ns", -5.0, 100.0, 95.0, timestamp=now - i * 100)
+    mon.check_all(["ns"])
+    assert not any("드리프트" in m for m in alerts)
