@@ -732,6 +732,7 @@ class PerformanceMonitor:
         mdd_halt_pct: float = 0.15,
         check_interval: float = 14400.0,
         baseline_n: int = 30,
+        drawdown_monitor: Optional[object] = None,
     ):
         self.tracker = tracker
         self.on_alert = on_alert
@@ -739,8 +740,10 @@ class PerformanceMonitor:
         self.pf_warn = pf_warn
         self.mdd_warn_pct = mdd_warn_pct
         self.mdd_halt_pct = mdd_halt_pct
+        self._default_mdd_halt_pct: float = mdd_halt_pct
         self.check_interval = check_interval
         self.baseline_n = baseline_n
+        self.drawdown_monitor = drawdown_monitor
         self._last_check: float = 0.0
         self._alerted_strategies: Dict[str, float] = {}
         self._baseline_returns: Dict[str, List[float]] = {}
@@ -839,8 +842,26 @@ class PerformanceMonitor:
         )
 
     def regime_change_alert(self, old_regime: str, new_regime: str) -> None:
-        """레짐 전환 알림 발송."""
+        """레짐 전환 알림 발송 + DrawdownMonitor 연동 + mdd_halt_pct 자동 조정.
+
+        bull 레짐(TREND_UP/BULL): mdd_halt_pct 25% 완화
+        bear 레짐(TREND_DOWN/BEAR): mdd_halt_pct 15% 강화
+        그 외(RANGING/HIGH_VOL 등): 기본값 복원
+        """
         msg = f"레짐 전환: {old_regime} → {new_regime}"
         logger.info("PerformanceMonitor: %s", msg)
+
+        upper = new_regime.upper() if new_regime else ""
+        if upper in ("TREND_UP", "BULL"):
+            self.mdd_halt_pct = 0.25
+        elif upper in ("TREND_DOWN", "BEAR"):
+            self.mdd_halt_pct = 0.15
+        else:
+            self.mdd_halt_pct = self._default_mdd_halt_pct
+        logger.info("PerformanceMonitor: mdd_halt_pct → %.0f%% (regime=%s)", self.mdd_halt_pct * 100, upper)
+
+        if self.drawdown_monitor is not None and hasattr(self.drawdown_monitor, "set_regime"):
+            self.drawdown_monitor.set_regime(new_regime)
+
         if self.on_alert:
             self.on_alert("INFO", msg)

@@ -228,6 +228,34 @@ def test_perf_monitor_regime_change_alert():
     assert "HIGH_VOL" in alerts_received[0][1]
 
 
+def test_perf_monitor_regime_change_mdd_halt_pct():
+    """레짐에 따른 mdd_halt_pct 자동 조정 검증 (Cycle 243 B)."""
+    tracker = LivePerformanceTracker()
+    monitor = PerformanceMonitor(tracker=tracker, mdd_halt_pct=0.20)
+
+    monitor.regime_change_alert("RANGING", "TREND_UP")
+    assert monitor.mdd_halt_pct == pytest.approx(0.25)
+
+    monitor.regime_change_alert("TREND_UP", "TREND_DOWN")
+    assert monitor.mdd_halt_pct == pytest.approx(0.15)
+
+    monitor.regime_change_alert("TREND_DOWN", "RANGING")
+    assert monitor.mdd_halt_pct == pytest.approx(0.20)
+
+
+def test_perf_monitor_regime_change_calls_drawdown_monitor():
+    """DrawdownMonitor.set_regime()이 레짐 전환 시 호출되는지 확인 (Cycle 243 B)."""
+    from unittest.mock import MagicMock
+    tracker = LivePerformanceTracker()
+    mock_dm = MagicMock()
+
+    monitor = PerformanceMonitor(tracker=tracker, drawdown_monitor=mock_dm)
+    monitor.regime_change_alert("RANGING", "BEAR")
+
+    mock_dm.set_regime.assert_called_once_with("BEAR")
+    assert monitor.mdd_halt_pct == pytest.approx(0.15)
+
+
 # ── LivePaperTrader PerformanceMonitor 통합 테스트 ──────────
 
 

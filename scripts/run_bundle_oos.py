@@ -222,7 +222,13 @@ def bundle_results_to_rank_dicts(
     """
     dicts: list[dict] = []
     for name, r in results:
-        if r.folds:
+        # 모든 fold가 min_oos_trades로 제외된 경우 — 랭킹 최하위로 처리
+        all_excluded = any("모든 fold 거래 없음" in fr for fr in r.fail_reasons)
+        if all_excluded:
+            avg_trades = 0.0
+            avg_mdd = 1.0  # 최악 MDD로 페널티
+            consistency = 0.0
+        elif r.folds:
             avg_trades = sum(f.oos_trades for f in r.folds) / len(r.folds)
             avg_mdd = sum(f.oos_mdd for f in r.folds) / len(r.folds)
             consistency = sum(1 for f in r.folds if f.passed) / len(r.folds)
@@ -308,7 +314,7 @@ def run_bundle_oos(
     timeframe: str = "4h",
     limit: int = 4320,
     dry_run: bool = False,
-    min_oos_trades: int = 3,
+    min_oos_trades: int = 10,
 ) -> list[tuple[str, BundleOOSResult]]:
     """5-Bundle 전략에 대해 Rolling OOS 검증 실행."""
     mode = "DRY-RUN (synthetic)" if dry_run else "LIVE"
@@ -468,8 +474,8 @@ def main():
         help="합성 데이터로 검증 (ccxt 불필요)",
     )
     parser.add_argument(
-        "--min-trades", type=int, default=3,
-        help="저거래 fold 제외 임계값 (기본: 3). 저빈도 전략 분석 시 2로 낮추면 더 많은 fold 포함.",
+        "--min-trades", type=int, default=10,
+        help="저거래 fold 제외 임계값 (기본: 10). 저빈도 전략 분석 시 3으로 낮추면 더 많은 fold 포함.",
     )
     args = parser.parse_args()
 
