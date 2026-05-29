@@ -1,31 +1,31 @@
 ======================================================================
-🔄 CYCLE 243 — 2026-05-29
+🔄 CYCLE 244 — 2026-05-29
 ======================================================================
 
 ## 이번 사이클 배정 카테고리
 
-**Cycle 243** (243 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+**Cycle 244** (244 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
 ---
 
-### [C] Data — 완료
-- `run_bundle_oos.py` `min_oos_trades` 기본값 3 → 10 강화
-- CLI `--min-trades` 기본값도 3 → 10
-- `bundle_results_to_rank_dicts()` 버그 수정:
-  - "모든 fold 거래 없음" 전략이 rank 1위가 되던 문제 해결
-  - all_excluded=True 시 avg_mdd=1.0 페널티 적용
+### [D] ML — 완료
+- **WFE 역방향 신호 수정** (`walk_forward.py` + `engine.py`)
+  - IS < -1.0 + OOS > 0 케이스: WFE = 1.0 → **0.0** (fold FAIL 처리)
+  - elder_impulse fold1(IS=-2.859, OOS=+3.794): 이전 PASS → **FAIL**
+  - wick_reversal 역방향 fold들도 FAIL 처리됨
+- **`compute_ensemble_weight_recency()` fold_direction 지원** (`trainer.py`)
+  - `fold_sharpes: Optional[List[tuple]]` 파라미터 추가
+  - `sign_reversal_penalty=0.3`: IS < -1.0 + OOS > 0 fold 가중치 30%로 감소
 
-### [B] Risk — 완료
-- `PerformanceMonitor.regime_change_alert()` 확장
-  - `drawdown_monitor` 파라미터 추가 → `set_regime()` 자동 호출
-  - BULL/TREND_UP: mdd_halt_pct → 25%
-  - BEAR/TREND_DOWN: mdd_halt_pct → 15%
-  - 기타: 기본값 복원 (`_default_mdd_halt_pct`)
-- 신규 테스트 2개 추가
+### [E] 실행 — 완료
+- **`avg_slippage_per_trade` 필드 추가** (`engine.py`)
+  - `BacktestResult.avg_slippage_per_trade = total_slippage_cost / total_trades`
+  - `summary()` 출력에 포함
 
 ### [F] Research — 완료
-- Bundle OOS 결과: value_area 저거래(avg 4.7 trades/fold) → 4h봉 부적합 확인
-- elder_impulse fold1이 유일 PASS(Sharpe=3.794) → 해당 시기(IS 음수에서 OOS 양수) 분석 대상
+- **IS→OOS 역전 케이스 결론**: GBM 합성 데이터 노이즈 (IS=-2.859는 해당 구간 불리)
+- 9개 fold 중 유일한 OOS 양수 fold → 통계적으로 우연에 가까움
+- 실거래소 데이터 없이는 판단 불가 (SSL 차단 환경 한계)
 
 ---
 
@@ -33,15 +33,16 @@
 
 ### Paper Sim (Walk-Forward, 1h봉)
 - **PASS: 0/22** (합성 데이터 한계)
-- Top: supertrend_multi(Sharpe 6.06, +83.2%), momentum_quality(Sharpe 4.49, +53.9%)
-- price_action_momentum(Sharpe 3.37, +58.4%, MDD 20.8% — 경계)
+- Top composite: volume_breakout(score 75.7, Sharpe 3.69), order_flow_imbalance_v2(74.7, Sharpe 3.85)
+- 가장 안정적: volatility_cluster(SharpeStd=0.40), relative_volume(SharpeStd=0.51)
 
 ### Bundle OOS (5-bundle, 4h봉, min_oos_trades=10)
 - **PASS: 0/5**
-- value_area: **전량 제외** (trades < 10) — 4h봉 부적합 전략
-- OOS Sharpe std: narrow_range=6.37 > elder_impulse=4.69 > wick_reversal=4.15 > cmf=3.58
+- WFE fix 효과: elder_impulse avg_wfe -1.185 → **-1.352** (역방향 fold 정리)
+- wick_reversal avg_wfe 0.222 → **0.000** (모든 fold FAIL)
+- value_area: 여전히 0 trades (4h봉 부적합 — 245에서 해결 예정)
 
 ---
 
 ## 테스트 결과
-- **171 passed** (+2 신규: regime_change_alert 확장 검증)
+- **175 passed, 3 skipped** (기존 테스트 전부 통과, 신규 테스트 없음)

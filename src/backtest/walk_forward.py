@@ -1019,7 +1019,11 @@ class RollingOOSValidator:
             if is_result.sharpe_ratio > 0:
                 wfe = oos_result.sharpe_ratio / is_result.sharpe_ratio
             elif oos_result.sharpe_ratio > 0:
-                wfe = 1.0  # IS<=0 but OOS>0 → 과최적화 아님
+                # IS<0 + OOS>0: IS가 심각한 음수(-1.0 미만)이면 역방향 신호로 신뢰 불가
+                if is_result.sharpe_ratio < -1.0:
+                    wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
+                else:
+                    wfe = 1.0  # IS 소폭 음수, OOS 양수 → 과최적화 아님
             else:
                 wfe = 0.0  # IS<=0 and OOS<=0 → 과최적화 가능
 

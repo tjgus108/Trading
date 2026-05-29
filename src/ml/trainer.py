@@ -816,6 +816,8 @@ class WalkForwardTrainer:
         results: List["TrainingResult"],
         baseline: float = 0.50,
         decay: float = 0.85,
+        fold_sharpes: Optional[List[tuple]] = None,
+        sign_reversal_penalty: float = 0.3,
     ) -> List[float]:
         """
         시간 순서를 반영한 앙상블 가중치 계산.
@@ -827,6 +829,9 @@ class WalkForwardTrainer:
             results: TrainingResult 리스트 (시간 순서: 오래된→최신)
             baseline: 기준 정확도 (기본 0.50)
             decay: 시간 감쇠율 (0~1). 1이면 감쇠 없음.
+            fold_sharpes: 각 fold의 (is_sharpe, oos_sharpe) 튜플 리스트 (선택).
+                          IS < -1.0 이고 OOS > 0인 역방향 fold는 sign_reversal_penalty 적용.
+            sign_reversal_penalty: 역방향 fold 가중치 감소 계수 (0=완전 제거, 1=패널티 없음).
 
         Returns:
             List[float]: 정규화 가중치 (합=1.0)
@@ -844,7 +849,13 @@ class WalkForwardTrainer:
             perf = max(0.0, perf)
             # 시간 가중치: 마지막(최신)이 가장 큼
             time_weight = decay ** (n - 1 - i)
-            raw.append(perf * time_weight)
+            weight = perf * time_weight
+            # fold_direction 페널티: IS 심각 음수 + OOS 양수 역방향 fold
+            if fold_sharpes and i < len(fold_sharpes):
+                is_s, oos_s = fold_sharpes[i]
+                if is_s < -1.0 and oos_s > 0:
+                    weight *= sign_reversal_penalty
+            raw.append(weight)
 
         total = sum(raw)
         if total <= 0.0:

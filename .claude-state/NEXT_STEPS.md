@@ -1,49 +1,57 @@
 # Next Steps
 
-_Last updated: 2026-05-29 (Cycle 243 완료)_
+_Last updated: 2026-05-29 (Cycle 244 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 239, 240, 241, 242, 243
+### 이번 세션 완료 사이클: 240, 241, 242, 243, 244
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 239 | C+B+SIM+F | reconnect_gaps, cache_stats, MDD kill switch, vol_scaling |
 | 240 | D+E+SIM+F | regime별 importance, feature drift, check_strategy_health |
 | 241 | A+C+SIM+F | check_distribution_drift(KS-test+2-signal), OFI edge cases, 15개 신규 테스트 |
 | 242 | B+D+SIM+F | PerformanceMonitor drift 통합, ensemble stability penalty, WFE 분석 |
 | 243 | C+B+SIM+F | min_oos_trades 3→10, regime_change_alert DrawdownMonitor 연동, rank 버그 수정 |
+| 244 | D+E+SIM+F | WFE 역방향 fix, avg_slippage_per_trade, compute_ensemble_weight fold_direction |
 
-### 🎯 Cycle 244 작업 방향 (244 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 245 작업 방향 (245 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): elder_impulse fold1 분석 → 앙상블 개선
-- Bundle OOS에서 elder_impulse fold1이 유일 PASS fold (OOS Sharpe=3.794, PF=1.90)
-- IS Sharpe=-2.859인데 OOS=+3.794 → 역방향(IS 나쁜데 OOS 좋음) 케이스 분석
-- IS-OOS 방향이 역전되는 fold에 대한 weight 조정 고려
-- `compute_ensemble_weight_recency()`에 fold_direction 인자 추가 검토
+#### A(품질): value_area 4h 타임프레임 대응 검토
+- Cycle 244 Bundle OOS: value_area 모든 fold 0 trades (4h 봉에서 신호 미생성)
+- `BUNDLE_STRATEGIES`에서 value_area 타임프레임 관련 파라미터 조정 또는 검증 기준 완화
+  - va_period 15→10으로 축소하여 신호 빈도 증가 시도
+  - 또는 4h 대신 1h 전용 테스트 스크립트 추가 고려
+- 기존 테스트 커버리지 확인: `test_bundle_oos.py` value_area 관련 테스트 추가
 
-#### E(실행): min_oos_trades 강화 효과 검증
-- value_area가 완전 제외된 것이 올바른 판단인지 검증
-  - 시간프레임 변경(4h → 1h)으로 trades ≥ 10 달성 가능한지 확인
-  - `BUNDLE_STRATEGIES`에서 value_area 타임프레임 조건 추가 또는 다른 검증 기준 적용
-- 실행 모듈의 슬리피지 로깅 강화
+#### A(품질): Paper SIM 상위 전략 안정성 개선
+- relative_volume (SharpeStd=0.51, 가장 안정적, MDD=9.3%) → 일관성 필터 분석
+  - 4개 윈도우 중 어느 윈도우가 FAIL인지 확인
+  - Sharpe std 낮은 이유 분석 → 다른 전략에 적용 가능한 로직 도출
+- volatility_cluster (SharpeStd=0.40, 최저) — 안정성 유지 요인 확인
 
-#### F(리서치): IS 음수 → OOS 양수 역전 케이스 분석
-- elder_impulse fold1: IS=-2.859, OOS=+3.794 — 왜 IS가 나쁜데 OOS가 좋은가?
-- 원인 가설:
-  1. GBM 합성 데이터에서 IS 구간이 특별히 불리한 시장 패턴
-  2. elder_impulse 신호가 mean-reverting 성질
-  3. IS 구간의 파라미터가 OOS에 과적합이 아닌 저적합(underfitting)
-- 실거래소 데이터 검증 필요
+#### C(데이터): 합성 데이터 품질 개선
+- 현재 GBM BlockBootstrap 데이터: IS Sharpe 100% 음수 전략 다수
+- 더 현실적인 가격 시뮬레이션 고려: regime-switching 모델 추가
+  - HMM 기반 Bull/Bear 레짐 전환 포함한 합성 데이터 생성
+  - `heston_model.py` 활용 확대 (현재 미활용)
+
+#### F(리서치): WFE sign reversal fix 효과 측정
+- Cycle 244에서 IS < -1.0 + OOS > 0 → WFE=0.0 fix 적용
+- 이 변경이 전체 PASS 기준 강화에 미치는 효과:
+  - elder_impulse: 이전 PASS fold 1개 → 0개 (OOS Sharpe std=4.691 → 전략 평가 미변화)
+  - wick_reversal: avg_wfe 0.222 → 0.000 (더 엄격한 평가)
+- 실거래소 데이터에서 동일 패턴 검증 필요 (SSL 차단으로 현재 불가)
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단
 - 합성 데이터 결과는 방향성 참고만
 
 ### 핵심 메트릭
-- 상위 3: supertrend_multi(Sharpe 6.06), momentum_quality(Sharpe 4.49), price_action_momentum(Sharpe 3.37)
-- 테스트: 171 passed (Cycle 243 +2개 추가)
-- min_oos_trades: 10 (이전 3에서 강화)
-- PerformanceMonitor: DrawdownMonitor 레짐 연동, mdd_halt_pct 자동 조정(bull 25%, bear 15%)
+- Paper SIM 상위: volume_breakout(composite 75.7), order_flow_imbalance_v2(74.7), price_action_momentum(74.5)
+- 가장 안정적: volatility_cluster(SharpeStd=0.40), relative_volume(SharpeStd=0.51)
+- 테스트: 175 passed, 3 skipped (Cycle 244 변경 기존 테스트 모두 통과)
+- WFE 역방향 fix: IS < -1.0 + OOS > 0 → WFE = 0.0 (engine.py + walk_forward.py)
+- avg_slippage_per_trade: BacktestResult에 신규 추가
+- compute_ensemble_weight_recency: fold_sharpes + sign_reversal_penalty 파라미터 추가

@@ -63,6 +63,7 @@ class BacktestResult:
     fail_reasons: List[str]
     total_fees: float = 0.0
     total_slippage_cost: float = 0.0
+    avg_slippage_per_trade: float = 0.0  # 거래당 평균 슬리피지 비용
     deflated_sharpe_ratio: float = 0.0  # DSR (과최적화 보정)
     avg_win: float = 0.0  # 평균 수익 거래
     avg_loss: float = 0.0  # 평균 손실 거래 (양수)
@@ -88,6 +89,7 @@ class BacktestResult:
             f"  total_return: {self.total_return:.1%}",
             f"  total_fees: {self.total_fees:.4f}",
             f"  total_slippage_cost: {self.total_slippage_cost:.4f}",
+            f"  avg_slippage_per_trade: {self.avg_slippage_per_trade:.6f}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
@@ -265,7 +267,11 @@ class BacktestEngine:
         if is_sharpe > 0:
             wfe = result.sharpe_ratio / is_sharpe
         elif result.sharpe_ratio > 0:
-            wfe = 1.0  # IS<=0 but OOS>0 → 과최적화 아님
+            # IS<0 + OOS>0: IS가 심각한 음수(-1.0 미만)이면 역방향 신호로 신뢰 불가
+            if is_sharpe < -1.0:
+                wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
+            else:
+                wfe = 1.0  # IS 소폭 음수, OOS 양수 → 과최적화 아님
         else:
             wfe = 0.0  # IS<=0 and OOS<=0 → 과최적화 가능
 
@@ -418,6 +424,8 @@ class BacktestEngine:
             else:
                 cur_cons_loss = 0
         
+        avg_slip = total_slippage_cost / len(trades) if trades else 0.0
+
         return BacktestResult(
             strategy=name,
             total_trades=len(trades),
@@ -430,6 +438,7 @@ class BacktestEngine:
             fail_reasons=fail_reasons,
             total_fees=round(total_fees, 6),
             total_slippage_cost=round(total_slippage_cost, 6),
+            avg_slippage_per_trade=round(avg_slip, 6),
             deflated_sharpe_ratio=round(dsr, 3),
             avg_win=round(avg_win_val, 6),
             avg_loss=round(avg_loss_val, 6),

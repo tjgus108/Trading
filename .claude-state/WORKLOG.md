@@ -1,3 +1,36 @@
+## [2026-05-29] Cycle 244 — D(ML) + E(실행) + SIM + F(리서치)
+
+**[D] ML — WFE 역방향 신호 수정 (walk_forward.py + engine.py):**
+- IS < -1.0 이고 OOS > 0인 "강한 역방향" fold: WFE = 1.0 → **0.0** 으로 수정
+  - elder_impulse fold1: IS=-2.859, OOS=+3.794 → WFE=0.0 → FAIL (이전: WFE=1.0 → PASS)
+  - wick_reversal 역방향 fold들도 동일하게 FAIL 처리
+  - engine.py `apply_wfe()` 동일 로직 적용 (일관성)
+- 근거: IS Sharpe -2.859는 전략이 해당 구간에서 강하게 손실. OOS=+3.794는 합성 데이터 노이즈
+
+**[D] ML — compute_ensemble_weight_recency() fold_direction 지원 (trainer.py):**
+- `fold_sharpes: Optional[List[tuple]]` 파라미터 추가
+- `sign_reversal_penalty: float = 0.3` 추가
+- IS < -1.0 + OOS > 0인 fold는 weight에 0.3 페널티 적용
+
+**[E] 실행 — avg_slippage_per_trade 지표 추가 (engine.py):**
+- `BacktestResult.avg_slippage_per_trade` 필드 추가 (거래당 평균 슬리피지)
+- `_compute_metrics()`에서 자동 계산
+- `summary()`에 `avg_slippage_per_trade` 출력 추가
+
+**[SIM] 시뮬레이션 분석 (2026-05-29):**
+- Paper (1h Walk-Forward): 0/22 PASS. Top composite: volume_breakout(Sharpe 3.69, std 1.58), order_flow_imbalance_v2(Sharpe 3.85), relative_volume(Sharpe 2.98, std 0.51 — 가장 안정적)
+- Bundle OOS (4h, min_oos_trades=10): 0/5 PASS
+  - WFE 수정 효과: elder_impulse 이전 PASS fold 1개 → 0개 (sign reversal fix 작동)
+  - wick_reversal: avg_wfe 0.222 → 0.000 (역방향 fold 정리됨)
+  - value_area: 여전히 0 trades — 4h 타임프레임에서 신호 없음 문제 미해결
+  - 전체 IS Sharpe 음수 비율: cmf/wick_reversal 100%, 합성 데이터 한계
+
+**[F] 리서치 — IS→OOS 역전 케이스 분석:**
+- elder_impulse fold1: IS=-2.859 → 전략이 IS에서 강하게 손실
+  - GBM 합성 데이터에서 IS 구간이 특별히 불리한 시장 패턴 (가설 1 지지)
+  - OOS=+3.794는 신호 반전이 아닌 데이터 노이즈 (9개 fold 중 유일한 양수)
+  - 결론: IS 심각 음수 전략은 실거래소 데이터 없이는 신뢰 불가
+
 ## [2026-05-29] Cycle 243 — C(데이터) + B(리스크) + SIM + F(리서치)
 
 **[C] Data — run_bundle_oos min_oos_trades 강화:**
@@ -59,3 +92,97 @@
 **[SIM] 이전 사이클 리포트 분석:**
 - Paper: 0/22 PASS. 합성 데이터 한계. momentum_quality/price_action_momentum 상위권
 - Bundle OOS: 0/5 PASS. narrow_range std=6.35 최악. elder_impulse fold1만 PASS(OOS Sharpe 3.794)
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-29 15:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
