@@ -55,8 +55,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "min_volatility": [0.001, 0.002, 0.003],
     },
     "value_area": {
-        "va_period": [15, 20, 25],
-        "va_mult": [0.65, 0.70, 0.75],  # 범위 축소: OOS Sharpe std 과다(6.589) 완화
+        "va_period": [10, 15, 20],  # 10 추가: 4h 봉 신호 빈도 개선
+        "va_mult": [0.55, 0.60, 0.65],
     },
     "narrow_range": {
         "nr_lookback": [5, 6, 7],  # NR5/NR6/NR7 — 4h봉 0거래 문제 완화

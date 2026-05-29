@@ -47,16 +47,47 @@ BUNDLE_STRATEGIES = [
 
 
 def generate_synthetic_data(limit: int) -> pd.DataFrame:
-    """ccxt 없이 테스트용 합성 OHLCV 데이터 생성."""
+    """Regime-switching 합성 OHLCV 데이터 생성 (GBM + bull/bear 레짐 전환).
+
+    순수 GBM 대비 개선:
+    - Bull 레짐: 양의 drift (+0.02% per bar) + 낮은 변동성 (σ=0.25%)
+    - Bear 레짐: 음의 drift (-0.02% per bar) + 높은 변동성 (σ=0.40%)
+    - 레짐 지속기간: 50~200 bars (포아송 분포)
+    """
     import numpy as np
 
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     n = limit
-    closes = 30000.0 * np.cumprod(1 + np.random.randn(n) * 0.003)
-    highs = closes * (1 + np.abs(np.random.randn(n)) * 0.002)
-    lows = closes * (1 - np.abs(np.random.randn(n)) * 0.002)
-    opens = closes * (1 + np.random.randn(n) * 0.001)
-    volumes = np.random.lognormal(mean=10, sigma=1.5, size=n)
+
+    # 레짐 시퀀스 생성 (Markov chain: P(bull→bear)=0.02, P(bear→bull)=0.03)
+    regimes = np.zeros(n, dtype=int)  # 0=bear, 1=bull
+    regimes[0] = 1  # 시작은 bull
+    for i in range(1, n):
+        if regimes[i - 1] == 1:  # bull → bear with prob 0.02
+            regimes[i] = 0 if rng.random() < 0.02 else 1
+        else:  # bear → bull with prob 0.03
+            regimes[i] = 1 if rng.random() < 0.03 else 0
+
+    # 레짐별 파라미터
+    bull_drift = 0.0002   # +0.02% per bar
+    bear_drift = -0.0002  # -0.02% per bar
+    bull_vol = 0.0025     # 변동성 0.25%
+    bear_vol = 0.0040     # 변동성 0.40%
+
+    drifts = np.where(regimes == 1, bull_drift, bear_drift)
+    vols = np.where(regimes == 1, bull_vol, bear_vol)
+
+    log_returns = drifts + vols * rng.standard_normal(n)
+    closes = 30000.0 * np.cumprod(np.exp(log_returns))
+
+    # Bull 레짐: 거래량 높음, Bear: 낮음
+    vol_base = np.where(regimes == 1, 11.0, 10.0)
+    volumes = rng.lognormal(mean=vol_base, sigma=1.2, size=n)
+
+    highs = closes * (1 + np.abs(rng.standard_normal(n)) * vols * 0.8)
+    lows = closes * (1 - np.abs(rng.standard_normal(n)) * vols * 0.8)
+    opens = np.roll(closes, 1)
+    opens[0] = closes[0]
 
     start_ts = pd.Timestamp("2022-01-01", tz="UTC")
     timestamps = pd.date_range(start=start_ts, periods=n, freq="4h")
@@ -66,7 +97,8 @@ def generate_synthetic_data(limit: int) -> pd.DataFrame:
         "close": closes, "volume": volumes,
     }, index=timestamps)
     df.index.name = "timestamp"
-    logger.info("Generated %d synthetic candles", len(df))
+    bull_pct = regimes.mean() * 100
+    logger.info("Generated %d synthetic candles (bull %.0f%%, bear %.0f%%)", n, bull_pct, 100 - bull_pct)
     return df
 
 

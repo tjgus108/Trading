@@ -1,48 +1,51 @@
 ======================================================================
-🔄 CYCLE 244 — 2026-05-29
+🔄 CYCLE 245 — 2026-05-29
 ======================================================================
 
 ## 이번 사이클 배정 카테고리
 
-**Cycle 244** (244 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+**Cycle 245** (245 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
 ---
 
-### [D] ML — 완료
-- **WFE 역방향 신호 수정** (`walk_forward.py` + `engine.py`)
-  - IS < -1.0 + OOS > 0 케이스: WFE = 1.0 → **0.0** (fold FAIL 처리)
-  - elder_impulse fold1(IS=-2.859, OOS=+3.794): 이전 PASS → **FAIL**
-  - wick_reversal 역방향 fold들도 FAIL 처리됨
-- **`compute_ensemble_weight_recency()` fold_direction 지원** (`trainer.py`)
-  - `fold_sharpes: Optional[List[tuple]]` 파라미터 추가
-  - `sign_reversal_penalty=0.3`: IS < -1.0 + OOS > 0 fold 가중치 30%로 감소
+### [A] 품질 — 완료
+- **value_area EMA 필터 수정** (`src/strategy/value_area.py`)
+  - 문제: `ema20 > ema50` 추세 필터가 mean-reversion 신호와 충돌 → 4h 0 trades
+  - 수정: EMA momentum 방향 필터 `ema20[t] > ema20[t-1]` (단기 반전 감지)
+  - 파라미터 축소: `_VA_PERIOD: 20→10`, `_EMA_SHORT: 20→10`, `_EMA_LONG: 50→20`
+  - `_MIN_ROWS: 55→25` (EMA50 warmup 불필요)
+  - DEFAULT_GRIDS 업데이트: `va_period [15,20,25]→[10,15,20]` (`walk_forward.py`)
+  - 신규 테스트 2개 추가
 
-### [E] 실행 — 완료
-- **`avg_slippage_per_trade` 필드 추가** (`engine.py`)
-  - `BacktestResult.avg_slippage_per_trade = total_slippage_cost / total_trades`
-  - `summary()` 출력에 포함
+### [C] 데이터 — 완료
+- **generate_synthetic_data() Regime-Switching 개선** (`scripts/run_bundle_oos.py`)
+  - 순수 GBM → Markov Regime-Switching (Bull/Bear 자동 전환)
+  - Bull: drift=+0.02%/bar, σ=0.25% | Bear: drift=-0.02%/bar, σ=0.40%
+  - P(bull→bear)=0.02, P(bear→bull)=0.03
+  - 거래량도 레짐 반영 (Bull 높음, Bear 낮음)
 
-### [F] Research — 완료
-- **IS→OOS 역전 케이스 결론**: GBM 합성 데이터 노이즈 (IS=-2.859는 해당 구간 불리)
-- 9개 fold 중 유일한 OOS 양수 fold → 통계적으로 우연에 가까움
-- 실거래소 데이터 없이는 판단 불가 (SSL 차단 환경 한계)
+### [F/버그픽스] MC Permutation Test Annualization 수정 — 완료
+- **버그**: `_mc_permutation_test` 고정 `sqrt(8760)` vs 실제 Sharpe `sqrt(6048)` (1h)
+  - 비율 sqrt(8760/6048) ≈ 1.20 → permutation Sharpe 20% 과대 → p-value 인플레이션
+- **수정**: `ann_factor: int = 8760` 파라미터 추가, 호출부에서 실제 값 전달
+- 효과: mc_p_value 0.156~0.430 (이전 0.248~0.568)
 
 ---
 
 ## 시뮬레이션 결과
 
-### Paper Sim (Walk-Forward, 1h봉)
-- **PASS: 0/22** (합성 데이터 한계)
-- Top composite: volume_breakout(score 75.7, Sharpe 3.69), order_flow_imbalance_v2(74.7, Sharpe 3.85)
-- 가장 안정적: volatility_cluster(SharpeStd=0.40), relative_volume(SharpeStd=0.51)
+### Bundle OOS (5-bundle, 4h봉 Regime-Switching 합성 데이터)
+- **PASS: 0/5** (min_oos_trades=10 기준 엄격)
+- **value_area 개선**: 0→2-8 trades/fold, fold 6 PASS(Sharpe=1.775, PF=2.026, WFE=2.167)
+- IS Sharpe 음수 비율 개선: cmf 100%→78% (Regime-Switching 효과)
 
-### Bundle OOS (5-bundle, 4h봉, min_oos_trades=10)
-- **PASS: 0/5**
-- WFE fix 효과: elder_impulse avg_wfe -1.185 → **-1.352** (역방향 fold 정리)
-- wick_reversal avg_wfe 0.222 → **0.000** (모든 fold FAIL)
-- value_area: 여전히 0 trades (4h봉 부적합 — 245에서 해결 예정)
+### Paper Sim (Walk-Forward, 1h봉 BlockBootstrap)
+- **PASS: 0/22** (consistency 기준 엄격)
+- Top BTC: price_action_momentum(Sharpe 5.35), momentum_quality(6.04), supertrend_multi(4.54)
+- value_area AvgTrades: 16→27 (+68%), AvgSharpe: -1.31→-0.17 개선
+- mc_p_value 감소 확인: 0.156(price_action_momentum), 0.222(momentum_quality)
 
 ---
 
 ## 테스트 결과
-- **175 passed, 3 skipped** (기존 테스트 전부 통과, 신규 테스트 없음)
+- **145 passed** (신규 2개 포함: test_ema_momentum_filter, test_default_params)

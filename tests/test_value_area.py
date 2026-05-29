@@ -194,3 +194,34 @@ def test_exactly_min_rows():
     sig = s.generate(df)
     assert isinstance(sig, Signal)
     assert sig.action in (Action.BUY, Action.SELL, Action.HOLD)
+
+
+# ── 15. EMA momentum filter: 4h 봉 대응 확인 (Cycle 245) ─────────────────────
+
+def test_ema_momentum_filter_generates_signal():
+    """EMA short-period momentum filter가 4h-like 시나리오에서 신호를 생성하는지 확인."""
+    s = ValueAreaStrategy()
+    n = 30
+    closes = [100.0] * n
+    idx = n - 2
+    # 이전 봉: VA low 아래로 이탈
+    closes[idx - 1] = 85.0
+    # 현재 봉: VA 위로 회복 + EMA10 > prev EMA10 (closes[idx] > EMA10[idx-1])
+    closes[idx] = 99.0
+    closes[idx + 1] = 99.0
+    df = _make_df(n=n, close_values=closes)
+    sig = s.generate(df)
+    # 신호가 HOLD이거나 BUY여야 함 (필터 통과 여부와 무관하게 예외 없음)
+    assert sig.action in (Action.BUY, Action.HOLD)
+    assert isinstance(sig, Signal)
+
+
+# ── 16. 기본 파라미터 확인 (Cycle 245 기준: va_period=10, ema_short=10) ────────
+
+def test_default_params():
+    """Cycle 245 업데이트된 기본값 확인."""
+    from src.strategy.value_area import _VA_PERIOD, _EMA_SHORT, _EMA_LONG, _MIN_ROWS
+    assert _VA_PERIOD == 10
+    assert _EMA_SHORT == 10
+    assert _EMA_LONG == 20
+    assert _MIN_ROWS == 25

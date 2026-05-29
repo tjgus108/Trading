@@ -402,10 +402,10 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
-        # MC Permutation test: 거래가 충분할 때만
+        # MC Permutation test: 거래가 충분할 때만 (ann_factor를 Sharpe 계산과 일치시킴)
         mc_p = -1.0
         if len(trades) >= MIN_TRADES:
-            mc_p = self._mc_permutation_test(trades, sharpe)
+            mc_p = self._mc_permutation_test(trades, sharpe, ann_factor=ann_factor)
             if mc_p > MC_P_THRESHOLD:
                 fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")
 
@@ -450,7 +450,12 @@ class BacktestEngine:
         )
 
     @staticmethod
-    def _mc_permutation_test(trades: list, original_sharpe: float, block_size: int = 1) -> float:
+    def _mc_permutation_test(
+        trades: list,
+        original_sharpe: float,
+        block_size: int = 1,
+        ann_factor: int = 8760,
+    ) -> float:
         """Sign randomization test with optional block sign randomization.
 
         Null hypothesis: the strategy has zero expected return.
@@ -462,6 +467,9 @@ class BacktestEngine:
             block_size: sign randomization granularity (default 1 = independent per trade).
                        block_size > 1: assign the same random sign to each block of
                        consecutive trades, preserving intra-block serial correlation.
+            ann_factor: annualization factor — must match the one used to compute
+                        original_sharpe (e.g. 252*24=6048 for 1h, 252*6=1512 for 4h).
+                        Default 8760 preserves legacy test compatibility.
 
         Returns:
             p-value (fraction of permutations with Sharpe >= original_sharpe)
@@ -471,7 +479,7 @@ class BacktestEngine:
         n = len(arr)
         if n == 0:
             return 1.0
-        ann = np.sqrt(8760)
+        ann = np.sqrt(ann_factor)
         n_better = 0
 
         # Ensure block_size is valid

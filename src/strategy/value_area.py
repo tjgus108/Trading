@@ -1,11 +1,13 @@
 """
 ValueArea 전략 (개선):
 - VWAP 기반 Value Area(VA) 이탈 후 재진입 시 매매
-- 개선: 추세 필터 + 거래량 확인 + VA 간격 확인 (false signals 감소)
-- BUY:  prev_close < va_low AND curr_close > va_low AND trend_up (ema20>ema50) AND vol_ok
-- SELL: prev_close > va_high AND curr_close < va_high AND trend_down (ema20<ema50) AND vol_ok
-- confidence: HIGH if breach is significant (3σ+) + volume spike + trend
-- 최소 데이터: 55행 (20 기간 EMA + 20 기간 volume 필요)
+- 개선: 단기 EMA momentum 필터 + 거래량 확인 + VA 간격 확인
+- BUY:  prev_close < va_low AND curr_close > va_low AND ema_short rising AND vol_ok
+- SELL: prev_close > va_high AND curr_close < va_high AND ema_short falling AND vol_ok
+- confidence: HIGH if breach is significant (3σ+) + volume spike
+- 최소 데이터: 25행 (EMA_LONG=20 warmup 기준)
+- Cycle 245: EMA_SHORT=20→10, EMA_LONG=50→20, VA_PERIOD=20→10, MIN_ROWS=55→25
+  → 4h 봉에서 0 trades 문제 해결 (EMA50 trend filter → EMA10 momentum filter)
 """
 
 from typing import Optional
@@ -14,15 +16,15 @@ import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
 
-_MIN_ROWS = 55
-_VA_PERIOD = 20
-_VA_MULT = 0.6  # 0.7→0.6: VA 밴드 약간 좁힘 → 이탈/재진입 빈도 증가 (trades 14→15+ 목표)
+_MIN_ROWS = 25
+_VA_PERIOD = 10
+_VA_MULT = 0.6
 _HIGH_CONF_MULT = 0.3
-_EMA_SHORT = 20
-_EMA_LONG = 50
-_MIN_BREACH = 1.5  # 최소 breach width: std * 1.5
-_STD_FLOOR_PCT = 0.005  # std 하한: close의 0.5% — 횡보장 과잉신호 방지
-_VOL_FILTER_MULT = 0.7  # 거래량 필터: vol_ma * 0.7 이상 (1.0→0.8→0.7: trades 부족 추가 완화)
+_EMA_SHORT = 10
+_EMA_LONG = 20
+_MIN_BREACH = 1.5
+_STD_FLOOR_PCT = 0.005
+_VOL_FILTER_MULT = 0.7
 
 
 class ValueAreaStrategy(BaseStrategy):
@@ -38,7 +40,7 @@ class ValueAreaStrategy(BaseStrategy):
         self.vol_filter_mult = vol_filter_mult
 
     def generate(self, df: pd.DataFrame) -> Signal:
-        if df is None or len(df) < 55:
+        if df is None or len(df) < _MIN_ROWS:
             return self._hold_safe(df, f"Insufficient data for ValueArea (need {_MIN_ROWS} rows)")
 
         close = df["close"]
@@ -88,14 +90,16 @@ class ValueAreaStrategy(BaseStrategy):
         prev_va_low = float(va_low.iloc[idx - 1])
         curr_ema20 = float(ema20.iloc[idx])
         curr_ema50 = float(ema50.iloc[idx])
+        prev_ema20 = float(ema20.iloc[idx - 1])
         curr_vol = float(volume.iloc[idx])
         curr_vol_ma = float(vol_ma.iloc[idx])
 
-        # Trend flags
-        trend_up = curr_ema20 > curr_ema50
-        trend_down = curr_ema20 < curr_ema50
-        
-        # Volume confirmation (완화: vol_ma * 0.8 이상 → 저거래 fold 감소)
+        # EMA momentum direction: faster than EMA20>EMA50 crossover for 4h bars
+        # EMA(t) > EMA(t-1) iff close(t) > EMA(t-1), so this captures short-term momentum turn
+        trend_up = curr_ema20 > prev_ema20
+        trend_down = curr_ema20 < prev_ema20
+
+        # Volume confirmation
         volume_ok = curr_vol > curr_vol_ma * self.vol_filter_mult
 
         # Breach gap: how much price breached VA
