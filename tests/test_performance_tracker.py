@@ -825,3 +825,105 @@ def test_rolling_sharpe_consistent_with_check_regime_death():
     assert rolling is not None
     assert regime["live_sharpe"] is not None
     assert abs(rolling - regime["live_sharpe"]) < 0.01
+
+
+# --- check_distribution_drift 테스트 ---
+
+def test_distribution_drift_identical_distributions():
+    """동일 분포 → is_drifted=False."""
+    t = make_tracker()
+    baseline = [0.01, -0.005, 0.02, 0.003, -0.01, 0.015, 0.008, -0.003, 0.012, 0.007]
+    recent = baseline.copy()
+    result = t.check_distribution_drift(baseline, recent)
+    assert result["is_drifted"] is False
+    assert result["warn"] is False
+
+
+def test_distribution_drift_clearly_different():
+    """명백히 다른 분포 → is_drifted=True."""
+    t = make_tracker()
+    baseline = [0.01] * 30
+    recent = [-0.05] * 30
+    result = t.check_distribution_drift(baseline, recent)
+    assert result["is_drifted"] is True
+    assert result["ks_stat"] is not None
+    assert result["ks_pvalue"] is not None
+
+
+def test_distribution_drift_insufficient_baseline():
+    """baseline 5개 미만 → insufficient_data."""
+    t = make_tracker()
+    result = t.check_distribution_drift([0.01, 0.02, 0.03], [0.01] * 10)
+    assert result["ks_stat"] is None
+    assert "insufficient_data" in result["reason"]
+
+
+def test_distribution_drift_insufficient_recent():
+    """recent 5개 미만 → insufficient_data."""
+    t = make_tracker()
+    result = t.check_distribution_drift([0.01] * 10, [0.01, 0.02])
+    assert result["ks_stat"] is None
+    assert "insufficient_data" in result["reason"]
+
+
+def test_distribution_drift_two_signal_warn():
+    """KS drift + Sharpe < threshold → warn=True."""
+    t = make_tracker()
+    # 음수 수익 + 변동 있게 기록 (Sharpe 계산 가능 + 음수)
+    import random
+    rng = random.Random(99)
+    for i in range(10):
+        pnl = -1.0 - rng.uniform(0, 0.5)  # -1.0 ~ -1.5 (varying negatives)
+        t.record_trade("strat_drift", pnl, 100.0, 99.0)
+
+    baseline = [0.01] * 20
+    recent = [-0.05] * 20  # 완전히 다른 분포
+    result = t.check_distribution_drift(
+        baseline, recent,
+        strategy="strat_drift",
+        sharpe_window=10,
+    )
+    assert result["is_drifted"] is True
+    assert result["warn"] is True
+    assert len(result["reason"]) > 0
+
+
+def test_distribution_drift_no_warn_when_sharpe_ok():
+    """KS drift이지만 Sharpe 양수이면 warn=False."""
+    t = make_tracker()
+    for _ in range(10):
+        t.record_trade("strat_ok", 10.0, 100.0, 110.0)
+
+    baseline = [0.05] * 20
+    recent = [-0.05] * 20
+    result = t.check_distribution_drift(
+        baseline, recent,
+        strategy="strat_ok",
+        sharpe_threshold=0.5,
+        sharpe_window=10,
+    )
+    assert result["is_drifted"] is True
+    # Sharpe > 0.5 → warn=False
+    assert result["warn"] is False
+
+
+def test_distribution_drift_return_keys():
+    """반환 딕셔너리에 필수 키 존재."""
+    t = make_tracker()
+    baseline = [0.01] * 10
+    recent = [0.02] * 10
+    result = t.check_distribution_drift(baseline, recent)
+    for key in ("ks_stat", "ks_pvalue", "is_drifted", "rolling_sharpe", "warn", "reason"):
+        assert key in result, f"Missing key: {key}"
+
+
+def test_distribution_drift_ks_stat_range():
+    """ks_stat ∈ [0, 1]."""
+    t = make_tracker()
+    import random
+    rng = random.Random(42)
+    baseline = [rng.gauss(0, 0.01) for _ in range(50)]
+    recent = [rng.gauss(0.005, 0.015) for _ in range(50)]
+    result = t.check_distribution_drift(baseline, recent)
+    if result["ks_stat"] is not None:
+        assert 0.0 <= result["ks_stat"] <= 1.0

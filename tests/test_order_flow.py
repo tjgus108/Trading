@@ -669,3 +669,89 @@ class TestOFIVPINCorrelation(unittest.TestCase):
         result = compute_ofi_vpin_correlation(df)
         assert isinstance(result["redundant"], list)
 
+
+
+class TestVPINValidateExtremeImbalance(unittest.TestCase):
+    """VPINCalculator.validate_extreme_imbalance() 엣지케이스 테스트."""
+
+    def setUp(self):
+        from src.data.order_flow import VPINCalculator
+        self.calc = VPINCalculator(n_buckets=5)
+
+    def test_empty_dataframe(self):
+        """빈 DataFrame → has_extreme=False."""
+        import pandas as pd
+        df = pd.DataFrame()
+        result = self.calc.validate_extreme_imbalance(df)
+        self.assertFalse(result["has_extreme"])
+        self.assertEqual(result["extreme_count"], 0)
+
+    def test_zero_total_volume(self):
+        """모든 거래량 0 → issue=zero_total_vol."""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 5,
+            "close": [105.0] * 5,
+            "volume": [0.0] * 5,
+        })
+        result = self.calc.validate_extreme_imbalance(df)
+        self.assertFalse(result["has_extreme"])
+        self.assertEqual(result["issue"], "zero_total_vol")
+
+    def test_all_buy_candles_detects_extreme(self):
+        """모든 봉이 강한 매수 → extreme 감지."""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [90.0] * 10,
+            "close": [100.0] * 10,
+            "volume": [100.0] * 10,
+        })
+        result = self.calc.validate_extreme_imbalance(df, ofi_threshold=0.5)
+        self.assertTrue(result["has_extreme"])
+        self.assertGreater(result["extreme_count"], 0)
+
+    def test_balanced_candles_no_extreme(self):
+        """균형 봉들 → extreme 없음."""
+        import pandas as pd
+        rows = []
+        for i in range(10):
+            # close == open → OFI = 0.0 (neutral, not extreme)
+            rows.append({"open": 100.0, "close": 100.0, "volume": 100.0})
+        df = pd.DataFrame(rows)
+        result = self.calc.validate_extreme_imbalance(df, ofi_threshold=0.9)
+        self.assertFalse(result["has_extreme"])
+
+    def test_excessive_extreme_ratio_issue_message(self):
+        """50% 초과 극단봉 → 'excessive_extreme_imbalances' 메시지."""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [90.0] * 20,
+            "close": [100.0] * 20,
+            "volume": [100.0] * 20,
+        })
+        result = self.calc.validate_extreme_imbalance(df, ofi_threshold=0.5)
+        if result["has_extreme"] and result["extreme_count"] / 20 > 0.5:
+            self.assertIn("excessive", result["issue"])
+
+    def test_max_imbalance_within_bounds(self):
+        """max_imbalance ∈ [0, 1]."""
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0] * 8,
+            "close": [105.0, 95.0, 105.0, 95.0, 105.0, 95.0, 105.0, 95.0],
+            "volume": [100.0] * 8,
+        })
+        result = self.calc.validate_extreme_imbalance(df)
+        self.assertGreaterEqual(result["max_imbalance"], 0.0)
+        self.assertLessEqual(result["max_imbalance"], 1.0)
+
+    def test_single_extreme_candle(self):
+        """극단봉 1개만 있어도 감지 (나머지는 close==open 중립)."""
+        import pandas as pd
+        rows = [{"open": 100.0, "close": 100.0, "volume": 100.0}] * 9  # true neutral (OFI=0)
+        rows.append({"open": 90.0, "close": 100.0, "volume": 100.0})   # strong buy (OFI=1.0)
+        df = pd.DataFrame(rows)
+        result = self.calc.validate_extreme_imbalance(df, ofi_threshold=0.5)
+        self.assertTrue(result["has_extreme"])
+        self.assertEqual(result["extreme_count"], 1)
+        self.assertIn("extreme_imbalances_detected", result["issue"])

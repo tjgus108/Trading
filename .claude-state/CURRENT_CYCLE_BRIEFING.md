@@ -1,51 +1,53 @@
 ======================================================================
-🔄 CYCLE 240 — 2026-05-28T22:57:17.013857Z
+🔄 CYCLE 241 — 2026-05-29T00:30:00Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리 (병렬 3개)
+## 이번 사이클 배정 카테고리
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+**Cycle 241** (241 mod 5 = 1 → A(품질) + C(데이터) + F(리서치))
 
-### [E] Execution
-- **Agent**: execution-agent
-- **Focus**: Paper Trading, TWAP 검증, 슬리피지 모델, Telegram 알림
+---
 
-### [SIM] Paper Simulation & Auto-improve
-- **Agent**: backtest-agent
-- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
+### [A] Quality Assurance — 완료
+- `LivePerformanceTracker.check_distribution_drift()` 구현
+  - scipy.stats.ks_2samp 기반 KS-test
+  - 2-signal 합의: KS p<0.05 AND Rolling Sharpe < 0.5 → warn=True
+  - baseline/recent 5개 미만 시 insufficient_data 반환
+- 테스트 8개 추가 (`tests/test_performance_tracker.py`)
 
-### [F] Research
-- **Agent**: strategy-researcher-agent
-- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
+### [C] Data & Infrastructure — 완료
+- OFICalculator.validate_extreme_imbalance() 엣지케이스 검증
+  - 빈 DataFrame, 거래량 0, 중립 봉, 극단봉 1개 감지, excessive threshold 메시지
+- 테스트 7개 추가 (`tests/test_order_flow.py`)
 
-## 이전 사이클 현황
-**Cycle 120 COMPLETED — B + D + SIM + F** (2026-04-12 09:30 UTC)
-  **[B] Risk:** jitter→session 적용 순서 검증 (정확: jitter→clamp→session scale).
-  **[D] ML:** _with_retry 3회 실패 → "" 반환 확인.
-  **[SIM] wick_reversal v2:** RSI + 선택적 강화. +0.93%→+1.42%. 구조적 PF 한계 유지.
-  **[F] Research:** Hammer/Shooting Star 일간 반전 68% 정확도. 확인 봉+볼륨 필수.
+### [F] Research — 완료 (요약)
+- 모니터링 대시보드 best practice:
+  - 핵심 지표: Rolling Sharpe(30d), MDD, PF, Win Rate, Fill Rate, Latency
+  - 레짐 감지 패널: 현재 레짐 + 전환 히스토리
+  - 실시간 PnL curve + drawdown bar
+  - 분포 드리프트 경고 (KS-test, just implemented)
+  - 실행 품질: 슬리피지 %, 미체결률, 취소율
 
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
-  - ERROR 기록 존재
+---
 
-## ⛔ 금지 사항
-- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
-- 한 카테고리에 2 사이클 연속 집중 금지
-- 실패 사례 리서치 없이 코드만 작성 금지
+## 시뮬레이션 결과
 
-## 📋 사이클 종료 시 필수 수행
-1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
-2. STATUS.md 업데이트 (전체 현황)
-3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
-4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
-5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
+### Paper Sim (Walk-Forward, 1h봉)
+- **PASS: 0/22** (합성 데이터 한계, 0/4 consistency 전략)
+- Top: supertrend_multi (Sharpe 6.07, PF 2.10), price_action_momentum (Sharpe 4.96, PF 1.60)
+- 문제: PF≥1.5 충족하지만 Sharpe/Trades가 윈도우별로 불균등
 
-## 🚀 실행 지침 (Claude Code 세션용)
-이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
-1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
-2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
-3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
-4. 커밋 + push
+### Bundle OOS (5-bundle, 4h봉)
+- **PASS: 0/5** (OOS Sharpe std 모두 > 1.5, IS Sharpe 대부분 음수)
+- Best: value_area (avg PF 1.237, Score 76.3), wick_reversal (일부 fold PASS)
+- elder_impulse fold 1: OOS Sharpe 3.794 (PASS), 나머지 FAIL
+
+### 핵심 분석
+- OOS Sharpe std > 1.5: 파라미터 범위 축소 필요 (특히 narrow_range std 6.35)
+- 합성 GBM 데이터로 IS Sharpe 음수 → 실거래소 검증 미불가 환경 제약
+- 다음 개선 방향: perturbation_check 실행하여 ROBUST/FRAGILE 판정
+
+---
+
+## 테스트 결과
+- **8318 passed, 23 skipped** (15개 신규 추가)

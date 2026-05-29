@@ -4,6 +4,12 @@ from typing import Callable, Dict, List, Optional
 import time
 import logging
 
+try:
+    from scipy.stats import ks_2samp as _ks_2samp
+    _SCIPY_AVAILABLE = True
+except ImportError:
+    _SCIPY_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -564,6 +570,104 @@ class LivePerformanceTracker:
             "profit_factor": result["profit_factor"],
             "sharpe": result["sharpe"],
             "mdd": result["mdd"],
+        }
+
+    def check_distribution_drift(
+        self,
+        baseline_returns: List[float],
+        recent_returns: List[float],
+        p_threshold: float = 0.05,
+        sharpe_threshold: float = 0.5,
+        strategy: Optional[str] = None,
+        sharpe_window: int = 30,
+    ) -> dict:
+        """KS-test 기반 수익률 분포 드리프트 감지.
+
+        2-signal 합의: KS p<p_threshold AND rolling Sharpe < sharpe_threshold 동시 충족 시
+        warn=True.
+
+        Args:
+            baseline_returns: 기준 기간 수익률 리스트 (백테스트 또는 초기 라이브)
+            recent_returns: 최근 수익률 리스트
+            p_threshold: KS p-value 임계값 (기본 0.05)
+            sharpe_threshold: Rolling Sharpe 경고 임계값 (기본 0.5)
+            strategy: 전략 이름 (Rolling Sharpe 계산 시 사용)
+            sharpe_window: Rolling Sharpe 계산 윈도우 (기본 30)
+
+        Returns:
+            {
+              "ks_stat": float | None,
+              "ks_pvalue": float | None,
+              "is_drifted": bool,       — KS p < p_threshold
+              "rolling_sharpe": float | None,
+              "warn": bool,             — is_drifted AND rolling Sharpe < sharpe_threshold
+              "reason": str,
+            }
+        """
+        ks_stat: Optional[float] = None
+        ks_pvalue: Optional[float] = None
+        is_drifted = False
+
+        if not _SCIPY_AVAILABLE:
+            return {
+                "ks_stat": None,
+                "ks_pvalue": None,
+                "is_drifted": False,
+                "rolling_sharpe": None,
+                "warn": False,
+                "reason": "scipy unavailable",
+            }
+
+        if len(baseline_returns) < 5 or len(recent_returns) < 5:
+            return {
+                "ks_stat": None,
+                "ks_pvalue": None,
+                "is_drifted": False,
+                "rolling_sharpe": None,
+                "warn": False,
+                "reason": "insufficient_data",
+            }
+
+        try:
+            stat, pvalue = _ks_2samp(baseline_returns, recent_returns)
+            ks_stat = float(stat)
+            ks_pvalue = float(pvalue)
+            is_drifted = ks_pvalue < p_threshold
+        except Exception as exc:
+            logger.warning("KS-test failed: %s", exc)
+            return {
+                "ks_stat": None,
+                "ks_pvalue": None,
+                "is_drifted": False,
+                "rolling_sharpe": None,
+                "warn": False,
+                "reason": f"ks_test_error: {exc}",
+            }
+
+        rolling_sharpe: Optional[float] = None
+        if strategy is not None:
+            rolling_sharpe = self.get_live_sharpe(strategy, window=sharpe_window)
+
+        warn = is_drifted and (
+            rolling_sharpe is not None and rolling_sharpe < sharpe_threshold
+        )
+
+        reason = ""
+        if is_drifted and warn:
+            reason = (
+                f"분포 드리프트 감지 (KS p={ks_pvalue:.4f} < {p_threshold}) + "
+                f"Rolling Sharpe {rolling_sharpe if rolling_sharpe is not None else 'N/A'} < {sharpe_threshold}"
+            )
+        elif is_drifted:
+            reason = f"분포 드리프트 감지 (KS p={ks_pvalue:.4f} < {p_threshold}), Sharpe 정상"
+
+        return {
+            "ks_stat": round(ks_stat, 6),
+            "ks_pvalue": round(ks_pvalue, 6),
+            "is_drifted": is_drifted,
+            "rolling_sharpe": rolling_sharpe,
+            "warn": warn,
+            "reason": reason,
         }
 
     def get_summary(self, strategy: str) -> dict:
