@@ -75,6 +75,7 @@ class DrawdownStatus:
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
     rolling_mdd_short_pct: float = 0.0  # 단기 롤링(20봉) MDD — 장기 대비 조기 경보용
+    kelly_fraction_multiplier: float = 1.0  # Kelly fraction 배수 (MDD > kelly_reduce_at_mdd 시 0.5)
 
 
 class DrawdownMonitor:
@@ -128,6 +129,7 @@ class DrawdownMonitor:
         mdd_liquidate_pct: float = 0.15,
         mdd_halt_pct: float = 0.20,
         rolling_window: int = 50,
+        kelly_reduce_at_mdd: float = 0.15,
     ) -> None:
         """
         Args:
@@ -150,6 +152,9 @@ class DrawdownMonitor:
             mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
             mdd_halt_pct:      MDD 완전 중단 기준 (기본 20%). 전체 거래 중단.
             rolling_window:    rolling_mdd() 기본 윈도우 크기 (equity 업데이트 횟수, 기본 50).
+            kelly_reduce_at_mdd: MDD 이 값 초과 시 Kelly fraction을 0.5x로 자동 축소 (기본 15%).
+                                 get_kelly_fraction_multiplier() 반환값에 반영.
+                                 mdd_size_multiplier와 별개로 동작 — Kelly 계산 자체를 보수화.
         """
         self.max_drawdown_pct = max_drawdown_pct
         self.recovery_pct = recovery_pct
@@ -165,6 +170,7 @@ class DrawdownMonitor:
         self.mdd_block_pct = mdd_block_pct
         self.mdd_liquidate_pct = mdd_liquidate_pct
         self.mdd_halt_pct = mdd_halt_pct
+        self.kelly_reduce_at_mdd = kelly_reduce_at_mdd
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
         self._rolling_window: int = rolling_window  # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
@@ -388,6 +394,20 @@ class DrawdownMonitor:
         level = self.get_mdd_level()
         return level in (MddLevel.LIQUIDATE, MddLevel.FULL_HALT)
 
+    def get_kelly_fraction_multiplier(self) -> float:
+        """Kelly fraction 배수 반환.
+
+        MDD가 kelly_reduce_at_mdd 초과 시 0.5 반환 → KellySizer.fraction에 곱해서 사용.
+        mdd_size_multiplier와 별개로 동작: 포지션 사이즈가 아닌 Kelly fraction 자체를 보수화.
+
+        사용 예:
+            kmult = monitor.get_kelly_fraction_multiplier()
+            qty = kelly_sizer.compute(..., fraction=base_fraction * kmult)
+        """
+        if self.current_drawdown() >= self.kelly_reduce_at_mdd:
+            return 0.5
+        return 1.0
+
     def trailing_stop_signal(self, accel_threshold: float = 1.5) -> bool:
         """단기 MDD 속도가 장기 MDD 속도보다 accel_threshold배 이상이면 True.
 
@@ -540,6 +560,7 @@ class DrawdownMonitor:
             mdd_size_multiplier=cur_mdd_size_mult,
             rolling_mdd_pct=self.rolling_mdd(),
             rolling_mdd_short_pct=self.rolling_mdd(window=20),
+            kelly_fraction_multiplier=self.get_kelly_fraction_multiplier(),
         )
 
     def _check_tiered(
@@ -725,6 +746,7 @@ class DrawdownMonitor:
             "mdd_block_pct": self.mdd_block_pct,
             "mdd_liquidate_pct": self.mdd_liquidate_pct,
             "mdd_halt_pct": self.mdd_halt_pct,
+            "kelly_reduce_at_mdd": self.kelly_reduce_at_mdd,
             "rolling_window": self._rolling_window,
             "_peak": self._peak,
             "_current": self._current,
@@ -760,6 +782,7 @@ class DrawdownMonitor:
             mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
             mdd_halt_pct=data.get("mdd_halt_pct", 0.20),
             rolling_window=data.get("rolling_window", 50),
+            kelly_reduce_at_mdd=data.get("kelly_reduce_at_mdd", 0.15),
         )
         obj._peak = data["_peak"]
         obj._current = data["_current"]
