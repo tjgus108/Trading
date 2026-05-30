@@ -344,12 +344,38 @@ def format_fold_detail(name: str, r: BundleOOSResult) -> str:
     return "\n".join(lines)
 
 
+def _generate_quality_synthetic_data(limit: int) -> pd.DataFrame:
+    """quality_audit.make_synthetic_data() 기반 합성 데이터 생성.
+
+    GBM+regime 방식 대비 GARCH 변동성 클러스터링과 더 긴 trend block을 사용.
+    trend_up/trend_down/range/vol_spike 레짐 포함. GBM보다 trend-following 전략과 상성 우수.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from quality_audit import make_synthetic_data, make_block_bootstrap_data
+        seed_df = make_synthetic_data(n=min(limit, 1200), seed=42)
+        if limit <= len(seed_df):
+            df = seed_df.iloc[:limit].copy()
+        else:
+            df = make_block_bootstrap_data(seed_df, n=limit, block_size=48, seed=42)
+        # timestamp 인덱스 추가
+        start_ts = pd.Timestamp("2022-01-01", tz="UTC")
+        df.index = pd.date_range(start=start_ts, periods=len(df), freq="4h")
+        df.index.name = "timestamp"
+        logger.info("quality_audit 합성 데이터 사용: %d캔들 (GARCH + regime blocks)", len(df))
+        return df
+    except Exception as e:
+        logger.warning("quality_audit 데이터 생성 실패 (%s), GBM fallback", e)
+        return generate_synthetic_data(limit)
+
+
 def run_bundle_oos(
     symbol: str = "BTC/USDT",
     timeframe: str = "4h",
     limit: int = 4320,
     dry_run: bool = False,
     min_oos_trades: int = 10,
+    use_quality_data: bool = False,
 ) -> list[tuple[str, BundleOOSResult]]:
     """5-Bundle 전략에 대해 Rolling OOS 검증 실행."""
     mode = "DRY-RUN (synthetic)" if dry_run else "LIVE"
@@ -358,13 +384,19 @@ def run_bundle_oos(
 
     # 데이터 수집
     if dry_run:
-        df = enrich_indicators(generate_synthetic_data(limit))
+        if use_quality_data:
+            df = enrich_indicators(_generate_quality_synthetic_data(limit))
+        else:
+            df = enrich_indicators(generate_synthetic_data(limit))
     else:
         try:
             df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
         except (RuntimeError, ImportError) as e:
             logger.warning("실거래소 데이터 수집 실패 (%s), 합성 데이터로 fallback", e)
-            df = enrich_indicators(generate_synthetic_data(limit))
+            if use_quality_data:
+                df = enrich_indicators(_generate_quality_synthetic_data(limit))
+            else:
+                df = enrich_indicators(generate_synthetic_data(limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])
 
     # 검증기 초기화 (4h봉 기준: 6개월 ≈ 1080봉, 2개월 ≈ 360봉)
@@ -512,6 +544,10 @@ def main():
         "--min-trades", type=int, default=10,
         help="저거래 fold 제외 임계값 (기본: 10). 저빈도 전략 분석 시 3으로 낮추면 더 많은 fold 포함.",
     )
+    parser.add_argument(
+        "--use-quality-data", action="store_true",
+        help="quality_audit.make_synthetic_data() 기반 GARCH+regime 합성 데이터 사용 (GBM보다 현실적).",
+    )
     args = parser.parse_args()
 
     results = run_bundle_oos(
@@ -520,6 +556,7 @@ def main():
         limit=args.limit,
         dry_run=args.dry_run,
         min_oos_trades=args.min_trades,
+        use_quality_data=args.use_quality_data,
     )
 
     # 콘솔 요약 출력

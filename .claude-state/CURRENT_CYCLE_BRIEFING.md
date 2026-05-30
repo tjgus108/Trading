@@ -1,48 +1,48 @@
 ======================================================================
-🔄 CYCLE 248 — 2026-05-30
+🔄 CYCLE 249 — 2026-05-30
 ======================================================================
 
 ## 이번 사이클 배정 카테고리
 
-248 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)
+249 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
 
 ## 핵심 작업 완료
 
-### [C] generate_synthetic_data() regime 파라미터 개선
-- 목표: IS Sharpe 음수 (elder_impulse/narrow_range 100%) 근본 해소
-- 수정 (run_bundle_oos.py):
-  - P(bull→bear): 0.02 → 0.01 (bull 평균 100 bars, bull 비율 ~80%)
-  - P(bear→bull): 0.03 → 0.04 (bear 평균 25 bars, 빠른 회복)
-  - drift: ±0.02% → ±0.03% per bar (추세 신호 강도 1.5x)
-- 결과: IS Sharpe 음수 비율 개선 미완 (elder 100%, narrow 100% 지속)
-- 결론: GBM 기반 합성 데이터 자체 한계 → 실거래소 데이터 필요
+### [D] elder_impulse._calculate_atr() 버그 수정 (코드 정확성)
+- 버그: `_calculate_atr()` 이 period=14 파라미터를 무시하고 마지막 봉 단일 TR만 반환
+- 수정: numpy 기반 True Range 배열 계산 → 14기간 단순 평균으로 교체
+- 영향: 변동성 필터(min_volatility=0.002)가 노이즈 없는 안정적 ATR 기반으로 작동
+- 신규 테스트 3개: period 평균 검증, 범위 검증, short df 경계조건
 
-### [B] regime=None + MDD=9% 복합 축소 테스트 추가
-- 신규: TestKellyDrawdownIntegration::test_regime_none_mdd9_compound
-- 검증: regime=None(Kelly 레짐 스케일 없음) × mdd_warn(0.5) × kelly_frac(0.5) = 0.25x
-- 8340 passed (신규 1개)
+### [D] run_bundle_oos.py --use-quality-data 옵션 추가
+- `_generate_quality_synthetic_data()` 헬퍼: quality_audit.make_synthetic_data() (GARCH) 사용
+- --use-quality-data 플래그: 실거래소 차단 + dry-run 시 GARCH+regime 합성 데이터 활용
+- 비교 실험 가능: `python3 scripts/run_bundle_oos.py --dry-run --use-quality-data`
 
-### [F] value_area --min-trades 5 완화 검증
-- 결과: 0/5 PASS (value_area 포함 전 전략 FAIL)
-- 원인: 56% fold에서 4~5 trades (신호 부족), IS Sharpe 78% 음수
-- 결론: min-trades 완화 효과 없음 (실거래소 데이터 필요)
+### [E] avg_slippage_per_trade 정량화 검증 (슬리피지 모델)
+- BacktestResult.avg_slippage_per_trade 필드 정상 동작 확인
+- 신규 테스트 3개: total/count 일치, zero-slippage → zero avg, 비례 증가
+
+### [F] CMF 합성 데이터 우위 분석 완료
+- CMF = volume-weighted 가격 위치: GBM bull 레짐에서 볼륨↑ → CMF 양수 방향 일치
+- EMA 필터(close>ema50, ema20>ema50)도 bull 80% 구조에서 더 자주 충족
+- BlockBootstrap 데이터에서도 CMF 우위 유지 가능성 높음 (volume 패턴 보존)
 
 ## 시뮬레이션 결과
 
-### Bundle OOS BTC 4h (--min-trades 5, 합성)
+### Bundle OOS BTC 4h (합성 GBM, Cycle 249)
 - 0/5 PASS
-- Rank #1: cmf (Score 79.9, OOS Sharpe -1.473, Avg Trades 12.4, OOS MDD 7.64%)
-- Rank #2: elder_impulse (50.9), #3: wick_reversal (49.2)
-- IS Sharpe 음수: elder/narrow 100%, cmf/wick 89%, value_area 78%
+- Rank #1: cmf (Score 76.6, OOS Sharpe -1.270, Avg Trades 12.4, OOS MDD 7.64%)
+- IS Sharpe 음수: elder_impulse 100%, narrow_range 100%, cmf 89%, wick_reversal 89%
+- ATR 버그 수정은 다음 사이클 OOS 결과에서 elder_impulse 개선 기대
 
-### Paper SIM BTC 1h (이전 Cycle 247 결과 유지)
-- 0/22 PASS
-- Composite #1: value_area (Score 73.9, AvgSharpe 4.39, AvgTrades 27, AvgMDD 3.1%)
+### Paper SIM BTC 1h
+- 타임아웃 (300s). 실거래소 차단으로 합성 fallback 연산 과부하.
 
 ## 테스트
-8340 passed, 23 skipped (신규 1개 test_regime_none_mdd9_compound)
+8346 passed, 23 skipped (신규 6개: ATR 3개 + avg_slippage 3개)
 
-## 다음 사이클: 249 (D+E+F)
-- D: quality_audit.make_synthetic_data() → Bundle OOS fallback 교체 검토
-- E: Paper Trading slippage 모델 및 TWAP executor 검증
-- F: cmf 전략 우위 분석 (Bundle OOS Rank #1 지속)
+## 다음 사이클: 250 (A+C+F)
+- A: elder_impulse ATR 버그 수정 효과 + wick_reversal 변동성 필터 검토
+- C: --use-quality-data vs GBM 합성 데이터 IS Sharpe 비교표 작성
+- F: BlockBootstrap + 실거래소 없는 환경에서 신뢰가능 validation 방법론

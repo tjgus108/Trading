@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-05-30T15:14:02.422536Z_
+_Generated: 2026-05-30T20:11:54.202398Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -8,11 +8,11 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
 | Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | All Pass | Fail Reasons |
 |----------|-------|---------|----------------|------------|----------|--------------|
-| cmf | 9 | -0.123 | -1.473 | 0.947 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 2.614 > 1.5 (불안정) |
-| elder_impulse | 9 | 0.000 | -3.693 | 0.736 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 4.503 > 1.5 (불안정) |
+| cmf | 9 | -0.138 | -1.270 | 0.982 | FAIL | 저거래 fold 제외 (trades<10): [6]; Failed folds: [0, 1, 2, 3, 4, 5, 7, 8]; OOS Sharpe std 2.717 > 1.5 (불안정) |
+| elder_impulse | 9 | 0.000 | -4.304 | 0.684 | FAIL | 저거래 fold 제외 (trades<10): [0, 7]; Failed folds: [1, 2, 3, 4, 5, 6, 8]; OOS Sharpe std 4.900 > 1.5 (불안정) |
 | wick_reversal | 9 | -2.746 | -4.312 | 0.745 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 3.909 > 1.5 (불안정) |
-| narrow_range | 9 | 0.000 | -4.731 | 0.672 | FAIL | Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 5.219 > 1.5 (불안정) |
-| value_area | 9 | -3.526 | -6.036 | 0.381 | FAIL | 저거래 fold 제외 (trades<5): [3, 4, 5, 6, 7]; 저거래 fold 비율 56% > 40% (신호 부족); Failed folds: [0, 1, 2, 8]; OOS Sharpe std 4.252 > 1.5 (불안정) |
+| narrow_range | 9 | 0.000 | -5.227 | 0.633 | FAIL | 저거래 fold 제외 (trades<10): [4]; Failed folds: [0, 1, 2, 3, 5, 6, 7, 8]; OOS Sharpe std 5.348 > 1.5 (불안정) |
+| value_area | 9 | 0.000 | 0.000 | 0.000 | FAIL | 모든 fold 거래 없음 (min_oos_trades=10): folds=[0, 1, 2, 3, 4, 5, 6, 7, 8] |
 
 **PASS: 0/5** (none)
 **FAIL: 5/5** (cmf, elder_impulse, wick_reversal, narrow_range, value_area)
@@ -23,11 +23,11 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | cmf | 79.9 | p100 | -1.473 | 2.614 | 0.947 | 12.4 | 7.64% | 0% | FAIL |
-| 2 | elder_impulse | 50.9 | p75 | -3.693 | 4.503 | 0.736 | 10.8 | 6.49% | 0% | FAIL |
-| 3 | wick_reversal | 49.2 | p50 | -4.312 | 3.909 | 0.745 | 20.4 | 12.09% | 0% | FAIL |
-| 4 | narrow_range | 37.1 | p25 | -4.731 | 5.219 | 0.672 | 11.9 | 8.31% | 0% | FAIL |
-| 5 | value_area | 23.7 | p0 | -6.036 | 4.252 | 0.381 | 4.3 | 3.00% | 0% | FAIL |
+| 1 | cmf | 76.6 | p100 | -1.270 | 2.717 | 0.982 | 12.4 | 7.64% | 0% | FAIL |
+| 2 | wick_reversal | 57.2 | p75 | -4.312 | 3.909 | 0.745 | 20.4 | 12.09% | 0% | FAIL |
+| 3 | elder_impulse | 48.0 | p50 | -4.304 | 4.900 | 0.684 | 10.8 | 6.49% | 0% | FAIL |
+| 4 | value_area | 45.0 | p25 | 0.000 | 0.000 | 0.000 | 0.0 | 100.00% | 0% | FAIL |
+| 5 | narrow_range | 41.3 | p0 | -5.227 | 5.348 | 0.633 | 11.9 | 8.31% | 0% | FAIL |
 
 ## IS Sharpe 음수 진단
 
@@ -57,7 +57,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 7 | -2.818 | -3.027 | 0.000 | 0.763 | 16 | 14.69% | 12.08% | FAIL |
 | 8 | -3.245 | 3.385 | 0.000 | 1.703 | 15 | 23.83% | 5.44% | FAIL |
 
-**Fail reasons:** Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 2.614 > 1.5 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<10): [6]; Failed folds: [0, 1, 2, 3, 4, 5, 7, 8]; OOS Sharpe std 2.717 > 1.5 (불안정)
 
 ### elder_impulse
 
@@ -73,7 +73,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 7 | -2.712 | 0.234 | 0.000 | 1.167 | 8 | 17.47% | 4.35% | FAIL |
 | 8 | -1.198 | -3.088 | 0.000 | 0.719 | 10 | 12.58% | 5.67% | FAIL |
 
-**Fail reasons:** Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 4.503 > 1.5 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<10): [0, 7]; Failed folds: [1, 2, 3, 4, 5, 6, 8]; OOS Sharpe std 4.900 > 1.5 (불안정)
 
 ### wick_reversal
 
@@ -105,7 +105,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 7 | -6.086 | -4.450 | 0.000 | 0.627 | 14 | 21.77% | 6.48% | FAIL |
 | 8 | -6.308 | -1.412 | 0.000 | 0.916 | 10 | 26.58% | 7.38% | FAIL |
 
-**Fail reasons:** Failed folds: [0, 1, 2, 3, 4, 5, 6, 7, 8]; OOS Sharpe std 5.219 > 1.5 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<10): [4]; Failed folds: [0, 1, 2, 3, 5, 6, 7, 8]; OOS Sharpe std 5.348 > 1.5 (불안정)
 
 ### value_area
 
@@ -121,4 +121,4 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 7 | 2.113 | -8.251 | -3.905 | 0.000 | 3 | 2.55% | 3.69% | FAIL |
 | 8 | 0.755 | -10.648 | -14.103 | 0.000 | 5 | 4.91% | 5.98% | FAIL |
 
-**Fail reasons:** 저거래 fold 제외 (trades<5): [3, 4, 5, 6, 7]; 저거래 fold 비율 56% > 40% (신호 부족); Failed folds: [0, 1, 2, 8]; OOS Sharpe std 4.252 > 1.5 (불안정)
+**Fail reasons:** 모든 fold 거래 없음 (min_oos_trades=10): folds=[0, 1, 2, 3, 4, 5, 6, 7, 8]

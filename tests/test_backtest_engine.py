@@ -866,3 +866,56 @@ def test_build_engine_filters_invalid_keys():
     eng = BacktestEngine._build_engine(params)
     assert eng.atr_multiplier_sl == 2.0
     assert eng.commission == 0.001
+
+
+# ---------------------------------------------------------------------------
+# Cycle 249 E(실행): avg_slippage_per_trade 정량화 검증
+# ---------------------------------------------------------------------------
+
+def test_avg_slippage_per_trade_equals_total_over_count():
+    """avg_slippage_per_trade == total_slippage_cost / total_trades."""
+    engine = BacktestEngine(
+        initial_balance=10000.0,
+        slippage=0.0005,  # 0.05% 기본 슬리피지
+        commission=0.0,
+        atr_multiplier_sl=0.5,
+        atr_multiplier_tp=1.0,
+    )
+    df = make_df(n=200, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    if result.total_trades > 0:
+        expected_avg = result.total_slippage_cost / result.total_trades
+        assert abs(result.avg_slippage_per_trade - round(expected_avg, 6)) < 1e-9, (
+            f"avg_slippage_per_trade={result.avg_slippage_per_trade:.8f} != "
+            f"total/count={expected_avg:.8f}"
+        )
+
+
+def test_avg_slippage_per_trade_zero_when_no_slippage():
+    """슬리피지 0이면 avg_slippage_per_trade == 0."""
+    engine = BacktestEngine(
+        initial_balance=10000.0,
+        slippage=0.0,
+        commission=0.0,
+        atr_multiplier_sl=0.5,
+        atr_multiplier_tp=1.0,
+    )
+    df = make_df(n=200, close_trend=0.002)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert result.avg_slippage_per_trade == 0.0, (
+        f"슬리피지 없을 때 avg=0이어야 함: {result.avg_slippage_per_trade}"
+    )
+
+
+def test_avg_slippage_per_trade_larger_with_higher_slippage():
+    """슬리피지율이 높을수록 avg_slippage_per_trade가 커야 함."""
+    df = make_df(n=200, close_trend=0.002)
+    engine_low = BacktestEngine(slippage=0.0001, commission=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0)
+    engine_high = BacktestEngine(slippage=0.001, commission=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0)
+    result_low = engine_low.run(AlwaysBuyStrategy(), df)
+    result_high = engine_high.run(AlwaysBuyStrategy(), df)
+    if result_low.total_trades > 0 and result_high.total_trades > 0:
+        assert result_high.avg_slippage_per_trade > result_low.avg_slippage_per_trade, (
+            f"높은 슬리피지율이 avg 증가: high={result_high.avg_slippage_per_trade:.6f} "
+            f"low={result_low.avg_slippage_per_trade:.6f}"
+        )

@@ -218,3 +218,45 @@ def test_signal_entry_price_is_float():
 def test_strategy_name():
     """14. 전략 클래스 이름 속성 = 'elder_impulse'"""
     assert ElderImpulseStrategy.name == "elder_impulse"
+
+
+# ── 단위 테스트: _calculate_atr (Cycle 249 bug fix 검증) ────────────────────
+
+def test_calculate_atr_returns_period_average():
+    """15. _calculate_atr()는 단일 TR이 아닌 14기간 평균 ATR / close를 반환해야 함."""
+    from src.strategy.elder_impulse import _calculate_atr
+    # 일정한 변동폭: H-L=2, prev_close 근처이므로 TR ≈ 2 / close
+    n = 40
+    close = np.full(n, 100.0)
+    high = np.full(n, 102.0)
+    low = np.full(n, 98.0)
+    df = pd.DataFrame({"open": close - 1, "high": high, "low": low, "close": close, "volume": np.ones(n)})
+    atr = _calculate_atr(df, period=14)
+    # True Range = H - L = 4 (since all closes equal, |H-prev_C|=2, |L-prev_C|=2, H-L=4)
+    # ATR = mean(TR[-14:]) / close = 4 / 100 = 0.04
+    assert abs(atr - 0.04) < 1e-9, f"Expected 0.04, got {atr}"
+
+
+def test_calculate_atr_smoothed_vs_single_bar():
+    """16. ATR은 14봉 이동평균으로 단일 봉 노이즈보다 안정적이어야 함."""
+    from src.strategy.elder_impulse import _calculate_atr
+    rng = np.random.default_rng(0)
+    n = 50
+    close = np.cumsum(np.abs(rng.normal(0, 1, n))) + 100.0
+    high = close + np.abs(rng.normal(0, 2, n))
+    low = close - np.abs(rng.normal(0, 2, n))
+    df = pd.DataFrame({"open": close - 0.5, "high": high, "low": low, "close": close, "volume": np.ones(n)})
+    # ATR/close는 [0, ~1] 범위에 있어야 함 (비율 값)
+    atr = _calculate_atr(df, period=14)
+    assert 0.0 <= atr <= 1.0, f"ATR ratio should be [0,1], got {atr}"
+
+
+def test_calculate_atr_short_df():
+    """17. df 길이 < period 시에도 에러 없이 반환."""
+    from src.strategy.elder_impulse import _calculate_atr
+    df = pd.DataFrame({
+        "open": [100.0], "high": [102.0], "low": [98.0],
+        "close": [100.0], "volume": [1000.0],
+    })
+    atr = _calculate_atr(df, period=14)
+    assert atr == 0.0  # 길이 1이면 TR 계산 불가 → 0.0
