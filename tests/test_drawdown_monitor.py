@@ -867,3 +867,54 @@ class TestMddKillSwitch:
         status = m.get_kill_switch_status(-0.16, -0.10, multiplier=1.5)
         assert status["current_mdd"] == pytest.approx(0.16)
         assert status["threshold"] == pytest.approx(0.15)
+
+
+# ── kelly_reduce_at_mdd 단위 테스트 ──────────────────────────────────────
+
+
+def test_kelly_fraction_multiplier_normal():
+    """MDD < kelly_reduce_at_mdd(8%) → kelly_fraction_multiplier = 1.0."""
+    m = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+    m.update(10000)
+    m.update(9300)  # 7% MDD < 8%
+    assert m.get_kelly_fraction_multiplier() == 1.0
+    status = m.update(9300)
+    assert status.kelly_fraction_multiplier == 1.0
+
+
+def test_kelly_fraction_multiplier_reduced():
+    """MDD > kelly_reduce_at_mdd(8%) → kelly_fraction_multiplier = 0.5."""
+    m = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+    m.update(10000)
+    m.update(9100)  # 9% MDD > 8%
+    assert m.get_kelly_fraction_multiplier() == 0.5
+    status = m.update(9100)
+    assert status.kelly_fraction_multiplier == 0.5
+
+
+def test_kelly_fraction_multiplier_boundary():
+    """MDD 정확히 kelly_reduce_at_mdd → 경계에서 0.5 반환 (> 비교, 같으면 1.0)."""
+    m = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+    m.update(10000)
+    # 정확히 8%: 10000 → 9200 = 8% DD. 조건이 > 이므로 1.0 반환
+    m.update(9200)
+    assert m.get_kelly_fraction_multiplier() == 1.0
+
+
+def test_kelly_fraction_multiplier_custom_threshold():
+    """custom kelly_reduce_at_mdd=0.12 설정 시 동작 검증."""
+    m = DrawdownMonitor(kelly_reduce_at_mdd=0.12)
+    m.update(10000)
+    m.update(8900)  # 11% < 12% → 1.0
+    assert m.get_kelly_fraction_multiplier() == 1.0
+    m.update(8700)  # 13% > 12% → 0.5
+    assert m.get_kelly_fraction_multiplier() == 0.5
+
+
+def test_kelly_reduce_at_mdd_to_dict_roundtrip():
+    """to_dict/from_dict round-trip이 kelly_reduce_at_mdd 보존."""
+    m = DrawdownMonitor(kelly_reduce_at_mdd=0.10)
+    m.update(10000)
+    d = m.to_dict()
+    m2 = DrawdownMonitor.from_dict(d)
+    assert m2.kelly_reduce_at_mdd == pytest.approx(0.10)

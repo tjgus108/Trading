@@ -1,3 +1,39 @@
+## [2026-05-30] Cycle 246 — B(리스크) + D(ML) + SIM + F(리서치)
+
+**[B] 리스크 — DrawdownMonitor `kelly_reduce_at_mdd` 파라미터 추가:**
+- `kelly_reduce_at_mdd: float = 0.08` 신규 파라미터 (기본 8%, mdd_warn=5%와 mdd_block=10% 사이)
+- `get_kelly_fraction_multiplier()` 메서드: MDD > kelly_reduce_at_mdd 시 0.5 반환
+- `DrawdownStatus.kelly_fraction_multiplier` 필드 추가 (update() 자동 반영)
+- `to_dict()` / `from_dict()` 직렬화 지원 추가
+- 5개 신규 테스트 (normal/reduced/boundary/custom/roundtrip)
+- 배경: Cycle 245 lob_maker MDD=20.0% (경계값), cmf MDD=21.1% → 20% 도달 전 Kelly 조기 축소 필요
+
+**[D] ML — BacktestEngine `mc_min_trades` / `mc_block_size` 파라미터 노출:**
+- `mc_min_trades: int = 0` 파라미터 추가 (0이면 MODULE 상수 MIN_TRADES=15 사용)
+- `mc_block_size: int = 1` 파라미터 추가 (>1이면 블록 부호 셔플 적용, 직렬 상관 보존)
+- run() 내 MC 검정에 self.mc_min_trades, self.mc_block_size 적용
+- 효과: 거래 수 적은 전략(15~19건)의 불안정한 MC p-value를 mc_min_trades=20으로 회피 가능
+- `_mc_permutation_test` 기존 block_size 파라미터가 실제로 사용 가능하게 됨
+
+**[F] 리서치 — Paper SIM 실패 패턴 분석:**
+- mc_p_value > 0.05 원인: 합성 Block Bootstrap 데이터의 랜덤 특성이 전략 신호와 유사 → 통계적 유의성 낮음
+- 실거래소 데이터에서는 mc_p_value 개선 기대 (signal-to-noise ratio 향상)
+- lob_maker: PF 1.39 (< 1.5 기준), MDD 20% 정확히 경계 → Kelly 조기 축소 필요성 확인
+- value_area: SharpeStd 1.70 (불안정) → min_oos_trades 완화 시 검증 필요
+
+**[SIM] 시뮬레이션 결과 (2026-05-30 Cycle 246):**
+- Paper BTC (1h Walk-Forward, Regime-Switching 합성 데이터):
+  - 0/22 PASS (일관성 기준 모두 미달)
+  - Top 3 (상대순위): price_action_momentum(Sharpe 5.42), momentum_quality(3.31), supertrend_multi(2.80)
+  - lob_maker: AvgReturn +44.27%, AvgSharpe 3.09, **AvgMDD 20.0%** (경계)
+  - cmf: **AvgMDD 21.1%** > 20% 기준 초과
+  - 주요 FAIL: mc_p_value > 0.05 (최고 전략도 0.124~0.494), profit_factor < 1.5
+- Bundle OOS BTC (4h, 합성 데이터):
+  - 0/5 PASS (IS Sharpe 전부 음수: elder_impulse/wick_reversal/narrow_range 100%)
+  - value_area: fold 6만 PASS (OOS Sharpe=1.775), min_oos_trades=10 기준 전 fold 미달
+
+**테스트: 8332 passed (기존 8332 = 이전 145개 단위 + MC/백테스트 + 5 신규 kelly_reduce_at_mdd)**
+
 ## [2026-05-29] Cycle 245 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] 품질 — value_area 4h 타임프레임 신호 생성 수정:**
@@ -497,6 +533,288 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-29 20:39 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-30 05:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-30 05:19 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

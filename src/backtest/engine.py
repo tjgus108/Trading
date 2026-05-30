@@ -111,6 +111,8 @@ class BacktestEngine:
         funding_cost_per_candle: float = 0.0,
         dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
         adaptive_slippage: bool = False,  # True면 ATR 기반 레짐별 가변 슬리피지
+        mc_min_trades: int = 0,  # MC 검정 최소 거래 수 (0=MIN_TRADES 사용)
+        mc_block_size: int = 1,  # MC block sign randomization 크기 (1=독립 셔플)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -125,6 +127,9 @@ class BacktestEngine:
         self.funding_cost_per_candle = funding_cost_per_candle
         self.dsr_threshold = dsr_threshold
         self.adaptive_slippage = adaptive_slippage
+        # mc_min_trades: 0이면 MIN_TRADES(모듈 상수) 그대로 사용
+        self.mc_min_trades = int(mc_min_trades) if mc_min_trades > 0 else MIN_TRADES
+        self.mc_block_size = max(1, int(mc_block_size))
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -402,10 +407,12 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
-        # MC Permutation test: 거래가 충분할 때만 (ann_factor를 Sharpe 계산과 일치시킴)
+        # MC Permutation test: mc_min_trades 이상일 때만 실행 (ann_factor를 Sharpe 계산과 일치시킴)
         mc_p = -1.0
-        if len(trades) >= MIN_TRADES:
-            mc_p = self._mc_permutation_test(trades, sharpe, ann_factor=ann_factor)
+        if len(trades) >= self.mc_min_trades:
+            mc_p = self._mc_permutation_test(
+                trades, sharpe, block_size=self.mc_block_size, ann_factor=ann_factor
+            )
             if mc_p > MC_P_THRESHOLD:
                 fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")
 

@@ -75,6 +75,7 @@ class DrawdownStatus:
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
     rolling_mdd_short_pct: float = 0.0  # 단기 롤링(20봉) MDD — 장기 대비 조기 경보용
+    kelly_fraction_multiplier: float = 1.0  # Kelly fraction 축소 배수 (MDD > kelly_reduce_at_mdd 시 0.5)
 
 
 class DrawdownMonitor:
@@ -128,6 +129,7 @@ class DrawdownMonitor:
         mdd_liquidate_pct: float = 0.15,
         mdd_halt_pct: float = 0.20,
         rolling_window: int = 50,
+        kelly_reduce_at_mdd: float = 0.08,
     ) -> None:
         """
         Args:
@@ -150,6 +152,10 @@ class DrawdownMonitor:
             mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
             mdd_halt_pct:      MDD 완전 중단 기준 (기본 20%). 전체 거래 중단.
             rolling_window:    rolling_mdd() 기본 윈도우 크기 (equity 업데이트 횟수, 기본 50).
+            kelly_reduce_at_mdd: MDD가 이 값을 초과하면 Kelly fraction을 0.5x 축소 신호 반환
+                                 (DrawdownStatus.kelly_fraction_multiplier = 0.5).
+                                 mdd_size_multiplier와 독립적으로 작동 — 포트폴리오 배분 레이어용.
+                                 기본 0.08 (8%): mdd_warn_pct(5%)보다 엄격, mdd_block_pct(10%)보다 완화.
         """
         self.max_drawdown_pct = max_drawdown_pct
         self.recovery_pct = recovery_pct
@@ -165,6 +171,7 @@ class DrawdownMonitor:
         self.mdd_block_pct = mdd_block_pct
         self.mdd_liquidate_pct = mdd_liquidate_pct
         self.mdd_halt_pct = mdd_halt_pct
+        self.kelly_reduce_at_mdd = float(kelly_reduce_at_mdd)
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
         self._rolling_window: int = rolling_window  # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
@@ -383,6 +390,21 @@ class DrawdownMonitor:
         # BLOCK_ENTRY, LIQUIDATE, FULL_HALT → 0.0
         return 0.0
 
+    def get_kelly_fraction_multiplier(self) -> float:
+        """Kelly fraction 축소 배수 반환.
+
+        MDD가 kelly_reduce_at_mdd(기본 8%)를 초과하면 0.5를 반환하여
+        KellySizer의 fraction을 절반으로 줄이도록 신호를 제공한다.
+        mdd_size_multiplier(개별 거래 포지션 사이즈 제어)와 별개로 동작하며
+        포트폴리오 배분 레이어에서 전략의 자본 할당을 조정하는 데 사용한다.
+
+        Returns:
+            0.5 if current_drawdown() > kelly_reduce_at_mdd, else 1.0
+        """
+        if self.current_drawdown() > self.kelly_reduce_at_mdd:
+            return 0.5
+        return 1.0
+
     def should_liquidate_all(self) -> bool:
         """MDD LIQUIDATE 이상 단계 시 True — 모든 포지션 청산 권고."""
         level = self.get_mdd_level()
@@ -540,6 +562,7 @@ class DrawdownMonitor:
             mdd_size_multiplier=cur_mdd_size_mult,
             rolling_mdd_pct=self.rolling_mdd(),
             rolling_mdd_short_pct=self.rolling_mdd(window=20),
+            kelly_fraction_multiplier=self.get_kelly_fraction_multiplier(),
         )
 
     def _check_tiered(
@@ -725,6 +748,7 @@ class DrawdownMonitor:
             "mdd_block_pct": self.mdd_block_pct,
             "mdd_liquidate_pct": self.mdd_liquidate_pct,
             "mdd_halt_pct": self.mdd_halt_pct,
+            "kelly_reduce_at_mdd": self.kelly_reduce_at_mdd,
             "rolling_window": self._rolling_window,
             "_peak": self._peak,
             "_current": self._current,
@@ -760,6 +784,7 @@ class DrawdownMonitor:
             mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
             mdd_halt_pct=data.get("mdd_halt_pct", 0.20),
             rolling_window=data.get("rolling_window", 50),
+            kelly_reduce_at_mdd=data.get("kelly_reduce_at_mdd", 0.08),
         )
         obj._peak = data["_peak"]
         obj._current = data["_current"]
