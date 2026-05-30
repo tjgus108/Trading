@@ -1,6 +1,28 @@
 ======================================================================
-🔄 CYCLE 245 — 2026-05-29
+🔄 CYCLE 246 — 2026-05-30
 ======================================================================
+
+## 이번 사이클 배정 카테고리
+
+**Cycle 246** (246 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+
+### [B] 리스크 — 완료
+- DrawdownMonitor: `kelly_reduce_at_mdd=0.15`, `get_kelly_fraction_multiplier()` 추가
+- DrawdownStatus: `kelly_fraction_multiplier` 필드 추가, 직렬화 지원
+- 7개 신규 테스트 (TestKellyReduceAtMdd)
+
+### [D] ML — 완료
+- `MIN_MC_TRADES = 20` 신규 상수 (MIN_TRADES=15와 분리, 소표본 MC 오판 방지)
+- `MC_N_PERMUTATIONS: 500 → 1000` (p-value 정밀도 2배)
+
+### [SIM] 결과
+- Paper BTC: 0/22 PASS, Top: momentum_quality(7.96), price_action_momentum(6.81)
+- Bundle OOS 4h: 0/5 PASS, cmf rank#1, value_area fold6 PASS(1.775) 유지
+- 테스트: 8332 passed (전체), 7개 신규
+
+---
+
+## [이전] CYCLE 245 — 2026-05-29
 
 ## 이번 사이클 배정 카테고리
 

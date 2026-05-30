@@ -845,3 +845,83 @@ class TestBayesianKellyExtreme:
         bk = BayesianKellyPositionSizer()
         qty = bk.calculate_position_size(capital=100_000, price=0.0)
         assert qty == 0.0
+
+
+# ── DrawdownMonitor kelly_reduce_at_mdd (Cycle 246) ────────────────────────
+
+
+class TestKellyReduceAtMdd:
+    """get_kelly_fraction_multiplier() 동작 검증 — kelly_reduce_at_mdd 파라미터."""
+
+    def test_below_threshold_returns_1(self):
+        """MDD < kelly_reduce_at_mdd → 1.0 반환."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.15)
+        m.update(10_000)
+        m.update(9_200)  # DD = 8% < 15%
+        assert m.get_kelly_fraction_multiplier() == 1.0
+
+    def test_at_threshold_returns_half(self):
+        """MDD >= kelly_reduce_at_mdd → 0.5 반환."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.15)
+        m.update(10_000)
+        m.update(8_500)  # DD = 15% == threshold
+        assert m.get_kelly_fraction_multiplier() == 0.5
+
+    def test_above_threshold_returns_half(self):
+        """MDD > kelly_reduce_at_mdd → 0.5 반환."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.15)
+        m.update(10_000)
+        m.update(8_000)  # DD = 20% > 15%
+        assert m.get_kelly_fraction_multiplier() == 0.5
+
+    def test_drawdown_status_includes_kelly_fraction_multiplier(self):
+        """DrawdownStatus에 kelly_fraction_multiplier 포함."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.10)
+        m.update(10_000)
+        status_normal = m.update(9_500)  # DD=5% < 10%
+        assert status_normal.kelly_fraction_multiplier == 1.0
+
+        status_reduced = m.update(8_900)  # DD=11% >= 10%
+        assert status_reduced.kelly_fraction_multiplier == 0.5
+
+    def test_custom_threshold(self):
+        """커스텀 kelly_reduce_at_mdd=0.08 동작 검증."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+        m.update(10_000)
+        m.update(9_300)  # DD = 7% < 8%
+        assert m.get_kelly_fraction_multiplier() == 1.0
+        m.update(9_100)  # DD = 9% >= 8%
+        assert m.get_kelly_fraction_multiplier() == 0.5
+
+    def test_kelly_fraction_multiplier_applied_to_sizer(self):
+        """kelly_reduce_at_mdd 초과 시 KellySizer에 0.5x fraction 적용하면 사이즈 축소."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.15)
+        m.update(10_000)
+        m.update(8_400)  # DD = 16% >= 15%
+        k_mult = m.get_kelly_fraction_multiplier()
+        assert k_mult == 0.5
+
+        sizer = KellySizer(fraction=0.5, max_fraction=0.20, kelly_cap=0.25)
+        base_fraction = 0.5
+        qty_full = sizer.compute(
+            win_rate=0.6, avg_win=0.02, avg_loss=0.01,
+            capital=8_400, price=100.0,
+        )
+        # fraction=0.5*0.5=0.25로 재생성하여 비교
+        sizer_reduced = KellySizer(fraction=base_fraction * k_mult, max_fraction=0.20, kelly_cap=0.25)
+        qty_reduced = sizer_reduced.compute(
+            win_rate=0.6, avg_win=0.02, avg_loss=0.01,
+            capital=8_400, price=100.0,
+        )
+        assert qty_reduced < qty_full
+
+    def test_serialization_preserves_kelly_reduce_at_mdd(self):
+        """to_dict/from_dict에서 kelly_reduce_at_mdd 보존."""
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.12)
+        m.update(10_000)
+        m.update(8_000)
+        d = m.to_dict()
+        assert d["kelly_reduce_at_mdd"] == 0.12
+        m2 = DrawdownMonitor.from_dict(d)
+        assert m2.kelly_reduce_at_mdd == 0.12
+        assert m2.get_kelly_fraction_multiplier() == 0.5

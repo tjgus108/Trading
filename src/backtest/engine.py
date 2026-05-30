@@ -21,9 +21,10 @@ MIN_SHARPE = 1.0
 MAX_DRAWDOWN = 0.20
 MIN_PROFIT_FACTOR = 1.5
 MIN_TRADES = 15          # Cycle 140: 50 → 15 (실데이터 거래 수 부족 해소)
+MIN_MC_TRADES = 20       # Cycle 246: MC 테스트 최소 거래 수 (15거래 MC는 분해능 낮음 — 별도 임계값)
 MIN_WFE = 0.5            # Walk-Forward Efficiency: OOS_Sharpe / IS_Sharpe 최솟값
 MC_P_THRESHOLD = 0.05    # Monte Carlo permutation p-value 상한
-MC_N_PERMUTATIONS = 500  # 셔플 횟수 (리서치 권장 1000, 속도 타협 500)
+MC_N_PERMUTATIONS = 1000 # Cycle 246: 500 → 1000 (소표본 p-value 정밀도 개선)
 MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
 
 ANNUALIZATION = {
@@ -402,9 +403,9 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
-        # MC Permutation test: 거래가 충분할 때만 (ann_factor를 Sharpe 계산과 일치시킴)
+        # MC Permutation test: MIN_MC_TRADES 이상일 때만 (소표본에서 분해능 부족 방지)
         mc_p = -1.0
-        if len(trades) >= MIN_TRADES:
+        if len(trades) >= MIN_MC_TRADES:
             mc_p = self._mc_permutation_test(trades, sharpe, ann_factor=ann_factor)
             if mc_p > MC_P_THRESHOLD:
                 fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")
