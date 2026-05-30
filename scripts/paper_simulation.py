@@ -711,6 +711,12 @@ USE_REGIME_WEIGHTS = _os.environ.get("PAPER_SIM_REGIME_WEIGHTS", "0") == "1"
 # Perturbation check: 각 전략의 파라미터 섭동 안정성 검증 (--perturbation-check로 활성화)
 USE_PERTURBATION_CHECK = False
 
+# MC permutation test: 거래 수 필터 + 블록 크기 (BacktestEngine 전달)
+# --mc-min-trades N: 최소 거래 수 (0=engine 기본값 MIN_TRADES=15)
+# --mc-block-size N: 블록 셔플 크기 (1=독립, 24=일봉 블록)
+MC_MIN_TRADES: int = 0
+MC_BLOCK_SIZE: int = 1
+
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
 
@@ -903,6 +909,8 @@ def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
         initial_balance=10_000,
         fee_rate=0.00055,       # Bybit taker 0.055%
         slippage_pct=0.0005,    # 0.05%
+        mc_min_trades=getattr(_this, "MC_MIN_TRADES", 0),
+        mc_block_size=getattr(_this, "MC_BLOCK_SIZE", 1),
     )
 
     sections = []
@@ -984,6 +992,18 @@ if __name__ == "__main__":
         default=False,
         help="각 전략의 파라미터 섭동 안정성 검증 (ROBUST/MODERATE/FRAGILE 판정)",
     )
+    parser.add_argument(
+        "--mc-min-trades",
+        type=int,
+        default=0,
+        help="MC permutation test 최소 거래 수 (기본 0=engine 내부 MIN_TRADES=15 사용)",
+    )
+    parser.add_argument(
+        "--mc-block-size",
+        type=int,
+        default=1,
+        help="MC block sign randomization 크기 (기본 1=독립 셔플, 24=1h→daily blocks)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -996,4 +1016,10 @@ if __name__ == "__main__":
     if args.perturbation_check:
         _this.USE_PERTURBATION_CHECK = True
         print(f"[CONFIG] Perturbation check enabled (ROBUST/MODERATE/FRAGILE)", flush=True)
+    if args.mc_min_trades > 0:
+        _this.MC_MIN_TRADES = args.mc_min_trades
+        print(f"[CONFIG] MC min trades overridden: {args.mc_min_trades}", flush=True)
+    if args.mc_block_size > 1:
+        _this.MC_BLOCK_SIZE = args.mc_block_size
+        print(f"[CONFIG] MC block size overridden: {args.mc_block_size}", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

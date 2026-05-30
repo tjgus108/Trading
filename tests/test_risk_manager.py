@@ -1189,6 +1189,48 @@ class TestKellyDrawdownIntegration:
         assert res.status == RiskStatus.APPROVED
         assert abs(res.position_size - base) < 1e-6
 
+    def _make_kelly_reduce_dd(self):
+        """MDD=9% DrawdownMonitor: WARN 단계(5~10%) + kelly_reduce_at_mdd(8%) 초과."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dd = DrawdownMonitor(
+            mdd_warn_pct=0.05, mdd_block_pct=0.10, kelly_reduce_at_mdd=0.08,
+            rolling_window=50,
+        )
+        # 점진적 하락 후 9100(= 10000 * 0.91, MDD=9%) 안정화
+        for i in range(40):
+            dd.update(10_000 - i * 22.5)   # 10000→9100
+        for _ in range(10):
+            dd.update(9_100)
+        return dd
+
+    def test_kelly_fraction_multiplier_applied_with_kelly_sizer(self):
+        """MDD=9% + kelly_sizer: mdd_size_mult(0.5) × kelly_frac_mult(0.5) = 0.25x."""
+        from src.risk.kelly_sizer import KellySizer
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_mdd_size_multiplier() == pytest.approx(0.5)   # WARN zone
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)  # MDD > 8%
+        assert not dd.trailing_stop_signal()
+
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks, drawdown_monitor=dd)
+        base = self._base_size()
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000)
+        assert res.status == RiskStatus.APPROVED
+        # size_mult=0.5 (WARN) × kelly_frac_mult=0.5 = 0.25
+        assert abs(res.position_size - base * 0.25) < 1e-6
+
+    def test_kelly_fraction_multiplier_not_applied_without_kelly_sizer(self):
+        """MDD=9% + kelly_sizer 없음: kelly_frac_mult는 무시, mdd_size_mult(0.5)만 적용."""
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)
+
+        rm = self._make_rm(drawdown_monitor=dd)   # kelly_sizer=None
+        base = self._base_size()
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000)
+        assert res.status == RiskStatus.APPROVED
+        # kelly_frac_mult는 적용되지 않으므로 mdd_size_mult=0.5 만 반영
+        assert abs(res.position_size - base * 0.5) < 1e-6
+
 
 # ── check_strategy_health 테스트 (작업1) ────────────────────────────────────
 

@@ -560,6 +560,20 @@ class RiskManager:
                 max_size *= 0.5
                 logger.warning("DrawdownMonitor trailing_stop_signal — position_size halved")
 
+        # DrawdownMonitor kelly_fraction_multiplier: MDD > kelly_reduce_at_mdd(8%) → Kelly 0.5x 축소.
+        # size_multiplier(개별 거래 사이즈 제어)와 독립적인 포트폴리오 배분 레이어.
+        # kelly_sizer가 있을 때만 적용 (Kelly allocation과 연계된 신호이므로).
+        if self.kelly_sizer is not None and self.drawdown_monitor is not None:
+            _kelly_mdd_mult = self.drawdown_monitor.get_kelly_fraction_multiplier()
+            if _kelly_mdd_mult < 1.0:
+                position_size *= _kelly_mdd_mult
+                max_size *= _kelly_mdd_mult
+                logger.info(
+                    "DrawdownMonitor kelly_fraction_multiplier=%.2f applied (MDD > %.0f%%)",
+                    _kelly_mdd_mult,
+                    self.drawdown_monitor.kelly_reduce_at_mdd * 100,
+                )
+
         # ATR이 매우 커서 포지션 사이즈가 사실상 0인 경우 BLOCK (< 1e-8 단위)
         if position_size < 1e-8:
             logger.warning("position_size <= 0 after sizing (ATR too large?): atr=%.6f — BLOCKED", atr)
