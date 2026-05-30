@@ -1231,6 +1231,23 @@ class TestKellyDrawdownIntegration:
         # kelly_frac_mult는 적용되지 않으므로 mdd_size_mult=0.5 만 반영
         assert abs(res.position_size - base * 0.5) < 1e-6
 
+    def test_regime_none_mdd9_compound(self):
+        """regime=None + MDD=9%: Kelly 레짐 스케일 없음 × mdd_size_mult(0.5) × kelly_frac_mult(0.5) = 0.25x."""
+        from src.risk.kelly_sizer import KellySizer
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_mdd_size_multiplier() == pytest.approx(0.5)    # WARN zone
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)  # MDD > 8%
+        assert not dd.trailing_stop_signal()
+
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks, drawdown_monitor=dd)
+        base = self._base_size()
+        # regime=None → kelly_scale=1.0 (레짐 기반 축소 없음)
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000, regime=None)
+        assert res.status == RiskStatus.APPROVED
+        # 1.0(regime없음) × 0.5(mdd_warn) × 0.5(kelly_frac) = 0.25x
+        assert abs(res.position_size - base * 0.25) < 1e-6
+
 
 # ── check_strategy_health 테스트 (작업1) ────────────────────────────────────
 

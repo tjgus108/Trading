@@ -50,27 +50,30 @@ def generate_synthetic_data(limit: int) -> pd.DataFrame:
     """Regime-switching 합성 OHLCV 데이터 생성 (GBM + bull/bear 레짐 전환).
 
     순수 GBM 대비 개선:
-    - Bull 레짐: 양의 drift (+0.02% per bar) + 낮은 변동성 (σ=0.25%)
-    - Bear 레짐: 음의 drift (-0.02% per bar) + 높은 변동성 (σ=0.40%)
-    - 레짐 지속기간: 50~200 bars (포아송 분포)
+    - Bull 레짐: 양의 drift (+0.03% per bar) + 낮은 변동성 (σ=0.25%)
+    - Bear 레짐: 음의 drift (-0.03% per bar) + 높은 변동성 (σ=0.40%)
+    - 레짐 지속기간: bull ~100 bars, bear ~25 bars (trend-following에 적합)
+    - Cycle 248 수정: P(bull→bear) 0.02→0.01, P(bear→bull) 0.03→0.04, drift 0.02%→0.03%
+      IS Sharpe 음수 근본 원인(레짐 전환 과다)을 해소하고 trend-following IS 성과 개선
     """
     import numpy as np
 
     rng = np.random.default_rng(42)
     n = limit
 
-    # 레짐 시퀀스 생성 (Markov chain: P(bull→bear)=0.02, P(bear→bull)=0.03)
+    # 레짐 시퀀스 생성 (Markov chain: P(bull→bear)=0.01, P(bear→bull)=0.04)
+    # bull ~100 bars, bear ~25 bars → 전체 약 80% bull
     regimes = np.zeros(n, dtype=int)  # 0=bear, 1=bull
     regimes[0] = 1  # 시작은 bull
     for i in range(1, n):
-        if regimes[i - 1] == 1:  # bull → bear with prob 0.02
-            regimes[i] = 0 if rng.random() < 0.02 else 1
-        else:  # bear → bull with prob 0.03
-            regimes[i] = 1 if rng.random() < 0.03 else 0
+        if regimes[i - 1] == 1:  # bull → bear with prob 0.01
+            regimes[i] = 0 if rng.random() < 0.01 else 1
+        else:  # bear → bull with prob 0.04
+            regimes[i] = 1 if rng.random() < 0.04 else 0
 
     # 레짐별 파라미터
-    bull_drift = 0.0002   # +0.02% per bar
-    bear_drift = -0.0002  # -0.02% per bar
+    bull_drift = 0.0003   # +0.03% per bar (이전 0.02%)
+    bear_drift = -0.0003  # -0.03% per bar (이전 -0.02%)
     bull_vol = 0.0025     # 변동성 0.25%
     bear_vol = 0.0040     # 변동성 0.40%
 

@@ -1,42 +1,48 @@
 ======================================================================
-🔄 CYCLE 247 — 2026-05-30
+🔄 CYCLE 248 — 2026-05-30
 ======================================================================
 
 ## 이번 사이클 배정 카테고리
 
-247 mod 5 = 2 → B(리스크) + D(ML) + F(리서치)
+248 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치)
 
 ## 핵심 작업 완료
 
-### [B] kelly_fraction_multiplier → manager.py 연결
-- 갭: Cycle 246에서 `get_kelly_fraction_multiplier()` 추가했으나 `evaluate()`에서 미호출
-- 수정: kelly_sizer + drawdown_monitor 모두 있을 때 MDD > 8% → position_size × 0.5 추가 적용
-- 효과: MDD 8~10% 구간 → 총 0.25x 복합 축소 (mdd_warn 0.5x × kelly_frac 0.5x)
-- 신규 테스트 2개: 통합 검증
+### [C] generate_synthetic_data() regime 파라미터 개선
+- 목표: IS Sharpe 음수 (elder_impulse/narrow_range 100%) 근본 해소
+- 수정 (run_bundle_oos.py):
+  - P(bull→bear): 0.02 → 0.01 (bull 평균 100 bars, bull 비율 ~80%)
+  - P(bear→bull): 0.03 → 0.04 (bear 평균 25 bars, 빠른 회복)
+  - drift: ±0.02% → ±0.03% per bar (추세 신호 강도 1.5x)
+- 결과: IS Sharpe 음수 비율 개선 미완 (elder 100%, narrow 100% 지속)
+- 결론: GBM 기반 합성 데이터 자체 한계 → 실거래소 데이터 필요
 
-### [D] paper_simulation.py MC CLI 인수 추가
-- --mc-min-trades N: BacktestEngine.mc_min_trades 제어
-- --mc-block-size N: BacktestEngine.mc_block_size 제어
-- 모듈 상수 MC_MIN_TRADES=0, MC_BLOCK_SIZE=1 추가
+### [B] regime=None + MDD=9% 복합 축소 테스트 추가
+- 신규: TestKellyDrawdownIntegration::test_regime_none_mdd9_compound
+- 검증: regime=None(Kelly 레짐 스케일 없음) × mdd_warn(0.5) × kelly_frac(0.5) = 0.25x
+- 8340 passed (신규 1개)
 
-### [F] value_area min_oos_trades 분석
-- --min-trades CLI 이미 존재 → --min-trades 5로 즉시 완화 가능
-- 합성 데이터 IS Sharpe 음수 → 실거래소 데이터 필요
+### [F] value_area --min-trades 5 완화 검증
+- 결과: 0/5 PASS (value_area 포함 전 전략 FAIL)
+- 원인: 56% fold에서 4~5 trades (신호 부족), IS Sharpe 78% 음수
+- 결론: min-trades 완화 효과 없음 (실거래소 데이터 필요)
 
 ## 시뮬레이션 결과
 
-### Paper SIM BTC 1h (합성)
+### Bundle OOS BTC 4h (--min-trades 5, 합성)
+- 0/5 PASS
+- Rank #1: cmf (Score 79.9, OOS Sharpe -1.473, Avg Trades 12.4, OOS MDD 7.64%)
+- Rank #2: elder_impulse (50.9), #3: wick_reversal (49.2)
+- IS Sharpe 음수: elder/narrow 100%, cmf/wick 89%, value_area 78%
+
+### Paper SIM BTC 1h (이전 Cycle 247 결과 유지)
 - 0/22 PASS
 - Composite #1: value_area (Score 73.9, AvgSharpe 4.39, AvgTrades 27, AvgMDD 3.1%)
 
-### Bundle OOS BTC 4h (합성)
-- 0/5 PASS (IS Sharpe 100% 음수: elder_impulse/wick_reversal/narrow_range)
-- value_area fold 6 PASS (OOS Sharpe=1.775), 전 fold trades<10
-
 ## 테스트
-8339 passed, 23 skipped (신규 2개 포함)
+8340 passed, 23 skipped (신규 1개 test_regime_none_mdd9_compound)
 
-## 다음 사이클: 248 (C+B+F)
-- C: 합성 데이터 IS Sharpe 음수 해결 (bull regime 지속 기간 증가)
-- B: kelly_fraction_multiplier 복합 효과 백테스트 정량화
-- F: --min-trades 5 value_area 완화 검증
+## 다음 사이클: 249 (D+E+F)
+- D: quality_audit.make_synthetic_data() → Bundle OOS fallback 교체 검토
+- E: Paper Trading slippage 모델 및 TWAP executor 검증
+- F: cmf 전략 우위 분석 (Bundle OOS Rank #1 지속)
