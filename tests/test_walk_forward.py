@@ -1597,3 +1597,65 @@ class TestSharpeICEdgeCases:
         assert results[0].best_params == results[1].best_params, (
             f"Deterministic failure: {results[0].best_params} != {results[1].best_params}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 250 A: BundleOOSResult IS Sharpe 추적 필드 테스트
+# ---------------------------------------------------------------------------
+
+def test_bundle_oos_result_has_is_sharpe_fields():
+    """BundleOOSResult에 avg_is_sharpe, is_negative_fold_pct 필드 존재."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=-1.0, oos_sharpe=0.5,
+        is_mdd=0.05, oos_mdd=0.07, wfe=0.5, oos_pf=1.2,
+        oos_trades=15, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test", folds=[fold],
+        avg_wfe=0.5, avg_oos_sharpe=0.5, avg_oos_pf=1.2,
+        oos_sharpe_std=0.0, all_passed=True, fail_reasons=[],
+        avg_is_sharpe=-1.0, is_negative_fold_pct=1.0,
+    )
+    assert hasattr(result, "avg_is_sharpe"), "avg_is_sharpe 필드 없음"
+    assert hasattr(result, "is_negative_fold_pct"), "is_negative_fold_pct 필드 없음"
+    assert result.avg_is_sharpe == -1.0
+    assert result.is_negative_fold_pct == 1.0
+
+
+def test_bundle_oos_summary_includes_is_sharpe():
+    """BundleOOSResult.summary()에 avg_is_sharpe와 is_neg 비율 포함."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=0.5, oos_sharpe=0.8,
+        is_mdd=0.05, oos_mdd=0.07, wfe=1.0, oos_pf=1.5,
+        oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test", folds=[fold],
+        avg_wfe=1.0, avg_oos_sharpe=0.8, avg_oos_pf=1.5,
+        oos_sharpe_std=0.0, all_passed=True, fail_reasons=[],
+        avg_is_sharpe=0.5, is_negative_fold_pct=0.0,
+    )
+    summary = result.summary()
+    assert "avg_is_sharpe" in summary, "summary에 avg_is_sharpe 없음"
+    assert "is_neg=" in summary, "summary에 is_neg 비율 없음"
+
+
+def test_rolling_oos_is_negative_fold_tracking():
+    """RollingOOSValidator.validate() — IS 음수 fold 비율 계산."""
+    from src.backtest.walk_forward import RollingOOSValidator, BundleOOSResult
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    df = make_df(500)
+    strategy = EmaCrossStrategy(fast_span=5, slow_span=20)
+    v = RollingOOSValidator(is_bars=150, oos_bars=75, slide_bars=75, min_oos_trades=1)
+    result = v.validate(strategy, df)
+    assert isinstance(result, BundleOOSResult)
+    assert hasattr(result, "avg_is_sharpe"), "avg_is_sharpe 필드 없음"
+    assert hasattr(result, "is_negative_fold_pct"), "is_negative_fold_pct 필드 없음"
+    assert 0.0 <= result.is_negative_fold_pct <= 1.0, (
+        f"is_negative_fold_pct={result.is_negative_fold_pct} 범위 벗어남"
+    )

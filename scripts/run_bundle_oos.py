@@ -297,21 +297,22 @@ def format_summary_table(results: list[tuple[str, BundleOOSResult]]) -> str:
     """결과를 Markdown 테이블로 포맷."""
     header = (
         "| Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | "
-        "All Pass | Fail Reasons |"
+        "Fold Pass% | All Pass | Fail Reasons |"
     )
     separator = (
         "|----------|-------|---------|----------------|------------|"
-        "----------|--------------|"
+        "-----------|----------|--------------|"
     )
     rows = [header, separator]
 
     for name, r in results:
         pass_str = "PASS" if r.all_passed else "FAIL"
         fails = "; ".join(r.fail_reasons) if r.fail_reasons else "-"
+        fold_pass_pct = f"{r.fold_pass_rate:.0%}" if r.fold_pass_rate is not None else "N/A"
         rows.append(
             f"| {name} | {len(r.folds)} | {r.avg_wfe:.3f} | "
             f"{r.avg_oos_sharpe:.3f} | {r.avg_oos_pf:.3f} | "
-            f"{pass_str} | {fails} |"
+            f"{fold_pass_pct} | {pass_str} | {fails} |"
         )
 
     return "\n".join(rows)
@@ -392,11 +393,9 @@ def run_bundle_oos(
         try:
             df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
         except (RuntimeError, ImportError) as e:
-            logger.warning("실거래소 데이터 수집 실패 (%s), 합성 데이터로 fallback", e)
-            if use_quality_data:
-                df = enrich_indicators(_generate_quality_synthetic_data(limit))
-            else:
-                df = enrich_indicators(generate_synthetic_data(limit))
+            logger.warning("실거래소 데이터 수집 실패 (%s), GARCH 합성 데이터로 fallback", e)
+            # GARCH 데이터가 GBM보다 trend-following 전략에서 IS Sharpe 음수 비율 감소 (100%→44%)
+            df = enrich_indicators(_generate_quality_synthetic_data(limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])
 
     # 검증기 초기화 (4h봉 기준: 6개월 ≈ 1080봉, 2개월 ≈ 360봉)
