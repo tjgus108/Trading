@@ -934,6 +934,8 @@ class BundleOOSResult:
     all_passed: bool
     fail_reasons: List[str]
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
+    dsr_pvalue: Optional[float] = None  # Deflated Sharpe Ratio p-value
+    is_sharpe_significant: Optional[bool] = None  # DSR significance at α=0.05
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -946,10 +948,12 @@ class BundleOOSResult:
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
             f"  verdict: {verdict}",
         ]
+        if self.dsr_pvalue is not None:
+            sig_tag = "SIGNIFICANT" if self.is_sharpe_significant else "NOT_SIGNIFICANT"
+            lines.append(f"  dsr_pvalue: {self.dsr_pvalue:.4f} ({sig_tag})")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         return "\n".join(lines)
-
 
 class RollingOOSValidator:
     """Rolling IS/OOS 검증기 (파라미터 최적화 없이 고정 전략 평가).
@@ -1104,6 +1108,24 @@ class RollingOOSValidator:
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
 
+        # DSR 계산: OOS Sharpe 평균과 거래 수를 기반으로 통계적 유의성 판정
+        dsr_pvalue = None
+        is_sig = None
+        num_strategies_tested = 5  # Bundle 내 5개 전략
+        total_oos_trades = sum(f.oos_trades for f in active_folds)
+        
+        if total_oos_trades > 0 and avg_sharpe > 0:
+            dsr_pvalue = deflated_sharpe_ratio(
+                observed_sharpe=avg_sharpe,
+                num_strategies_tested=num_strategies_tested,
+                num_observations=total_oos_trades,
+            )
+            is_sig = dsr_pvalue < 0.05  # α=0.05
+            logger.info(
+                "[%s] DSR p-value=%.4f (observed_sharpe=%.3f, trades=%d, strategies=%d)",
+                strategy.name, dsr_pvalue, avg_sharpe, total_oos_trades, num_strategies_tested,
+            )
+
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
         low_trade_ratio = len(low_trade_fold_ids) / len(folds) if folds else 0.0
@@ -1136,6 +1158,8 @@ class RollingOOSValidator:
             oos_sharpe_std=round(oos_std, 4),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
+            dsr_pvalue=round(dsr_pvalue, 4) if dsr_pvalue is not None else None,
+            is_sharpe_significant=is_sig,
         )
         logger.info(result.summary())
         return result

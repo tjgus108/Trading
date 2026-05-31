@@ -559,3 +559,79 @@ def download_multi_timeframe(
             results[tf] = None
 
     return results
+
+
+def validate_ohlcv(
+    df: pd.DataFrame,
+    expected_interval_seconds: int = 14400,
+) -> Dict[str, any]:
+    """
+    CSV 데이터 또는 백테스트 전 OHLCV 데이터 품질 검증.
+    
+    Cycle 251 리서치: 데이터 파이프라인 실패의 47-51%는 중복 캔들,
+    6/200 사례는 갭, 타임존 불일치로 발생. 이 함수로 신속히 검출 가능.
+    
+    Args:
+        df: pandas DataFrame with columns [open, high, low, close, volume]
+            index는 datetime이어야 함 (timezone-aware 권장)
+        expected_interval_seconds: 예상 캔들 간격 (초 단위, 기본 4h=14400)
+    
+    Returns:
+        dict with keys:
+            - duplicates (int): 중복 타임스탬프 행 수
+            - gaps (int): 예상 간격과 다른 행 수
+            - ohlc_violations (int): high < max(open,close) 또는 low > min(open,close) 위반
+            - negative_volume (int): 음수 볼륨 행 수
+            - gap_ratio (float): 갭 행 수 / 전체 행 수 비율
+            - is_valid (bool): (duplicates==0 and gap_ratio<0.01 and ohlc_violations==0)
+    
+    Example:
+        result = validate_ohlcv(df, expected_interval_seconds=3600)
+        if not result['is_valid']:
+            print(f"Gaps: {result['gap_ratio']:.1%}, OHLC violations: {result['ohlc_violations']}")
+    """
+    # 1. 중복 검출
+    duplicates = df.index.duplicated().sum()
+    
+    # 2. 갭 검출 (index.diff()가 expected_interval과 다른 행)
+    if len(df) > 1:
+        time_diffs = df.index.to_series().diff().dt.total_seconds()
+        gaps = (time_diffs != expected_interval_seconds).sum() - 1  # 첫 행의 NaN 제외
+        gap_ratio = gaps / len(df) if len(df) > 0 else 0.0
+    else:
+        gaps = 0
+        gap_ratio = 0.0
+    
+    # 3. OHLC 논리 검증
+    ohlc_violations = 0
+    if "high" in df.columns and "low" in df.columns and "open" in df.columns and "close" in df.columns:
+        invalid_high = df[df["high"] < df[["open", "close"]].max(axis=1)]
+        invalid_low = df[df["low"] > df[["open", "close"]].min(axis=1)]
+        ohlc_violations = len(invalid_high) + len(invalid_low)
+    
+    # 4. 음수 볼륨 검출
+    negative_volume = 0
+    if "volume" in df.columns:
+        negative_volume = (df["volume"] < 0).sum()
+    
+    # 5. is_valid 판정
+    is_valid = (duplicates == 0 and gap_ratio < 0.01 and ohlc_violations == 0)
+    
+    # 6. 갭 비율 >1% 시 경고
+    if gap_ratio > 0.01:
+        logger.warning(
+            "High gap ratio detected: %.1f%% (%d/%d candles have gaps). "
+            "Check expected_interval_seconds and timezone consistency.",
+            gap_ratio * 100,
+            gaps,
+            len(df),
+        )
+    
+    return {
+        "duplicates": duplicates,
+        "gaps": gaps,
+        "ohlc_violations": ohlc_violations,
+        "negative_volume": negative_volume,
+        "gap_ratio": gap_ratio,
+        "is_valid": is_valid,
+    }

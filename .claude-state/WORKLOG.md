@@ -1,3 +1,30 @@
+## [2026-05-31] Cycle 252 — E(실행) + A(품질) + F(리서치)
+
+**[E] Execution — validate_ohlcv() 데이터 검증 헬퍼:**
+- `src/data/data_utils.py`에 validate_ohlcv(df, expected_interval_seconds=14400) 구현
+- 4가지 검증: 중복 타임스탬프, 갭(예상 간격 불일치), OHLC 논리, 음수 볼륨
+- 반환: {duplicates, gaps, ohlc_violations, negative_volume, gap_ratio, is_valid}
+- is_valid = (duplicates==0 and gap_ratio<0.01 and ohlc_violations==0)
+- 테스트 5개 추가, 21/21 전체 PASS
+
+**[A] Quality — DSR을 Bundle OOS에 통합:**
+- BundleOOSResult에 dsr_pvalue, is_sharpe_significant 필드 추가
+- RollingOOSValidator.validate()에서 OOS Sharpe 유의성 자동 계산
+- num_strategies_tested=5, total_oos_trades 기반 DSR 산출
+- summary() 메서드에 DSR p-value 출력 포함
+- 정보성 지표로만 사용 (기존 pass/fail 판정 변경 없음)
+
+**[F] Research — 레짐 감지 실패 패턴 + 데이터 아키텍처:**
+- HMM smoothed/filtered 확률 혼동이 최다 실패 원인 (look-ahead bias)
+- 레짐 전환 감지 중앙값 지연 ~25일, ADX 5-15bar 후 확인
+- 전환 구간 whipsaw → 포지션 0.5x "전환 쿠션" 권장
+- 데이터 아키텍처: data/historical/{exchange}/{pair}/{timeframe}.csv 구조 권장
+- 실패 사례: SQLite 중복 47-51%, API 갭 6/200 누락 → RSI 오염
+
+**테스트:** +5 validate_ohlcv (21/21 PASS)
+
+---
+
 ## [2026-05-31] Cycle 251 — B(리스크) + D(ML) + F(리서치)
 
 **[B] Risk — wick_reversal ATR 기반 변동성 필터 추가:**
@@ -1564,3 +1591,6 @@ Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-31 14:05 UTC] Cycle 251 Dispatched — A + C + SIM + F
 Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
+
+## [2026-05-31 14:10 UTC] Cycle 252 Dispatched — B + D + SIM + F
+Categories: B + D + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md

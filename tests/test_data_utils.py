@@ -14,6 +14,7 @@ from src.data.data_utils import (
     HistoricalDataDownloader,
     DataValidationReport,
     TIMEFRAME_MS,
+    validate_ohlcv,
 )
 
 
@@ -261,3 +262,104 @@ class TestTimefameConstants:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestValidateOhlcv:
+    """validate_ohlcv() 함수 테스트."""
+    
+    def test_validate_normal_data(self):
+        """정상 데이터 검증 → is_valid=True."""
+        dates = pd.date_range('2024-01-01', periods=100, freq='4h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000.0] * 100,
+            'high': [50100.0] * 100,
+            'low': [49900.0] * 100,
+            'close': [50050.0] * 100,
+            'volume': [1000.0] * 100,
+        }, index=dates)
+        
+        result = validate_ohlcv(df, expected_interval_seconds=14400)
+        
+        assert result['is_valid'] == True
+        assert result['duplicates'] == 0
+        assert result['gaps'] == 0
+        assert result['ohlc_violations'] == 0
+        assert result['gap_ratio'] == 0.0
+    
+    def test_validate_with_duplicates(self):
+        """중복 포함 → duplicates > 0."""
+        dates = pd.date_range('2024-01-01', periods=100, freq='4h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000.0] * 100,
+            'high': [50100.0] * 100,
+            'low': [49900.0] * 100,
+            'close': [50050.0] * 100,
+            'volume': [1000.0] * 100,
+        }, index=dates)
+        
+        # 중복 행 추가
+        df = pd.concat([df, df.iloc[[10]]])
+        df = df.sort_index()
+        
+        result = validate_ohlcv(df, expected_interval_seconds=14400)
+        
+        assert result['is_valid'] == False
+        assert result['duplicates'] > 0
+    
+    def test_validate_with_gaps(self):
+        """갭 포함 → gaps > 0, gap_ratio > 0."""
+        dates = pd.date_range('2024-01-01', periods=100, freq='4h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000.0] * 100,
+            'high': [50100.0] * 100,
+            'low': [49900.0] * 100,
+            'close': [50050.0] * 100,
+            'volume': [1000.0] * 100,
+        }, index=dates)
+        
+        # 갭 추가 (50번째와 51번째 사이에 2개 행 제거)
+        df = df.drop(df.index[50:52])
+        
+        result = validate_ohlcv(df, expected_interval_seconds=14400)
+        
+        assert result['is_valid'] == False
+        assert result['gaps'] > 0
+        assert result['gap_ratio'] > 0
+    
+    def test_validate_with_ohlc_violations(self):
+        """OHLC 위반 → ohlc_violations > 0."""
+        dates = pd.date_range('2024-01-01', periods=100, freq='4h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000.0] * 100,
+            'high': [50100.0] * 100,
+            'low': [49900.0] * 100,
+            'close': [50050.0] * 100,
+            'volume': [1000.0] * 100,
+        }, index=dates)
+        
+        # OHLC 위반: high < open
+        df.loc[df.index[10], 'high'] = 49500.0
+        
+        result = validate_ohlcv(df, expected_interval_seconds=14400)
+        
+        assert result['is_valid'] == False
+        assert result['ohlc_violations'] > 0
+    
+    def test_validate_with_negative_volume(self):
+        """음수 볼륨 포함."""
+        dates = pd.date_range('2024-01-01', periods=100, freq='4h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000.0] * 100,
+            'high': [50100.0] * 100,
+            'low': [49900.0] * 100,
+            'close': [50050.0] * 100,
+            'volume': [1000.0] * 100,
+        }, index=dates)
+        
+        # 음수 볼륨 추가
+        df.loc[df.index[10], 'volume'] = -100.0
+        
+        result = validate_ohlcv(df, expected_interval_seconds=14400)
+        
+        assert result['negative_volume'] > 0
+        assert result['is_valid'] == True
