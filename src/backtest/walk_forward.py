@@ -934,6 +934,8 @@ class BundleOOSResult:
     all_passed: bool
     fail_reasons: List[str]
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
+    avg_is_sharpe: float = 0.0   # fold별 IS Sharpe 평균 (진단용)
+    is_negative_fold_pct: float = 0.0  # IS Sharpe < 0인 fold 비율 (0~1)
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -941,6 +943,7 @@ class BundleOOSResult:
             f"BUNDLE_OOS: {self.strategy_name}",
             f"  folds: {len(self.folds)}",
             f"  avg_wfe: {self.avg_wfe:.3f}",
+            f"  avg_is_sharpe: {self.avg_is_sharpe:.3f} (is_neg={self.is_negative_fold_pct:.0%})",
             f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
             f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
@@ -1104,6 +1107,12 @@ class RollingOOSValidator:
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
 
+        # IS Sharpe 진단: 음수 fold 비율 계산 (전략 미작동 vs. 데이터 불일치 구분)
+        is_sharpes = [f.is_sharpe for f in active_folds]
+        avg_is_sharpe = sum(is_sharpes) / len(is_sharpes) if is_sharpes else 0.0
+        is_negative_folds = sum(1 for s in is_sharpes if s < 0)
+        is_negative_fold_pct = is_negative_folds / len(is_sharpes) if is_sharpes else 0.0
+
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
         low_trade_ratio = len(low_trade_fold_ids) / len(folds) if folds else 0.0
@@ -1117,6 +1126,18 @@ class RollingOOSValidator:
                 f"저거래 fold 비율 {low_trade_ratio:.0%} > 40% (신호 부족)"
             )
             all_passed = False
+        # IS Sharpe 음수 fold 80% 초과 → 전략 미작동 (합성 데이터 불일치 가능성)
+        IS_NEGATIVE_FOLD_MAX = 0.8
+        if is_negative_fold_pct > IS_NEGATIVE_FOLD_MAX:
+            bundle_fails.append(
+                f"IS Sharpe 음수 fold {is_negative_fold_pct:.0%} > {IS_NEGATIVE_FOLD_MAX:.0%} "
+                f"(avg_is={avg_is_sharpe:.3f}, 전략 미작동 또는 데이터 불일치)"
+            )
+            logger.warning(
+                "[%s] IS 음수 fold %d/%d (%.0%%) — 전략 미작동 가능성. avg_is_sharpe=%.3f",
+                strategy.name, is_negative_folds, len(active_folds),
+                is_negative_fold_pct * 100, avg_is_sharpe,
+            )
         if not all_passed:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
             if failed_ids:
@@ -1136,6 +1157,8 @@ class RollingOOSValidator:
             oos_sharpe_std=round(oos_std, 4),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
+            avg_is_sharpe=round(avg_is_sharpe, 3),
+            is_negative_fold_pct=round(is_negative_fold_pct, 4),
         )
         logger.info(result.summary())
         return result
