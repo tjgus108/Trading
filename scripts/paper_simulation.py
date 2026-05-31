@@ -42,6 +42,10 @@ RESULTS_JSON_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.json"
 RESULTS_CSV_PATH = STATE_DIR / "PAPER_SIMULATION_RESULTS.csv"
 CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 
+# CSV 데이터 디렉토리 (--csv-dir 옵션으로 설정, None이면 거래소 API 우선)
+# data/historical/{exchange}/{pair}/{timeframe}.csv 구조
+CSV_DATA_DIR: Optional[Path] = None
+
 # Walk-Forward 설정 (Cycle 211: 7일 train/28일 test → 학술 최적 조합 반영)
 # Cycle 210 리서치: 7d train/28d test가 81개 WF 조합 중 Sharpe 최고(1.252)
 # fold당 30 trades 목표: 1h봉 60일(1440h) 테스트 윈도우가 유리
@@ -60,6 +64,65 @@ TIMEFRAME_MS = {
     "1m": 60_000, "5m": 300_000, "15m": 900_000,
     "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
 }
+
+
+def load_ohlcv_from_csv_dir(
+    csv_dir: Path,
+    symbol: str = "BTC/USDT",
+    timeframe: str = "1h",
+) -> Optional[pd.DataFrame]:
+    """csv_dir에서 symbol/timeframe에 맞는 CSV 파일을 로드.
+
+    탐색 경로 우선순위:
+      1. {csv_dir}/{exchange}/{pair}/{timeframe}.csv  (data/historical 구조)
+      2. {csv_dir}/{pair}_{timeframe}.csv  (단순 평탄 구조)
+      3. {csv_dir}/**/{pair}*{timeframe}*.csv  (glob 폴백)
+
+    load_csv_ohlcv()로 파싱하여 enrich_indicators() 없이 raw OHLCV 반환.
+    """
+    from src.data.data_utils import load_csv_ohlcv
+
+    pair_clean = symbol.replace("/", "").replace(":", "")  # "BTC/USDT" → "BTCUSDT"
+    pair_slash = symbol.replace("/", "_")                   # "BTC/USDT" → "BTC_USDT"
+
+    candidates = []
+    # 1. data/historical 계층 구조 탐색
+    for exc_dir in csv_dir.iterdir() if csv_dir.exists() else []:
+        if exc_dir.is_dir():
+            for pair_dir in exc_dir.iterdir():
+                if pair_dir.is_dir() and pair_dir.name.upper() in (pair_clean, pair_slash.upper()):
+                    p = pair_dir / f"{timeframe}.csv"
+                    if p.exists():
+                        candidates.append(p)
+
+    # 2. 평탄 구조
+    for name in [f"{pair_clean}_{timeframe}.csv", f"{pair_slash}_{timeframe}.csv"]:
+        p = csv_dir / name
+        if p.exists():
+            candidates.append(p)
+
+    # 3. glob 폴백
+    if not candidates:
+        for p in csv_dir.rglob(f"*{pair_clean}*{timeframe}*.csv"):
+            candidates.append(p)
+        for p in csv_dir.rglob(f"*{pair_slash}*{timeframe}*.csv"):
+            candidates.append(p)
+
+    if not candidates:
+        return None
+
+    # 가장 최근 수정된 파일 우선
+    csv_path = max(candidates, key=lambda p: p.stat().st_mtime)
+    print(f"[DATA] CSV 로드: {csv_path}", flush=True)
+    try:
+        tf_seconds = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
+        df = load_csv_ohlcv(csv_path, validate=True, expected_interval_seconds=tf_seconds.get(timeframe))
+        if df is not None and not df.empty:
+            print(f"[DATA] CSV 로드 성공: {len(df)} 캔들 ({df.index[0]} ~ {df.index[-1]})", flush=True)
+            return df
+    except Exception as e:
+        print(f"[DATA] CSV 로드 실패: {e}", flush=True)
+    return None
 
 
 def fetch_real_data_paginated(
@@ -724,8 +787,25 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
-    df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
-    data_source = f"Bybit {symbol} 1h (paginated)"
+    # CSV 모드: --csv-dir 지정 시 CSV 우선 (거래소 API 스킵)
+    if CSV_DATA_DIR is not None:
+        df = load_ohlcv_from_csv_dir(CSV_DATA_DIR, symbol, "1h")
+        data_source = f"CSV {symbol} 1h ({CSV_DATA_DIR})"
+        if df is None:
+            print(f"[{symbol}][WARN] CSV 로드 실패 — 거래소 API 시도", flush=True)
+            df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
+            data_source = f"Bybit {symbol} 1h (paginated)"
+    else:
+        df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
+        data_source = f"Bybit {symbol} 1h (paginated)"
+        # 거래소 실패 시 CSV fallback (data/historical 자동 탐색)
+        if df is None:
+            default_csv_dir = ROOT / "data" / "historical"
+            if default_csv_dir.exists():
+                df = load_ohlcv_from_csv_dir(default_csv_dir, symbol, "1h")
+                if df is not None:
+                    data_source = f"CSV fallback {symbol} 1h ({default_csv_dir})"
+                    print(f"[{symbol}][FALLBACK] data/historical/ CSV 로드 성공", flush=True)
 
     if df is None:
         # 심볼별 다른 seed → 서로 다른 합성 데이터 생성
@@ -1004,6 +1084,12 @@ if __name__ == "__main__":
         default=1,
         help="MC block sign randomization 크기 (기본 1=독립 셔플, 24=1h→daily blocks)",
     )
+    parser.add_argument(
+        "--csv-dir",
+        type=str,
+        default=None,
+        help="로컬 CSV 데이터 디렉토리 (지정 시 CSV 우선 사용, 예: data/historical)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1022,4 +1108,7 @@ if __name__ == "__main__":
     if args.mc_block_size > 1:
         _this.MC_BLOCK_SIZE = args.mc_block_size
         print(f"[CONFIG] MC block size overridden: {args.mc_block_size}", flush=True)
+    if args.csv_dir is not None:
+        _this.CSV_DATA_DIR = Path(args.csv_dir).expanduser().resolve()
+        print(f"[CONFIG] CSV data dir: {_this.CSV_DATA_DIR}", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

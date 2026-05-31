@@ -110,10 +110,16 @@ class TestBuildFeaturesOnly:
 class TestFeatureNames:
     """feature_names property 검증."""
 
-    def test_returns_14_base_features(self):
-        """기본 피처 14개."""
+    def test_returns_16_base_features(self):
+        """기본 피처 16개 (14 + Cycle 254 NR 피처 2개)."""
         fb = FeatureBuilder()
-        assert len(fb.feature_names) == 14
+        assert len(fb.feature_names) == 16
+
+    def test_nr_features_in_feature_names(self):
+        """Cycle 254 NR 피처가 feature_names에 포함."""
+        fb = FeatureBuilder()
+        assert "nr_range_ratio" in fb.feature_names
+        assert "nr_atr_ratio" in fb.feature_names
 
     def test_no_removed_features(self):
         """Cycle 149에서 제거된 피처 포함되지 않음."""

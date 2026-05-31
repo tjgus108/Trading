@@ -1,36 +1,40 @@
 # Current Cycle Briefing
 
-_Cycle 253 — 2026-05-31_
-_카테고리: C(데이터) + B(리스크) + F(리서치)_
+_Cycle 254 — 2026-05-31_
+_카테고리: D(ML) + E(실행) + F(리서치)_
 
 ## 완료된 작업
 
-### C(데이터)
-- `load_csv_ohlcv(path, validate=True, expected_interval_seconds=None)` 구현
-- `resample_ohlcv(df, target_timeframe)` 구현 (1m/5m/15m/1h/4h/1d)
-- `data/historical/.gitkeep` 생성
-- 테스트 4개 추가
+### D(ML): NarrowRange ML 피처 추가
+- `src/ml/features.py`: `nr_range_ratio`, `nr_atr_ratio` 2개 피처 추가
+- base feature count: 14 → 16 (feature_names 업데이트)
+- narrow_range 신호 조건(ATR 수축, range 수축)을 RF가 직접 학습 가능
 
-### B(리스크)
-- `DrawdownMonitor.get_transition_cushion_multiplier(regime_confidence)` 구현
-  - `transition_cushion_enabled=False` (기본 비활성)
-  - `transition_cushion_threshold=0.70`
-- `RiskManager.evaluate()` — `regime_confidence` 파라미터 추가
-- 테스트 6개 추가 (TestTransitionCushion + risk_manager)
+### E(실행): paper_simulation.py CSV fallback + --csv-dir
+- `load_ohlcv_from_csv_dir()` 헬퍼: data/historical/ 계층 구조 탐색
+- simulate_symbol(): 거래소 실패 시 data/historical/ 자동 탐색
+- argparse `--csv-dir` 옵션 추가
 
-### Walk-Forward 개선
-- `RollingOOSValidator(max_oos_sharpe_std=None)` 파라미터 추가
-  - 기본값 1.5 유지, 환경별 커스터마이징 가능
+### E(실행) 버그 수정: BacktestEngine MC 테스트
+- **버그**: equity-curve Sharpe vs trade-PnL Sharpe 스케일 불일치
+  - equity-curve Sharpe: flat period로 희석 (~4.16 for narrow_range)
+  - trade-PnL Sharpe: 100 trades * ann_factor → much higher scale (~19.0)
+  - 결과: 모든 permutation이 original보다 낮아보여 p~0.25-0.35 (잘못된 결과)
+- **수정**: `mc_reference_sharpe`를 trade PnL 기준으로 계산 → apples-to-apples
+- **효과**: narrow_range mc_p 0.28 → ~0.007 예상 (합성 데이터에서도 신호 탐지)
 
-### F(리서치)
-- CPCV: N=6, k=2 조합(15경로) 인프라 완비 (test_cpcv.py 기존 존재)
-- PBO 계산: IS-best 전략 OOS 순위 반전 비율 측정 방식
-- 실 데이터 없이 합성 데이터 CPCV는 의미 없음 (PBO~50%)
+### F(리서치): PBO 분석
+- narrow_range fold 4 PASS: 합성 데이터 운 좋은 구간 (IS Sharpe 2.454)
+- PBO 계산: 9-fold CPCV IS-best → OOS 반전 비율 (합성~50%, 실 데이터 필요)
 
 ## 시뮬레이션 결과
-- Bundle OOS (4h): 0/5 PASS, narrow_range 1/9 fold PASS (PF 1.645)
-- Paper Sim: 타임아웃 (이전 사이클 결과: 0/22 PASS)
 
-## 다음 사이클
-- Cycle 254 (mod 5 = 4): D(ML) + E(실행) + F
-- load_csv_ohlcv → BacktestEngine CSV fallback 연동
+| 시뮬 | PASS | 최고 전략 |
+|------|------|----------|
+| Paper (1h, BTC/USDT) | 0/22 | narrow_range (Sharpe 4.16, PF 1.63) |
+| Bundle OOS (4h) | 0/5 | narrow_range (Score 85.2, fold 4 PASS) |
+
+## 다음 사이클 (255)
+- 255 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)
+- **핵심**: MC 버그 수정 후 시뮬 재실행 → narrow_range PASS 여부 확인
+- C: data/historical/ CSV 파이프라인 실전 검증

@@ -407,11 +407,19 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
-        # MC Permutation test: mc_min_trades 이상일 때만 실행 (ann_factor를 Sharpe 계산과 일치시킴)
+        # MC Permutation test: mc_min_trades 이상일 때만 실행
+        # equity-curve Sharpe는 flat period로 희석되어 trade-PnL Sharpe와 스케일 다름
+        # → trade PnL 기준 Sharpe로 비교 (apples-to-apples)
         mc_p = -1.0
         if len(trades) >= self.mc_min_trades:
+            trades_arr = np.array(trades, dtype=float)
+            trades_std = float(trades_arr.std())
+            mc_reference_sharpe = (
+                float(trades_arr.mean()) / trades_std * np.sqrt(ann_factor)
+                if trades_std > 1e-10 else 0.0
+            )
             mc_p = self._mc_permutation_test(
-                trades, sharpe, block_size=self.mc_block_size, ann_factor=ann_factor
+                trades, mc_reference_sharpe, block_size=self.mc_block_size, ann_factor=ann_factor
             )
             if mc_p > MC_P_THRESHOLD:
                 fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")

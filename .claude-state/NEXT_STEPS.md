@@ -1,46 +1,48 @@
 # Next Steps
 
-_Last updated: 2026-05-31 (Cycle 253 완료)_
+_Last updated: 2026-05-31 (Cycle 254 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 250, 251, 252, 253
+### 이번 세션 완료 사이클: 250, 251, 252, 253, 254
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 250 | A+C+SIM+F | GARCH(1,1) 합성데이터 개선, elder_impulse ATR 검증, MSGARCH/CPCV 리서치 |
-| 251 | B+D+F | wick_reversal ATR 필터, Deflated Sharpe Ratio 유틸리티, 데이터 확보 방안 |
-| 252 | E+A+F | validate_ohlcv() 헬퍼, DSR→BundleOOS 통합, 레짐감지 실패패턴 리서치 |
+| 250 | A+C+SIM+F | GARCH(1,1) 합성데이터 개선, elder_impulse ATR 검증 |
+| 251 | B+D+F | wick_reversal ATR 필터, Deflated Sharpe Ratio 유틸리티 |
+| 252 | E+A+F | validate_ohlcv() 헬퍼, DSR→BundleOOS 통합 |
 | 253 | C+B+F | load_csv_ohlcv/resample_ohlcv, 전환쿠션, RollingOOS max_oos_sharpe_std 파라미터화 |
+| 254 | D+E+F | nr_range_ratio/nr_atr_ratio 피처, --csv-dir 옵션, **MC 테스트 버그 수정** |
 
-### 🎯 Cycle 254 작업 방향 (254 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 255 작업 방향 (255 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): narrow_range 파라미터 최적화 신호 분석
-- narrow_range는 Cycle 253 Bundle OOS에서 최고점 (fold 4 PASS, PF 1.645)
-- ML 피처로 narrow_range의 핵심 조건 파악: ATR 임계값, 봉 수 등
-- RF feature importance로 narrow_range 생성 조건의 예측 변수 분석
-- 단, 새 전략 파일 생성 금지 → 기존 피처 선택 모듈 활용
+#### A(품질): MC 버그 수정 후 시뮬레이션 재검증
+- Cycle 254에서 MC permutation test 버그 수정 (equity-curve vs trade-PnL Sharpe 스케일 불일치)
+- 수정 후 paper_simulation.py 재실행 → narrow_range mc_p 개선 여부 확인
+- momentum_quality, volatility_cluster의 mc_p도 개선 예상 → PASS 가능성 분석
+- 기존 test_mc_narrow_range.py의 MC 테스트 케이스 업데이트 (새 기준에 맞게)
 
-#### E(실행): load_csv_ohlcv 활용 백테스트 파이프라인 연동
-- BacktestEngine에 CSV fallback 경로 추가: 거래소 연결 실패 시 data/historical/ 자동 탐색
-- paper_simulation.py에 --csv-dir 옵션 추가 (로컬 CSV 사용 모드)
-- validate_ohlcv() → resample_ohlcv() → BacktestEngine 체인 검증
+#### C(데이터): 실 데이터 CSV 파이프라인 실전 테스트
+- data/historical/ 구조에 샘플 CSV 생성: `data/historical/binance/BTCUSDT/1h.csv`
+- load_ohlcv_from_csv_dir() + paper_simulation.py --csv-dir 통합 검증
+- resample_ohlcv(df, "4h") → BacktestEngine(timeframe="4h") 체인 검증
+- 가능하면 Kaggle/CryptoDataDownload CSV 다운로드 후 실 데이터 시뮬
 
-#### F(리서치): CPCV PBO 구현 + 실 데이터 파이프라인
-- PBO(Probability of Backtest Overfitting) 실제 계산 방법
-- narrow_range fold 4 PASS 재현 가능성 분석 (합성 vs 실 데이터 차이)
-- CryptoDataDownload 수동 CSV 다운로드 방법 정리
+#### F(리서치): MC 버그 수정 영향 분석 + walk-forward 개선
+- 수정된 MC 테스트로 narrow_range가 합성 데이터에서 PASS 되는지 확인
+- 만약 PASS: PASS 기준 완화 없이 합성 데이터에서도 검증 가능 → 실 데이터 PASS 기대 ↑
+- 만약 여전히 FAIL: 다른 fail reason (OOS Sharpe std) 분석
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단 (합성 데이터만 사용 가능)
 - 합성 데이터 한계: OOS Sharpe std 3.7~7.7 (기준 1.5 대비 과대)
-- 실 데이터 필요: CryptoDataDownload/Kaggle CSV 수동 다운로드
-- load_csv_ohlcv() 구현 완료 → CSV만 있으면 즉시 활용 가능
+- MC 버그 수정으로 narrow_range mc_p 개선 예상 → 실 데이터 PASS 가능성 ↑
 
-### 핵심 메트릭 (Cycle 253)
-- 테스트: 320+107=427 passed (신규 10개)
-- 신규: load_csv_ohlcv(), resample_ohlcv(), transition_cushion, max_oos_sharpe_std 파라미터
-- 시뮬: 0/5 PASS (합성 데이터 한계 지속), narrow_range 최근접 (1/9 fold PASS)
-- 리서치: CPCV 인프라 완비, 실 데이터 CSV 로더로 연동 준비 완료
+### 핵심 메트릭 (Cycle 254)
+- 테스트: 8367 passed, 23 skipped (Cycle 254 피처 추가 후)
+- 신규: nr_range_ratio, nr_atr_ratio (ML 피처), --csv-dir (paper_sim), MC 버그 수정
+- 시뮬: 0/22 PASS paper (MC 버그 수정 전), 0/5 PASS Bundle OOS
+- 최근접: narrow_range (Score 85.2, fold 4 OOS Sharpe 3.016, PF 1.645)
+- **MC 버그 수정 효과**: 합성 데이터에서도 narrow_range mc_p ~0.007 (<<0.05) 예상

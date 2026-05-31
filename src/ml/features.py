@@ -262,6 +262,17 @@ class FeatureBuilder:
             _vpin = (_roll_imb / _roll_vol.replace(0, float("nan"))).fillna(0.5).clip(0.0, 1.0)
             feat["vpin_50"] = _vpin
 
+        # Narrow Range ML features (Cycle 254)
+        # nr_range_ratio: 현재 캔들 range / 20봉 평균 range → <1.0이면 range 수축 (NR 조건 직접 반영)
+        # nr_atr_ratio: 현재 ATR_pct / 20봉 평균 ATR_pct → <1.0이면 ATR 수축 (NR+ATR 필터 조건)
+        candle_range = (high - low) / (close + 1e-9)
+        range_ma20 = candle_range.shift(1).rolling(20, min_periods=10).mean()
+        feat["nr_range_ratio"] = candle_range / (range_ma20 + 1e-9)
+
+        atr_pct_prev = feat["atr_pct"].shift(1)
+        atr_pct_ma20 = atr_pct_prev.rolling(20, min_periods=10).mean()
+        feat["nr_atr_ratio"] = feat["atr_pct"] / (atr_pct_ma20 + 1e-9)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -360,6 +371,7 @@ class FeatureBuilder:
             "donchian_pct",
             "macd_hist",
             "bb_position",
+            "nr_range_ratio", "nr_atr_ratio",
         ]
 
 
