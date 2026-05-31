@@ -918,3 +918,28 @@ def test_kelly_reduce_at_mdd_to_dict_roundtrip():
     d = m.to_dict()
     m2 = DrawdownMonitor.from_dict(d)
     assert m2.kelly_reduce_at_mdd == pytest.approx(0.10)
+
+
+# ── Transition Cushion ─────────────────────────────────────────
+
+class TestTransitionCushion:
+    def test_cushion_disabled_by_default(self):
+        """transition_cushion_enabled=False(기본) → 항상 1.0."""
+        m = DrawdownMonitor()
+        assert m.get_transition_cushion_multiplier(0.5) == 1.0
+        assert m.get_transition_cushion_multiplier(0.0) == 1.0
+
+    def test_cushion_low_confidence(self):
+        """confidence=0.5 < threshold=0.70 → 0.5."""
+        m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+        assert m.get_transition_cushion_multiplier(0.5) == 0.5
+
+    def test_cushion_high_confidence(self):
+        """confidence=0.8 >= threshold=0.70 → 1.0."""
+        m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+        assert m.get_transition_cushion_multiplier(0.8) == 1.0
+
+    def test_cushion_boundary(self):
+        """confidence=0.70 (경계, 같음) → 1.0 (미만일 때만 적용)."""
+        m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+        assert m.get_transition_cushion_multiplier(0.70) == 1.0

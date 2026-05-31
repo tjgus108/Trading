@@ -1,3 +1,42 @@
+## [2026-05-31] Cycle 253 — C(데이터) + B(리스크) + F(리서치)
+
+**[C] Data — 히스토리컬 CSV 로더 + 리샘플링 유틸 구현:**
+- `src/data/data_utils.py`에 `load_csv_ohlcv(path, validate=True, expected_interval_seconds=None)` 추가
+  - 컬럼 정규화 (timestamp/time/date → DatetimeIndex UTC), validate_ohlcv() 자동 호출
+  - expected_interval_seconds=None 시 인접 행 diff 중앙값으로 자동 추정
+- `resample_ohlcv(df, target_timeframe)` 추가: 1m/5m/15m/1h/4h/1d 리샘플링
+  - open=first, high=max, low=min, close=last, volume=sum, NaN 제거
+- `data/historical/.gitkeep` 생성 (data/historical/{exchange}/{pair}/{timeframe}.csv 구조)
+- 테스트 4개 추가 (TestCsvLoader), 25/25 PASS
+
+**[B] Risk — 레짐 전환 쿠션 로직:**
+- `DrawdownMonitor`에 `transition_cushion_enabled`, `transition_cushion_threshold=0.70` 파라미터 추가
+- `get_transition_cushion_multiplier(regime_confidence)` 메서드: confidence<0.7 → 0.5x 반환
+- `RiskManager.evaluate()`에 `regime_confidence: Optional[float] = None` 파라미터 추가
+- 전환 쿠션 통합 블록 추가: drawdown_monitor + regime_confidence 함께 있을 때만 적용
+- TestTransitionCushion 4개 + risk_manager 2개 테스트 추가, 167/167 PASS
+
+**[WF] Walk-Forward 개선 — RollingOOSValidator max_oos_sharpe_std 파라미터화:**
+- `OOS_SHARPE_STD_MAX=1.5` 클래스 상수를 `max_oos_sharpe_std` 인스턴스 파라미터로 구성 가능하게 변경
+- 합성 데이터 환경(std>5)에서 더 관대한 기준 허용, 실 데이터에서 강화 가능
+- 기존 기본값 1.5 유지, 테스트 107/107 PASS
+
+**[F] Research — CPCV 구현 가이드:**
+- N=6 fold, k=2 조합 → 15개 경로 생성 (이미 test_cpcv.py, test_ml_cpcv_validation.py 존재)
+- PBO 산출: IS-best 전략 vs OOS 성과 순위 비교 → 반전 비율 측정
+- 합성 데이터 CPCV는 과적합 감지 불가 (모두 랜덤 수준 PBO~50%) → 실 데이터 필요
+- 결론: CPCV 인프라 완비, 실 데이터 CSV 로더(Cycle 253 C) 완성으로 연동 준비 완료
+
+**시뮬레이션 결과:**
+- Bundle OOS (4h BTC/USDT): 0/5 PASS — narrow_range 최고(Score 85.2, PF 1.657, 1 fold PASS)
+  - OOS Sharpe std 3.7~7.7 (합성 데이터 한계)
+- Paper Sim: 0/22 PASS — 합성 데이터 Consistency 0/4 (실 데이터 필요)
+- 가장 가까운: narrow_range (fold 4 PASS, OOS Sharpe 3.016, PF 1.645)
+
+**테스트:** +10개 신규, 320/320 PASS + 107 walk_forward PASS
+
+---
+
 ## [2026-05-31] Cycle 252 — E(실행) + A(품질) + F(리서치)
 
 **[E] Execution — validate_ohlcv() 데이터 검증 헬퍼:**

@@ -415,6 +415,7 @@ class RiskManager:
         open_positions: Optional[list] = None,  # 다중 포지션 total exposure 체크용
         confidence: str = "MEDIUM",  # 전략 신뢰도 → 포지션 사이징 반영
         regime: Optional[str] = None,  # 레짐 → adaptive_stop_multiplier 조정
+        regime_confidence: Optional[float] = None,  # 레짐 전환 쿠션용 신뢰도 (0~1)
     ) -> RiskResult:
         if action == "HOLD":
             return RiskResult(
@@ -559,6 +560,17 @@ class RiskManager:
                 position_size *= 0.5
                 max_size *= 0.5
                 logger.warning("DrawdownMonitor trailing_stop_signal — position_size halved")
+
+        # 레짐 전환 쿠션: regime_confidence가 낮으면 포지션 0.5x 축소
+        if self.drawdown_monitor is not None and regime_confidence is not None:
+            _cushion_mult = self.drawdown_monitor.get_transition_cushion_multiplier(regime_confidence)
+            if _cushion_mult < 1.0:
+                position_size *= _cushion_mult
+                max_size *= _cushion_mult
+                logger.info(
+                    "Transition cushion applied: regime_confidence=%.2f → position_size *= %.1f",
+                    regime_confidence, _cushion_mult,
+                )
 
         # DrawdownMonitor kelly_fraction_multiplier: MDD > kelly_reduce_at_mdd(8%) → Kelly 0.5x 축소.
         # size_multiplier(개별 거래 사이즈 제어)와 독립적인 포트폴리오 배분 레이어.

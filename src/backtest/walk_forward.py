@@ -962,7 +962,7 @@ class RollingOOSValidator:
     WFE ≥ 0.50, OOS Sharpe ≥ IS Sharpe × 0.60, OOS MDD ≤ IS MDD × 2.0.
     """
 
-    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 한계
+    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 기본 한계
 
     def __init__(
         self,
@@ -973,6 +973,7 @@ class RollingOOSValidator:
         sharpe_decay_max: float = 0.60,
         mdd_expand_max: float = 2.0,
         min_oos_trades: int = 3,   # 거래 수 미달 fold는 집계에서 제외 (신호 없음)
+        max_oos_sharpe_std: Optional[float] = None,  # None=클래스 기본값(1.5) 사용
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -981,6 +982,11 @@ class RollingOOSValidator:
         self.sharpe_decay_max = sharpe_decay_max
         self.mdd_expand_max = mdd_expand_max
         self.min_oos_trades = min_oos_trades
+        # 인스턴스별 기준 덮어쓰기 가능: 합성 데이터 환경에서는 완화, 실 데이터에서는 강화
+        if max_oos_sharpe_std is not None:
+            self._oos_sharpe_std_max = float(max_oos_sharpe_std)
+        else:
+            self._oos_sharpe_std_max = self.OOS_SHARPE_STD_MAX
 
     def validate(
         self,
@@ -1143,9 +1149,9 @@ class RollingOOSValidator:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
             if failed_ids:
                 bundle_fails.append(f"Failed folds: {failed_ids}")
-        if oos_std > self.OOS_SHARPE_STD_MAX:
+        if oos_std > self._oos_sharpe_std_max:
             bundle_fails.append(
-                f"OOS Sharpe std {oos_std:.3f} > {self.OOS_SHARPE_STD_MAX} (불안정)"
+                f"OOS Sharpe std {oos_std:.3f} > {self._oos_sharpe_std_max} (불안정)"
             )
             all_passed = False
 

@@ -130,6 +130,8 @@ class DrawdownMonitor:
         mdd_halt_pct: float = 0.20,
         rolling_window: int = 50,
         kelly_reduce_at_mdd: float = 0.08,
+        transition_cushion_enabled: bool = False,
+        transition_cushion_threshold: float = 0.70,
     ) -> None:
         """
         Args:
@@ -172,6 +174,8 @@ class DrawdownMonitor:
         self.mdd_liquidate_pct = mdd_liquidate_pct
         self.mdd_halt_pct = mdd_halt_pct
         self.kelly_reduce_at_mdd = float(kelly_reduce_at_mdd)
+        self.transition_cushion_enabled = transition_cushion_enabled
+        self.transition_cushion_threshold = transition_cushion_threshold
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
         self._rolling_window: int = rolling_window  # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
@@ -402,6 +406,22 @@ class DrawdownMonitor:
             0.5 if current_drawdown() > kelly_reduce_at_mdd, else 1.0
         """
         if self.current_drawdown() > self.kelly_reduce_at_mdd:
+            return 0.5
+        return 1.0
+
+    def get_transition_cushion_multiplier(self, regime_confidence: float) -> float:
+        """레짐 확률이 낮으면 전환 쿠션 적용 (0.5x 축소).
+
+        레짐 전환 구간에서 whipsaw 방지를 위해 포지션을 반으로 줄인다.
+        transition_cushion_enabled=False(기본)이면 항상 1.0 반환.
+        """
+        if not self.transition_cushion_enabled:
+            return 1.0
+        if regime_confidence < self.transition_cushion_threshold:
+            logger.info(
+                "Transition cushion: regime_confidence=%.2f < threshold=%.2f → 0.5x",
+                regime_confidence, self.transition_cushion_threshold,
+            )
             return 0.5
         return 1.0
 

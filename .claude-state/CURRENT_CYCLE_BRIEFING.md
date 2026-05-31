@@ -1,47 +1,36 @@
-======================================================================
-🔄 CYCLE 252 — 2026-05-31T14:10:40.029489Z
-======================================================================
+# Current Cycle Briefing
 
-## 이번 사이클 배정 카테고리 (병렬 3개)
+_Cycle 253 — 2026-05-31_
+_카테고리: C(데이터) + B(리스크) + F(리서치)_
 
-### [B] Risk Management
-- **Agent**: risk-agent
-- **Focus**: DrawdownMonitor, Kelly Sizer 튜닝, CircuitBreaker 개선, VaR/CVaR 검증
+## 완료된 작업
 
-### [D] ML & Signals
-- **Agent**: ml-agent
-- **Focus**: LSTM 재학습, RF 피처 분석, 앙상블 가중치, Walk-Forward 통합
+### C(데이터)
+- `load_csv_ohlcv(path, validate=True, expected_interval_seconds=None)` 구현
+- `resample_ohlcv(df, target_timeframe)` 구현 (1m/5m/15m/1h/4h/1d)
+- `data/historical/.gitkeep` 생성
+- 테스트 4개 추가
 
-### [SIM] Paper Simulation & Auto-improve
-- **Agent**: backtest-agent
-- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
+### B(리스크)
+- `DrawdownMonitor.get_transition_cushion_multiplier(regime_confidence)` 구현
+  - `transition_cushion_enabled=False` (기본 비활성)
+  - `transition_cushion_threshold=0.70`
+- `RiskManager.evaluate()` — `regime_confidence` 파라미터 추가
+- 테스트 6개 추가 (TestTransitionCushion + risk_manager)
 
-### [F] Research
-- **Agent**: strategy-researcher-agent
-- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
+### Walk-Forward 개선
+- `RollingOOSValidator(max_oos_sharpe_std=None)` 파라미터 추가
+  - 기본값 1.5 유지, 환경별 커스터마이징 가능
 
-## 이전 사이클 현황
-  (기록 없음)
+### F(리서치)
+- CPCV: N=6, k=2 조합(15경로) 인프라 완비 (test_cpcv.py 기존 존재)
+- PBO 계산: IS-best 전략 OOS 순위 반전 비율 측정 방식
+- 실 데이터 없이 합성 데이터 CPCV는 의미 없음 (PBO~50%)
 
-**[!] 감지된 이슈:**
-  - CRITICAL 항목 감지
-  - ERROR 기록 존재
+## 시뮬레이션 결과
+- Bundle OOS (4h): 0/5 PASS, narrow_range 1/9 fold PASS (PF 1.645)
+- Paper Sim: 타임아웃 (이전 사이클 결과: 0/22 PASS)
 
-## ⛔ 금지 사항
-- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
-- 한 카테고리에 2 사이클 연속 집중 금지
-- 실패 사례 리서치 없이 코드만 작성 금지
-
-## 📋 사이클 종료 시 필수 수행
-1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
-2. STATUS.md 업데이트 (전체 현황)
-3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
-4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
-5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
-
-## 🚀 실행 지침 (Claude Code 세션용)
-이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
-1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
-2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
-3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
-4. 커밋 + push
+## 다음 사이클
+- Cycle 254 (mod 5 = 4): D(ML) + E(실행) + F
+- load_csv_ohlcv → BacktestEngine CSV fallback 연동

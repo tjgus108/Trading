@@ -363,3 +363,110 @@ class TestValidateOhlcv:
         
         assert result['negative_volume'] > 0
         assert result['is_valid'] == True
+
+
+class TestCsvLoader:
+    """load_csv_ohlcv() 함수 테스트."""
+    
+    def test_load_csv_basic(self):
+        """정상 CSV 파일 로드, 컬럼/인덱스 검증."""
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("timestamp,open,high,low,close,volume\n")
+            f.write("2024-01-01 00:00:00,50000,50100,49900,50050,1000\n")
+            f.write("2024-01-01 01:00:00,50050,50150,49950,50100,1100\n")
+            f.write("2024-01-01 02:00:00,50100,50200,50000,50150,1200\n")
+            csv_path = f.name
+        
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            
+            df = load_csv_ohlcv(csv_path, validate=False)
+            
+            # 컬럼 확인
+            assert list(df.columns) == ['open', 'high', 'low', 'close', 'volume']
+            
+            # 인덱스 확인 (DatetimeIndex, UTC)
+            assert isinstance(df.index, pd.DatetimeIndex)
+            assert df.index.tz is not None
+            assert str(df.index.tz) == 'UTC'
+            
+            # 행 수 확인
+            assert len(df) == 3
+            
+            # 값 확인
+            assert df.iloc[0]['open'] == 50000
+            assert df.iloc[0]['volume'] == 1000
+        finally:
+            import os
+            os.unlink(csv_path)
+    
+    def test_load_csv_auto_validates(self):
+        """validate=True일 때 validate_ohlcv 자동 호출."""
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("timestamp,open,high,low,close,volume\n")
+            f.write("2024-01-01 00:00:00,50000,50100,49900,50050,1000\n")
+            f.write("2024-01-01 01:00:00,50050,50150,49950,50100,1100\n")
+            csv_path = f.name
+        
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            
+            # validate=True로 로드
+            df = load_csv_ohlcv(csv_path, validate=True, expected_interval_seconds=3600)
+            
+            # 데이터 로드 확인
+            assert len(df) == 2
+            assert df.iloc[0]['open'] == 50000
+        finally:
+            import os
+            os.unlink(csv_path)
+    
+    def test_resample_1h_to_4h(self):
+        """1h 데이터를 4h로 리샘플링."""
+        from src.data.data_utils import resample_ohlcv
+        
+        # 1시간 간격 데이터 생성 (16개 = 4일)
+        dates = pd.date_range('2024-01-01', periods=16, freq='1h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000 + i*10 for i in range(16)],
+            'high': [50100 + i*10 for i in range(16)],
+            'low': [49900 + i*10 for i in range(16)],
+            'close': [50050 + i*10 for i in range(16)],
+            'volume': [1000 + i*100 for i in range(16)],
+        }, index=dates)
+        
+        # 4h로 리샘플링
+        df_4h = resample_ohlcv(df, '4h')
+        
+        # 캔들 수 확인 (약 16 / 4 = 4개)
+        assert len(df_4h) == 4
+        
+        # 컬럼 확인
+        assert list(df_4h.columns) == ['open', 'high', 'low', 'close', 'volume']
+        
+        # 첫 번째 4h 캔들: open은 첫 행, close는 4번째 행
+        assert df_4h.iloc[0]['open'] == df.iloc[0]['open']  # 50000
+        assert df_4h.iloc[0]['close'] == df.iloc[3]['close']  # 50080
+        
+        # 볼륨은 합산
+        assert df_4h.iloc[0]['volume'] == df.iloc[0:4]['volume'].sum()
+    
+    def test_resample_invalid_timeframe(self):
+        """잘못된 timeframe → ValueError."""
+        from src.data.data_utils import resample_ohlcv
+        
+        dates = pd.date_range('2024-01-01', periods=10, freq='1h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000] * 10,
+            'high': [50100] * 10,
+            'low': [49900] * 10,
+            'close': [50050] * 10,
+            'volume': [1000] * 10,
+        }, index=dates)
+        
+        with pytest.raises(ValueError):
+            resample_ohlcv(df, 'invalid_timeframe')

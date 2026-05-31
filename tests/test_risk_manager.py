@@ -1374,3 +1374,57 @@ class TestMaxPositionByOrderbook:
         from src.risk.position_sizer import max_position_by_orderbook
         result = max_position_by_orderbook(200_000, max_impact_pct=0.10)
         assert result == pytest.approx(20_000.0)
+
+
+# ── Transition Cushion (regime_confidence) ────────────────────
+
+def test_regime_confidence_low_reduces_position():
+    """regime_confidence=0.5 → DrawdownMonitor transition cushion → position_size 절반."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    dm = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        drawdown_monitor=dm,
+    )
+
+    result_normal = rm.evaluate(
+        action="BUY",
+        entry_price=100.0,
+        atr=1.0,
+        account_balance=10_000.0,
+        regime_confidence=0.9,  # 높음 → 쿠션 없음
+    )
+    result_low = rm.evaluate(
+        action="BUY",
+        entry_price=100.0,
+        atr=1.0,
+        account_balance=10_000.0,
+        regime_confidence=0.5,  # 낮음 → 0.5x 적용
+    )
+
+    assert result_normal.status == RiskStatus.APPROVED
+    assert result_low.status == RiskStatus.APPROVED
+    assert result_low.position_size == pytest.approx(result_normal.position_size * 0.5, rel=1e-4)
+
+
+def test_regime_confidence_high_no_change():
+    """regime_confidence=0.9 >= threshold=0.70 → position_size 변화 없음."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    dm = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    rm_with = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5, drawdown_monitor=dm)
+    rm_without = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+
+    result_with = rm_with.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0, regime_confidence=0.9,
+    )
+    result_without = rm_without.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0,
+    )
+
+    assert result_with.status == RiskStatus.APPROVED
+    assert result_with.position_size == pytest.approx(result_without.position_size, rel=1e-4)
