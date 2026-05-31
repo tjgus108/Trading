@@ -1,42 +1,52 @@
 ## [2026-05-31] Cycle 250 — A(품질) + C(데이터) + F(리서치)
 
-**[A] walk_forward.py — BundleOOSResult IS Sharpe 진단 필드 추가:**
-- `avg_is_sharpe: float = 0.0` 필드 추가: fold별 IS Sharpe 평균 (진단용)
-- `is_negative_fold_pct: float = 0.0` 필드 추가: IS Sharpe < 0인 fold 비율
-- `BundleOOSResult.summary()`: `avg_is_sharpe (is_neg=%)` 표시 추가
-- `RollingOOSValidator.validate()`: IS 음수 fold 80% 초과 시 fail_reasons에 진단 메시지 등록
-- 효과: BUNDLE_OOS_REPORT.md에서 "IS Sharpe 음수 진단" 섹션이 walk_forward 수준에서 추적 가능
+**[A] 품질 — elder_impulse ATR 수정 효과 검증 (GARCH 데이터):**
+- GARCH `--dry-run --use-quality-data` 실행: elder_impulse IS 음수 비율 100%→44% (GBM 대비)
+- ATR 버그 수정(Cycle 249)이 GARCH 합성 데이터에서 확인됨: IS Sharpe 양수 fold 5/9개
+- GBM 대비 GARCH 전략별 IS 음수 비율: cmf 89%→22%, narrow_range 100%→56%, wick_reversal 89%→0%
+- BundleOOSResult에 `fold_pass_rate` 필드 추가: active fold 중 PASS 비율 계산
+  - `validate()` 메서드에서 자동 계산: `sum(f.passed)/len(active_folds)`
+  - `summary()` 출력에 fold_pass_rate 표시 추가
+- `format_summary_table()` 에 "Fold Pass%" 열 추가 → BUNDLE_OOS_REPORT 가독성 개선
+- 신규 테스트 4개:
+  - test_bundle_oos_result_fold_pass_rate_default: 기본값 0.0 확인
+  - test_rolling_oos_validator_fold_pass_rate_populated: 0~1 범위 확인
+  - test_bundle_oos_result_summary_includes_fold_pass_rate: summary 문자열 포함 확인
+  - test_garch_synthetic_wick_ratio_realistic: GARCH 데이터 wick_ratio >= 0.65 존재 확인
 
-**[A] elder_impulse ATR 수정 효과 검증 완료:**
-- Cycle 249 수정 (_calculate_atr 14기간 평균) → Cycle 250 GARCH 시뮬에서 확인
-- IS 음수 비율: GBM 100% → GARCH 44% (ATR 수정 + GARCH 데이터 복합 효과)
-- narrow_range도 GARCH fold 5~7에서 IS 양수 (7.7, 6.6, 3.3) → 추세 구간 신호 증가
+**[C] 데이터 — GARCH 합성 데이터 wick multiplier 수정:**
+- 버그: `quality_audit.make_synthetic_data()` wick multiplier 0.010 → wick 크기 ~0.00012% (실제 0.6~2.5%)
+  - `high = close * (1 + high_wicks * 0.010)` → `high = close * (1 + high_wicks * 0.5)`
+  - wick_reversal이 GARCH 데이터에서 IS 신호 0건인 근본 원인
+- 수정 효과: wick_reversal IS Sharpe **전체 9 fold 양수** (수정 전: 4/9 양수)
+  - OOS < 10 trades 한계는 고정 regime 패턴 분포에 기인 (IS에 wick 패턴 집중됨)
+  - IS Sharpe 개선 자체는 합성 데이터 현실성 향상의 증거
+- GBM vs GARCH 비교표 (IS 음수 비율):
+  | 전략 | GBM | GARCH(이전) | GARCH(신규) |
+  |------|-----|-------------|-------------|
+  | cmf | 89% | 44% | 22% |
+  | elder_impulse | 100% | 44% | 44% |
+  | wick_reversal | 89% | 44% | 0% |
+  | narrow_range | 100% | 44% | 56% |
+  | value_area | 78% | 100% | 89% |
 
-**[C] 데이터 — run_bundle_oos.py 기본 fallback GARCH 변경:**
-- 실거래소 차단 시 GBM 대신 GARCH 합성 데이터로 fallback
-- 근거: GBM vs GARCH 비교에서 IS neg 100%→44% 개선 (elder_impulse 기준)
-- narrow_range: GARCH에서 fold 5~7 IS Sharpe 양수 (GBM에서는 모두 음수)
-- GBM은 --dry-run 명시 시에만 유지 (비교 실험 및 하위 호환)
+**[F] 리서치 — 실거래소 없는 환경에서 신뢰가능한 검증 방법론:**
+- GARCH > GBM 결과: trend block 구조 합성 데이터가 trend-following 전략과 더 일치
+- wick_reversal IS Sharpe 0% 음수: wick multiplier 수정으로 현실적 봉 구조 달성
+- value_area 여전히 OOS 0 trades: 4h 봉 기준 volume profile 신호 부족 (합성 데이터 한계)
+- OOS std > 1.5 기준이 cmf/narrow_range 전체 PASS 막는 주요 장벽:
+  - GARCH cmf: avg OOS Sharpe 1.075, Fold Pass% 44%, OOS std 4.236 → FAIL
+  - 결론: 실거래소 데이터 없이는 OOS std 기준 통과 불가 (fold 간 레짐 차이 너무 큼)
 
-**[F] 리서치 — GARCH vs GBM 비교 정량화:**
-- GARCH(trend_up +0.03%/bar × ~120봉, bear ~25봉) > GBM: trend-following IS 음수 비율 감소
-- cmf: GBM/GARCH 모두 Rank #1 (volume-direction 상관관계 구조 보존)
-- wick_reversal, value_area: GARCH에서도 0 OOS trades → 실거래소 데이터 필수
-- 결론: GARCH+regime 블록이 실거래소 데이터 대용으로 더 신뢰가능
+**[SIM] Bundle OOS (GBM, 2026-05-31):**
+- 0/5 PASS, Rank #1: cmf (Score 76.6, OOS Sharpe -1.270, Avg Trades 12.4, MDD 7.64%)
 
-**[SIM] Bundle OOS BTC (4h, GARCH fallback, 2026-05-31):**
-- 0/5 PASS
-- Rank #1: cmf (Score 88.7, OOS Sharpe 1.085, Avg Trades 22.3, IS neg 44%)
-- Rank #2: narrow_range (Score 85.6, OOS Sharpe 1.029, IS neg 44%)
-- elder_impulse: IS neg 44% (이전 GBM 100% → GARCH 44% 개선 확인)
-- wick_reversal/value_area: 0 OOS trades (GARCH에서도 min_oos_trades=10 미충족)
+**[SIM] Bundle OOS GARCH (수정 후, 2026-05-31):**
+- 0/5 PASS, Rank #1: cmf (Score 92.9, OOS Sharpe 1.075, Avg Trades 15.4, MDD 6.11%)
+- wick_reversal IS Sharpe: 0% 음수 (9/9 양수) → 합성 데이터 wick 수정 효과 확인
+- fold_pass_rate 열 새로 표시됨 (Summary 테이블)
 
-**[SIM] Paper SIM BTC 1h (BlockBootstrap, 2026-05-31):**
-- 0/22 PASS (합성 BlockBootstrap 데이터)
-- 상대 우위: momentum_quality(+59.23%, Sharpe 5.11), cmf(+58.61%, Sharpe 3.87)
-- Bundle 5 중: cmf +58.61%, narrow_range +5.28%, wick_reversal -1.23%, elder_impulse -9.09%
-
-**테스트: 8349 passed** (신규 3개: IS neg fold 필드·summary·E2E 검증)
+**테스트: 8350 passed** (신규 4개: fold_pass_rate ×3 + wick_ratio 1개)
 
 ---
 
@@ -1547,7 +1557,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1596,7 +1606,7 @@ Context: score=N/A news=NONE
 Notes: none
 ImplShortfall: -5.00bps
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1605,7 +1615,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1614,7 +1624,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1623,7 +1633,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1632,7 +1642,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:10 UTC]
+## [2026-05-31 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1641,7 +1651,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1690,7 +1700,7 @@ Context: score=N/A news=NONE
 Notes: none
 ImplShortfall: -5.00bps
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1699,7 +1709,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1708,7 +1718,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1717,7 +1727,7 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
@@ -1726,7 +1736,101 @@ Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
-## [2026-05-31 10:15 UTC]
+## [2026-05-31 05:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-05-31 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 05:31 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

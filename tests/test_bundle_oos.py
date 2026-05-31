@@ -145,6 +145,71 @@ def test_format_summary_table():
     assert "narrow_range" in table
 
 
+# ── BundleOOSResult fold_pass_rate 테스트 ─────────────────
+
+
+def test_bundle_oos_result_fold_pass_rate_default():
+    """fold_pass_rate 기본값 0.0 확인."""
+    result = BundleOOSResult(
+        strategy_name="test", folds=[], avg_wfe=0.5,
+        avg_oos_sharpe=1.0, avg_oos_pf=1.5,
+        all_passed=True, fail_reasons=[],
+    )
+    assert result.fold_pass_rate == 0.0
+
+
+def test_rolling_oos_validator_fold_pass_rate_populated():
+    """RollingOOSValidator가 fold_pass_rate를 0~1 사이 값으로 채우는지 확인."""
+    from src.strategy.base import Action, BaseStrategy, Confidence, Signal
+
+    class AlwaysBuyStrat(BaseStrategy):
+        name = "always_buy"
+        def generate(self, df):
+            return Signal(
+                action=Action.BUY, confidence=Confidence.HIGH,
+                strategy=self.name, entry_price=float(df["close"].iloc[-1]),
+                reasoning="test", invalidation="none",
+            )
+
+    v = RollingOOSValidator(is_bars=100, oos_bars=50, slide_bars=50, min_oos_trades=1)
+    df = make_ohlcv(500)
+    result = v.validate(AlwaysBuyStrat(), df)
+    assert 0.0 <= result.fold_pass_rate <= 1.0
+
+
+def test_bundle_oos_result_summary_includes_fold_pass_rate():
+    """summary()에 fold_pass_rate 항목 포함 확인."""
+    result = BundleOOSResult(
+        strategy_name="test", folds=[], avg_wfe=0.6,
+        avg_oos_sharpe=1.0, avg_oos_pf=1.5,
+        all_passed=True, fail_reasons=[],
+        fold_pass_rate=0.75,
+    )
+    s = result.summary()
+    assert "fold_pass_rate" in s
+    assert "75%" in s
+
+
+def test_garch_synthetic_wick_ratio_realistic():
+    """quality_audit.make_synthetic_data() wick ratio가 wick_reversal 임계값(0.65)을 충족 가능."""
+    import sys
+    sys.path.insert(0, "/home/user/Trading/scripts")
+    from quality_audit import make_synthetic_data
+
+    df = make_synthetic_data(500, seed=42)
+    lower_wick = (df[["open", "close"]].min(axis=1) - df["low"]).clip(lower=0)
+    upper_wick = (df["high"] - df[["open", "close"]].max(axis=1)).clip(lower=0)
+    total_range = df["high"] - df["low"]
+    valid = total_range > 0
+    lower_ratio = (lower_wick[valid] / total_range[valid])
+    upper_ratio = (upper_wick[valid] / total_range[valid])
+    # multiplier 0.5 적용 후: wick_ratio >= 0.65인 봉이 충분히 존재해야 함
+    n_hammer = (lower_ratio >= 0.65).sum()
+    n_star = (upper_ratio >= 0.65).sum()
+    assert n_hammer > 0, "GARCH 데이터에서 Hammer 패턴(lower_wick_ratio >= 0.65) 0건"
+    assert n_star > 0, "GARCH 데이터에서 Shooting Star 패턴(upper_wick_ratio >= 0.65) 0건"
+
+
 # ── PerformanceMonitor 연동 테스트 ─────────────────────────
 
 

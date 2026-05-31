@@ -934,6 +934,7 @@ class BundleOOSResult:
     all_passed: bool
     fail_reasons: List[str]
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
+    fold_pass_rate: float = 0.0  # active fold 중 PASS 비율 (0.0~1.0)
     avg_is_sharpe: float = 0.0   # fold별 IS Sharpe 평균 (진단용)
     is_negative_fold_pct: float = 0.0  # IS Sharpe < 0인 fold 비율 (0~1)
 
@@ -947,6 +948,7 @@ class BundleOOSResult:
             f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
             f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
+            f"  fold_pass_rate: {self.fold_pass_rate:.0%}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
@@ -1106,6 +1108,7 @@ class RollingOOSValidator:
         oos_sharpes = [f.oos_sharpe for f in active_folds]
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
+        fold_pass_rate = sum(1 for f in active_folds if f.passed) / len(active_folds)
 
         # IS Sharpe 진단: 음수 fold 비율 계산 (전략 미작동 vs. 데이터 불일치 구분)
         is_sharpes = [f.is_sharpe for f in active_folds]
@@ -1157,6 +1160,7 @@ class RollingOOSValidator:
             oos_sharpe_std=round(oos_std, 4),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
+            fold_pass_rate=round(fold_pass_rate, 4),
             avg_is_sharpe=round(avg_is_sharpe, 3),
             is_negative_fold_pct=round(is_negative_fold_pct, 4),
         )
