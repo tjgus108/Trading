@@ -124,11 +124,13 @@ def make_synthetic_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
     close = 50000 * np.exp(np.cumsum(returns))
     
     # OHLC 생성 (개선: High/Low는 volatility state와 연관)
+    # multiplier 0.5: range 레짐 wick ~0.6%, trend wick ~0.75%, vol_spike wick ~2.5%
+    # (이전 0.010은 너무 작아 wick_reversal 신호 생성 불가)
     high_wicks = np.abs(np.random.normal(0, 1, n)) * volatility_state
     low_wicks = np.abs(np.random.normal(0, 1, n)) * volatility_state
-    
-    high = close * (1 + high_wicks * 0.010)
-    low = close * (1 - low_wicks * 0.010)
+
+    high = close * (1 + high_wicks * 0.5)
+    low = close * (1 - low_wicks * 0.5)
     
     # Open: 이전 Close와 현재 Close 사이, 약간의 갭 가능성
     open_ = np.zeros(n)

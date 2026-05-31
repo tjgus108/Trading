@@ -934,6 +934,7 @@ class BundleOOSResult:
     all_passed: bool
     fail_reasons: List[str]
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
+    fold_pass_rate: float = 0.0  # active fold 중 PASS 비율 (0.0~1.0)
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -944,6 +945,7 @@ class BundleOOSResult:
             f"  avg_oos_sharpe: {self.avg_oos_sharpe:.3f}",
             f"  oos_sharpe_std: {self.oos_sharpe_std:.3f}",
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
+            f"  fold_pass_rate: {self.fold_pass_rate:.0%}",
             f"  verdict: {verdict}",
         ]
         if self.fail_reasons:
@@ -1103,6 +1105,7 @@ class RollingOOSValidator:
         oos_sharpes = [f.oos_sharpe for f in active_folds]
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
+        fold_pass_rate = sum(1 for f in active_folds if f.passed) / len(active_folds)
 
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
@@ -1136,6 +1139,7 @@ class RollingOOSValidator:
             oos_sharpe_std=round(oos_std, 4),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
+            fold_pass_rate=round(fold_pass_rate, 4),
         )
         logger.info(result.summary())
         return result

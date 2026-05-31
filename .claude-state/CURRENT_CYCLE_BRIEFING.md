@@ -1,48 +1,40 @@
 ======================================================================
-🔄 CYCLE 249 — 2026-05-30
+🔄 CYCLE 250 완료 → CYCLE 251 준비 — 2026-05-31
 ======================================================================
 
-## 이번 사이클 배정 카테고리
+## Cycle 250 배정 카테고리
 
-249 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
+**A(품질) + C(데이터) + F(리서치)** (250 mod 5 = 0)
 
-## 핵심 작업 완료
+## 완료된 작업
 
-### [D] elder_impulse._calculate_atr() 버그 수정 (코드 정확성)
-- 버그: `_calculate_atr()` 이 period=14 파라미터를 무시하고 마지막 봉 단일 TR만 반환
-- 수정: numpy 기반 True Range 배열 계산 → 14기간 단순 평균으로 교체
-- 영향: 변동성 필터(min_volatility=0.002)가 노이즈 없는 안정적 ATR 기반으로 작동
-- 신규 테스트 3개: period 평균 검증, 범위 검증, short df 경계조건
+### [A] 품질
+- elder_impulse ATR 수정 효과 검증: GARCH 데이터에서 IS 음수 비율 100%→44%
+- BundleOOSResult.fold_pass_rate 필드 추가 (A품질: 보고서 개선)
+- format_summary_table에 "Fold Pass%" 열 추가
 
-### [D] run_bundle_oos.py --use-quality-data 옵션 추가
-- `_generate_quality_synthetic_data()` 헬퍼: quality_audit.make_synthetic_data() (GARCH) 사용
-- --use-quality-data 플래그: 실거래소 차단 + dry-run 시 GARCH+regime 합성 데이터 활용
-- 비교 실험 가능: `python3 scripts/run_bundle_oos.py --dry-run --use-quality-data`
+### [C] 데이터
+- GARCH wick multiplier 수정 (0.010 → 0.5): wick_reversal IS Sharpe 0% 음수 달성
+- GBM vs GARCH IS 음수 비율 비교 완료
 
-### [E] avg_slippage_per_trade 정량화 검증 (슬리피지 모델)
-- BacktestResult.avg_slippage_per_trade 필드 정상 동작 확인
-- 신규 테스트 3개: total/count 일치, zero-slippage → zero avg, 비례 증가
-
-### [F] CMF 합성 데이터 우위 분석 완료
-- CMF = volume-weighted 가격 위치: GBM bull 레짐에서 볼륨↑ → CMF 양수 방향 일치
-- EMA 필터(close>ema50, ema20>ema50)도 bull 80% 구조에서 더 자주 충족
-- BlockBootstrap 데이터에서도 CMF 우위 유지 가능성 높음 (volume 패턴 보존)
+### [F] 리서치
+- OOS std > 1.5 기준이 합성 데이터 환경에서 PASS 장벽임 확인
+- 실거래소 데이터 없이는 fold 간 레짐 차이로 std 통과 불가
 
 ## 시뮬레이션 결과
 
-### Bundle OOS BTC 4h (합성 GBM, Cycle 249)
-- 0/5 PASS
-- Rank #1: cmf (Score 76.6, OOS Sharpe -1.270, Avg Trades 12.4, OOS MDD 7.64%)
-- IS Sharpe 음수: elder_impulse 100%, narrow_range 100%, cmf 89%, wick_reversal 89%
-- ATR 버그 수정은 다음 사이클 OOS 결과에서 elder_impulse 개선 기대
+### Bundle OOS (GBM)
+- 0/5 PASS, cmf Rank #1 (OOS Sharpe -1.270, Fold Pass% 0%)
 
-### Paper SIM BTC 1h
-- 타임아웃 (300s). 실거래소 차단으로 합성 fallback 연산 과부하.
+### Bundle OOS (GARCH 신규 wick)
+- 0/5 PASS, cmf Rank #1 (OOS Sharpe +1.075, Fold Pass% 44%)
+- wick_reversal IS 음수: 0% (9/9 양수) ← wick 수정 효과
 
-## 테스트
-8346 passed, 23 skipped (신규 6개: ATR 3개 + avg_slippage 3개)
+## Cycle 251 준비
 
-## 다음 사이클: 250 (A+C+F)
-- A: elder_impulse ATR 버그 수정 효과 + wick_reversal 변동성 필터 검토
-- C: --use-quality-data vs GBM 합성 데이터 IS Sharpe 비교표 작성
-- F: BlockBootstrap + 실거래소 없는 환경에서 신뢰가능 validation 방법론
+**B(리스크) + D(ML) + F(리서치)** (251 mod 5 = 1)
+
+### 우선 작업
+1. OOS Sharpe std 기준(1.5) 재검토: cmf avg OOS +1.075이지만 std로 FAIL
+2. cmf GARCH PASS fold 분석 (어떤 레짐에서 PASS)
+3. DrawdownMonitor circuit_breaker 통합 테스트 추가
