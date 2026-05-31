@@ -1,48 +1,47 @@
 ======================================================================
-🔄 CYCLE 249 — 2026-05-30
+🔄 CYCLE 251 — 2026-05-31T14:05:52.643088Z
 ======================================================================
 
-## 이번 사이클 배정 카테고리
+## 이번 사이클 배정 카테고리 (병렬 3개)
 
-249 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
+### [A] Quality Assurance
+- **Agent**: backtest-agent
+- **Focus**: 전략 품질 재검증, 테스트 커버리지, 기존 실패 테스트 수정
 
-## 핵심 작업 완료
+### [C] Data & Infrastructure
+- **Agent**: data-agent
+- **Focus**: WebSocket 안정성, DataFeed 캐시, OrderFlow 정확도, 온체인 데이터
 
-### [D] elder_impulse._calculate_atr() 버그 수정 (코드 정확성)
-- 버그: `_calculate_atr()` 이 period=14 파라미터를 무시하고 마지막 봉 단일 TR만 반환
-- 수정: numpy 기반 True Range 배열 계산 → 14기간 단순 평균으로 교체
-- 영향: 변동성 필터(min_volatility=0.002)가 노이즈 없는 안정적 ATR 기반으로 작동
-- 신규 테스트 3개: period 평균 검증, 범위 검증, short df 경계조건
+### [SIM] Paper Simulation & Auto-improve
+- **Agent**: backtest-agent
+- **Focus**: scripts/paper_simulation.py 실행 → 결과 분석 → PASS 전략 하위 1-2개 개선 제안/적용
 
-### [D] run_bundle_oos.py --use-quality-data 옵션 추가
-- `_generate_quality_synthetic_data()` 헬퍼: quality_audit.make_synthetic_data() (GARCH) 사용
-- --use-quality-data 플래그: 실거래소 차단 + dry-run 시 GARCH+regime 합성 데이터 활용
-- 비교 실험 가능: `python3 scripts/run_bundle_oos.py --dry-run --use-quality-data`
+### [F] Research
+- **Agent**: strategy-researcher-agent
+- **Focus**: 트레이딩봇 실패/성공 케이스 리서치 (필수), 최신 논문 조사 (구현 없이)
 
-### [E] avg_slippage_per_trade 정량화 검증 (슬리피지 모델)
-- BacktestResult.avg_slippage_per_trade 필드 정상 동작 확인
-- 신규 테스트 3개: total/count 일치, zero-slippage → zero avg, 비례 증가
+## 이전 사이클 현황
+  (기록 없음)
 
-### [F] CMF 합성 데이터 우위 분석 완료
-- CMF = volume-weighted 가격 위치: GBM bull 레짐에서 볼륨↑ → CMF 양수 방향 일치
-- EMA 필터(close>ema50, ema20>ema50)도 bull 80% 구조에서 더 자주 충족
-- BlockBootstrap 데이터에서도 CMF 우위 유지 가능성 높음 (volume 패턴 보존)
+**[!] 감지된 이슈:**
+  - CRITICAL 항목 감지
+  - ERROR 기록 존재
 
-## 시뮬레이션 결과
+## ⛔ 금지 사항
+- 새 전략 파일 생성 금지 (현재 ~355개로 충분)
+- 한 카테고리에 2 사이클 연속 집중 금지
+- 실패 사례 리서치 없이 코드만 작성 금지
 
-### Bundle OOS BTC 4h (합성 GBM, Cycle 249)
-- 0/5 PASS
-- Rank #1: cmf (Score 76.6, OOS Sharpe -1.270, Avg Trades 12.4, OOS MDD 7.64%)
-- IS Sharpe 음수: elder_impulse 100%, narrow_range 100%, cmf 89%, wick_reversal 89%
-- ATR 버그 수정은 다음 사이클 OOS 결과에서 elder_impulse 개선 기대
+## 📋 사이클 종료 시 필수 수행
+1. .claude-state/WORKLOG.md 업데이트 (이번 사이클 작업 기록)
+2. STATUS.md 업데이트 (전체 현황)
+3. .claude-state/NEXT_STEPS.md 업데이트 (다음 작업 힌트)
+4. git add -A && git commit -m '[Cycle N] 카테고리 요약' && git push
+5. CYCLE_STATE.txt 다음 사이클 번호로 업데이트
 
-### Paper SIM BTC 1h
-- 타임아웃 (300s). 실거래소 차단으로 합성 fallback 연산 과부하.
-
-## 테스트
-8346 passed, 23 skipped (신규 6개: ATR 3개 + avg_slippage 3개)
-
-## 다음 사이클: 250 (A+C+F)
-- A: elder_impulse ATR 버그 수정 효과 + wick_reversal 변동성 필터 검토
-- C: --use-quality-data vs GBM 합성 데이터 IS Sharpe 비교표 작성
-- F: BlockBootstrap + 실거래소 없는 환경에서 신뢰가능 validation 방법론
+## 🚀 실행 지침 (Claude Code 세션용)
+이 브리핑을 읽은 Claude Code는 다음과 같이 진행:
+1. 위 3개 카테고리를 Agent tool로 *병렬* 실행
+2. 각 agent는 해당 카테고리 focus 항목 중 1~2개 실제 개선 작업 수행
+3. 모든 agent 완료 후 WORKLOG/STATUS/NEXT_STEPS 업데이트
+4. 커밋 + push

@@ -1,6 +1,6 @@
 # Trading Bot Status
 
-_Last updated: 2026-05-31 (Cycle 250)_
+_Last updated: 2026-05-31 (Cycle 251)_
 
 ## 현황 요약
 - **전략 수**: ~355개 (신규 추가 동결)
@@ -9,7 +9,7 @@ _Last updated: 2026-05-31 (Cycle 250)_
 - **ML 2-class**: BTC 1000캔들 acc 63.5% → PASS
 - **ML 파이프라인**: ✅ 재학습+PFI+SHAP+ExtraTrees+XGBoost+PSI+MultiWindowEnsemble+RegimeAwareFeatureBuilder(**regime별 importance**)+DataFeed E2E+ADWIN 드리프트 감지+추론벤치마크+온체인피처stub+EWMA early warning+should_retrain_by_ewma+get_model_health+compare_feature_importance+VPIN피처+**check_feature_drift** 완비
 - **Walk-Forward**: ✅ 7개 전략 factory + OOS Sharpe std 필터 + param stability CV + Sharpe-λ*CV penalty + fold time-decay 가중치 + WFE/fold_pass_rate/is_robust + Sharpe IC 파라미터 선택 + regime fold weighting + min_oos_trades=10
-- **테스트**: 8,346+ passed (Cycle 250)
+- **테스트**: 8,351+ passed (Cycle 251 +5: wick_reversal 2 + DSR 3)
 - **리스크**: **Kelly(rolling win_rate+quarter-cap+레짐+MDD+스무딩+stress+동적fraction+vol_scaling+kelly_reduce_at_mdd)** + BayesianKelly + VaR(CF+backtest+scipy_fallback+소표본경고) + DrawdownMonitor(4단계+cooldown+streak_grace+trailing_stop_signal+mdd_kill_switch+레짐별MDD조정) + VolTargeting(simple+EWMA) + CircuitBreaker(일일제한+급속하락+config확장+15분윈도우FlashCrash) + RiskManager(CF-VaR+trailing_stop+orchestrator주입+**check_strategy_health**+kelly_fraction_multiplier) + **max_position_by_orderbook**
 - **실행**: TWAP(80테스트+unfilled_qty누적재시도+orderbook동적슬라이스+volume-weighted slices+엣지케이스검증) + ML필터 + 레짐필터 + PaperTrader(VolTargeting+KellySizer+TieredSlippage+save_state/load_state+load_state스키마검증+get_execution_summary+avg_slippage_per_trade) + CB + HealthChecker(get_uptime_pct+엣지케이스8개보강) + Notifier + Telegram + BayesianKelly live + RegimeDetector + PerformanceTracker(시간별+주간/월간PnL+rolling_sharpe_30d) + PerformanceMonitor→DrawdownMonitor레짐연동
 - **데이터**: 실데이터+**GARCH(1,1)합성(vol clustering+spike블록)**+BlockBootstrap합성(block_size기본24)+레짐캐시(동적TTL+레짐별 차등만료)+갭감지+DataFeed CB(get_cache_stats)+FR/OI+0.055%+adaptive슬리피지+VPIN(극단불균형감지)+WebSocket(ConnectionHealthMonitor+동적타임아웃+validate_timeout+MAX_BACKOFF=60s+reconnect_gaps)+RegimeFeature E2E+중복타임스탬프제거+스테일캐시자동무효화+get_order_book_depth(5초TTL)+OFICalculator(극단감지)+TTL일관성검증
@@ -19,18 +19,18 @@ _Last updated: 2026-05-31 (Cycle 250)_
 - **OOS 인프라**: run_bundle_oos.py — 5-Bundle Rolling OOS + Rank Score 리포트 + min_oos_trades=10 + --use-quality-data
 - **SIM 랭킹**: Composite Rank Score (6지표 가중합산) — paper_simulation + bundle_oos 양쪽 적용
 
-## 최근 작업 (Cycle 250)
+## 최근 작업 (Cycle 251)
 | 카테고리 | 상태 | 주요 변경 |
 |---------|------|----------|
-| A (품질) | ✅ | elder_impulse ATR fix 검증(17/17 PASS), wick_reversal 변동성 필터 분석 |
-| C (데이터) | ✅ | generate_synthetic_data() GARCH(1,1)+vol spike+drift 강화 |
-| SIM | ✅ | 0/5 PASS (합성 한계), perturbation 11/11 PASS |
-| F (리서치) | ✅ | MSGARCH 교체 권고, CPCV/PBO, CryptoDataDownload CSV 대안 |
+| B (리스크) | ✅ | wick_reversal ATR min_volatility=0.002 필터 추가 (21/21 PASS) |
+| D (ML) | ✅ | Deflated Sharpe Ratio 유틸리티 구현 (DSR p-value + is_sharpe_significant) |
+| F (리서치) | ✅ | 데이터 확보(CryptoDataDownload/Kaggle/Bybit), MSGARCH(hmmlearn+arch), 파이프라인 실패 사례 |
 
 ## 주요 리스크/이슈
 - ⚠️ 실데이터 PASS 전략 0개 (실데이터 필요 — CryptoDataDownload CSV 즉시 대안)
 - ⚠️ IS Sharpe 음수 근본 원인: GBM 구조 vs trend-following 전략 충돌
-- ⚠️ wick_reversal 변동성 필터 느슨 (vol_mult=0.8, ATR 기반 필터 없음)
+- ✅ wick_reversal ATR 변동성 필터 추가됨 (min_volatility=0.002)
+- 🆕 Deflated Sharpe Ratio 유틸리티 추가 (N=355 기준 multiple testing 보정)
 - ✅ elder_impulse ATR 버그 수정 검증 완료
 - ✅ GARCH(1,1) 변동성 클러스터링 추가됨
 - ⚠️ 볼륨 단위 불일치: Binance(base) vs Bybit(quote)

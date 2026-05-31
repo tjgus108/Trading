@@ -288,3 +288,33 @@ def test_hammer_and_shooting_star_mutual_exclusion():
     df = _make_df(n=30, pattern="none")
     sig = strategy.generate(df)
     assert sig.action == Action.HOLD
+
+
+# ── 20. ATR 필터: 저변동성 → Hammer 패턴이어도 HOLD ─────────────────────────
+def test_low_atr_blocks_hammer():
+    """
+    ATR/close < min_volatility(0.002)이면 Hammer 패턴이어도 HOLD 반환.
+    close=100, high-low=0.001(extremely tight) → atr_ratio << 0.002
+    """
+    df = _make_df(n=30, pattern="hammer", wick_ratio=0.65, close_near_sma=True, vol_ok=True)
+    # 마지막 완성봉 포함 모든 봉의 high/low를 극도로 좁게 만들어 ATR을 0에 근사
+    for i in range(len(df)):
+        mid = float(df.at[i, "close"])
+        df.at[i, "high"] = mid + 0.0001
+        df.at[i, "low"] = mid - 0.0001
+    sig = strategy.generate(df)
+    assert sig.action == Action.HOLD
+    assert "저변동성" in sig.reasoning
+
+
+# ── 21. ATR 필터: 충분한 변동성 → 필터 통과 (기존 신호 유지) ─────────────────
+def test_sufficient_atr_passes_filter():
+    """
+    ATR/close >= min_volatility(0.002)이면 ATR 필터를 통과하고 패턴 조건에 따라 신호 생성.
+    _make_df 기본값(close=100, range=2.0)은 atr_ratio ≈ 0.02 >> 0.002.
+    """
+    df = _make_df(n=30, pattern="hammer", wick_ratio=0.65, close_near_sma=True, vol_ok=True)
+    sig = strategy.generate(df)
+    # ATR 필터 통과 + Hammer 패턴 → BUY (저변동성 차단 아님)
+    assert sig.action == Action.BUY
+    assert "저변동성" not in sig.reasoning

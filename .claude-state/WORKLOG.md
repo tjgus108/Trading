@@ -1,3 +1,27 @@
+## [2026-05-31] Cycle 251 — B(리스크) + D(ML) + F(리서치)
+
+**[B] Risk — wick_reversal ATR 기반 변동성 필터 추가:**
+- `min_volatility: float = 0.002` 파라미터 추가 (elder_impulse 방식)
+- generate()에서 14-period TR 평균 기반 ATR 계산 → atr_ratio < min_volatility 시 HOLD 반환
+- 기존 vol_mult(0.8) 건드리지 않고 ATR 필터 추가로 적용
+- 21/21 테스트 PASS (신규 2개: 저변동성 필터링, 정상 통과 검증)
+
+**[D] ML — Deflated Sharpe Ratio 유틸리티 구현:**
+- `deflated_sharpe_ratio(observed_sharpe, num_strategies, num_obs, skew, kurt)` — Harvey et al. DSR p-value
+- `is_sharpe_significant(sharpe, n_obs, n_strategies=355, alpha=0.05)` — 통계적 유의성 판별
+- E[max SR] 계산: (1-γ)*Z_{1-1/N} + γ*Z_{1-1/(N*e)}, γ=0.5772 (Euler-Mascheroni)
+- src/backtest/walk_forward.py 끝에 추가, tests/test_backtest.py에 3개 테스트 추가
+
+**[F] Research — 히스토리컬 데이터 확보 + MSGARCH:**
+- 데이터 소스: CryptoDataDownload(Binance 1h→4h 리샘플링), Bybit 공식 히스토리, Kaggle(2012~현재 1분봉)
+- MSGARCH: Python `arch` 미지원 → hmmlearn+arch 2단계 근사 방식 권장, 최소 1000~2000 캔들 필요
+- 데이터 파이프라인 실패 패턴: 중복 캔들(47-51%), 갭(6/200 누락), 타임존 불일치
+- validate_ohlcv() 헬퍼 도입 제안: 중복/갭/UTC 자동 검증
+
+**테스트:** 21/21 wick_reversal PASS, 3/3 DSR PASS
+
+---
+
 ## [2026-05-31] Cycle 250 — A(품질) + C(데이터) + SIM + F(리서치)
 
 **[A] Quality — elder_impulse ATR 수정 검증 + wick_reversal 분석:**
@@ -1537,3 +1561,6 @@ Risk: N/A
 Execution: SKIPPED
 Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-05-31 14:05 UTC] Cycle 251 Dispatched — A + C + SIM + F
+Categories: A + C + SIM + F. Briefing: CURRENT_CYCLE_BRIEFING.md
