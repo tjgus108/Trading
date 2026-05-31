@@ -1,3 +1,36 @@
+## [2026-05-31] Cycle 250 — A(품질) + C(데이터) + SIM + F(리서치)
+
+**[A] Quality — elder_impulse ATR 수정 검증 + wick_reversal 분석:**
+- elder_impulse: 17/17 테스트 PASS, ATR 14기간 평균 정상 작동 확인
+- wick_reversal 변동성 필터 문제 발견: vol_mult=0.8 (평균 80%만 되어도 통과) → 너무 느슨
+- wick_reversal에는 elder_impulse 같은 ATR 기반 최소 변동성 필터 없음
+- Bundle OOS: ATR fix 후에도 elder_impulse IS Sharpe 100% 음수 유지 (합성 데이터 한계)
+
+**[C] Data — generate_synthetic_data() GARCH(1,1) 개선:**
+- GARCH(1,1) 추가: σ²_t = 0.05*ε²_{t-1} + 0.90*σ²_{t-1} (변동성 클러스터링)
+- 레짐 전환: P(bull→bear) 0.01→0.005, P(bear→bull) 0.04→0.05 (bull ~200봉)
+- Drift 강화: 0.03%→0.05% (trend-following 수익화 가능성 ↑)
+- 변동성 spike 블록: 50봉마다 25% 확률, 8-14봉 고변동성 구간
+- High/Low를 volatility_state 기반으로 현실적 wicks 생성
+- test_bundle_oos.py 18/18 PASS
+
+**[SIM] Bundle OOS 결과 분석:**
+- 0/5 PASS (합성 데이터). ATR fix → elder_impulse IS Sharpe 여전히 100% 음수
+- cmf Rank #1 (Score 76.6, 12.4 trades, MDD 7.64%)
+- perturbation 테스트: 11/11 PASS
+- 근본 원인: GBM 구조 자체가 trend-following 전략과 충돌
+
+**[F] Research — 합성 데이터 검증 대안:**
+- MSGARCH(2-regime) 교체 권고: 실 크립토 분포에 가장 근접, `arch` 패키지로 구현 가능
+- CPCV(Combinatorial Purged CV): PBO/DSR 지표로 overfitting 수치화, N=6/k=2 시작점
+- BlockBootstrap: 실제 수익률 블록 재조합으로 fat tails + vol clustering 보존
+- **즉시 대안: CryptoDataDownload/Kaggle에서 BTC 4h CSV 수동 다운로드 → 로컬 저장**
+- Lopez de Prado: 샘플/파라미터 비율 250:1 이상 권장
+
+**테스트:** 18/18 bundle_oos PASS, 11/11 perturbation PASS, 17/17 elder_impulse PASS
+
+---
+
 ## [2026-05-30] Cycle 249 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML — elder_impulse._calculate_atr() 버그 수정:**
