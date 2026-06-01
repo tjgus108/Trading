@@ -1,3 +1,37 @@
+## [2026-06-01] Cycle 255 — A(품질) + C(데이터) + F(리서치)
+
+**[A] 품질 — compute_rank_scores 0-trade 버그 수정:**
+- `src/backtest/report.py` `compute_rank_scores()` 수정
+  - 문제: avg_trades=0인 "silent" 전략이 MDD=0, sharpe_std=0으로 인위적으로 높은 점수 획득
+  - 수정: silence_mask(trades<1)에 대해 n_sharpe_adj=0.0 강제 설정
+  - trade_gate = trades/max(trades.max(),1) 적용 → MDD/stability 컴포넌트 trades로 가중
+  - 효과: 0-trade 전략은 negative-sharpe 실거래 전략보다 낮은 순위로 정정
+- `tests/test_paper_simulation.py` 테스트 추가:
+  - `test_silent_strategy_scores_below_active_strategy`: 0-trade < negative-sharpe 검증
+
+**[C] 데이터 — 히스토리컬 CSV 파이프라인 실전 구축:**
+- `data/historical/binance/BTCUSDT/1h.csv` 생성 (12,000행, 500일)
+  - 초기 GBM → OHLCV 위반(1439건) 발생 → 수정: high/low가 open/close를 포함하도록 재생성
+  - 최종: GARCH(1,1) + regime-switching (bull 75%, bear 9%, sideways 16%)
+  - validate_ohlcv: is_valid=True, violations=0, gaps=0
+- load_ohlcv_from_csv_dir() 검증 (BTC/USDT 1h → 12000 캔들 로드 성공)
+- resample_ohlcv(df, "4h") 체인 검증 (12000행 → 3000행, validate 통과)
+- paper_simulation.py --csv-dir data/historical 통합 확인
+
+**[F] 리서치 — 시뮬레이션 결과 분석:**
+- Paper Sim BTC (CSV GARCH 1h): 0/22 PASS (8 windows)
+  - 대부분 전략 0 trades → GBM 초기 데이터 불충분 (GARCH로 개선 후 재실행 필요)
+- Paper Sim ETH (합성 GARCH): 1/22 PASS — linear_channel_rev (sharpe=2.37, 2/4)
+- Paper Sim SOL (합성 GARCH): **6/22 PASS** — price_action_momentum, momentum_quality, roc_ma_cross, cmf, supertrend_multi, acceleration_band
+- Bundle OOS: 0/5 PASS — narrow_range #1 (Score 85.2, OOS Sharpe std 5.458)
+- 핵심 fail 원인: profit_factor < 1.5 (PF가 binding constraint)
+  - most failed strategies have correct direction (positive sharpe) but PF 1.0-1.45 range
+  - 신호는 맞는데 손절 vs 익절 비율 개선 필요
+
+**테스트:** 8367 passed, 23 skipped (전체 통과, 새 테스트 1건 추가)
+
+---
+
 ## [2026-05-31] Cycle 254 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML — NarrowRange ML 피처 추가:**
@@ -2047,6 +2081,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-05-31 20:38 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-01 00:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-01 00:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-01 00:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-01 00:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-01 00:24 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-01 00:24 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

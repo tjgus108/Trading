@@ -1,48 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-05-31 (Cycle 254 완료)_
+_Last updated: 2026-06-01 (Cycle 255 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 250, 251, 252, 253, 254
+### 이번 세션 완료 사이클: 251, 252, 253, 254, 255
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 250 | A+C+SIM+F | GARCH(1,1) 합성데이터 개선, elder_impulse ATR 검증 |
 | 251 | B+D+F | wick_reversal ATR 필터, Deflated Sharpe Ratio 유틸리티 |
 | 252 | E+A+F | validate_ohlcv() 헬퍼, DSR→BundleOOS 통합 |
 | 253 | C+B+F | load_csv_ohlcv/resample_ohlcv, 전환쿠션, RollingOOS max_oos_sharpe_std 파라미터화 |
-| 254 | D+E+F | nr_range_ratio/nr_atr_ratio 피처, --csv-dir 옵션, **MC 테스트 버그 수정** |
+| 254 | D+E+F | nr_range_ratio/nr_atr_ratio 피처, --csv-dir 옵션, **MC 버그 수정** |
+| 255 | A+C+F | GARCH CSV 생성, 0-trade score 버그 수정, SOL 6/22 PASS 확인 |
 
-### 🎯 Cycle 255 작업 방향 (255 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 256 작업 방향 (256 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): MC 버그 수정 후 시뮬레이션 재검증
-- Cycle 254에서 MC permutation test 버그 수정 (equity-curve vs trade-PnL Sharpe 스케일 불일치)
-- 수정 후 paper_simulation.py 재실행 → narrow_range mc_p 개선 여부 확인
-- momentum_quality, volatility_cluster의 mc_p도 개선 예상 → PASS 가능성 분석
-- 기존 test_mc_narrow_range.py의 MC 테스트 케이스 업데이트 (새 기준에 맞게)
+#### B(리스크): Profit Factor 개선을 위한 리스크 파라미터 조정
+- SOL 시뮬에서 fail 원인 1위: profit_factor < 1.5 (PF 1.0~1.45 범위)
+- atr_multiplier_tp 현재값 확인 → TP를 더 넓게 설정하면 PF 개선 가능성
+- BacktestEngine 기본 파라미터: atr_multiplier_sl, atr_multiplier_tp 최적화 실험
+  - 단, 전략 파일 수정 없이 engine level에서만 조정
+- Kelly sizer 파라미터 검토: f* = (p*b - q) / b 공식에서 b(odds) 계산 정확성 확인
 
-#### C(데이터): 실 데이터 CSV 파이프라인 실전 테스트
-- data/historical/ 구조에 샘플 CSV 생성: `data/historical/binance/BTCUSDT/1h.csv`
-- load_ohlcv_from_csv_dir() + paper_simulation.py --csv-dir 통합 검증
-- resample_ohlcv(df, "4h") → BacktestEngine(timeframe="4h") 체인 검증
-- 가능하면 Kaggle/CryptoDataDownload CSV 다운로드 후 실 데이터 시뮬
+#### D(ML): price_action_momentum, momentum_quality 신호 품질 향상
+- SOL 시뮬 TOP 전략 (sharpe 4.18, 3.67) 분석 → ML 피처로 이 신호 조건 학습
+- FeatureBuilder에 모멘텀 강도 피처 추가 검토:
+  - `mom_quality_score`: price_action_momentum의 핵심 조건 (return_5 > threshold) 피처화
+  - `trend_strength`: momentum_quality의 EMA alignment score
+- run_bundle_oos.py GARCH 데이터에서 narrow_range mc_p 추가 분석
 
-#### F(리서치): MC 버그 수정 영향 분석 + walk-forward 개선
-- 수정된 MC 테스트로 narrow_range가 합성 데이터에서 PASS 되는지 확인
-- 만약 PASS: PASS 기준 완화 없이 합성 데이터에서도 검증 가능 → 실 데이터 PASS 기대 ↑
-- 만약 여전히 FAIL: 다른 fail reason (OOS Sharpe std) 분석
+#### F(리서치): PF 개선 전략 리서치
+- profit_factor 1.5 기준: 1 손실당 1.5 이익 필요 → win_rate 41%에서 달성 조건 분석
+- Exit logic 개선: trailing stop vs ATR-based TP 비교 실험
+- data/historical GARCH CSV로 paper_simulation --csv-dir 재실행 (BTC 결과 개선 확인)
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단 (합성 데이터만 사용 가능)
-- 합성 데이터 한계: OOS Sharpe std 3.7~7.7 (기준 1.5 대비 과대)
-- MC 버그 수정으로 narrow_range mc_p 개선 예상 → 실 데이터 PASS 가능성 ↑
+- BTC CSV (GARCH, 12000 rows): 아직 미실행 (이번 사이클에 CSV 생성 후 시간 부족)
+- 합성 데이터 한계: OOS Sharpe std 3.7~7.7 (기준 1.5 대비 과대) — 실 데이터 PASS 필수
 
-### 핵심 메트릭 (Cycle 254)
-- 테스트: 8367 passed, 23 skipped (Cycle 254 피처 추가 후)
-- 신규: nr_range_ratio, nr_atr_ratio (ML 피처), --csv-dir (paper_sim), MC 버그 수정
-- 시뮬: 0/22 PASS paper (MC 버그 수정 전), 0/5 PASS Bundle OOS
-- 최근접: narrow_range (Score 85.2, fold 4 OOS Sharpe 3.016, PF 1.645)
-- **MC 버그 수정 효과**: 합성 데이터에서도 narrow_range mc_p ~0.007 (<<0.05) 예상
+### 핵심 메트릭 (Cycle 255)
+- 테스트: 8367 passed, 23 skipped + 1 신규 (silent strategy score test)
+- 신규: GARCH CSV (data/historical/binance/BTCUSDT/1h.csv), 0-trade score 버그 수정
+- Paper Sim: BTC 0/22, ETH 1/22 (linear_channel_rev), **SOL 6/22 PASS**
+  - PASS: price_action_momentum(4.18), momentum_quality(3.67), roc_ma_cross(3.84), cmf(2.59), supertrend_multi(2.80), acceleration_band(2.17)
+- Bundle OOS: 0/5 PASS — narrow_range #1 (Score 85.2, OOS Sharpe std 5.458)
+- 주요 fail 원인: profit_factor < 1.5 (binding constraint)

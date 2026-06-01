@@ -132,6 +132,37 @@ class TestComputeRankScores:
         assert r["avg_return"] == 0.05
         assert r["avg_sharpe"] == 1.5
 
+    def test_silent_strategy_scores_below_active_strategy(self):
+        """0-trade(silent) 전략은 실제 거래가 있는 전략보다 낮게 스코어되어야 한다.
+
+        0-trade 전략은 MDD=0, sharpe_std=0으로 인해 인위적으로 높은 score를 얻는 버그 방지.
+        """
+        # 실제 거래는 있지만 음수 sharpe인 전략
+        active_neg = _make_result(
+            "active_neg",
+            avg_sharpe=-1.0,
+            avg_trades=10,
+            avg_max_dd=0.08,
+            sharpe_std=0.5,
+            consistency_score=0.0,
+        )
+        # 한 번도 신호를 내지 않은 silent 전략 (0-trade)
+        silent = _make_result(
+            "silent",
+            avg_sharpe=0.0,
+            avg_trades=0,
+            avg_max_dd=0.0,
+            sharpe_std=0.0,
+            consistency_score=0.0,
+        )
+        results = compute_rank_scores([active_neg, silent])
+        active_score = next(r["rank_score"] for r in results if r["name"] == "active_neg")
+        silent_score = next(r["rank_score"] for r in results if r["name"] == "silent")
+        assert active_score > silent_score, (
+            f"Active (negative sharpe) should outrank silent strategy: "
+            f"active={active_score}, silent={silent_score}"
+        )
+
 
 class TestBlockBootstrapToggle:
     """paper_simulation의 Block Bootstrap 토글 로직 테스트."""
