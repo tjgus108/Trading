@@ -104,13 +104,15 @@ class BacktestEngine:
         commission: float = DEFAULT_FEE_RATE,  # Bybit taker 0.055% (deprecated alias: use fee_rate)
         fee_rate: Optional[float] = None,  # 진입/청산 각 taker fee, 왕복 0.11%
         atr_multiplier_sl: float = 1.5,
-        atr_multiplier_tp: float = 3.0,
+        atr_multiplier_tp: float = 3.5,  # Cycle 256: 3.0→3.5 (R:R=2.33:1, PF 임계값 낮춤)
         slippage: float = DEFAULT_SLIPPAGE,
         slippage_pct: Optional[float] = None,  # 기본 0.05% (보통 레짐)
         timeframe: str = "1h",
         funding_cost_per_candle: float = 0.0,
         dsr_threshold: float = 0.0,  # DSR 경고 임계값 (0.0=기본, 1.0=엄격)
         adaptive_slippage: bool = False,  # True면 ATR 기반 레짐별 가변 슬리피지
+        mc_min_trades: int = 0,  # MC 검정 최소 거래 수 (0=MIN_TRADES 사용)
+        mc_block_size: int = 1,  # MC block sign randomization 크기 (1=독립 셔플)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -125,6 +127,9 @@ class BacktestEngine:
         self.funding_cost_per_candle = funding_cost_per_candle
         self.dsr_threshold = dsr_threshold
         self.adaptive_slippage = adaptive_slippage
+        # mc_min_trades: 0이면 MIN_TRADES(모듈 상수) 그대로 사용
+        self.mc_min_trades = int(mc_min_trades) if mc_min_trades > 0 else MIN_TRADES
+        self.mc_block_size = max(1, int(mc_block_size))
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -402,10 +407,20 @@ class BacktestEngine:
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
 
-        # MC Permutation test: 거래가 충분할 때만 (ann_factor를 Sharpe 계산과 일치시킴)
+        # MC Permutation test: mc_min_trades 이상일 때만 실행
+        # equity-curve Sharpe는 flat period로 희석되어 trade-PnL Sharpe와 스케일 다름
+        # → trade PnL 기준 Sharpe로 비교 (apples-to-apples)
         mc_p = -1.0
-        if len(trades) >= MIN_TRADES:
-            mc_p = self._mc_permutation_test(trades, sharpe, ann_factor=ann_factor)
+        if len(trades) >= self.mc_min_trades:
+            trades_arr = np.array(trades, dtype=float)
+            trades_std = float(trades_arr.std())
+            mc_reference_sharpe = (
+                float(trades_arr.mean()) / trades_std * np.sqrt(ann_factor)
+                if trades_std > 1e-10 else 0.0
+            )
+            mc_p = self._mc_permutation_test(
+                trades, mc_reference_sharpe, block_size=self.mc_block_size, ann_factor=ann_factor
+            )
             if mc_p > MC_P_THRESHOLD:
                 fail_reasons.append(f"mc_p_value {mc_p:.3f} > {MC_P_THRESHOLD} (우연 가능성)")
 

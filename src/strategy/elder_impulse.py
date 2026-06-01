@@ -21,6 +21,7 @@ confidence:
 최소 데이터: 35행
 """
 
+import numpy as np
 import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
@@ -37,23 +38,25 @@ def _impulse_color(ema_up: bool, hist_up: bool) -> str:
 
 
 def _calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
-    """ATR (Average True Range) 계산 - 변동성 측도"""
-    high = df["high"].iloc[-period:] if len(df) >= period else df["high"]
-    low = df["low"].iloc[-period:] if len(df) >= period else df["low"]
-    close = df["close"].iloc[-period-1:-1] if len(df) > period else df["close"].iloc[:-1]
-    
-    if len(high) < 1 or len(low) < 1:
+    """ATR (Average True Range) / close 반환.
+
+    True Range = max(H-L, |H-prev_C|, |L-prev_C|) 를 period 기간 단순 평균.
+    이전 버그: 단일 TR만 반환 (평균 없음) → 노이즈가 커서 필터 불안정.
+    """
+    n = len(df)
+    if n < 2:
         return 0.0
-    
-    tr1 = high.iloc[-1] - low.iloc[-1]
-    if len(close) > 0:
-        tr2 = abs(high.iloc[-1] - close.iloc[-1])
-        tr3 = abs(low.iloc[-1] - close.iloc[-1])
-        true_range = max(tr1, tr2, tr3)
-    else:
-        true_range = tr1
-    
-    return true_range / (df["close"].iloc[-1] + 1e-10)
+    high = df["high"].values
+    low = df["low"].values
+    close = df["close"].values
+    # True Ranges: n-1 개
+    tr = np.maximum(
+        high[1:] - low[1:],
+        np.maximum(np.abs(high[1:] - close[:-1]), np.abs(low[1:] - close[:-1])),
+    )
+    lookback = min(period, len(tr))
+    atr_val = float(np.mean(tr[-lookback:])) if lookback > 0 else 0.0
+    return atr_val / (float(close[-1]) + 1e-10)
 
 
 class ElderImpulseStrategy(BaseStrategy):

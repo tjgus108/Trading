@@ -203,14 +203,26 @@ def compute_rank_scores(results: List[dict]) -> List[dict]:
     n_consist = _minmax(consistencies)
     n_stability = _minmax(sharpe_stds, invert=True)  # 낮은 std가 좋음
 
+    # Silent-strategy correction: strategies with 0 trades get trivially perfect
+    # MDD (=0) and stability (std=0) plus neutral sharpe (=0 > negative sharpe).
+    # This inflates their score above strategies that actually traded but lost money.
+    # Fix: (1) force n_sharpe=0 for never-triggered strategies, and
+    #      (2) gate MDD/stability by trade activity (0-trade → 0 contribution).
+    silence_mask = trades < 1.0
+    n_sharpe_adj = n_sharpe.copy()
+    n_sharpe_adj[silence_mask] = 0.0
+    trade_gate = np.minimum(trades / max(float(trades.max()), 1.0), 1.0)
+    n_mdd_gated = n_mdd * trade_gate
+    n_stability_gated = n_stability * trade_gate
+
     # 가중 합산
     scores = (
-        0.30 * n_sharpe
+        0.30 * n_sharpe_adj
         + 0.20 * n_pf
         + 0.15 * n_trades
-        + 0.15 * n_mdd
+        + 0.15 * n_mdd_gated
         + 0.10 * n_consist
-        + 0.10 * n_stability
+        + 0.10 * n_stability_gated
     ) * 100.0
 
     # 순위 산출: score 내림차순 인덱스

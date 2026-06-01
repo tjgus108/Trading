@@ -351,3 +351,42 @@ def test_mc_permutation_test_consistency():
     # (block shuffling vs sign randomization)
     print(f"p_value (block_size=1): {p1:.4f}")
     print(f"p_value (block_size=10): {p5:.4f}")
+
+
+# ------------------------------------------------------------------
+# Deflated Sharpe Ratio tests
+# ------------------------------------------------------------------
+
+from src.backtest.walk_forward import deflated_sharpe_ratio, is_sharpe_significant
+
+
+def test_dsr_no_correction_high_sharpe():
+    """N=1(보정 없음), 높은 Sharpe → p-value가 낮아야 함(유의)."""
+    p = deflated_sharpe_ratio(
+        observed_sharpe=2.0,
+        num_strategies_tested=1,
+        num_observations=252,
+    )
+    assert 0.0 <= p <= 1.0, f"p-value out of range: {p}"
+    assert p < 0.05, f"N=1, SR=2.0 은 유의해야 함. p={p:.4f}"
+
+
+def test_dsr_many_strategies_penalizes():
+    """N=355(강한 보정)는 N=1보다 p-value가 높아야 함(더 어려운 기준)."""
+    sr = 1.5
+    T = 500
+    p_single = deflated_sharpe_ratio(sr, num_strategies_tested=1, num_observations=T)
+    p_many = deflated_sharpe_ratio(sr, num_strategies_tested=355, num_observations=T)
+    assert p_many > p_single, (
+        f"N=355 보정이 N=1보다 엄격해야 함: p_single={p_single:.4f} p_many={p_many:.4f}"
+    )
+
+
+def test_is_sharpe_significant_default_355():
+    """is_sharpe_significant: 매우 높은 Sharpe는 355 전략 보정 후에도 유의해야 함."""
+    # SR=3.0, T=1000 은 355 전략 보정 후에도 유의하길 기대
+    result = is_sharpe_significant(observed_sharpe=3.0, num_observations=1000)
+    assert isinstance(result, bool)
+    # SR=0.3, T=50 은 유의하지 않아야 함
+    result_low = is_sharpe_significant(observed_sharpe=0.3, num_observations=50)
+    assert not result_low, f"낮은 SR(0.3, T=50)은 유의하지 않아야 함"

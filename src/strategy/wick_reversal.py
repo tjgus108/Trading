@@ -1,11 +1,13 @@
 """
 WickReversalStrategy v2: 긴 꼬리(wick)를 이용한 반전 감지.
 개선 (Cycle 120): 선택적 강화 필터 (거래수 유지 + 품질 향상)
+개선 (Cycle 250): ATR 기반 최소 변동성 필터 추가 (저변동성 구간 신호 차단)
 - Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.97, vol_ok OR rsi<=70) → BUY
 - Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, vol_ok OR rsi>=30) → SELL
 - volume > avg_volume_10 * 1.0 (기존 유지)
 - wick_ratio > 0.7 → HIGH confidence
 - 추세 필터 유지 (trend_up/trend_down)
+- ATR 필터: atr/close < min_volatility(0.002) → HOLD (저변동성 차단)
 """
 
 from typing import Optional
@@ -19,11 +21,20 @@ from .base import Action, BaseStrategy, Confidence, Signal
 class WickReversalStrategy(BaseStrategy):
     name = "wick_reversal"
 
-    def __init__(self, min_wick_ratio: float = 0.65, vol_mult: float = 0.8, sma_period: int = 20, trend_period: int = 14, **kwargs):
+    def __init__(
+        self,
+        min_wick_ratio: float = 0.65,
+        vol_mult: float = 0.8,
+        sma_period: int = 20,
+        trend_period: int = 14,
+        min_volatility: float = 0.002,
+        **kwargs,
+    ):
         self.min_wick_ratio = min_wick_ratio
         self.vol_mult = vol_mult
         self.sma_period = sma_period
         self.trend_period = trend_period
+        self.min_volatility = min_volatility
 
     MIN_ROWS = 25
 
@@ -68,6 +79,24 @@ class WickReversalStrategy(BaseStrategy):
         lookback = min(self.sma_period, len(df) - 1)
         sma20 = float(df["close"].iloc[-lookback - 1:-1].mean())
 
+        # ATR 기반 최소 변동성 필터 (Cycle 250)
+        atr_period = 14
+        atr_lookback = min(atr_period, len(df) - 1)
+        atr_slice = df.iloc[-atr_lookback - 1:-1]
+        tr = pd.concat([
+            atr_slice["high"] - atr_slice["low"],
+            (atr_slice["high"] - atr_slice["close"].shift(1)).abs(),
+            (atr_slice["low"] - atr_slice["close"].shift(1)).abs(),
+        ], axis=1).max(axis=1)
+        atr_val = float(tr.mean()) if len(tr) > 0 else 0.0
+        atr_ratio = atr_val / close if close > 0 else 0.0
+
+        if atr_ratio < self.min_volatility:
+            hold.reasoning = (
+                f"저변동성 필터: ATR14/close={atr_ratio:.6f} < min_volatility={self.min_volatility}"
+            )
+            return hold
+
         # 볼륨: 기존 기준 유지 (0.8배)
         vol_lookback = min(10, len(df) - 1)
         avg_vol_10 = float(df["volume"].iloc[-vol_lookback - 1:-1].mean())
@@ -77,7 +106,7 @@ class WickReversalStrategy(BaseStrategy):
         trend_lookback = min(self.trend_period, len(df) - 1)
         high_14 = float(df["high"].iloc[-trend_lookback - 1:-1].max())
         low_14 = float(df["low"].iloc[-trend_lookback - 1:-1].min())
-        
+
         trend_up = high >= high_14 * 0.99
         trend_down = low <= low_14 * 1.01
 
@@ -99,8 +128,8 @@ class WickReversalStrategy(BaseStrategy):
         # 기본: lower_wick_ratio >= self.min_wick_ratio + trend_up + close > SMA20*0.97
         # 강화: + (vol_ok OR rsi <= 70)
         hammer = (
-            lower_wick_ratio >= self.min_wick_ratio and 
-            close > sma20 * 0.97 and 
+            lower_wick_ratio >= self.min_wick_ratio and
+            close > sma20 * 0.97 and
             trend_up and
             (vol_ok or rsi <= 70)
         )
@@ -125,8 +154,8 @@ class WickReversalStrategy(BaseStrategy):
         # 기본: upper_wick_ratio >= self.min_wick_ratio + trend_down + close < SMA20*1.03
         # 강화: + (vol_ok OR rsi >= 30)
         shooting_star = (
-            upper_wick_ratio >= self.min_wick_ratio and 
-            close < sma20 * 1.03 and 
+            upper_wick_ratio >= self.min_wick_ratio and
+            close < sma20 * 1.03 and
             trend_down and
             (vol_ok or rsi >= 30)
         )

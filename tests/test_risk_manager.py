@@ -1189,6 +1189,65 @@ class TestKellyDrawdownIntegration:
         assert res.status == RiskStatus.APPROVED
         assert abs(res.position_size - base) < 1e-6
 
+    def _make_kelly_reduce_dd(self):
+        """MDD=9% DrawdownMonitor: WARN 단계(5~10%) + kelly_reduce_at_mdd(8%) 초과."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dd = DrawdownMonitor(
+            mdd_warn_pct=0.05, mdd_block_pct=0.10, kelly_reduce_at_mdd=0.08,
+            rolling_window=50,
+        )
+        # 점진적 하락 후 9100(= 10000 * 0.91, MDD=9%) 안정화
+        for i in range(40):
+            dd.update(10_000 - i * 22.5)   # 10000→9100
+        for _ in range(10):
+            dd.update(9_100)
+        return dd
+
+    def test_kelly_fraction_multiplier_applied_with_kelly_sizer(self):
+        """MDD=9% + kelly_sizer: mdd_size_mult(0.5) × kelly_frac_mult(0.5) = 0.25x."""
+        from src.risk.kelly_sizer import KellySizer
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_mdd_size_multiplier() == pytest.approx(0.5)   # WARN zone
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)  # MDD > 8%
+        assert not dd.trailing_stop_signal()
+
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks, drawdown_monitor=dd)
+        base = self._base_size()
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000)
+        assert res.status == RiskStatus.APPROVED
+        # size_mult=0.5 (WARN) × kelly_frac_mult=0.5 = 0.25
+        assert abs(res.position_size - base * 0.25) < 1e-6
+
+    def test_kelly_fraction_multiplier_not_applied_without_kelly_sizer(self):
+        """MDD=9% + kelly_sizer 없음: kelly_frac_mult는 무시, mdd_size_mult(0.5)만 적용."""
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)
+
+        rm = self._make_rm(drawdown_monitor=dd)   # kelly_sizer=None
+        base = self._base_size()
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000)
+        assert res.status == RiskStatus.APPROVED
+        # kelly_frac_mult는 적용되지 않으므로 mdd_size_mult=0.5 만 반영
+        assert abs(res.position_size - base * 0.5) < 1e-6
+
+    def test_regime_none_mdd9_compound(self):
+        """regime=None + MDD=9%: Kelly 레짐 스케일 없음 × mdd_size_mult(0.5) × kelly_frac_mult(0.5) = 0.25x."""
+        from src.risk.kelly_sizer import KellySizer
+        dd = self._make_kelly_reduce_dd()
+        assert dd.get_mdd_size_multiplier() == pytest.approx(0.5)    # WARN zone
+        assert dd.get_kelly_fraction_multiplier() == pytest.approx(0.5)  # MDD > 8%
+        assert not dd.trailing_stop_signal()
+
+        ks = KellySizer(fraction=0.5)
+        rm = self._make_rm(kelly_sizer=ks, drawdown_monitor=dd)
+        base = self._base_size()
+        # regime=None → kelly_scale=1.0 (레짐 기반 축소 없음)
+        res = rm.evaluate(action="BUY", entry_price=50_000, atr=500, account_balance=10_000, regime=None)
+        assert res.status == RiskStatus.APPROVED
+        # 1.0(regime없음) × 0.5(mdd_warn) × 0.5(kelly_frac) = 0.25x
+        assert abs(res.position_size - base * 0.25) < 1e-6
+
 
 # ── check_strategy_health 테스트 (작업1) ────────────────────────────────────
 
@@ -1315,3 +1374,57 @@ class TestMaxPositionByOrderbook:
         from src.risk.position_sizer import max_position_by_orderbook
         result = max_position_by_orderbook(200_000, max_impact_pct=0.10)
         assert result == pytest.approx(20_000.0)
+
+
+# ── Transition Cushion (regime_confidence) ────────────────────
+
+def test_regime_confidence_low_reduces_position():
+    """regime_confidence=0.5 → DrawdownMonitor transition cushion → position_size 절반."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    dm = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    rm = RiskManager(
+        risk_per_trade=0.01,
+        atr_multiplier_sl=1.5,
+        drawdown_monitor=dm,
+    )
+
+    result_normal = rm.evaluate(
+        action="BUY",
+        entry_price=100.0,
+        atr=1.0,
+        account_balance=10_000.0,
+        regime_confidence=0.9,  # 높음 → 쿠션 없음
+    )
+    result_low = rm.evaluate(
+        action="BUY",
+        entry_price=100.0,
+        atr=1.0,
+        account_balance=10_000.0,
+        regime_confidence=0.5,  # 낮음 → 0.5x 적용
+    )
+
+    assert result_normal.status == RiskStatus.APPROVED
+    assert result_low.status == RiskStatus.APPROVED
+    assert result_low.position_size == pytest.approx(result_normal.position_size * 0.5, rel=1e-4)
+
+
+def test_regime_confidence_high_no_change():
+    """regime_confidence=0.9 >= threshold=0.70 → position_size 변화 없음."""
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    dm = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    rm_with = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5, drawdown_monitor=dm)
+    rm_without = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+
+    result_with = rm_with.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0, regime_confidence=0.9,
+    )
+    result_without = rm_without.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0,
+    )
+
+    assert result_with.status == RiskStatus.APPROVED
+    assert result_with.position_size == pytest.approx(result_without.position_size, rel=1e-4)

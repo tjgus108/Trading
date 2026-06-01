@@ -559,3 +559,235 @@ def download_multi_timeframe(
             results[tf] = None
 
     return results
+
+
+def validate_ohlcv(
+    df: pd.DataFrame,
+    expected_interval_seconds: int = 14400,
+) -> Dict[str, any]:
+    """
+    CSV 데이터 또는 백테스트 전 OHLCV 데이터 품질 검증.
+    
+    Cycle 251 리서치: 데이터 파이프라인 실패의 47-51%는 중복 캔들,
+    6/200 사례는 갭, 타임존 불일치로 발생. 이 함수로 신속히 검출 가능.
+    
+    Args:
+        df: pandas DataFrame with columns [open, high, low, close, volume]
+            index는 datetime이어야 함 (timezone-aware 권장)
+        expected_interval_seconds: 예상 캔들 간격 (초 단위, 기본 4h=14400)
+    
+    Returns:
+        dict with keys:
+            - duplicates (int): 중복 타임스탬프 행 수
+            - gaps (int): 예상 간격과 다른 행 수
+            - ohlc_violations (int): high < max(open,close) 또는 low > min(open,close) 위반
+            - negative_volume (int): 음수 볼륨 행 수
+            - gap_ratio (float): 갭 행 수 / 전체 행 수 비율
+            - is_valid (bool): (duplicates==0 and gap_ratio<0.01 and ohlc_violations==0)
+    
+    Example:
+        result = validate_ohlcv(df, expected_interval_seconds=3600)
+        if not result['is_valid']:
+            print(f"Gaps: {result['gap_ratio']:.1%}, OHLC violations: {result['ohlc_violations']}")
+    """
+    # 1. 중복 검출
+    duplicates = df.index.duplicated().sum()
+    
+    # 2. 갭 검출 (index.diff()가 expected_interval과 다른 행)
+    if len(df) > 1:
+        time_diffs = df.index.to_series().diff().dt.total_seconds()
+        gaps = (time_diffs != expected_interval_seconds).sum() - 1  # 첫 행의 NaN 제외
+        gap_ratio = gaps / len(df) if len(df) > 0 else 0.0
+    else:
+        gaps = 0
+        gap_ratio = 0.0
+    
+    # 3. OHLC 논리 검증
+    ohlc_violations = 0
+    if "high" in df.columns and "low" in df.columns and "open" in df.columns and "close" in df.columns:
+        invalid_high = df[df["high"] < df[["open", "close"]].max(axis=1)]
+        invalid_low = df[df["low"] > df[["open", "close"]].min(axis=1)]
+        ohlc_violations = len(invalid_high) + len(invalid_low)
+    
+    # 4. 음수 볼륨 검출
+    negative_volume = 0
+    if "volume" in df.columns:
+        negative_volume = (df["volume"] < 0).sum()
+    
+    # 5. is_valid 판정
+    is_valid = (duplicates == 0 and gap_ratio < 0.01 and ohlc_violations == 0)
+    
+    # 6. 갭 비율 >1% 시 경고
+    if gap_ratio > 0.01:
+        logger.warning(
+            "High gap ratio detected: %.1f%% (%d/%d candles have gaps). "
+            "Check expected_interval_seconds and timezone consistency.",
+            gap_ratio * 100,
+            gaps,
+            len(df),
+        )
+    
+    return {
+        "duplicates": duplicates,
+        "gaps": gaps,
+        "ohlc_violations": ohlc_violations,
+        "negative_volume": negative_volume,
+        "gap_ratio": gap_ratio,
+        "is_valid": is_valid,
+    }
+
+
+# Resample frequency mapping
+RESAMPLE_FREQ = {
+    "1m": "1min",
+    "5m": "5min",
+    "15m": "15min",
+    "1h": "1h",
+    "4h": "4h",
+    "1d": "1D",
+}
+
+
+def load_csv_ohlcv(
+    path: str,
+    validate: bool = True,
+    expected_interval_seconds: Optional[int] = None,
+) -> pd.DataFrame:
+    """
+    CSV 파일을 읽어 OHLCV DataFrame 반환.
+    
+    Args:
+        path: CSV 파일 경로
+        validate: True시 validate_ohlcv() 자동 호출, 결과를 logger.warning으로 출력
+        expected_interval_seconds: 예상 캔들 간격 (초). None이면 인접 행 diff 중앙값으로 자동 추정
+    
+    Returns:
+        pd.DataFrame (columns: open, high, low, close, volume; index: DatetimeIndex UTC)
+    
+    Raises:
+        FileNotFoundError: 파일이 없음
+        ValueError: CSV 파싱 불가 또는 필수 컬럼 누락
+    """
+    # 1. 파일 존재 확인
+    path_obj = Path(path)
+    if not path_obj.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    
+    try:
+        # 2. CSV 파일 읽기
+        df = pd.read_csv(path)
+    except Exception as e:
+        raise ValueError(f"Failed to parse CSV {path}: {e}")
+    
+    if df.empty:
+        raise ValueError(f"CSV file is empty: {path}")
+    
+    # 3. 컬럼 정규화
+    # timestamp/time/date → index로, open/high/low/close/volume 소문자 매핑
+    df_normalized = df.copy()
+    df_normalized.columns = df_normalized.columns.str.lower()
+    
+    # 타임스탬프 컬럼 찾기
+    timestamp_col = None
+    for col in ["timestamp", "time", "date"]:
+        if col in df_normalized.columns:
+            timestamp_col = col
+            break
+    
+    if timestamp_col is None:
+        raise ValueError(f"No timestamp column (timestamp/time/date) found in {path}")
+    
+    # 필수 OHLCV 컬럼 확인
+    required_cols = ["open", "high", "low", "close", "volume"]
+    for col in required_cols:
+        if col not in df_normalized.columns:
+            raise ValueError(f"Missing required column '{col}' in {path}")
+    
+    # 4. 타임스탐프를 index로 설정, UTC timezone-aware 변환
+    try:
+        df_normalized[timestamp_col] = pd.to_datetime(df_normalized[timestamp_col])
+    except Exception as e:
+        raise ValueError(f"Failed to parse timestamp column: {e}")
+    
+    # UTC 타임존 처리
+    if df_normalized[timestamp_col].dt.tz is None:
+        df_normalized[timestamp_col] = df_normalized[timestamp_col].dt.tz_localize('UTC')
+    else:
+        df_normalized[timestamp_col] = df_normalized[timestamp_col].dt.tz_convert('UTC')
+    
+    df_normalized = df_normalized.set_index(timestamp_col)
+    
+    # 5. OHLCV 컬럼만 선택 및 정렬
+    df_result = df_normalized[required_cols].sort_index()
+    
+    # 6. expected_interval_seconds 자동 추정 (필요한 경우)
+    if expected_interval_seconds is None and len(df_result) > 1:
+        time_diffs = df_result.index.to_series().diff().dt.total_seconds()
+        time_diffs = time_diffs.dropna()
+        if len(time_diffs) > 0:
+            expected_interval_seconds = int(time_diffs.median())
+            logger.debug("Auto-estimated expected_interval_seconds: %d", expected_interval_seconds)
+    
+    if expected_interval_seconds is None:
+        expected_interval_seconds = 3600  # 기본값 1h
+    
+    # 7. validate=True 시 validate_ohlcv 호출 및 결과 로깅
+    if validate:
+        validation_result = validate_ohlcv(df_result, expected_interval_seconds)
+        if not validation_result['is_valid']:
+            logger.warning(
+                "OHLCV validation failed for %s: duplicates=%d, gaps=%d, gap_ratio=%.1f%%, ohlc_violations=%d",
+                path,
+                validation_result['duplicates'],
+                validation_result['gaps'],
+                validation_result['gap_ratio'] * 100,
+                validation_result['ohlc_violations'],
+            )
+        else:
+            logger.debug("OHLCV validation passed for %s", path)
+    
+    return df_result
+
+
+def resample_ohlcv(df: pd.DataFrame, target_timeframe: str) -> pd.DataFrame:
+    """
+    OHLCV DataFrame을 다른 타임프레임으로 리샘플링.
+    
+    Args:
+        df: OHLCV DataFrame (index: DatetimeIndex, columns: open, high, low, close, volume)
+        target_timeframe: "1m", "5m", "15m", "1h", "4h", "1d" 중 하나
+    
+    Returns:
+        pd.DataFrame (리샘플링된 OHLCV)
+    
+    Raises:
+        ValueError: target_timeframe이 지원하지 않는 형식
+    """
+    if target_timeframe not in RESAMPLE_FREQ:
+        raise ValueError(
+            f"Invalid target_timeframe '{target_timeframe}'. "
+            f"Supported: {list(RESAMPLE_FREQ.keys())}"
+        )
+    
+    # 1. index가 timezone-aware 아니면 UTC로 변환
+    if df.index.tz is None:
+        df = df.copy()
+        df.index = df.index.tz_localize('UTC')
+    elif str(df.index.tz) != 'UTC':
+        df = df.copy()
+        df.index = df.index.tz_convert('UTC')
+    
+    # 2. resample 실행
+    freq = RESAMPLE_FREQ[target_timeframe]
+    resampled = df.resample(freq).agg({
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum',
+    })
+    
+    # 3. NaN 행 제거
+    resampled = resampled.dropna()
+    
+    return resampled

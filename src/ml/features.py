@@ -262,6 +262,33 @@ class FeatureBuilder:
             _vpin = (_roll_imb / _roll_vol.replace(0, float("nan"))).fillna(0.5).clip(0.0, 1.0)
             feat["vpin_50"] = _vpin
 
+        # Narrow Range ML features (Cycle 254)
+        # nr_range_ratio: 현재 캔들 range / 20봉 평균 range → <1.0이면 range 수축 (NR 조건 직접 반영)
+        # nr_atr_ratio: 현재 ATR_pct / 20봉 평균 ATR_pct → <1.0이면 ATR 수축 (NR+ATR 필터 조건)
+        candle_range = (high - low) / (close + 1e-9)
+        range_ma20 = candle_range.shift(1).rolling(20, min_periods=10).mean()
+        feat["nr_range_ratio"] = candle_range / (range_ma20 + 1e-9)
+
+        atr_pct_prev = feat["atr_pct"].shift(1)
+        atr_pct_ma20 = atr_pct_prev.rolling(20, min_periods=10).mean()
+        feat["nr_atr_ratio"] = feat["atr_pct"] / (atr_pct_ma20 + 1e-9)
+
+        # Momentum quality features (Cycle 256)
+        # mom_quality_score: price_action_momentum 전략의 핵심 — ROC5 z-score
+        #   roc5 > 0.005 + SMA-trend 조건을 ML 피처화: (roc5 - roc5_mean) / roc5_std
+        roc5 = close.pct_change(5)
+        roc5_ma = roc5.shift(1).rolling(10, min_periods=5).mean()
+        roc5_std = roc5.shift(1).rolling(20, min_periods=10).std()
+        feat["mom_quality_score"] = (roc5 - roc5_ma) / (roc5_std + 1e-9)
+
+        # trend_strength: momentum_quality 전략의 핵심 — consistency × acceleration
+        #   consistency(10봉 상승 비율) + 가속도(mom5 > mom10) 합산
+        returns_prev = log_ret.shift(1)
+        mom5_prev = returns_prev.rolling(5, min_periods=3).mean()
+        mom10_prev = returns_prev.rolling(10, min_periods=5).mean()
+        consistency_prev = (returns_prev > 0).rolling(10, min_periods=5).mean()
+        feat["trend_strength"] = (consistency_prev * 2.0 - 1.0) + (mom5_prev > mom10_prev).astype(float)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -360,6 +387,8 @@ class FeatureBuilder:
             "donchian_pct",
             "macd_hist",
             "bb_position",
+            "nr_range_ratio", "nr_atr_ratio",
+            "mom_quality_score", "trend_strength",  # Cycle 256
         ]
 
 

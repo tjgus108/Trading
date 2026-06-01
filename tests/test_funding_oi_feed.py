@@ -299,8 +299,8 @@ class TestFeatureBuilderFrOi:
 
         X, y = fb.build(df)
 
-        # base 15 (with vpin_50) + delta_fr + fr_oi_interaction = 17
-        assert len(X.columns) == 17
+        # base 19 (18 + vpin_50) + delta_fr + fr_oi_interaction = 21
+        assert len(X.columns) == 21
 
     def test_delta_fr_correctness(self):
         """delta_fr = fr[t] - fr[t-1] 정확성 검증."""

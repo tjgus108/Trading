@@ -1,51 +1,37 @@
-======================================================================
-🔄 CYCLE 245 — 2026-05-29
-======================================================================
+# Current Cycle Briefing
 
-## 이번 사이클 배정 카테고리
+_Cycle 256 — 2026-06-01_
+_카테고리: B(리스크) + D(ML) + F(리서치)_
 
-**Cycle 245** (245 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+## 완료된 작업
 
----
+### B(리스크): BacktestEngine atr_multiplier_tp 기본값 조정
+- `src/backtest/engine.py`: atr_multiplier_tp 3.0 → 3.5 (R:R 2.33:1)
+- Kelly sizer f* 공식 검증: 구현 정확 (f* = p - q/b)
+- 효과: SOL 6/22 → 8/22 PASS, price_action_momentum sharpe 4.18→5.48
 
-### [A] 품질 — 완료
-- **value_area EMA 필터 수정** (`src/strategy/value_area.py`)
-  - 문제: `ema20 > ema50` 추세 필터가 mean-reversion 신호와 충돌 → 4h 0 trades
-  - 수정: EMA momentum 방향 필터 `ema20[t] > ema20[t-1]` (단기 반전 감지)
-  - 파라미터 축소: `_VA_PERIOD: 20→10`, `_EMA_SHORT: 20→10`, `_EMA_LONG: 50→20`
-  - `_MIN_ROWS: 55→25` (EMA50 warmup 불필요)
-  - DEFAULT_GRIDS 업데이트: `va_period [15,20,25]→[10,15,20]` (`walk_forward.py`)
-  - 신규 테스트 2개 추가
+### D(ML): FeatureBuilder 모멘텀 품질 피처 추가
+- `src/ml/features.py`:
+  - `mom_quality_score`: ROC5 z-score (price_action_momentum 핵심 신호 피처화)
+  - `trend_strength`: (consistency×2-1) + (mom5>mom10) (momentum_quality 핵심 피처화)
+  - feature_names: 16 → 18
+- 테스트 4개 파일 업데이트 (feature count)
+- 전체 테스트: 8369 passed (신규 2건 추가)
 
-### [C] 데이터 — 완료
-- **generate_synthetic_data() Regime-Switching 개선** (`scripts/run_bundle_oos.py`)
-  - 순수 GBM → Markov Regime-Switching (Bull/Bear 자동 전환)
-  - Bull: drift=+0.02%/bar, σ=0.25% | Bear: drift=-0.02%/bar, σ=0.40%
-  - P(bull→bear)=0.02, P(bear→bull)=0.03
-  - 거래량도 레짐 반영 (Bull 높음, Bear 낮음)
+### F(리서치): atr_multiplier_tp PF 효과 분석
+- R:R=2.33:1: PF=1.5 달성 최소 win_rate 39.2% (이전 42.9%), 3.7%p 완화
+- BTC 0/22 PASS: GARCH CSV가 trend-insufficient → 합성 데이터로 대체 불가
+- SOL 8/22 PASS 중 price_action_momentum 4/4 윈도우 완전 일관성
 
-### [F/버그픽스] MC Permutation Test Annualization 수정 — 완료
-- **버그**: `_mc_permutation_test` 고정 `sqrt(8760)` vs 실제 Sharpe `sqrt(6048)` (1h)
-  - 비율 sqrt(8760/6048) ≈ 1.20 → permutation Sharpe 20% 과대 → p-value 인플레이션
-- **수정**: `ann_factor: int = 8760` 파라미터 추가, 호출부에서 실제 값 전달
-- 효과: mc_p_value 0.156~0.430 (이전 0.248~0.568)
+## 시뮬레이션 결과 (Cycle 256)
+- Paper Sim BTC: 0/22 PASS (AvgPF 1.0~1.2)
+- Paper Sim ETH: 3/22 PASS
+- Paper Sim SOL: **8/22 PASS** (Cycle 255 6/22 → 개선)
+- Bundle OOS BTC 4h: 0/5 PASS (OOS Sharpe std 3.9~8.5, 여전히 불안정)
 
----
-
-## 시뮬레이션 결과
-
-### Bundle OOS (5-bundle, 4h봉 Regime-Switching 합성 데이터)
-- **PASS: 0/5** (min_oos_trades=10 기준 엄격)
-- **value_area 개선**: 0→2-8 trades/fold, fold 6 PASS(Sharpe=1.775, PF=2.026, WFE=2.167)
-- IS Sharpe 음수 비율 개선: cmf 100%→78% (Regime-Switching 효과)
-
-### Paper Sim (Walk-Forward, 1h봉 BlockBootstrap)
-- **PASS: 0/22** (consistency 기준 엄격)
-- Top BTC: price_action_momentum(Sharpe 5.35), momentum_quality(6.04), supertrend_multi(4.54)
-- value_area AvgTrades: 16→27 (+68%), AvgSharpe: -1.31→-0.17 개선
-- mc_p_value 감소 확인: 0.156(price_action_momentum), 0.222(momentum_quality)
-
----
-
-## 테스트 결과
-- **145 passed** (신규 2개 포함: test_ema_momentum_filter, test_default_params)
+## 다음 Cycle 257 (257 mod 5 = 2 → B+D+F)
+- B: momentum_quality MDD 개선 (22%>20% 초과 → MDD 제약 강화 검토)
+- B: acceleration_band SOL MDD 23% 초과 → 포지션 사이징 조정
+- D: mom_quality_score, trend_strength REGIME_FEATURE_CONFIG["bull"] 추가 (테스트 영향 확인 필요)
+- D: BTC 0/22 원인 분석 — price_action_momentum이 SOL에선 4/4 PASS인데 BTC에선 PF 1.00 → 심볼 특성 차이 분석
+- F: Bundle OOS Sharpe std 개선을 위한 파라미터 안정화 방안 (narrowing grid search)

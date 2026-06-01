@@ -934,6 +934,8 @@ class BundleOOSResult:
     all_passed: bool
     fail_reasons: List[str]
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
+    dsr_pvalue: Optional[float] = None  # Deflated Sharpe Ratio p-value
+    is_sharpe_significant: Optional[bool] = None  # DSR significance at α=0.05
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -946,10 +948,12 @@ class BundleOOSResult:
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
             f"  verdict: {verdict}",
         ]
+        if self.dsr_pvalue is not None:
+            sig_tag = "SIGNIFICANT" if self.is_sharpe_significant else "NOT_SIGNIFICANT"
+            lines.append(f"  dsr_pvalue: {self.dsr_pvalue:.4f} ({sig_tag})")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         return "\n".join(lines)
-
 
 class RollingOOSValidator:
     """Rolling IS/OOS 검증기 (파라미터 최적화 없이 고정 전략 평가).
@@ -958,7 +962,7 @@ class RollingOOSValidator:
     WFE ≥ 0.50, OOS Sharpe ≥ IS Sharpe × 0.60, OOS MDD ≤ IS MDD × 2.0.
     """
 
-    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 한계
+    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 기본 한계
 
     def __init__(
         self,
@@ -969,6 +973,7 @@ class RollingOOSValidator:
         sharpe_decay_max: float = 0.60,
         mdd_expand_max: float = 2.0,
         min_oos_trades: int = 3,   # 거래 수 미달 fold는 집계에서 제외 (신호 없음)
+        max_oos_sharpe_std: Optional[float] = None,  # None=클래스 기본값(1.5) 사용
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -977,6 +982,11 @@ class RollingOOSValidator:
         self.sharpe_decay_max = sharpe_decay_max
         self.mdd_expand_max = mdd_expand_max
         self.min_oos_trades = min_oos_trades
+        # 인스턴스별 기준 덮어쓰기 가능: 합성 데이터 환경에서는 완화, 실 데이터에서는 강화
+        if max_oos_sharpe_std is not None:
+            self._oos_sharpe_std_max = float(max_oos_sharpe_std)
+        else:
+            self._oos_sharpe_std_max = self.OOS_SHARPE_STD_MAX
 
     def validate(
         self,
@@ -1104,6 +1114,24 @@ class RollingOOSValidator:
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
 
+        # DSR 계산: OOS Sharpe 평균과 거래 수를 기반으로 통계적 유의성 판정
+        dsr_pvalue = None
+        is_sig = None
+        num_strategies_tested = 5  # Bundle 내 5개 전략
+        total_oos_trades = sum(f.oos_trades for f in active_folds)
+        
+        if total_oos_trades > 0 and avg_sharpe > 0:
+            dsr_pvalue = deflated_sharpe_ratio(
+                observed_sharpe=avg_sharpe,
+                num_strategies_tested=num_strategies_tested,
+                num_observations=total_oos_trades,
+            )
+            is_sig = dsr_pvalue < 0.05  # α=0.05
+            logger.info(
+                "[%s] DSR p-value=%.4f (observed_sharpe=%.3f, trades=%d, strategies=%d)",
+                strategy.name, dsr_pvalue, avg_sharpe, total_oos_trades, num_strategies_tested,
+            )
+
         # OOS Sharpe 표준편차 필터: fold별 변동이 너무 크면 FAIL
         bundle_fails = []
         low_trade_ratio = len(low_trade_fold_ids) / len(folds) if folds else 0.0
@@ -1121,9 +1149,9 @@ class RollingOOSValidator:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
             if failed_ids:
                 bundle_fails.append(f"Failed folds: {failed_ids}")
-        if oos_std > self.OOS_SHARPE_STD_MAX:
+        if oos_std > self._oos_sharpe_std_max:
             bundle_fails.append(
-                f"OOS Sharpe std {oos_std:.3f} > {self.OOS_SHARPE_STD_MAX} (불안정)"
+                f"OOS Sharpe std {oos_std:.3f} > {self._oos_sharpe_std_max} (불안정)"
             )
             all_passed = False
 
@@ -1136,6 +1164,8 @@ class RollingOOSValidator:
             oos_sharpe_std=round(oos_std, 4),
             all_passed=all_passed,
             fail_reasons=bundle_fails,
+            dsr_pvalue=round(dsr_pvalue, 4) if dsr_pvalue is not None else None,
+            is_sharpe_significant=is_sig,
         )
         logger.info(result.summary())
         return result
@@ -1283,3 +1313,102 @@ class WalkForwardValidator:
             consistency_score=consistency,
             results=window_results,
         )
+
+
+# ------------------------------------------------------------------
+# Deflated Sharpe Ratio (Harvey et al.)
+# ------------------------------------------------------------------
+
+import math as _math
+from scipy.stats import norm as _norm
+
+#: Euler-Mascheroni 상수
+_EULER_MASCHERONI = 0.5772156649015328
+
+
+def deflated_sharpe_ratio(
+    observed_sharpe: float,
+    num_strategies_tested: int,
+    num_observations: int,
+    skewness: float = 0.0,
+    kurtosis: float = 3.0,
+) -> float:
+    """Harvey et al. Deflated Sharpe Ratio (DSR) p-value 계산.
+
+    다중 전략 테스트 시 우연 Sharpe 보정. 반환값이 낮을수록 통계적으로 유의.
+
+    Args:
+        observed_sharpe: 관찰된 최대 Sharpe Ratio (SR_max).
+        num_strategies_tested: 테스트한 전략 수 (N). 보정 강도 결정.
+        num_observations: 관측 수 T (거래 수 또는 봉 수).
+        skewness: 수익률 왜도 (γ₃). 기본값 0 (정규분포).
+        kurtosis: 수익률 첨도 (γ₄). 기본값 3 (정규분포).
+
+    Returns:
+        DSR p-value (0~1). p < 0.05이면 유의한 Sharpe.
+
+    References:
+        Harvey, C.R., Liu, Y. & Zhu, H. (2016). … and the Cross-Section of Expected Returns.
+        Review of Financial Studies 29(1), 5–68.
+    """
+    N = max(num_strategies_tested, 1)
+    T = max(num_observations, 2)
+
+    # 기대 최대 Sharpe (SR_0): multiple testing 보정
+    # E[max SR] ≈ (1-γ)*Z_{1-1/N} + γ*Z_{1-1/(N*e)}
+    gamma = _EULER_MASCHERONI
+    e = _math.e
+
+    # N=1이면 보정 없음: SR_0 = 0
+    if N == 1:
+        sr0 = 0.0
+    else:
+        z1 = _norm.ppf(1.0 - 1.0 / N)
+        z2 = _norm.ppf(1.0 - 1.0 / (N * e))
+        sr0 = (1.0 - gamma) * z1 + gamma * z2
+
+    # 분모: 비정규성 보정 항
+    # √(1 - γ₃*SR_max + (γ₄-1)/4 * SR_max²)
+    sr = observed_sharpe
+    denom_sq = 1.0 - skewness * sr + (kurtosis - 1.0) / 4.0 * sr ** 2
+    if denom_sq <= 0:
+        denom_sq = 1e-9  # 수치 안정성
+    denom = _math.sqrt(denom_sq)
+
+    # DSR 통계량: z = (SR_max*√T - √(T-1)*SR_0) / denom
+    z_stat = (sr * _math.sqrt(T) - _math.sqrt(T - 1) * sr0) / denom
+
+    # p-value = 1 - Φ(z_stat)
+    p_value = float(1.0 - _norm.cdf(z_stat))
+    return p_value
+
+
+def is_sharpe_significant(
+    observed_sharpe: float,
+    num_observations: int,
+    num_strategies_tested: int = 355,
+    skewness: float = 0.0,
+    kurtosis: float = 3.0,
+    alpha: float = 0.05,
+) -> bool:
+    """DSR p-value < alpha 이면 True (통계적으로 유의한 Sharpe).
+
+    Args:
+        observed_sharpe: 관찰된 Sharpe Ratio.
+        num_observations: 관측 수 T.
+        num_strategies_tested: 테스트한 전략 수 (기본값 355).
+        skewness: 수익률 왜도.
+        kurtosis: 수익률 첨도.
+        alpha: 유의수준 (기본 0.05).
+
+    Returns:
+        True이면 유의한 Sharpe (과도한 다중 테스트 후에도 통계적으로 의미 있음).
+    """
+    p = deflated_sharpe_ratio(
+        observed_sharpe=observed_sharpe,
+        num_strategies_tested=num_strategies_tested,
+        num_observations=num_observations,
+        skewness=skewness,
+        kurtosis=kurtosis,
+    )
+    return p < alpha
