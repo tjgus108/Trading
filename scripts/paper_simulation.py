@@ -1090,6 +1090,12 @@ if __name__ == "__main__":
         default=None,
         help="로컬 CSV 데이터 디렉토리 (지정 시 CSV 우선 사용, 예: data/historical)",
     )
+    parser.add_argument(
+        "--symbols",
+        nargs="+",
+        default=None,
+        help="실행할 심볼 목록 (기본: BTC/USDT ETH/USDT SOL/USDT, 예: --symbols BTC/USDT)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1111,4 +1117,7 @@ if __name__ == "__main__":
     if args.csv_dir is not None:
         _this.CSV_DATA_DIR = Path(args.csv_dir).expanduser().resolve()
         print(f"[CONFIG] CSV data dir: {_this.CSV_DATA_DIR}", flush=True)
+    if args.symbols is not None:
+        _this.SYMBOLS = args.symbols
+        print(f"[CONFIG] Symbols overridden: {_this.SYMBOLS}", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

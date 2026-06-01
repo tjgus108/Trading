@@ -33,6 +33,11 @@ SYMBOL_PARAMS = {
         "bull_to_bear": 0.006,
         "bear_to_bull": 0.05,
         "vol_spike_prob": 0.28,
+        # OU 평균회귀 파라미터: 가격이 log-앵커로 회귀
+        "ou_theta": 0.003,       # 회귀 강도 (클수록 강한 회귀)
+        "ou_anchor_mult": 2.5,   # 앵커 = start_price * this (2023 ETH 고점 ~2900 반영)
+        "price_max_mult": 5.0,   # start_price * 5 초과 시 강제 하향 드리프트
+        "price_min_mult": 0.15,  # start_price * 0.15 미만 시 강제 상향 드리프트
     },
     "SOL": {
         "start_price": 15.0,
@@ -44,6 +49,11 @@ SYMBOL_PARAMS = {
         "bull_to_bear": 0.005,
         "bear_to_bull": 0.06,
         "vol_spike_prob": 0.35,
+        # OU 평균회귀: SOL 2023 범위 ~10~250
+        "ou_theta": 0.004,
+        "ou_anchor_mult": 5.0,   # 앵커 = 15 * 5 = 75 (2023 SOL 중간값 ~60-80)
+        "price_max_mult": 20.0,  # 15 * 20 = 300 초과 시 강제 하향
+        "price_min_mult": 0.20,  # 15 * 0.2 = 3 미만 시 강제 상향
     },
 }
 
@@ -98,7 +108,22 @@ def generate_garch_ohlcv(
         elif regime == "bear" and rng.random() < p_bear_to_bull:
             regime = "bull"
 
-        drift = params["bull_drift"] if regime == "bull" else params["bear_drift"]
+        base_drift = params["bull_drift"] if regime == "bull" else params["bear_drift"]
+
+        # Ornstein-Uhlenbeck 평균회귀: log-price를 앵커로 당김
+        ou_theta = params["ou_theta"]
+        ou_anchor = np.log(params["start_price"] * params["ou_anchor_mult"])
+        ou_correction = ou_theta * (ou_anchor - np.log(max(price, 1e-6)))
+        drift = base_drift + ou_correction
+
+        # 가격 한계 초과 시 강제 드리프트 반전 (2차 안전장치)
+        p_max = params["start_price"] * params["price_max_mult"]
+        p_min = params["start_price"] * params["price_min_mult"]
+        if price >= p_max:
+            drift = min(drift, -abs(base_drift) * 3)
+        elif price <= p_min:
+            drift = max(drift, abs(base_drift) * 3)
+
         ret = np.clip(drift + sigma * rng.standard_normal(), -0.15, 0.15)
 
         open_p = price

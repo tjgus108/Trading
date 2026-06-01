@@ -46,6 +46,33 @@ BUNDLE_STRATEGIES = [
 ]
 
 
+def load_csv_and_resample(csv_path: Path, symbol: str, target_tf: str) -> pd.DataFrame:
+    """CSV(1h봉)를 로드하여 target_tf로 리샘플링 후 반환."""
+    from src.data.data_utils import load_csv_ohlcv, resample_ohlcv
+
+    pair_clean = symbol.replace("/", "").replace(":", "")
+    candidates: list[Path] = []
+    if csv_path.is_dir():
+        for exc_dir in csv_path.iterdir():
+            if exc_dir.is_dir():
+                for pair_dir in exc_dir.iterdir():
+                    if pair_dir.is_dir() and pair_dir.name.upper() in (pair_clean, symbol.replace("/", "_").upper()):
+                        p = pair_dir / "1h.csv"
+                        if p.exists():
+                            candidates.append(p)
+    if not candidates:
+        return pd.DataFrame()
+    src = max(candidates, key=lambda p: p.stat().st_mtime)
+    logger.info("Loading CSV for Bundle OOS: %s", src)
+    df = load_csv_ohlcv(src, validate=False)
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if target_tf != "1h":
+        df = resample_ohlcv(df, target_tf)
+    logger.info("CSV loaded and resampled to %s: %d candles", target_tf, len(df))
+    return df
+
+
 def generate_synthetic_data(limit: int) -> pd.DataFrame:
     """Regime-switching 합성 OHLCV 데이터 생성 (GBM + GARCH 변동성 + 강화 레짐).
 
@@ -436,14 +463,23 @@ def run_bundle_oos(
     dry_run: bool = False,
     min_oos_trades: int = 10,
     use_quality_data: bool = False,
+    csv_dir: "Path | None" = None,
 ) -> list[tuple[str, BundleOOSResult]]:
     """5-Bundle 전략에 대해 Rolling OOS 검증 실행."""
     mode = "DRY-RUN (synthetic)" if dry_run else "LIVE"
     logger.info("=== 5-Bundle Rolling OOS Validation [%s] ===", mode)
     logger.info("Symbol: %s | Timeframe: %s | Candles: %d | min_oos_trades: %d", symbol, timeframe, limit, min_oos_trades)
 
-    # 데이터 수집
-    if dry_run:
+    # 데이터 수집: csv_dir 지정 시 CSV 우선 사용
+    if csv_dir is not None:
+        csv_df = load_csv_and_resample(csv_dir, symbol, timeframe)
+        if not csv_df.empty:
+            df = enrich_indicators(csv_df)
+            logger.info("CSV data used for Bundle OOS: %d candles", len(df))
+        else:
+            logger.warning("CSV 로드 실패, synthetic fallback")
+            df = enrich_indicators(generate_synthetic_data(limit))
+    elif dry_run:
         if use_quality_data:
             df = enrich_indicators(_generate_quality_synthetic_data(limit))
         else:
@@ -608,6 +644,12 @@ def main():
         "--use-quality-data", action="store_true",
         help="quality_audit.make_synthetic_data() 기반 GARCH+regime 합성 데이터 사용 (GBM보다 현실적).",
     )
+    parser.add_argument(
+        "--csv-dir",
+        type=str,
+        default=None,
+        help="로컬 CSV 디렉토리 (1h봉 CSV를 target timeframe으로 리샘플링, 예: data/historical)",
+    )
     args = parser.parse_args()
 
     results = run_bundle_oos(
@@ -617,6 +659,7 @@ def main():
         dry_run=args.dry_run,
         min_oos_trades=args.min_trades,
         use_quality_data=args.use_quality_data,
+        csv_dir=Path(args.csv_dir).expanduser().resolve() if args.csv_dir else None,
     )
 
     # 콘솔 요약 출력
