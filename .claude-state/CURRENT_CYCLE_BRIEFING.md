@@ -1,37 +1,38 @@
 # Current Cycle Briefing
 
-_Cycle 256 — 2026-06-01_
+_Cycle 257 — 2026-06-01_
 _카테고리: B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): BacktestEngine atr_multiplier_tp 기본값 조정
-- `src/backtest/engine.py`: atr_multiplier_tp 3.0 → 3.5 (R:R 2.33:1)
-- Kelly sizer f* 공식 검증: 구현 정확 (f* = p - q/b)
-- 효과: SOL 6/22 → 8/22 PASS, price_action_momentum sharpe 4.18→5.48
+### B(리스크): HIGH Confidence 포지션 사이징 축소
+- `src/backtest/engine.py`: HIGH confidence multiplier 1.5 → 1.2
+- `src/risk/manager.py`: CONFIDENCE_MULTIPLIER HIGH 1.5 → 1.2 (동기화)
+- 목적: acceleration_band SOL MDD 23%>20% 해결
+- 효과: acceleration_band MDD 23%→8.3% (목표 달성), 단 SOL 총 PASS 8→4 (mixed)
 
-### D(ML): FeatureBuilder 모멘텀 품질 피처 추가
+### D(ML): REGIME_FEATURE_CONFIG 업데이트
 - `src/ml/features.py`:
-  - `mom_quality_score`: ROC5 z-score (price_action_momentum 핵심 신호 피처화)
-  - `trend_strength`: (consistency×2-1) + (mom5>mom10) (momentum_quality 핵심 피처화)
-  - feature_names: 16 → 18
-- 테스트 4개 파일 업데이트 (feature count)
-- 전체 테스트: 8369 passed (신규 2건 추가)
+  - `"bull"` 레짐: `mom_quality_score` 추가 (SOL price_action_momentum 핵심 피처)
+  - `"ranging"` 레짐: `trend_strength` 추가 (momentum_quality 전략 지원)
+  - 피처 수: bull 10→11, ranging 8→9
 
-### F(리서치): atr_multiplier_tp PF 효과 분석
-- R:R=2.33:1: PF=1.5 달성 최소 win_rate 39.2% (이전 42.9%), 3.7%p 완화
-- BTC 0/22 PASS: GARCH CSV가 trend-insufficient → 합성 데이터로 대체 불가
-- SOL 8/22 PASS 중 price_action_momentum 4/4 윈도우 완전 일관성
+### F(리서치): OOS Sharpe std 저거래 fold 제외
+- `src/backtest/walk_forward.py`:
+  - `WindowResult.oos_trades` 필드 추가
+  - OOS std 계산: 저거래 fold (< 30 trades) 제외
+  - 근거: 저거래 OOS fold의 Sharpe는 통계적으로 신뢰 불가 (trades=7에서 Sharpe=7.674 같은 이상치)
 
-## 시뮬레이션 결과 (Cycle 256)
-- Paper Sim BTC: 0/22 PASS (AvgPF 1.0~1.2)
-- Paper Sim ETH: 3/22 PASS
-- Paper Sim SOL: **8/22 PASS** (Cycle 255 6/22 → 개선)
-- Bundle OOS BTC 4h: 0/5 PASS (OOS Sharpe std 3.9~8.5, 여전히 불안정)
+## 시뮬레이션 결과 (Cycle 257)
+- Paper Sim BTC 1h (CSV): 0/22 PASS
+  - Top: supertrend_multi(0.50), price_cluster(0.41)
+- Paper Sim ETH (합성): **5/22 PASS** ↑ (Cycle 256 3/22)
+  - momentum_quality(4/4, 5.56), supertrend_multi(3/4, 4.78), price_action_momentum(2/4, 3.80)
+- Paper Sim SOL (합성): **4/22 PASS** ↓ (Cycle 256 8/22)
+  - momentum_quality(4/4, 4.89), acceleration_band(2/4, MDD 8.3%)
+- Bundle OOS BTC 4h: 0/5 PASS (narrow_range #1 Score 87.1, OOS Sharpe std 5.203)
 
-## 다음 Cycle 257 (257 mod 5 = 2 → B+D+F)
-- B: momentum_quality MDD 개선 (22%>20% 초과 → MDD 제약 강화 검토)
-- B: acceleration_band SOL MDD 23% 초과 → 포지션 사이징 조정
-- D: mom_quality_score, trend_strength REGIME_FEATURE_CONFIG["bull"] 추가 (테스트 영향 확인 필요)
-- D: BTC 0/22 원인 분석 — price_action_momentum이 SOL에선 4/4 PASS인데 BTC에선 PF 1.00 → 심볼 특성 차이 분석
-- F: Bundle OOS Sharpe std 개선을 위한 파라미터 안정화 방안 (narrowing grid search)
+## 다음 Cycle 258 (258 mod 5 = 3 → C+B+F)
+- C: ETH/SOL CSV 데이터 생성 (합성 데이터 품질 개선 — 4 windows→8 windows)
+- B: HIGH conf 1.2→1.35 재검토 (SOL PASS 8→4 원인 분석)
+- F: Bundle OOS std 저거래 제외 효과 측정, run_bundle_oos.py에도 동일 로직 적용 검토

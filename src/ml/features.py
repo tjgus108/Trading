@@ -407,6 +407,7 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
         "ema_ratio", "price_vs_ema20", "price_vs_ema50",
         "volume_ratio_20", "donchian_pct",
         "macd_hist",
+        "mom_quality_score",  # Cycle 257: SOL PASS 핵심 피처
     ],
     "bear": [
         "return_1", "return_3", "return_5",
@@ -419,6 +420,7 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
         "atr_pct", "volatility_20",
         "bb_position", "macd_hist",
         "volume_ratio_20", "donchian_pct",
+        "trend_strength",  # Cycle 257: momentum_quality 전략 지원
     ],
     "crisis": [
         "return_1", "return_3",

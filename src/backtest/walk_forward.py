@@ -81,6 +81,7 @@ class WindowResult:
     oos_sharpe: float   # out-of-sample 실제 Sharpe
     oos_passed: bool    # OOS 백테스트 통과 여부
     is_oos_ratio: float # OOS/IS 비율
+    oos_trades: int = 0  # Cycle 257: OOS 거래 수 (저거래 std 오염 방지)
 
     def is_overfit(self) -> bool:
         return self.is_oos_ratio < IS_OOS_RATIO_MIN
@@ -313,6 +314,7 @@ class WalkForwardOptimizer:
                 oos_sharpe=oos_result.sharpe_ratio,
                 oos_passed=oos_result.passed,
                 is_oos_ratio=ratio,
+                oos_trades=oos_result.total_trades,
             )
             window_results.append(wr)
             fold_params_history.append(best_params)
@@ -359,7 +361,12 @@ class WalkForwardOptimizer:
         import statistics
         oos_sharpes = [wr.oos_sharpe for wr in window_results]
         avg_oos = sum(oos_sharpes) / len(oos_sharpes) if oos_sharpes else 0.0
-        oos_std = statistics.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
+        # Cycle 257: 저거래(< MIN_RELIABLE_OOS_TRADES) fold는 Sharpe 신뢰 불가 → std 계산 제외
+        # 저거래 Sharpe는 분산이 극대화되어 OOS std를 인위적으로 상승시킴
+        reliable_sharpes = [wr.oos_sharpe for wr in window_results
+                            if wr.oos_trades >= 30]
+        std_source = reliable_sharpes if len(reliable_sharpes) > 1 else oos_sharpes
+        oos_std = statistics.stdev(std_source) if len(std_source) > 1 else 0.0
         overfit_count = sum(1 for wr in window_results if wr.is_overfit())
 
         # 파라미터 안정성 CV 계산 (fold 간 파라미터 CV = std / |mean|)

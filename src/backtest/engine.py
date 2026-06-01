@@ -198,9 +198,10 @@ class BacktestEngine:
                         )
                     if atr > 0:
                         sl_dist = atr * self.atr_multiplier_sl
-                        # Confidence 기반 리스크 배율 (HIGH=1.5%, MEDIUM=1%, LOW=0.5%)
+                        # Confidence 기반 리스크 배율 (HIGH=1.2%, MEDIUM=1%, LOW=0.5%)
+                        # Cycle 257: HIGH 1.5→1.2 (MDD 초과 전략 개선)
                         conf_name = getattr(signal.confidence, 'name', str(signal.confidence)).upper()
-                        conf_mult = {"HIGH": 1.5, "MEDIUM": 1.0, "LOW": 0.5}.get(conf_name, 1.0)
+                        conf_mult = {"HIGH": 1.2, "MEDIUM": 1.0, "LOW": 0.5}.get(conf_name, 1.0)
                         risk_amt = balance * 0.01 * conf_mult
                         size = risk_amt / sl_dist
                         close = candle["close"]
