@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-06-01 (Cycle 257 완료)_
+_Last updated: 2026-06-01 (Cycle 258 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 251, 252, 253, 254, 255, 256, 257
+### 이번 세션 완료 사이클: 251, 252, 253, 254, 255, 256, 257, 258
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -17,49 +17,48 @@ _Last updated: 2026-06-01 (Cycle 257 완료)_
 | 255 | A+C+F | GARCH CSV 생성, 0-trade score 버그 수정, SOL 6/22 PASS 확인 |
 | 256 | B+D+F | atr_multiplier_tp 3.0→3.5, mom_quality_score/trend_strength 피처 추가, **SOL 8/22 PASS** |
 | 257 | B+D+F | HIGH conf 1.5→1.2, REGIME bull/ranging 피처 추가, OOS std 저거래 제외, **ETH 5/22 PASS** |
+| 258 | C+B+F | ETH/SOL GARCH CSV 생성, HIGH conf 1.2→1.35, Bundle OOS std 로직 확인 |
 
-### 🎯 Cycle 258 작업 방향 (258 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 259 작업 방향 (259 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### B(리스크): HIGH Confidence 혼합 효과 재검토
-- Cycle 257 결과: HIGH conf 1.5→1.2 → ETH +2, SOL -4 PASS (mixed)
-  - acceleration_band SOL MDD 23%→8.3% ✓ (목표 달성!)
-  - price_action_momentum SOL 4/4→1/4 ✗ (borderline 전략 수익 감소)
-- 고려: **전략별 confidence 동적 조정**보다 종목별 차이 분석 우선
-  - SOL은 trend-persistent → HIGH conf 유지 유리
-  - ETH는 더 volatile → HIGH conf 축소 유리
-- 제안: HIGH conf 1.2→1.35 (중간값) 또는 전략별 파라미터로 분리
+#### D(ML): GARCH CSV 품질 개선 — 평균회귀 컴포넌트 추가
+- Cycle 258 문제: ETH(1200→63000), SOL(15→1765) 극단 드리프트
+  - 원인: GARCH drift 누적 (bull_drift=0.00055/0.00080 × 12000봉 = 누적 효과)
+  - 결과: ETH 0/22, SOL 0/22 (Cycle 257: ETH 5/22, SOL 4/22에서 하락)
+- 수정 방향: `scripts/generate_garch_csv.py` 개선
+  - **Ornstein-Uhlenbeck 평균회귀**: `ret = θ*(μ - log(price)) * dt + sigma * dW`
+  - 또는 더 간단히: 가격이 시작가의 N배를 초과하면 drift를 0 또는 반전
+  - 목표: ETH 가격 범위 1000~5000 (실제 2023 범위), SOL 10~250
+- ETH/SOL GARCH CSV 재생성 후 재시뮬 → 이전 결과(ETH 5/22, SOL 4/22) 회복 목표
 
-#### C(데이터): ETH/SOL CSV 데이터 생성 (합성 개선)
-- 현재 ETH/SOL은 Block Bootstrap 합성 데이터 (seed 고정)
-- BTC 1h CSV (data/historical/binance/BTCUSDT/1h.csv) 형식으로 ETH/SOL CSV 생성 필요
-  - scripts/generate_garch_csv.py가 있다면 ETH/SOL 생성 호출
-  - 없으면 BTC GARCH 패턴에서 SOL-like (higher vol), ETH-like 데이터 생성
-- ETH/SOL CSV 있으면: 8 windows (vs 현재 4 windows) → 더 신뢰할 수 있는 결과
+#### E(실행): roc_ma_cross SOL 분석
+- Cycle 258: roc_ma_cross SOL Sharpe 1.35, PF 1.43, 1/8 PASS (borderline)
+  - 문제: PF 1.43 < 1.5 기준 미달 (차이 작음)
+  - Trades 34 (충분), MDD 6.9% (양호)
+- roc_ma_cross 파라미터 확인: `src/strategy/roc_ma_cross.py`
+  - TP/SL 비율 조정으로 PF 개선 가능성 검토
+  - 단, CLAUDE.md 규정: 합성 데이터 PASS만으로 파라미터 수정 금지
 
-#### F(리서치): OOS Sharpe std 저거래 제외 효과 측정
-- Cycle 257에서 walk_forward.py std 계산 개선 (저거래 fold 제외) 
-- Bundle OOS에도 동일 로직 적용 필요 여부 확인
-  - scripts/run_bundle_oos.py의 OOS std 계산 방식 확인
-  - 저거래 fold 제외 후 narrow_range의 std 5.203 → 얼마나 감소하는지 측정
+#### F(리서치): 평균회귀 합성 데이터 효과 측정
+- 개선된 GARCH CSV(OU 포함)로 재시뮬 후 ETH/SOL PASS 수 비교
+  - 목표: Cycle 257 수준(ETH 5/22, SOL 4/22) 이상 회복
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단 (합성 데이터만 사용 가능)
 - BTC GARCH CSV (12,000 rows): PASS 0/22 — trend 지속성 부족 (BTC 합성 데이터 개선 필요)
-- ETH/SOL: Block Bootstrap 합성 4 windows (BTC CSV는 8 windows) — 불균형
+- ETH/SOL: 새 GARCH CSV 8 windows — 극단 드리프트 문제로 결과 신뢰도 낮음
 
-### 핵심 메트릭 (Cycle 257)
+### 핵심 메트릭 (Cycle 258)
 - 테스트: 8369 passed, 23 skipped (변경 없음)
-- Paper Sim BTC: 0/22 (top: supertrend_multi sharpe 0.50, price_cluster sharpe 0.41)
-- Paper Sim ETH: **5/22 PASS** ↑ (Cycle 256 3/22)
-  - TOP: momentum_quality(4/4, 5.56), supertrend_multi(3/4, 4.78), price_action_momentum(2/4, 3.80)
-- Paper Sim SOL: **4/22 PASS** ↓ (Cycle 256 8/22)
-  - TOP: momentum_quality(4/4, 4.89), acceleration_band(2/4, MDD 8.3%!)
-  - acceleration_band MDD: 23.0%→8.3% ← HIGH conf 1.5→1.2 주효
-- Bundle OOS BTC 4h: 0/5 PASS (narrow_range #1 Score 87.1)
+- Paper Sim BTC: 0/22 (top: supertrend_multi +5.87%, price_cluster +2.50%)
+- Paper Sim ETH: **0/22** ↓ (Cycle 257: 5/22 — GARCH 드리프트 원인)
+  - TOP: dema_cross(Sharpe 1.87 but 14 trades), acceleration_band(1.85 but 12 trades)
+- Paper Sim SOL: **0/22** ↓ (Cycle 257: 4/22 — GARCH 드리프트 원인)
+  - TOP: roc_ma_cross(Sharpe 1.35, PF 1.43, 1/8), acceleration_band(1.85, PF 2.43, 8 trades)
+- Bundle OOS BTC 4h: 0/5 PASS (narrow_range Score 87.1, OOS Sharpe 0.240↑)
 
-### 주요 코드 변경 이력 (Cycle 257)
-1. `src/backtest/engine.py:203` — HIGH conf_mult 1.5→1.2
-2. `src/risk/manager.py:404` — CONFIDENCE_MULTIPLIER HIGH 1.5→1.2
-3. `src/ml/features.py:405,417` — REGIME_FEATURE_CONFIG bull+mom_quality_score, ranging+trend_strength
-4. `src/backtest/walk_forward.py:83,317,362` — WindowResult.oos_trades, OOS std 저거래 제외
-5. `tests/test_risk_manager.py:871,900` — test_confidence_high_is_1_2x_medium 업데이트
+### 주요 코드 변경 이력 (Cycle 258)
+1. `scripts/generate_garch_csv.py` — 신규 생성 (ETH/SOL GARCH 합성 CSV 생성기)
+2. `src/backtest/engine.py:204` — HIGH conf_mult 1.2→1.35
+3. `src/risk/manager.py:405` — CONFIDENCE_MULTIPLIER HIGH 1.2→1.35
+4. `tests/test_risk_manager.py:871,901` — HIGH multiplier 테스트 업데이트 (1.2→1.35)

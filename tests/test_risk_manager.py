@@ -868,13 +868,13 @@ def _sized(confidence: str, **kw):
     )
 
 
-def test_confidence_high_is_1_2x_medium():
-    # Cycle 257: HIGH 1.5→1.2 (MDD 초과 전략 개선)
+def test_confidence_high_is_1_35x_medium():
+    # Cycle 258: HIGH 1.2→1.35 (ETH/SOL 혼합 결과 중간값)
     med = _sized("MEDIUM")
     high = _sized("HIGH")
     assert med.status == RiskStatus.APPROVED
     assert high.status == RiskStatus.APPROVED
-    assert high.position_size == pytest.approx(med.position_size * 1.2, rel=1e-3)
+    assert high.position_size == pytest.approx(med.position_size * 1.35, rel=1e-3)
 
 
 def test_confidence_low_is_0_5x_medium():
@@ -898,7 +898,7 @@ def test_confidence_unknown_value_defaults_to_medium():
 def test_confidence_lowercase_accepted():
     med = _sized("MEDIUM")
     high_lower = _sized("high")
-    assert high_lower.position_size == pytest.approx(med.position_size * 1.2, rel=1e-3)
+    assert high_lower.position_size == pytest.approx(med.position_size * 1.35, rel=1e-3)
 
 
 # ── DrawdownMonitor + RiskManager 통합 시나리오 (Cycle 197 B카테고리) ──────────

@@ -400,9 +400,9 @@ class RiskManager:
             "threshold": status["threshold"],
         }
 
-    # Confidence → 포지션 사이징 배율 (HIGH=1.2x, MEDIUM=1.0x, LOW=0.5x)
-    # Cycle 257: HIGH 1.5→1.2 (MDD 초과 전략 개선)
-    CONFIDENCE_MULTIPLIER = {"HIGH": 1.2, "MEDIUM": 1.0, "LOW": 0.5}
+    # Confidence → 포지션 사이징 배율 (HIGH=1.35x, MEDIUM=1.0x, LOW=0.5x)
+    # Cycle 258: HIGH 1.2→1.35 (ETH/SOL 혼합 결과 중간값)
+    CONFIDENCE_MULTIPLIER = {"HIGH": 1.35, "MEDIUM": 1.0, "LOW": 0.5}
 
     def evaluate(
         self,
