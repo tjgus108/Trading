@@ -76,6 +76,7 @@ class DrawdownStatus:
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
     rolling_mdd_short_pct: float = 0.0  # 단기 롤링(20봉) MDD — 장기 대비 조기 경보용
     kelly_fraction_multiplier: float = 1.0  # Kelly fraction 축소 배수 (MDD > kelly_reduce_at_mdd 시 0.5)
+    atr_vol_multiplier: float = 1.0  # ATR 변동성 필터 배수 (ATR 급등 시 0.5)
 
 
 class DrawdownMonitor:
@@ -180,6 +181,9 @@ class DrawdownMonitor:
         self._current_regime: str = ''             # 현재 레짐 (빈 문자열 = 기본)
         self._rolling_window: int = rolling_window  # 롤링 MDD 윈도우 크기 (equity 업데이트 횟수)
         self._equity_history: Deque[float] = deque(maxlen=self._rolling_window)
+        # ATR 변동성 필터 상태
+        self._atr_vol_elevated: bool = False       # ATR 급등 여부
+        self._atr_vol_mult: float = 1.0            # ATR 필터 배수 (정상=1.0, 급등=0.5)
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -229,6 +233,38 @@ class DrawdownMonitor:
             )
         else:
             logger.debug('DrawdownMonitor: regime=%s (일일 한도=%.1f%%)', self._current_regime, self.daily_limit * 100)
+
+    def set_atr_state(self, atr: float, atr_ma: float, threshold: float = 1.5) -> None:
+        """ATR 변동성 상태 설정. ATR > ATR_MA * threshold이면 포지션 사이즈를 0.5로 축소.
+
+        Args:
+            atr:       현재 ATR 값.
+            atr_ma:    ATR 이동평균 값.
+            threshold: 급등 판정 배수 (기본 1.5 — ATR이 MA의 1.5배 초과 시 급등).
+        """
+        if atr_ma <= 0 or atr <= 0:
+            self._atr_vol_elevated = False
+            self._atr_vol_mult = 1.0
+            return
+        ratio = atr / atr_ma
+        elevated = ratio >= threshold
+        if elevated != self._atr_vol_elevated:
+            if elevated:
+                logger.info(
+                    "DrawdownMonitor: ATR 급등 감지 — ratio=%.2fx ≥ %.1fx → size_mult 0.5 적용",
+                    ratio, threshold,
+                )
+            else:
+                logger.info(
+                    "DrawdownMonitor: ATR 정상화 — ratio=%.2fx < %.1fx → size_mult 복원",
+                    ratio, threshold,
+                )
+        self._atr_vol_elevated = elevated
+        self._atr_vol_mult = 0.5 if elevated else 1.0
+
+    def get_atr_vol_multiplier(self) -> float:
+        """ATR 변동성 필터 배수 반환 (정상=1.0, 급등=0.5)."""
+        return self._atr_vol_mult
 
     def _effective_daily_limit(self) -> float:
         """현재 레짐에 따른 실효 일일 DD 한도 반환."""
@@ -352,7 +388,7 @@ class DrawdownMonitor:
             self._consecutive_losses = 0
         streak_mult = 0.5 if self._consecutive_losses >= self.loss_streak_threshold else 1.0
         mdd_mult = self.get_mdd_size_multiplier()
-        return min(streak_mult, mdd_mult)
+        return min(streak_mult, mdd_mult, self._atr_vol_mult)
 
     # ── 단계적 MDD 서킷브레이커 ─────────────────────────────────
 
@@ -583,6 +619,7 @@ class DrawdownMonitor:
             rolling_mdd_pct=self.rolling_mdd(),
             rolling_mdd_short_pct=self.rolling_mdd(window=20),
             kelly_fraction_multiplier=self.get_kelly_fraction_multiplier(),
+            atr_vol_multiplier=self._atr_vol_mult,
         )
 
     def _check_tiered(
@@ -641,6 +678,8 @@ class DrawdownMonitor:
         self._single_loss_cooldown_until = 0.0
         self._last_loss_at = 0.0
         self._equity_history.clear()
+        self._atr_vol_elevated = False
+        self._atr_vol_mult = 1.0
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:

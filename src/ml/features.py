@@ -289,6 +289,13 @@ class FeatureBuilder:
         consistency_prev = (returns_prev > 0).rolling(10, min_periods=5).mean()
         feat["trend_strength"] = (consistency_prev * 2.0 - 1.0) + (mom5_prev > mom10_prev).astype(float)
 
+        # atr_vol_regime (Cycle 261): ATR/ATR_MA50 비율 — 변동성 레짐 신호
+        #   1.0 = high-vol (ATR > ATR_MA * 1.5), 0.0 = normal/low-vol
+        #   momentum_quality 전략이 고변동성 구간에서 실패 → ML이 필터링할 수 있도록 추가
+        atr_pct_prev_shift = feat["atr_pct"].shift(1)
+        atr_ma50 = atr_pct_prev_shift.rolling(50, min_periods=20).mean()
+        feat["atr_vol_regime"] = (feat["atr_pct"] > atr_ma50 * 1.5).astype(float)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -389,6 +396,7 @@ class FeatureBuilder:
             "bb_position",
             "nr_range_ratio", "nr_atr_ratio",
             "mom_quality_score", "trend_strength",  # Cycle 256
+            "atr_vol_regime",  # Cycle 261
         ]
 
 
@@ -408,6 +416,7 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
         "volume_ratio_20", "donchian_pct",
         "macd_hist",
         "mom_quality_score",  # Cycle 257: SOL PASS 핵심 피처
+        "atr_vol_regime",     # Cycle 261: 고변동성 구간 필터
     ],
     "bear": [
         "return_1", "return_3", "return_5",
