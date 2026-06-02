@@ -23,7 +23,7 @@ class WickReversalStrategy(BaseStrategy):
 
     def __init__(
         self,
-        min_wick_ratio: float = 0.65,
+        min_wick_ratio: float = 0.55,
         vol_mult: float = 0.8,
         sma_period: int = 20,
         trend_period: int = 14,

@@ -112,12 +112,20 @@ class MLSignalGenerator:
                 logger.info("Auto-enabled regime_aware mode (trained_regime=%s)", self._trained_regime)
 
             if self._feature_importances:
-                top3 = sorted(
+                ranked = sorted(
                     self._feature_importances.items(),
                     key=lambda x: x[1], reverse=True,
-                )[:3]
-                top3_str = ", ".join(f"{n}={v:.3f}" for n, v in top3)
+                )
+                top3_str = ", ".join(f"{n}={v:.3f}" for n, v in ranked[:3])
                 logger.info("Top features: %s", top3_str)
+                # 하위 피처 경고 (importance < 0.01) — 불필요 피처 누적 방지
+                low_feats = [(n, v) for n, v in ranked if v < 0.01]
+                if low_feats:
+                    low_str = ", ".join(f"{n}={v:.4f}" for n, v in low_feats[-5:])
+                    logger.warning(
+                        "Low-importance features (imp<0.01): %s — consider removal via get_low_importance_features()",
+                        low_str,
+                    )
             logger.info("ML model loaded: %s (trained: %s)", self._model_name, self._train_date or "unknown")
             return True
         except Exception as e:

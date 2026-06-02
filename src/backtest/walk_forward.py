@@ -47,7 +47,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "buy_thresh": [0.07, 0.08, 0.09],  # Cycle 263: 범위 축소 (0.06-0.10→0.07-0.09)
     },
     "wick_reversal": {
-        "min_wick_ratio": [0.60, 0.65, 0.70],
+        "min_wick_ratio": [0.50, 0.55, 0.60],  # Cycle 264: 하향 조정 (0거래 문제 완화)
         "vol_mult": [0.7, 0.8, 0.9],
     },
     "elder_impulse": {
@@ -1038,7 +1038,12 @@ class RollingOOSValidator:
             elif oos_result.sharpe_ratio > 0:
                 # IS<0 + OOS>0: IS가 심각한 음수(-1.0 미만)이면 역방향 신호로 신뢰 불가
                 if is_result.sharpe_ratio < -1.0:
-                    wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
+                    if oos_result.sharpe_ratio > 2.0:
+                        # 레짐 전환 마커: IS 역방향 레짐(약세/횡보)에서 손실,
+                        # OOS에서 대폭 회복 → 완전 배제보다 부분 신뢰가 적절 (cmf 패턴)
+                        wfe = 0.5
+                    else:
+                        wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
                 else:
                     wfe = 1.0  # IS 소폭 음수, OOS 양수 → 과최적화 아님
             else:

@@ -249,16 +249,19 @@ def test_hammer_with_trend_up_true():
 def test_hammer_with_trend_up_false():
     """
     Hammer + 최근 고점에서 멀림 → trend_up=False → HOLD
+    min_wick_ratio=0.65 명시: 테스트 캔들의 upper_wick=0.644가 새 기본값(0.55)에서
+    shooting_star를 의도치 않게 트리거하는 것을 방지
     """
+    s = WickReversalStrategy(min_wick_ratio=0.65)
     df = _make_df(n=30, pattern="hammer", wick_ratio=0.75, close_near_sma=True, vol_ok=True)
     idx_last = len(df) - 2  # 28
-    
+
     for i in range(15, idx_last + 1):
         df.at[i, "high"] = 105.0
-    
+
     df.at[idx_last, "high"] = 103.0
-    
-    sig = strategy.generate(df)
+
+    sig = s.generate(df)
     assert sig.action == Action.HOLD
     assert "trend_up=False" in sig.reasoning
 
