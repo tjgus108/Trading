@@ -394,6 +394,13 @@ def evaluate_strategy_walk_forward(
                 win_vol = 0.0
             window_vols.append(win_vol)
 
+            # 시장 방향 태그 (Cycle260: 레짐별 전략 성과 분석을 위한 어노테이션)
+            mkt_ret = 0.0
+            mkt_state = "unknown"
+            if "close" in test_df.columns and len(test_df) > 1:
+                mkt_ret = float((test_df["close"].iloc[-1] - test_df["close"].iloc[0]) / (test_df["close"].iloc[0] + 1e-9))
+                mkt_state = "bull" if mkt_ret > 0.05 else ("bear" if mkt_ret < -0.05 else "sideways")
+
             window_results.append({
                 "window": i + 1,
                 "sharpe": bt.sharpe_ratio,
@@ -405,8 +412,9 @@ def evaluate_strategy_walk_forward(
                 "passed": bt.passed,
                 "fail_reasons": list(bt.fail_reasons) if bt.fail_reasons else [],
                 "final_balance": 10_000 * (1 + bt.total_return),
-                "fail_reasons": bt.fail_reasons,
                 "volatility": win_vol,
+                "market_return": round(mkt_ret, 4),
+                "market_state": mkt_state,
             })
         except Exception as e:
             window_vols.append(0.0)
@@ -416,6 +424,8 @@ def evaluate_strategy_walk_forward(
                 "final_balance": 10_000, "error": str(e)[:100],
                 "fail_reasons": [f"exception: {str(e)[:80]}"],
                 "volatility": 0.0,
+                "market_return": 0.0,
+                "market_state": "unknown",
             })
 
     # 일관성 점수: 통과한 윈도우 비율

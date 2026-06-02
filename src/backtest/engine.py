@@ -23,7 +23,7 @@ MIN_PROFIT_FACTOR = 1.5
 MIN_TRADES = 15          # Cycle 140: 50 → 15 (실데이터 거래 수 부족 해소)
 MIN_WFE = 0.5            # Walk-Forward Efficiency: OOS_Sharpe / IS_Sharpe 최솟값
 MC_P_THRESHOLD = 0.05    # Monte Carlo permutation p-value 상한
-MC_N_PERMUTATIONS = 500  # 셔플 횟수 (리서치 권장 1000, 속도 타협 500)
+MC_N_PERMUTATIONS = 1000  # Cycle260: 500→1000, p-value 정밀도 향상 (경계값 오분류 감소)
 MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
 
 ANNUALIZATION = {

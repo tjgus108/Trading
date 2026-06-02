@@ -1,3 +1,46 @@
+## [2026-06-02] Cycle 260 — A(품질) + C(데이터) + F(리서치)
+
+**[A] 품질 개선 2건:**
+1. `src/backtest/engine.py`: MC_N_PERMUTATIONS 500→1000
+   - 경계값 p-value(0.056 등)의 오분류 감소 목적
+   - supertrend_multi w2: sharpe=3.23, pf=1.68이지만 mc_p=0.056으로 FAIL 사례 분석
+2. `scripts/paper_simulation.py`: 윈도우별 `market_state` 태그 추가
+   - test_df의 종가 변화율로 bull/bear/sideways 분류 (±5% 기준)
+   - 다음 실행부터 레짐별 전략 성과 분석 가능
+
+**[A] BTC 윈도우 레짐 분석 (핵심):**
+- w1(Jul-Sep 2023): 횡보/약세 → roc_ma_cross PASS, supertrend_multi PASS
+- w2-w3(Aug-Nov 2023): BTC $25k→$37k 완만한 상승 → 전략 성과 호전
+- w4-w7(Oct 2023-Mar 2024): BTC ETF+반감기 강세장 ($34k→$67k) → **모든 전략 FAIL**
+- w8(Feb-Apr 2024): 고점 조정 → 일부 회복
+- **결론**: 비방향성 전략들이 강세장 구간에서 집중 실패 → 레짐 필터 필요
+
+**[C] 데이터 — ETH GARCH OU 파라미터 튜닝:**
+- ou_theta: 0.003 → 0.008, anchor_mult: 2.5 → 2.0, price_max_mult: 5.0 → 4.0
+- 결과: ETH max 11655 → **5955** (목표 6000 이하 달성!)
+- final: 3708 → 2433 (2023 ETH 실제 범위 2000-2500 근접)
+
+**[F] 리서치 — CMF 레짐 의존성 분석:**
+- Bundle OOS (BTC CSV 5 fold) fold별 날짜 매핑:
+  - fold 0 (Jul-Sep 2023 횡보): FAIL (WFE=0, IS=-1.499)
+  - fold 1 (Oct-Dec 2023 강세): **PASS** (OOS_Sharpe=3.858)
+  - fold 2 (Jan-Mar 2024 ETF 고변동): FAIL (WFE=0.434, IS decay)
+  - fold 3 (Feb-Apr 2024 반감기 피크): FAIL (WFE=0.449, IS decay)
+  - fold 4 (Apr-May 2024 조정): **PASS** (OOS_Sharpe=1.451)
+- **CMF 레짐 패턴**: 지속적 방향성 트렌드에서 작동, 고변동성/횡보에서 실패
+- 개선 방향: ATR 기반 변동성 필터 추가 (고변동성 구간 신호 억제)
+
+**시뮬레이션 결과 (Cycle 260):**
+- Paper Sim BTC: 0/22 (top: price_cluster 69.2점, supertrend_multi 67.6점)
+- Paper Sim ETH: 0/22 (top: momentum_quality **Sharpe 0.73** 75.8점 — 이전 1.30에서 하락)
+  - ETH GARCH 파라미터 변경 후 가격 범위 정상화 → 전략 성과 하락 (합성 데이터 과적합 해소)
+- Paper Sim SOL: 0/22 (top: momentum_quality 75.0점, order_flow_imbalance_v2 64.6점)
+- Bundle OOS BTC 4h (실 CSV): 0/5 PASS (Cycle 259와 동일 — CMF std=1.888 > 1.5)
+
+**테스트:** 8369 passed, 23 skipped (변경 없음, backtest+walk_forward 148 pass)
+
+---
+
 ## [2026-06-01] Cycle 259 — D(ML) + E(실행) + F(리서치)
 
 **[D] ML — GARCH CSV OU 평균회귀 추가 (핵심 수정):**
@@ -3196,6 +3239,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-01 20:16 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-02 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-02 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-02 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-02 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-02 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-02 00:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

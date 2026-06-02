@@ -34,9 +34,9 @@ SYMBOL_PARAMS = {
         "bear_to_bull": 0.05,
         "vol_spike_prob": 0.28,
         # OU 평균회귀 파라미터: 가격이 log-앵커로 회귀
-        "ou_theta": 0.003,       # 회귀 강도 (클수록 강한 회귀)
-        "ou_anchor_mult": 2.5,   # 앵커 = start_price * this (2023 ETH 고점 ~2900 반영)
-        "price_max_mult": 5.0,   # start_price * 5 초과 시 강제 하향 드리프트
+        "ou_theta": 0.008,       # Cycle260: 0.003→0.008, max 6000 이하 목표
+        "ou_anchor_mult": 2.0,   # 앵커 = start_price*2.0=2400 (2023 ETH 중간값)
+        "price_max_mult": 4.0,   # start_price*4=4800 초과 시 강제 하향 드리프트
         "price_min_mult": 0.15,  # start_price * 0.15 미만 시 강제 상향 드리프트
     },
     "SOL": {
