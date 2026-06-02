@@ -43,8 +43,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "short_threshold": [-0.0001, -0.0002],
     },
     "cmf": {
-        "period": [15, 20, 25],
-        "buy_thresh": [0.06, 0.08, 0.10],
+        "period": [18, 20, 22],        # Cycle 263: 범위 축소 (15-25→18-22), OOS std 안정화
+        "buy_thresh": [0.07, 0.08, 0.09],  # Cycle 263: 범위 축소 (0.06-0.10→0.07-0.09)
     },
     "wick_reversal": {
         "min_wick_ratio": [0.60, 0.65, 0.70],

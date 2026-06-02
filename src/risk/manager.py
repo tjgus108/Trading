@@ -561,8 +561,14 @@ class RiskManager:
             if _size_mult < 1.0:
                 position_size *= _size_mult
                 max_size *= _size_mult
+                # Cycle 263 B: 컴포넌트별 분해 로그 — ATR/streak/MDD 중 어느 것이 원인인지 추적
+                _streak_m = 0.5 if self.drawdown_monitor._consecutive_losses >= self.drawdown_monitor.loss_streak_threshold else 1.0
+                _mdd_m = self.drawdown_monitor.get_mdd_size_multiplier()
+                _atr_m = self.drawdown_monitor.get_atr_vol_multiplier()
                 logger.warning(
-                    "DrawdownMonitor size_mult=%.2f applied (streak/MDD)", _size_mult
+                    "DrawdownMonitor size_mult=%.2f applied "
+                    "[streak=%.1f mdd=%.1f atr=%.1f] regime=%s",
+                    _size_mult, _streak_m, _mdd_m, _atr_m, regime or "None",
                 )
                 if regime and regime.upper() in ("HIGH_VOL", "CRISIS") and _kelly_scale < 1.0:
                     logger.warning(
