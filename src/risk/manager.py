@@ -501,6 +501,18 @@ class RiskManager:
         # 포지션 사이징 (candle_df 있으면 adaptive multiplier, 없으면 config 값 사용)
         if candle_df is not None:
             sl_mult = self.adaptive_stop_multiplier(candle_df, regime=regime)
+            # DrawdownMonitor ATR 필터 자동 연계: candle_df에서 ATR MA 계산 후 상태 갱신
+            if self.drawdown_monitor is not None:
+                try:
+                    _atr_col = "atr14" if "atr14" in candle_df.columns else None
+                    if _atr_col:
+                        _atr_series = candle_df[_atr_col]
+                    else:
+                        _atr_series = candle_df["high"] - candle_df["low"]
+                    _atr_ma = float(_atr_series.rolling(14, min_periods=5).mean().iloc[-1])
+                    self.drawdown_monitor.set_atr_state(atr, _atr_ma)
+                except Exception:
+                    pass
         else:
             sl_mult = self.atr_multiplier_sl
         sl_distance = atr * sl_mult

@@ -296,6 +296,18 @@ class FeatureBuilder:
         atr_ma50 = atr_pct_prev_shift.rolling(50, min_periods=20).mean()
         feat["atr_vol_regime"] = (feat["atr_pct"] > atr_ma50 * 1.5).astype(float)
 
+        # momentum_persistence (Cycle 262): 현재 방향의 연속 봉 수 (정규화)
+        #   연속 상승이면 양수, 연속 하락이면 음수, 범위 [-1, 1] 정규화 (÷10)
+        #   trend-following 전략이 "얼마나 오래 지속된 모멘텀인지" 학습 가능
+        sign_ret = np.sign(log_ret.fillna(0.0))
+        _pers = pd.Series(0.0, index=df.index, dtype=float)
+        for i in range(1, len(df)):
+            if sign_ret.iat[i] == sign_ret.iat[i - 1] and sign_ret.iat[i] != 0:
+                _pers.iat[i] = _pers.iat[i - 1] + sign_ret.iat[i]
+            else:
+                _pers.iat[i] = sign_ret.iat[i]
+        feat["momentum_persistence"] = (_pers / 10.0).clip(-1.0, 1.0)
+
         # inf/-inf → NaN 변환 (close=0 등 극단값 방어)
         feat = feat.replace([np.inf, -np.inf], np.nan)
 
@@ -397,6 +409,7 @@ class FeatureBuilder:
             "nr_range_ratio", "nr_atr_ratio",
             "mom_quality_score", "trend_strength",  # Cycle 256
             "atr_vol_regime",  # Cycle 261
+            "momentum_persistence",  # Cycle 262
         ]
 
 
@@ -415,8 +428,9 @@ REGIME_FEATURE_CONFIG: Dict[str, List[str]] = {
         "ema_ratio", "price_vs_ema20", "price_vs_ema50",
         "volume_ratio_20", "donchian_pct",
         "macd_hist",
-        "mom_quality_score",  # Cycle 257: SOL PASS 핵심 피처
-        "atr_vol_regime",     # Cycle 261: 고변동성 구간 필터
+        "mom_quality_score",     # Cycle 257: SOL PASS 핵심 피처
+        "atr_vol_regime",        # Cycle 261: 고변동성 구간 필터
+        "momentum_persistence",  # Cycle 262: 연속 방향 지속 봉 수
     ],
     "bear": [
         "return_1", "return_3", "return_5",

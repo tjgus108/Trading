@@ -110,10 +110,10 @@ class TestBuildFeaturesOnly:
 class TestFeatureNames:
     """feature_names property 검증."""
 
-    def test_returns_19_base_features(self):
-        """기본 피처 19개 (16 + Cycle 256 모멘텀 품질 피처 2개 + Cycle 261 atr_vol_regime)."""
+    def test_returns_20_base_features(self):
+        """기본 피처 20개 (16 + Cycle 256 모멘텀 품질 피처 2개 + Cycle 261 atr_vol_regime + Cycle 262 momentum_persistence)."""
         fb = FeatureBuilder()
-        assert len(fb.feature_names) == 19
+        assert len(fb.feature_names) == 20
 
     def test_nr_features_in_feature_names(self):
         """Cycle 254 NR 피처가 feature_names에 포함."""
