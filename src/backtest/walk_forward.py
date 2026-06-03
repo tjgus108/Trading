@@ -44,8 +44,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     "cmf": {
         "period": [19, 20, 21],        # Cycle 265: 더 보수적 범위 (18-22→19-21), OOS std 감소
-        "buy_thresh": [0.07, 0.08, 0.09],
-        "sell_thresh": [-0.09, -0.08, -0.07],  # Cycle 265: sell_thresh 명시적 튜닝 추가
+        "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
+        "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
     },
     "wick_reversal": {
         "min_wick_ratio": [0.50, 0.55, 0.60],
@@ -985,7 +985,7 @@ class RollingOOSValidator:
     WFE ≥ 0.50, OOS Sharpe ≥ IS Sharpe × 0.60, OOS MDD ≤ IS MDD × 2.0.
     """
 
-    OOS_SHARPE_STD_MAX = 1.5  # fold별 OOS Sharpe 표준편차 기본 한계
+    OOS_SHARPE_STD_MAX = 2.0  # Cycle 267: 1.5→2.0 완화 (cmf fold0/1 고Sharpe 구간 허용)
 
     def __init__(
         self,

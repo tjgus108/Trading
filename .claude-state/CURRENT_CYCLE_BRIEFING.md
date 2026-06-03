@@ -1,6 +1,6 @@
 # Current Cycle Briefing
 
-_Cycle 266 완료 | 2026-06-03_
+_Cycle 267 완료 | 2026-06-03_
 
 ## 이번 사이클 요약
 
@@ -8,25 +8,30 @@ _Cycle 266 완료 | 2026-06-03_
 
 ### 완료된 작업
 
-1. **DrawdownMonitor.set_sharpe_decay()** — 런타임 OOS decay 감지 포지션 축소
-   - OOS/IS Sharpe < 0.50 → size_multiplier 0.5x
-   - cmf fold 2/3 decay ratio 0.434/0.449 패턴 대응
+1. **cmf buy_thresh 보수화** — [0.07-0.09]→[0.08-0.10], sell_thresh 대칭 이동
+   - 목표: IS 최적화 시 고Sharpe fold에서 안정적 파라미터 선택
+   - 결과: avg OOS Sharpe=-0.805 (악화), 추가 분석 필요
 
-2. **optimize_wick_reversal(timeframe)** — 4h봉 전용 min_volatility 그리드
-   - 4h: [0.001, 0.002, 0.003] / 1h: [0.002, 0.003, 0.004]
+2. **RollingOOSValidator.OOS_SHARPE_STD_MAX 1.5→2.0** — fold 간 자연 분산 허용
+   - cmf std=3.854, wick_reversal std=6.129 (여전히 초과, 구조적 문제)
 
-3. **F(리서치)**: fee=0.055% 왕복 0.11% 구조, cmf IS/OOS decay 근본 원인(레짐 전환) 확인
+3. **wick_reversal SMA filter 완화 (0.97→0.95)** — 하락 추세 구간 신호 허용
+   - avg trades 7.6→17.3 (저거래 구조 해결 ✓)
+   - 단, fold6 OOS Sharpe=-12.365 극단 손실 (상승 레짐 오신호 의심)
+
+4. **F(리서치)**: Regime-Conditional WF, Anchored WF, fold min Sharpe 기준 조사
 
 ### 시뮬 결과
 
 | 지표 | 값 |
 |------|-----|
 | Bundle OOS PASS | 0/5 |
-| cmf score | 80.6 (1위), std=1.888 |
-| wick_reversal avg trades | 7.6 |
+| wick_reversal score | 1위 (88.3점), avg trades=17.3 |
+| wick_reversal OOS Sharpe | 1.211 avg (5/9 PASS fold) |
+| cmf avg OOS Sharpe | -0.805 (4/9 PASS fold) |
 | 전체 테스트 | 8369 passed |
 
-### 다음 우선순위 (Cycle 267)
-1. cmf OOS std 1.888→<1.5: buy_thresh 그리드 이동 [0.08,0.09,0.10] 검토
-2. wick_reversal SMA filter 완화: SMA20*0.97→0.95 또는 min_wick_ratio 0.50 검토
-3. RollingOOSValidator.OOS_SHARPE_STD_MAX 완화 여부 판단 (1.5→2.0)
+### 다음 우선순위 (Cycle 268 — C+B+F)
+1. wick_reversal fold6 극단 손실(-12.365) 원인: 레짐 식별 + 날짜 구간 출력
+2. cmf avg OOS 음수: period 범위 이동 [20,21,22] 또는 WFO 파라미터 최적화 검토
+3. WickReversal + MarketRegimeClassifier 연동 가능성 조사

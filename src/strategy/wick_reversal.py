@@ -129,7 +129,7 @@ class WickReversalStrategy(BaseStrategy):
         # 강화: + (vol_ok OR rsi <= 70)
         hammer = (
             lower_wick_ratio >= self.min_wick_ratio and
-            close > sma20 * 0.97 and
+            close > sma20 * 0.95 and  # Cycle 267: 0.97→0.95 완화, 하락 추세 구간 신호 빈도 개선
             trend_up and
             (vol_ok or rsi <= 70)
         )
@@ -142,10 +142,10 @@ class WickReversalStrategy(BaseStrategy):
                 entry_price=entry,
                 reasoning=(
                     f"Hammer 패턴 (v2): lower_wick_ratio={lower_wick_ratio:.3f} >= 0.65, "
-                    f"close({close:.4f}) > SMA20*0.97({sma20*0.97:.4f}), trend_up={trend_up}, "
+                    f"close({close:.4f}) > SMA20*0.95({sma20*0.95:.4f}), trend_up={trend_up}, "
                     f"(vol_ok={vol_ok} OR rsi={rsi:.1f}<=70)"
                 ),
-                invalidation=f"Close below SMA20*0.97 ({sma20*0.97:.4f})",
+                invalidation=f"Close below SMA20*0.95 ({sma20*0.95:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )
