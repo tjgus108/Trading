@@ -62,7 +62,9 @@ def load_csv_and_resample(csv_path: Path, symbol: str, target_tf: str) -> pd.Dat
                             candidates.append(p)
     if not candidates:
         return pd.DataFrame()
-    src = max(candidates, key=lambda p: p.stat().st_mtime)
+    def _cand_key(p: Path):
+        return ("synthetic" in str(p).lower(), -p.stat().st_mtime)
+    src = min(candidates, key=_cand_key)
     logger.info("Loading CSV for Bundle OOS: %s", src)
     df = load_csv_ohlcv(src, validate=False)
     if df is None or df.empty:

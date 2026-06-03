@@ -111,8 +111,11 @@ def load_ohlcv_from_csv_dir(
     if not candidates:
         return None
 
-    # 가장 최근 수정된 파일 우선
-    csv_path = max(candidates, key=lambda p: p.stat().st_mtime)
+    # synthetic보다 실거래소(binance 등) 데이터 우선 선택; 동일 조건이면 최근 수정본
+    def _candidate_key(p: Path):
+        is_synthetic = "synthetic" in str(p).lower()
+        return (is_synthetic, -p.stat().st_mtime)  # synthetic=False(0)가 True(1)보다 우선
+    csv_path = min(candidates, key=_candidate_key)
     print(f"[DATA] CSV 로드: {csv_path}", flush=True)
     try:
         tf_seconds = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}

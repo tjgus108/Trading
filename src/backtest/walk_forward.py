@@ -43,12 +43,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "short_threshold": [-0.0001, -0.0002],
     },
     "cmf": {
-        "period": [18, 20, 22],        # Cycle 263: 범위 축소 (15-25→18-22), OOS std 안정화
-        "buy_thresh": [0.07, 0.08, 0.09],  # Cycle 263: 범위 축소 (0.06-0.10→0.07-0.09)
+        "period": [19, 20, 21],        # Cycle 265: 더 보수적 범위 (18-22→19-21), OOS std 감소
+        "buy_thresh": [0.07, 0.08, 0.09],
+        "sell_thresh": [-0.09, -0.08, -0.07],  # Cycle 265: sell_thresh 명시적 튜닝 추가
     },
     "wick_reversal": {
-        "min_wick_ratio": [0.50, 0.55, 0.60],  # Cycle 264: 하향 조정 (0거래 문제 완화)
+        "min_wick_ratio": [0.50, 0.55, 0.60],
         "vol_mult": [0.7, 0.8, 0.9],
+        "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -817,6 +819,7 @@ def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
         return WickReversalStrategy(
             min_wick_ratio=params.get("min_wick_ratio", 0.65),
             vol_mult=params.get("vol_mult", 0.8),
+            min_volatility=params.get("min_volatility", 0.002),
         )
 
     opt = WalkForwardOptimizer(
