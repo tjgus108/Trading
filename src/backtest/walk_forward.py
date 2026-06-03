@@ -811,8 +811,14 @@ def optimize_cmf(df: pd.DataFrame, n_windows: int = 3,
 
 
 def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
-                           plateau_pct: float = 0.9) -> WalkForwardResult:
-    """Wick Reversal 전략 파라미터 최적화."""
+                           plateau_pct: float = 0.9,
+                           timeframe: str = "1h") -> WalkForwardResult:
+    """Wick Reversal 전략 파라미터 최적화.
+
+    Args:
+        timeframe: 데이터 타임프레임. "4h"이면 더 낮은 min_volatility 그리드 사용.
+                   4h봉은 ATR14/close 비율이 1h 대비 작으므로 필터 완화 필요.
+    """
     from src.strategy.wick_reversal import WickReversalStrategy
 
     def factory(params: dict) -> BaseStrategy:
@@ -822,10 +828,17 @@ def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
             min_volatility=params.get("min_volatility", 0.002),
         )
 
+    # 타임프레임별 min_volatility 그리드 분리:
+    # 4h봉: 캔들 1개 진폭이 1h 대비 작으므로 더 낮은 임계값 적용
+    if timeframe == "4h":
+        grid = {**DEFAULT_GRIDS["wick_reversal"], "min_volatility": [0.001, 0.002, 0.003]}
+    else:
+        grid = DEFAULT_GRIDS["wick_reversal"]
+
     opt = WalkForwardOptimizer(
         strategy_name="wick_reversal",
         strategy_factory=factory,
-        param_grid=DEFAULT_GRIDS["wick_reversal"],
+        param_grid=grid,
         n_windows=n_windows,
         plateau_pct=plateau_pct,
     )

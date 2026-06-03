@@ -184,6 +184,8 @@ class DrawdownMonitor:
         # ATR 변동성 필터 상태
         self._atr_vol_elevated: bool = False       # ATR 급등 여부
         self._atr_vol_mult: float = 1.0            # ATR 필터 배수 (정상=1.0, 급등=0.5)
+        # OOS Sharpe decay 필터: OOS/IS Sharpe 비율이 threshold 미만이면 0.5x 적용
+        self._sharpe_decay_mult: float = 1.0
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -265,6 +267,44 @@ class DrawdownMonitor:
     def get_atr_vol_multiplier(self) -> float:
         """ATR 변동성 필터 배수 반환 (정상=1.0, 급등=0.5)."""
         return self._atr_vol_mult
+
+    def set_sharpe_decay(
+        self,
+        recent_sharpe: float,
+        historical_sharpe: float,
+        threshold: float = 0.40,
+    ) -> None:
+        """OOS Sharpe decay 필터 설정.
+
+        OOS Sharpe / IS Sharpe 비율이 threshold 미만이면 포지션 사이즈를 50% 축소.
+        IS Sharpe가 0 이하이거나 recent_sharpe도 양수이면 정상으로 간주.
+
+        Args:
+            recent_sharpe:     최근 OOS 구간 Sharpe (또는 최근 롤링 Sharpe).
+            historical_sharpe: 기준 IS Sharpe (또는 이전 장기 Sharpe).
+            threshold:         OOS/IS 최소 비율. 기본 0.40 (IS_OOS_RATIO_MIN과 동일).
+        """
+        if historical_sharpe <= 0:
+            self._sharpe_decay_mult = 1.0
+            return
+        ratio = recent_sharpe / historical_sharpe
+        decayed = ratio < threshold
+        if decayed != (self._sharpe_decay_mult < 1.0):
+            if decayed:
+                logger.info(
+                    "DrawdownMonitor: OOS Sharpe decay 감지 — ratio=%.3f < %.2f → size_mult 0.5 적용",
+                    ratio, threshold,
+                )
+            else:
+                logger.info(
+                    "DrawdownMonitor: OOS Sharpe decay 해소 — ratio=%.3f ≥ %.2f → size_mult 복원",
+                    ratio, threshold,
+                )
+        self._sharpe_decay_mult = 0.5 if decayed else 1.0
+
+    def get_sharpe_decay_multiplier(self) -> float:
+        """Sharpe decay 필터 배수 반환 (정상=1.0, decay=0.5)."""
+        return self._sharpe_decay_mult
 
     def _effective_daily_limit(self) -> float:
         """현재 레짐에 따른 실효 일일 DD 한도 반환."""
@@ -388,7 +428,7 @@ class DrawdownMonitor:
             self._consecutive_losses = 0
         streak_mult = 0.5 if self._consecutive_losses >= self.loss_streak_threshold else 1.0
         mdd_mult = self.get_mdd_size_multiplier()
-        return min(streak_mult, mdd_mult, self._atr_vol_mult)
+        return min(streak_mult, mdd_mult, self._atr_vol_mult, self._sharpe_decay_mult)
 
     # ── 단계적 MDD 서킷브레이커 ─────────────────────────────────
 
@@ -680,6 +720,7 @@ class DrawdownMonitor:
         self._equity_history.clear()
         self._atr_vol_elevated = False
         self._atr_vol_mult = 1.0
+        self._sharpe_decay_mult = 1.0
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:
