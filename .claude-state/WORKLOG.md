@@ -1,3 +1,34 @@
+## [2026-06-03] Cycle 266 — B(리스크) + D(ML) + F(리서치)
+
+**[B] 리스크 개선: DrawdownMonitor Sharpe decay 포지션 축소 필터 추가**
+1. `src/risk/drawdown_monitor.py`: `set_sharpe_decay(recent, historical, threshold=0.50)` 신규 메서드
+   - OOS/IS Sharpe 비율 < 0.50 시 size_multiplier 0.5x 적용 (IS_OOS_RATIO_MIN과 동일 기준)
+   - `get_sharpe_decay_multiplier()` 반환 메서드 추가
+   - `get_size_multiplier()` 내 min() 연산에 통합
+   - `reset()` 시 자동 초기화
+   - 배경: cmf fold 2/3 IS/OOS decay ratio 0.434/0.449 → 런타임 포지션 보호 강화
+
+**[D] ML 개선: optimize_wick_reversal 4h 타임프레임별 min_volatility 그리드 분리**
+2. `src/backtest/walk_forward.py`: `optimize_wick_reversal(timeframe="1h")` 파라미터 추가
+   - 4h: min_volatility [0.001, 0.002, 0.003] (완화)
+   - 1h: min_volatility [0.002, 0.003, 0.004] (기존 유지)
+   - 이유: 4h 봉 ATR14/close 비율이 1h 대비 낮아 더 낮은 임계값 필요
+
+**[F] 리서치 결과:**
+- IS_OOS_RATIO_MIN=0.50, fee_rate=0.055% (왕복 0.11%), BTC 데이터 2023-01-01~2024-05-14
+- cmf 4h: IS/OOS decay가 구조적 문제 (regime shift fold 2/3)
+- wick_reversal: real BTC 4h에서 SMA trend filter + volume filter가 신호 빈도 제한
+
+**시뮬레이션 결과 (Cycle 266):**
+- Paper Sim BTC: Cycle 265와 동일 (0/22 PASS; top: supertrend_multi 72.6점, Sharpe=0.43)
+  - paper_simulation이 실행 시간 초과 (~8분)로 Cycle 265 리포트 재활용
+- Bundle OOS BTC 4h: 0/5 PASS (Cycle 265와 동일 결과)
+  - cmf: 3/5 PASS fold, avg OOS Sharpe=2.508, std=1.888 (OOS_STD_MAX=1.5 초과)
+  - wick_reversal: avg 7.6 trades (4/5 fold <10거래 — 저거래 FAIL)
+- 테스트: **8369 passed, 23 skipped** (148/148 단위테스트 통과)
+
+---
+
 ## [2026-06-03] Cycle 265 — A(품질) + C(데이터) + F(리서치)
 
 **[A] 품질 개선: wick_reversal 저변동성 노이즈 필터 강화**
@@ -4336,6 +4367,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-03 00:42 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-03 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 05:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 05:17 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

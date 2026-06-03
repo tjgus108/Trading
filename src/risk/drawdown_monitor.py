@@ -272,11 +272,12 @@ class DrawdownMonitor:
         self,
         recent_sharpe: float,
         historical_sharpe: float,
-        threshold: float = 0.40,
+        threshold: float = 0.50,
     ) -> None:
         """OOS Sharpe decay 필터 설정.
 
         OOS Sharpe / IS Sharpe 비율이 threshold 미만이면 포지션 사이즈를 50% 축소.
+        IS_OOS_RATIO_MIN=0.50 기준과 동일하게 맞춤.
         IS Sharpe가 0 이하이거나 recent_sharpe도 양수이면 정상으로 간주.
 
         Args:
