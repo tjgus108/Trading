@@ -33,7 +33,7 @@
   - narrow_range: avg OOS Sharpe=-1.287 (std=2.695 불안정)
   - value_area: avg OOS Sharpe=0.713 (std=2.018 불안정)
 - Paper Sim: 실행 중 (결과 업데이트 예정)
-- 테스트: 88 passed (test_walk_forward + test_bundle_oos, 관련 스위트)
+- 테스트: **8369 passed, 23 skipped** (전체 스위트)
 
 ---
 

@@ -34,7 +34,7 @@ _Cycle 268 완료 | 2026-06-03_
 | cmf avg OOS Sharpe | 2.508 (랭크1, 3/5 PASS fold) |
 | cmf FAIL 이유 | fold2/3 WFE < 0.50 |
 | wick_reversal avg OOS Sharpe | 1.772 (랭크2, 저거래 FAIL) |
-| 테스트 (관련) | 88 passed |
+| 테스트 | 8369 passed, 23 skipped |
 
 ### 다음 우선순위 (Cycle 269 — D+E+F)
 1. wick_reversal Shooting Star에 레짐 필터 (close < SMA50 조건 추가)

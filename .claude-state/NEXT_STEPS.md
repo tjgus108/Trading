@@ -42,7 +42,7 @@ _Last updated: 2026-06-03 (Cycle 268 완료)_
   - 참고: 이전 9-fold 결과는 거래소 직접 연결 시 (4320봉 기준)
 
 ### 핵심 메트릭 (Cycle 268)
-- 테스트: **88 passed** (test_walk_forward + test_bundle_oos, 전체 스위트 실행 중)
+- 테스트: **8369 passed, 23 skipped** (전체 스위트)
 - Paper Sim BTC: 실행 중 (이전 사이클 top: supertrend_multi +5.87%, Sharpe=0.43)
 - Bundle OOS BTC 4h (5-fold, CSV 기반): 0/5 PASS
   - cmf: 3/5 PASS fold, avg OOS Sharpe=2.508, std=1.888, FAIL(fold2/3 WFE<0.50)
