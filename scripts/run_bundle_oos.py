@@ -413,17 +413,18 @@ def format_fold_detail(name: str, r: BundleOOSResult) -> str:
 
     lines = [f"### {name}\n"]
     lines.append(
-        "| Fold | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
+        "| Fold | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
         "IS MDD | OOS MDD | Pass |"
     )
     lines.append(
-        "|------|-----------|------------|-----|--------|------------|"
+        "|------|------------|-----------|------------|-----|--------|------------|"
         "-------|---------|------|"
     )
     for f in r.folds:
         pass_str = "PASS" if f.passed else "FAIL"
+        date_range = f"{f.oos_start}~{f.oos_end}" if f.oos_start and f.oos_end else "-"
         lines.append(
-            f"| {f.fold_id} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
+            f"| {f.fold_id} | {date_range} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
             f"{f.wfe:.3f} | {f.oos_pf:.3f} | {f.oos_trades} | "
             f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |"
         )

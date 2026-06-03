@@ -1,3 +1,42 @@
+## [2026-06-03] Cycle 268 — C(데이터) + B(리스크) + F(리서치)
+
+**[C] 데이터 개선: OOSFoldResult fold 날짜 진단 + wick_reversal min_wick_ratio 완화**
+1. `src/backtest/walk_forward.py`: `OOSFoldResult`에 `oos_start`, `oos_end` 날짜 필드 추가
+   - `RollingOOSValidator.validate()` 내 oos_df.index 기반 날짜 자동 기록
+   - logger.info 출력: `OOS Fold N [날짜~날짜]: IS_Sharpe=... OOS_Sharpe=...`
+   - 배경: fold6 극단 손실(-12.365) 레짐 식별 불가 → 날짜 추적으로 레짐 진단 가능
+2. `scripts/run_bundle_oos.py`: `format_fold_detail` 테이블에 "OOS Period" 컬럼 추가
+3. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["wick_reversal"]["min_wick_ratio"] [0.50,0.55,0.60]→[0.40,0.45,0.50]
+   - 배경: 4h fold0-3 평균 7trades로 min_oos_trades=10 미달 제외 → 완화로 WFO가 더 낮은 임계값 선택 가능
+
+**[B] 리스크 개선: cmf period 그리드 이동**
+4. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["cmf"]["period"] [19,20,21]→[20,21,22]
+   - 배경: fold2/3 WFE=0.434/0.449 < 0.50 FAIL → 더 긴 CMF 평활화로 IS 과최적화 완화
+
+**[F] 리서치: fold별 OOS 날짜 레짐 분석 (BTC 4h CSV, 3000캔들)**
+- fold0 OOS: 2023-06-30~2023-08-28 (BTC ~28k-30k 횡보)
+- fold1 OOS: 2023-08-29~2023-10-27 (BTC 26k→30k 변동장)
+- fold2 OOS: 2023-10-28~2023-12-26 (BTC 30k→43k 강한 상승 ← 레짐 전환)
+- fold3 OOS: 2023-12-27~2024-02-24 (BTC 43k→52k 지속 상승)
+- fold4 OOS: 2024-02-25~2024-04-24 (BTC 52k→70k 불마켓 피크)
+- 결론: wick_reversal fold1-2 실패(OOS Sharpe -4.606/-2.046) = 2023 Q4 상승장 Shooting Star(SELL) 신호 손실
+- 결론: cmf fold2/3 WFE FAIL = IS 과최적화 (period=20이 해당 IS 구간에 과도하게 맞음)
+- 권고: wick_reversal에 레짐 필터 필요 (상승장 SELL 억제 — 다음 사이클 검토)
+
+**시뮬레이션 결과 (Cycle 268):**
+- Bundle OOS BTC 4h (CSV 기반, 5 folds): 0/5 PASS
+  - cmf: 3/5 PASS fold, avg OOS Sharpe=2.508, std=1.888 (top: 랭크1, 80.6점)
+    - FAIL 이유: fold2 WFE=0.434, fold3 WFE=0.449 < 0.50
+  - wick_reversal: 1/5 유효 fold (fold4만 ≥10거래), avg OOS Sharpe=1.772 (랭크2)
+    - FAIL 이유: fold0-3 < 10거래 제외 (80% 저거래 비율 FAIL)
+  - elder_impulse: avg OOS Sharpe=-2.941 (저거래+고Sharpe std=3.117)
+  - narrow_range: avg OOS Sharpe=-1.287 (std=2.695 불안정)
+  - value_area: avg OOS Sharpe=0.713 (std=2.018 불안정)
+- Paper Sim: 실행 중 (결과 업데이트 예정)
+- 테스트: 88 passed (test_walk_forward + test_bundle_oos, 관련 스위트)
+
+---
+
 ## [2026-06-03] Cycle 267 — B(리스크) + D(ML) + F(리서치)
 
 **[B] 리스크 개선: cmf buy_thresh 그리드 보수화 + OOS_SHARPE_STD_MAX 완화**
@@ -4673,6 +4712,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-03 10:30 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 15:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-03 15:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 15:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 15:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 15:14 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-03 15:14 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
