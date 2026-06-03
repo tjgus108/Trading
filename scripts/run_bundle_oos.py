@@ -411,22 +411,46 @@ def format_fold_detail(name: str, r: BundleOOSResult) -> str:
     if not r.folds:
         return f"### {name}\n\n_No folds (data insufficient)_\n"
 
+    # C(데이터) Cycle 268: 날짜 컬럼 포함 여부 결정
+    has_dates = any(getattr(f, 'oos_start_date', None) is not None for f in r.folds)
+
     lines = [f"### {name}\n"]
-    lines.append(
-        "| Fold | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
-        "IS MDD | OOS MDD | Pass |"
-    )
-    lines.append(
-        "|------|-----------|------------|-----|--------|------------|"
-        "-------|---------|------|"
-    )
-    for f in r.folds:
-        pass_str = "PASS" if f.passed else "FAIL"
+    if has_dates:
         lines.append(
-            f"| {f.fold_id} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
-            f"{f.wfe:.3f} | {f.oos_pf:.3f} | {f.oos_trades} | "
-            f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |"
+            "| Fold | IS Start | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
+            "IS MDD | OOS MDD | Pass |"
         )
+        lines.append(
+            "|------|----------|------------|-----------|------------|-----|--------|------------|"
+            "-------|---------|------|"
+        )
+        for f in r.folds:
+            pass_str = "PASS" if f.passed else "FAIL"
+            is_start = getattr(f, 'is_start_date', None) or "-"
+            oos_start = getattr(f, 'oos_start_date', None) or "-"
+            oos_end = getattr(f, 'oos_end_date', None) or "-"
+            oos_period = f"{oos_start}~{oos_end}" if oos_start != "-" else "-"
+            lines.append(
+                f"| {f.fold_id} | {is_start} | {oos_period} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
+                f"{f.wfe:.3f} | {f.oos_pf:.3f} | {f.oos_trades} | "
+                f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |"
+            )
+    else:
+        lines.append(
+            "| Fold | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
+            "IS MDD | OOS MDD | Pass |"
+        )
+        lines.append(
+            "|------|-----------|------------|-----|--------|------------|"
+            "-------|---------|------|"
+        )
+        for f in r.folds:
+            pass_str = "PASS" if f.passed else "FAIL"
+            lines.append(
+                f"| {f.fold_id} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
+                f"{f.wfe:.3f} | {f.oos_pf:.3f} | {f.oos_trades} | "
+                f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |"
+            )
     if r.fail_reasons:
         lines.append(f"\n**Fail reasons:** {'; '.join(r.fail_reasons)}")
     lines.append("")

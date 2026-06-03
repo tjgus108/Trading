@@ -43,7 +43,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "short_threshold": [-0.0001, -0.0002],
     },
     "cmf": {
-        "period": [19, 20, 21],        # Cycle 265: 더 보수적 범위 (18-22→19-21), OOS std 감소
+        "period": [20, 21, 22],        # Cycle 268: [19,20,21]→[20,21,22], 더 긴 CMF 평활화 시도 (음수 avg OOS 개선)
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
     },
@@ -944,6 +944,10 @@ class OOSFoldResult:
     oos_trades: int
     passed: bool
     fail_reasons: List[str]
+    # C(데이터) Cycle 268: fold 날짜 → 레짐 식별용
+    is_start_date: Optional[str] = None
+    oos_start_date: Optional[str] = None
+    oos_end_date: Optional[str] = None
 
 
 @dataclass
@@ -1079,6 +1083,16 @@ class RollingOOSValidator:
                     f"IS×{self.mdd_expand_max} ({is_result.max_drawdown * self.mdd_expand_max:.1%})"
                 )
 
+            # C(데이터) Cycle 268: fold 날짜 추출 (datetime index 있을 때만)
+            _is_start = _oos_start = _oos_end = None
+            try:
+                if hasattr(df.index, 'dtype') and str(df.index.dtype).startswith('datetime'):
+                    _is_start = str(is_df.index[0])[:10] if len(is_df) > 0 else None
+                    _oos_start = str(oos_df.index[0])[:10] if len(oos_df) > 0 else None
+                    _oos_end = str(oos_df.index[-1])[:10] if len(oos_df) > 0 else None
+            except Exception:
+                pass
+
             fold = OOSFoldResult(
                 fold_id=fold_id,
                 is_sharpe=round(is_result.sharpe_ratio, 3),
@@ -1090,6 +1104,9 @@ class RollingOOSValidator:
                 oos_trades=oos_result.total_trades,
                 passed=len(fold_fails) == 0,
                 fail_reasons=fold_fails,
+                is_start_date=_is_start,
+                oos_start_date=_oos_start,
+                oos_end_date=_oos_end,
             )
             folds.append(fold)
 

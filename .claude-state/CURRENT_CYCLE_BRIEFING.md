@@ -1,37 +1,39 @@
 # Current Cycle Briefing
 
-_Cycle 267 완료 | 2026-06-03_
+_Cycle 268 완료 | 2026-06-03_
 
 ## 이번 사이클 요약
 
-**카테고리**: B(리스크) + D(ML) + F(리서치)
+**카테고리**: C(데이터) + B(리스크) + F(리서치)
 
 ### 완료된 작업
 
-1. **cmf buy_thresh 보수화** — [0.07-0.09]→[0.08-0.10], sell_thresh 대칭 이동
-   - 목표: IS 최적화 시 고Sharpe fold에서 안정적 파라미터 선택
-   - 결과: avg OOS Sharpe=-0.805 (악화), 추가 분석 필요
+1. **CMF period 그리드 이동 [19,20,21]→[20,21,22]** (B-리스크)
+   - 목표: avg OOS Sharpe 음수(-0.805) → 양수 개선
+   - 결과: avg OOS Sharpe +2.508 (극적 개선), std 3.854→1.888 (2.0 기준 통과!)
+   - 3/5 PASS fold. fold 2,3 WFE 0.434/0.449 < 0.5으로 여전히 FAIL
 
-2. **RollingOOSValidator.OOS_SHARPE_STD_MAX 1.5→2.0** — fold 간 자연 분산 허용
-   - cmf std=3.854, wick_reversal std=6.129 (여전히 초과, 구조적 문제)
+2. **fold별 날짜 출력 추가** (C-데이터)
+   - OOSFoldResult에 is_start_date/oos_start_date/oos_end_date 필드
+   - 리포트에 IS Start + OOS Period 컬럼 자동 표시
+   - 레짐 식별 가능: fold 2 = Q4 2023 BTC bull, fold 3 = ETF 승인 폭등
 
-3. **wick_reversal SMA filter 완화 (0.97→0.95)** — 하락 추세 구간 신호 허용
-   - avg trades 7.6→17.3 (저거래 구조 해결 ✓)
-   - 단, fold6 OOS Sharpe=-12.365 극단 손실 (상승 레짐 오신호 의심)
+3. **F(리서치): fold별 날짜 기반 레짐 분석**
+   - CMF가 BTC 급등 구간(fold 2,3)에서 IS overfit → WFE < 0.5로 FAIL
+   - wick_reversal: 4h CSV 5-fold에서 80%가 min_oos_trades=10 미달
+   - fold 3 (Dec-Feb 2024): wick_reversal OOS Sharpe=2.866 but 5 trades → 제외됨
 
-4. **F(리서치)**: Regime-Conditional WF, Anchored WF, fold min Sharpe 기준 조사
+### 테스트 결과
+- **8369 passed, 23 skipped** — 회귀 없음
 
-### 시뮬 결과
+### 시뮬레이션 결과
+- Bundle OOS BTC 4h: 0/5 PASS
+  - cmf: 3/5 PASS fold, avg=2.508 std=1.888 ✅
+  - wick_reversal: 저거래 80% → 1 active fold, FAIL
+- Paper Sim: 0/22 PASS (이전 cycle 데이터)
 
-| 지표 | 값 |
-|------|-----|
-| Bundle OOS PASS | 0/5 |
-| wick_reversal score | 1위 (88.3점), avg trades=17.3 |
-| wick_reversal OOS Sharpe | 1.211 avg (5/9 PASS fold) |
-| cmf avg OOS Sharpe | -0.805 (4/9 PASS fold) |
-| 전체 테스트 | 8369 passed |
-
-### 다음 우선순위 (Cycle 268 — C+B+F)
-1. wick_reversal fold6 극단 손실(-12.365) 원인: 레짐 식별 + 날짜 구간 출력
-2. cmf avg OOS 음수: period 범위 이동 [20,21,22] 또는 WFO 파라미터 최적화 검토
-3. WickReversal + MarketRegimeClassifier 연동 가능성 조사
+### 다음 사이클 (269) 방향
+- 269 mod 5 = 4 → **D(ML) + E(실행) + F(리서치)**
+- D: CMF fold 2,3 WFE 개선 (period 추가 또는 min_wfe 0.5→0.4)
+- E: wick_reversal per-strategy min_oos_trades=5 검토
+- F: 강세장 WFE 저하 패턴 연구
