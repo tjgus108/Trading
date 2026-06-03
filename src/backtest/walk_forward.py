@@ -43,12 +43,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "short_threshold": [-0.0001, -0.0002],
     },
     "cmf": {
-        "period": [19, 20, 21],        # Cycle 265: 더 보수적 범위 (18-22→19-21), OOS std 감소
+        "period": [20, 21, 22],        # Cycle 268: 더 긴 CMF 평활화 (19-21→20-22), fold3/5/6 음수 완화
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
     },
     "wick_reversal": {
-        "min_wick_ratio": [0.50, 0.55, 0.60],
+        "min_wick_ratio": [0.40, 0.45, 0.50],  # Cycle 268: 완화 (0.50-0.60→0.40-0.50), 4h fold 저거래 개선
         "vol_mult": [0.7, 0.8, 0.9],
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
     },
@@ -944,6 +944,8 @@ class OOSFoldResult:
     oos_trades: int
     passed: bool
     fail_reasons: List[str]
+    oos_start: Optional[str] = None   # OOS 구간 시작 날짜 (레짐 진단용)
+    oos_end: Optional[str] = None     # OOS 구간 종료 날짜
 
 
 @dataclass
@@ -1079,6 +1081,13 @@ class RollingOOSValidator:
                     f"IS×{self.mdd_expand_max} ({is_result.max_drawdown * self.mdd_expand_max:.1%})"
                 )
 
+            # fold 날짜 추출 (인덱스가 DatetimeIndex인 경우, 레짐 진단용)
+            oos_start_str: Optional[str] = None
+            oos_end_str: Optional[str] = None
+            if hasattr(oos_df.index, "date") and len(oos_df) > 0:
+                oos_start_str = str(oos_df.index[0].date())
+                oos_end_str = str(oos_df.index[-1].date())
+
             fold = OOSFoldResult(
                 fold_id=fold_id,
                 is_sharpe=round(is_result.sharpe_ratio, 3),
@@ -1090,12 +1099,15 @@ class RollingOOSValidator:
                 oos_trades=oos_result.total_trades,
                 passed=len(fold_fails) == 0,
                 fail_reasons=fold_fails,
+                oos_start=oos_start_str,
+                oos_end=oos_end_str,
             )
             folds.append(fold)
 
             logger.info(
-                "OOS Fold %d: IS_Sharpe=%.2f OOS_Sharpe=%.2f WFE=%.3f PF=%.2f %s",
-                fold_id, is_result.sharpe_ratio, oos_result.sharpe_ratio,
+                "OOS Fold %d [%s ~ %s]: IS_Sharpe=%.2f OOS_Sharpe=%.2f WFE=%.3f PF=%.2f %s",
+                fold_id, oos_start_str or "?", oos_end_str or "?",
+                is_result.sharpe_ratio, oos_result.sharpe_ratio,
                 wfe, oos_result.profit_factor, "PASS" if fold.passed else "FAIL",
             )
 
