@@ -32,7 +32,9 @@
   - elder_impulse: avg OOS Sharpe=-2.941 (저거래+고Sharpe std=3.117)
   - narrow_range: avg OOS Sharpe=-1.287 (std=2.695 불안정)
   - value_area: avg OOS Sharpe=0.713 (std=2.018 불안정)
-- Paper Sim: 실행 중 (결과 업데이트 예정)
+- Paper Sim BTC 1h: 0/22 PASS (top: supertrend_multi +5.87%, Sharpe=0.43, PF=1.13)
+  - FAIL 주요 원인: profit_factor < 1.5 (수수료 0.1% 구조적 한계)
+  - wick_reversal: -11.15% 최하위 (레짐 필터 부재로 상승장 SELL 신호 손실 확인)
 - 테스트: **8369 passed, 23 skipped** (전체 스위트)
 
 ---
