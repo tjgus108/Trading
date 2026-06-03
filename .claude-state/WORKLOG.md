@@ -20,8 +20,8 @@
 - wick_reversal: real BTC 4h에서 SMA trend filter + volume filter가 신호 빈도 제한
 
 **시뮬레이션 결과 (Cycle 266):**
-- Paper Sim BTC: Cycle 265와 동일 (0/22 PASS; top: supertrend_multi 72.6점, Sharpe=0.43)
-  - paper_simulation이 실행 시간 초과 (~8분)로 Cycle 265 리포트 재활용
+- Paper Sim BTC: 0/22 PASS (fresh run 완료; top: supertrend_multi 72.6점, Sharpe=0.43, PF=1.13)
+  - 수수료 구조 한계 (왕복 0.3%) → PF<1.5 구조적 FAIL 유지
 - Bundle OOS BTC 4h: 0/5 PASS (Cycle 265와 동일 결과)
   - cmf: 3/5 PASS fold, avg OOS Sharpe=2.508, std=1.888 (OOS_STD_MAX=1.5 초과)
   - wick_reversal: avg 7.6 trades (4/5 fold <10거래 — 저거래 FAIL)
