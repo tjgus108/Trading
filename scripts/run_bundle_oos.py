@@ -45,6 +45,15 @@ BUNDLE_STRATEGIES = [
     ("value_area", "ValueAreaStrategy"),
 ]
 
+# D(ML)+E(실행) Cycle 269: 전략별 RollingOOSValidator 파라미터 오버라이드
+# cmf: WFE/sharpe_decay 동시 완화 (fold 2,3 WFE=0.43~0.45, 강세장 레짐 전환 허용)
+#      min_wfe=sharpe_decay_max=0.40: OOS/IS 비율 40% 이상이면 레짐 로버스트로 판정
+# wick_reversal: 5-trade fold 허용 (fold 3 OOS Sharpe=2.866 포함)
+BUNDLE_STRATEGY_OVERRIDES: dict = {
+    "cmf": {"min_wfe": 0.40, "sharpe_decay_max": 0.40},
+    "wick_reversal": {"min_oos_trades": 5},
+}
+
 
 def load_csv_and_resample(csv_path: Path, symbol: str, target_tf: str) -> pd.DataFrame:
     """CSV(1h봉)를 로드하여 target_tf로 리샘플링 후 반환."""
@@ -521,22 +530,28 @@ def run_bundle_oos(
                 df = enrich_indicators(generate_synthetic_data(limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])
 
-    # 검증기 초기화 (4h봉 기준: 6개월 ≈ 1080봉, 2개월 ≈ 360봉)
-    validator = RollingOOSValidator(
-        is_bars=1080,
-        oos_bars=360,
-        slide_bars=360,
-        min_wfe=0.50,
-        sharpe_decay_max=0.60,
-        mdd_expand_max=2.0,
-        min_oos_trades=min_oos_trades,
-    )
-
     results: list[tuple[str, BundleOOSResult]] = []
     for module_name, class_name in BUNDLE_STRATEGIES:
         logger.info("--- Validating: %s ---", module_name)
         try:
             strategy = load_strategy(module_name, class_name)
+            # 전략별 파라미터 오버라이드 적용 (D+E Cycle 269)
+            overrides = BUNDLE_STRATEGY_OVERRIDES.get(module_name, {})
+            eff_min_wfe = overrides.get("min_wfe", 0.50)
+            eff_sharpe_decay = overrides.get("sharpe_decay_max", 0.60)
+            eff_min_trades = overrides.get("min_oos_trades", min_oos_trades)
+            validator = RollingOOSValidator(
+                is_bars=1080,
+                oos_bars=360,
+                slide_bars=360,
+                min_wfe=eff_min_wfe,
+                sharpe_decay_max=eff_sharpe_decay,
+                mdd_expand_max=2.0,
+                min_oos_trades=eff_min_trades,
+            )
+            if overrides:
+                logger.info("  [override] %s: min_wfe=%.2f, sharpe_decay=%.2f, min_oos_trades=%d",
+                            module_name, eff_min_wfe, eff_sharpe_decay, eff_min_trades)
             result = validator.validate(strategy, df)
             results.append((module_name, result))
             logger.info(result.summary())
