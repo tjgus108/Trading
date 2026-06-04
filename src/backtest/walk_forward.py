@@ -59,6 +59,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "min_wick_ratio": [0.50, 0.55, 0.60],
         "vol_mult": [0.7, 0.8, 0.9],
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
+        "adx_threshold": [20, 25, 30],             # Cycle 272: 횡보 구간 필터 (ADX<threshold만 진입)
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -834,6 +835,7 @@ def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
             min_wick_ratio=params.get("min_wick_ratio", 0.65),
             vol_mult=params.get("vol_mult", 0.8),
             min_volatility=params.get("min_volatility", 0.002),
+            adx_threshold=params.get("adx_threshold", 25.0),
         )
 
     # 타임프레임별 min_volatility 그리드 분리:

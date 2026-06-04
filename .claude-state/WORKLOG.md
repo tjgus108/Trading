@@ -1,3 +1,44 @@
+## [2026-06-04] Cycle 272 — B(리스크) + D(ML) + F(리서치)
+
+**[B] 리스크: wick_reversal ADX14 필터 추가 (Cycle 272)**
+1. `src/strategy/wick_reversal.py`: ADX14 필터 추가 (adx_threshold=25.0)
+   - Hammer/Shooting Star 진입 조건에 `adx14 < adx_threshold` 추가
+   - ADX > 25 = 강한 트렌드 → wick 패턴 신뢰 불가 → HOLD
+   - ADX 계산: Wilder EWM 방식, 데이터 부족 시 0.0 반환 (필터 통과 허용)
+   - `_calculate_adx(df, period=14)` 메서드 추가
+   - 결과: fold 0,1,4 trades < 5 (저거래율 60% > 40% → FAIL)
+   - 분석: ADX=25 threshold가 4h BTC에서 과도하게 제한적 (crypto ADX 자주 > 25)
+   - 문제: ADX 필터가 수익 구간(fold0 Sharpe=+2.761, fold1 Sharpe=+1.328)도 차단
+
+2. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["wick_reversal"]에 adx_threshold 추가
+   - `"adx_threshold": [20, 25, 30]` 추가 (WFO 파라미터 탐색용)
+   - `optimize_wick_reversal` factory: `adx_threshold=params.get("adx_threshold", 25.0)` 추가
+
+**[D] ML: paper_simulation strategy_params 지원 추가**
+3. `scripts/paper_simulation.py`: `evaluate_strategy_walk_forward()`에 `strategy_params` 인자 추가
+   - `strategy_params: dict = None` 파라미터 추가
+   - `strategy_inst = strategy_cls(**(strategy_params or {}))` 로 변경
+   - `PAPER_SIM_STRATEGY_PARAMS` 딕셔너리 추가 (전략별 파라미터 오버라이드용)
+4. cmf period=60 1h 실험: PAPER_SIM_STRATEGY_PARAMS={"cmf": {"period":60}} → rank=14 (period=20 rank=13 대비 악화)
+   - 결론: cmf period=60이 1h 성능에 도움 안됨 → 오버라이드 초기화
+
+**[F] 리서치: ADX 필터 결과 분석**
+- ADX threshold=25 분석:
+  - fold 0 (Jun-Aug 2023): 2 trades (EXCLUDED) — OOS Sharpe=+2.761 (수익 구간 차단 문제)
+  - fold 1 (Aug-Oct 2023): 3 trades (EXCLUDED) — OOS Sharpe=+1.328 (bull run에서도 wick 유효)
+  - fold 4 (Feb-Apr 2024): 3 trades (EXCLUDED) — 2024 bull run 차단
+- 핵심 인사이트: wick_reversal은 트렌드 구간에서도 수익 가능 (ADX 가정 틀림)
+- 개선 방향: adx_threshold=35로 완화, 또는 Shooting Star에만 적용, 또는 ADX 필터 제거
+
+**시뮬레이션 결과 (Cycle 272):**
+- 테스트: **8369 passed, 23 skipped** (413s) — 회귀 없음
+- Paper Sim BTC 1h (8 windows): 0/22 PASS
+  - top: supertrend_multi +5.87%, cmf rank=14 AvgSharpe=-1.36 (period=60 오버라이드 결과)
+- Bundle OOS BTC 4h (CSV, 5-fold): **1/5 PASS** (cmf PASS)
+  - cmf: 5/5 PASS, avg=2.508, std=1.888 ✅ (전 사이클과 동일)
+  - wick_reversal: FAIL (ADX 필터 → 저거래율 60% > 40%), active folds avg=0.980 (Cycle 271: 1.200)
+  - elder_impulse: FAIL, narrow_range: FAIL, value_area: FAIL
+
 ## [2026-06-04] Cycle 271 — B(리스크) + D(ML) + F(리서치)
 
 **[B] 리스크: EMA 방향 필터 실험 → 역효과 확인 후 롤백**
@@ -5387,6 +5428,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 20:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-04 20:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 20:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 20:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 20:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 20:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

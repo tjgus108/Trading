@@ -57,6 +57,10 @@ MIN_WINDOWS = 3          # 최소 테스트 윈도우 수
 # 전략 통과 기준: 테스트 윈도우 중 과반수에서 통과해야 PASS
 PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 
+# 전략별 파라미터 오버라이드 (빈 dict = 기본값 사용)
+# D(ML) Cycle 272 실험: cmf period=60 → rank=14 (period=20 rank=13 대비 악화) → 오버라이드 없음
+PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {}
+
 
 # ── 데이터 수집 ──────────────────────────────────────────────
 
@@ -367,14 +371,18 @@ def evaluate_strategy_walk_forward(
     strategy_cls,
     windows: List[Tuple[pd.DataFrame, pd.DataFrame]],
     engine: BacktestEngine,
+    strategy_params: Optional[Dict] = None,
 ) -> dict:
     """Walk-Forward로 전략을 평가. 각 윈도우의 테스트 구간에서 백테스트 실행.
+
+    Args:
+        strategy_params: 전략 생성자 오버라이드 파라미터 (None이면 기본값 사용).
 
     Returns:
         dict with keys: name, window_results, consistency_score, avg metrics, overall_passed
     """
     window_results = []
-    strategy = strategy_cls()
+    strategy = strategy_cls(**(strategy_params or {}))
     name = strategy.name
 
     window_vols = []  # 윈도우별 변동성 (regime weighting용)
@@ -386,7 +394,7 @@ def evaluate_strategy_walk_forward(
             warmup = train_df.iloc[-100:] if len(train_df) > 100 else train_df
             eval_df = pd.concat([warmup, test_df])
 
-            strategy_inst = strategy_cls()
+            strategy_inst = strategy_cls(**(strategy_params or {}))
             bt = engine.run(strategy_inst, eval_df)
 
             # 테스트 구간 변동성 계산 (ATR/close 평균)
@@ -857,7 +865,8 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
             load_failures += 1
             continue
         try:
-            result = evaluate_strategy_walk_forward(cls, windows, engine)
+            s_params = PAPER_SIM_STRATEGY_PARAMS.get(mod_name, {})
+            result = evaluate_strategy_walk_forward(cls, windows, engine, strategy_params=s_params or None)
             results.append(result)
             if (idx + 1) % 50 == 0:
                 print(f"[{symbol}][PROGRESS] {idx + 1}/{len(pass_list)} evaluated", flush=True)
