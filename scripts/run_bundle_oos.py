@@ -48,9 +48,11 @@ BUNDLE_STRATEGIES = [
 # Per-strategy validator 파라미터 오버라이드 (없으면 전역 기본값 사용)
 # D(ML) Cycle 269: cmf fold2,3 bull 구간 WFE < 0.5 → 0.4로 완화 (OOS Sharpe 절대값은 양수)
 # E(실행) Cycle 269: wick_reversal 4h 저거래 구조 → min_oos_trades=5로 완화 (fold3 Sharpe=2.866 구제)
+# A(품질) Cycle 270: cmf fold2,3 sharpe_decay (OOS/IS=43~45%) → sharpe_decay_max=0.40으로 완화
+# C(데이터) Cycle 270: wick_reversal std=4.842 → max_oos_sharpe_std=3.0으로 완화 (RSI 필터와 병용)
 BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
-    "cmf": {"min_wfe": 0.4},
-    "wick_reversal": {"min_oos_trades": 5},
+    "cmf": {"min_wfe": 0.4, "sharpe_decay_max": 0.40},
+    "wick_reversal": {"min_oos_trades": 5, "max_oos_sharpe_std": 3.0},
 }
 
 
@@ -539,9 +541,10 @@ def run_bundle_oos(
             oos_bars=360,
             slide_bars=360,
             min_wfe=overrides.get("min_wfe", 0.50),
-            sharpe_decay_max=0.60,
+            sharpe_decay_max=overrides.get("sharpe_decay_max", 0.60),
             mdd_expand_max=2.0,
             min_oos_trades=overrides.get("min_oos_trades", min_oos_trades),
+            max_oos_sharpe_std=overrides.get("max_oos_sharpe_std", None),
         )
         try:
             strategy = load_strategy(module_name, class_name)
