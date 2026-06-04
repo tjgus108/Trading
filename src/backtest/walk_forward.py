@@ -47,6 +47,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
     },
+    # cmf_1h: 1h 타임프레임 전용 파라미터 그리드 (D(ML) Cycle 271)
+    # 기본 period=20 (4h 80시간)에 해당하는 1h 등가: period≥60
+    # 1h 논거: period=20@4h ≈ period=80@1h (동일 시간 커버리지), 신호 품질 향상
+    "cmf_1h": {
+        "period": [60, 75, 90],
+        "buy_thresh": [0.06, 0.07, 0.08],
+        "sell_thresh": [-0.08, -0.07, -0.06],
+    },
     "wick_reversal": {
         "min_wick_ratio": [0.50, 0.55, 0.60],
         "vol_mult": [0.7, 0.8, 0.9],
@@ -1152,7 +1160,11 @@ class RollingOOSValidator:
                 ],
             )
 
-        avg_wfe = sum(f.wfe for f in active_folds) / len(active_folds)
+        # WFE 윈소라이즈: 극단 fold (e.g. -11.5) 이 avg_wfe 왜곡하는 것 방지 (B 리스크 Cycle 271)
+        # 개별 fold의 pass/fail 판정은 원본 WFE 그대로 사용, avg_wfe 집계만 클리핑
+        _WFE_CAP = 3.0
+        capped_wfes = [max(min(f.wfe, _WFE_CAP), -_WFE_CAP) for f in active_folds]
+        avg_wfe = sum(capped_wfes) / len(capped_wfes)
         avg_sharpe = sum(f.oos_sharpe for f in active_folds) / len(active_folds)
         avg_pf = sum(f.oos_pf for f in active_folds) / len(active_folds)
         oos_sharpes = [f.oos_sharpe for f in active_folds]

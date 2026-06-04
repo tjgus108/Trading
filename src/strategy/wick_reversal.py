@@ -2,11 +2,10 @@
 WickReversalStrategy v2: 긴 꼬리(wick)를 이용한 반전 감지.
 개선 (Cycle 120): 선택적 강화 필터 (거래수 유지 + 품질 향상)
 개선 (Cycle 250): ATR 기반 최소 변동성 필터 추가 (저변동성 구간 신호 차단)
-- Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.97, vol_ok OR rsi<=70) → BUY
-- Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, rsi<70, vol_ok OR rsi>=30) → SELL
-- volume > avg_volume_10 * 1.0 (기존 유지)
-- wick_ratio > 0.7 → HIGH confidence
-- 추세 필터 유지 (trend_up/trend_down)
+개선 (Cycle 270): Shooting Star에 rsi < 70 추가 (강한 bull 레짐 억제)
+개선 (Cycle 271): EMA 방향 필터 실험 → 역효과 (avg 1.200→-0.416), 롤백함
+- Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.95, trend_up, vol_ok OR rsi<=70) → BUY
+- Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, trend_down, rsi<70, vol_ok OR rsi>=30) → SELL
 - ATR 필터: atr/close < min_volatility(0.002) → HOLD (저변동성 차단)
 """
 
@@ -125,7 +124,7 @@ class WickReversalStrategy(BaseStrategy):
         )
 
         # Hammer: BUY
-        # 기본: lower_wick_ratio >= self.min_wick_ratio + trend_up + close > SMA20*0.97
+        # 기본: lower_wick_ratio >= self.min_wick_ratio + trend_up + close > SMA20*0.95
         # 강화: + (vol_ok OR rsi <= 70)
         hammer = (
             lower_wick_ratio >= self.min_wick_ratio and

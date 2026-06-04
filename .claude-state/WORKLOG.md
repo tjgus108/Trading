@@ -1,3 +1,42 @@
+## [2026-06-04] Cycle 271 — B(리스크) + D(ML) + F(리서치)
+
+**[B] 리스크: EMA 방향 필터 실험 → 역효과 확인 후 롤백**
+1. `src/strategy/wick_reversal.py`: EMA 방향 필터 추가 (Hammer: ema20>ema50, Shooting Star: ema20<ema50)
+   - 실험 결과: avg OOS Sharpe 1.200 → -0.416 (악화), std 4.842 → 6.995 (악화)
+   - 원인: fold1(Aug-Oct 2023) EMA20>EMA50 bull 구간에서 Hammer 5 trades → 모두 실패
+   - 5 trades로 Sharpe=-9.992 극단적 노이즈 → EMA 필터가 오히려 고위험 구간만 남김
+   - 결정: EMA 필터 전면 롤백 (Cycle 270 RSI 필터 상태로 복원)
+
+2. `src/backtest/walk_forward.py`: avg_wfe 윈소라이즈 추가 (WFE ±3.0 클리핑)
+   - WFE = -11.472 같은 극단값이 avg_wfe 왜곡하는 문제 해결
+   - fold 개별 pass/fail 판정은 원본 WFE 그대로 사용, 집계 지표만 클리핑
+   - cmf avg_wfe: 4.433 → 1.136 (fold1 WFE=19.485 → 3.0 클리핑), wick_reversal: -2.661 → -0.543
+
+**[D] ML: cmf 1h 실패 원인 분석 + DEFAULT_GRIDS cmf_1h 추가**
+3. `src/backtest/walk_forward.py`: DEFAULT_GRIDS에 cmf_1h 파라미터 그리드 추가
+   - cmf 1h 실패 근본 원인: period=20@1h = 20시간만 커버 (4h에서는 80시간)
+   - cmf 1h: AvgPF=0.90 < 1.0, AvgTrades=75 (fee drag ~7.9%), rank=13/22
+   - 1h에서는 period≥60 필요 (4h period=20의 등가 1h: period=80)
+   - cmf_1h grid: period=[60,75,90], buy_thresh=[0.06,0.07,0.08]
+   - 목적: 미래 1h cmf WFO 실행 시 적절한 파라미터 범위 제공
+
+**[F] 리서치: EMA 방향 필터 실패 메커니즘 분석**
+- wick_reversal 4h fold1 (2023-08-29~10-27, 강한 bull run):
+  - EMA20>EMA50 조건: Hammer 허용 → 5 trades 남음 (EMA filter가 이 기간은 block 못함)
+  - 5 trades에서 Sharpe=-9.992: 극단적 노이즈 (5 trades로 신뢰할 수 없는 Sharpe)
+  - 근본 진단: wick_reversal은 4h에서도 min_oos_trades=5로 설정 → 저거래 폴드 std 오염
+  - 해결 방향: ADX < 25 필터 (트렌드 강도 낮을 때만 신호) OR min_oos_trades=8로 상향
+
+**시뮬레이션 결과 (Cycle 271):**
+- 테스트: **8369 passed, 23 skipped** (413s) — 회귀 없음
+- walk_forward 테스트: **70 passed** (129s) — avg_wfe 클리핑 변경 후 이상 없음
+- Paper Sim BTC 1h (8 windows): 0/22 PASS (Cycle 270과 동일, EMA filter reverted)
+  - top: supertrend_multi +5.87%, cmf rank=13 AvgPF=0.90 FAIL
+- Bundle OOS BTC 4h (CSV, 5-fold): **1/5 PASS** (cmf PASS — Cycle 270과 동일)
+  - cmf: 5/5 PASS, avg=2.508, std=1.888 (avg_wfe 윈소라이즈 후: 4.433→1.136)
+  - wick_reversal: avg_wfe=-0.543 (클리핑 전 -2.661), avg OOS=-0.416 (EMA filter로 악화, reverted)
+  - 실제 wick_reversal Cycle 270 상태: avg=1.200, std=4.842 (EMA 롤백 후 복원)
+
 ## [2026-06-04] Cycle 270 — A(품질) + C(데이터) + F(리서치)
 
 **[A] 품질 개선: cmf sharpe_decay_max=0.40 오버라이드 추가 (핵심 성과)**
@@ -5254,6 +5293,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-04 10:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-04 15:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
