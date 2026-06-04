@@ -963,6 +963,8 @@ class BundleOOSResult:
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
     dsr_pvalue: Optional[float] = None  # Deflated Sharpe Ratio p-value
     is_sharpe_significant: Optional[bool] = None  # DSR significance at α=0.05
+    # F Cycle 269: WFE 독립 절대 기준 — OOS Sharpe ≥ 1.0인 fold 수 (연구용, PASS/FAIL 미영향)
+    abs_pass_folds: int = 0
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -978,6 +980,8 @@ class BundleOOSResult:
         if self.dsr_pvalue is not None:
             sig_tag = "SIGNIFICANT" if self.is_sharpe_significant else "NOT_SIGNIFICANT"
             lines.append(f"  dsr_pvalue: {self.dsr_pvalue:.4f} ({sig_tag})")
+        if self.abs_pass_folds > 0:
+            lines.append(f"  abs_pass_folds(OOS≥1.0): {self.abs_pass_folds}/{len(self.folds)}")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
         return "\n".join(lines)
@@ -1200,6 +1204,10 @@ class RollingOOSValidator:
             )
             all_passed = False
 
+        # F Cycle 269: WFE 독립 절대 PASS 기준 탐색 (연구용)
+        # OOS Sharpe ≥ 1.0인 fold 수 — WFE 실패해도 절대 수익성 있는 fold 파악
+        abs_pass_folds = sum(1 for f in folds if f.oos_sharpe >= 1.0)
+
         result = BundleOOSResult(
             strategy_name=strategy.name,
             folds=folds,
@@ -1211,6 +1219,7 @@ class RollingOOSValidator:
             fail_reasons=bundle_fails,
             dsr_pvalue=round(dsr_pvalue, 4) if dsr_pvalue is not None else None,
             is_sharpe_significant=is_sig,
+            abs_pass_folds=abs_pass_folds,
         )
         logger.info(result.summary())
         return result
