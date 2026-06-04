@@ -43,7 +43,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "short_threshold": [-0.0001, -0.0002],
     },
     "cmf": {
-        "period": [20, 21, 22],        # Cycle 268: [19,20,21]→[20,21,22], 더 긴 CMF 평활화 시도 (음수 avg OOS 개선)
+        "period": [21, 22, 23],        # Cycle 269: [20,21,22]→[21,22,23], 더 긴 CMF로 fold2,3 bull IS/OOS 갭 완화
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
     },

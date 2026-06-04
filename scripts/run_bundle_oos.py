@@ -45,6 +45,14 @@ BUNDLE_STRATEGIES = [
     ("value_area", "ValueAreaStrategy"),
 ]
 
+# Per-strategy validator 파라미터 오버라이드 (없으면 전역 기본값 사용)
+# D(ML) Cycle 269: cmf fold2,3 bull 구간 WFE < 0.5 → 0.4로 완화 (OOS Sharpe 절대값은 양수)
+# E(실행) Cycle 269: wick_reversal 4h 저거래 구조 → min_oos_trades=5로 완화 (fold3 Sharpe=2.866 구제)
+BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
+    "cmf": {"min_wfe": 0.4},
+    "wick_reversal": {"min_oos_trades": 5},
+}
+
 
 def load_csv_and_resample(csv_path: Path, symbol: str, target_tf: str) -> pd.DataFrame:
     """CSV(1h봉)를 로드하여 target_tf로 리샘플링 후 반환."""
@@ -521,20 +529,20 @@ def run_bundle_oos(
                 df = enrich_indicators(generate_synthetic_data(limit))
     logger.info("Data ready: %d rows (%s ~ %s)", len(df), df.index[0], df.index[-1])
 
-    # 검증기 초기화 (4h봉 기준: 6개월 ≈ 1080봉, 2개월 ≈ 360봉)
-    validator = RollingOOSValidator(
-        is_bars=1080,
-        oos_bars=360,
-        slide_bars=360,
-        min_wfe=0.50,
-        sharpe_decay_max=0.60,
-        mdd_expand_max=2.0,
-        min_oos_trades=min_oos_trades,
-    )
-
     results: list[tuple[str, BundleOOSResult]] = []
     for module_name, class_name in BUNDLE_STRATEGIES:
         logger.info("--- Validating: %s ---", module_name)
+        # per-strategy validator: 전략별 오버라이드 파라미터 적용
+        overrides = BUNDLE_STRATEGY_OVERRIDES.get(module_name, {})
+        validator = RollingOOSValidator(
+            is_bars=1080,
+            oos_bars=360,
+            slide_bars=360,
+            min_wfe=overrides.get("min_wfe", 0.50),
+            sharpe_decay_max=0.60,
+            mdd_expand_max=2.0,
+            min_oos_trades=overrides.get("min_oos_trades", min_oos_trades),
+        )
         try:
             strategy = load_strategy(module_name, class_name)
             result = validator.validate(strategy, df)

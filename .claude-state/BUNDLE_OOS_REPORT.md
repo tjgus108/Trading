@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-03T20:16:29.415037Z_
+_Generated: 2026-06-04T05:16:03.644600Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -10,7 +10,7 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 |----------|-------|---------|----------------|------------|----------|--------------|
 | cmf | 5 | 4.433 | 2.508 | 1.387 | FAIL | Failed folds: [2, 3] |
 | elder_impulse | 5 | -0.723 | -2.941 | 0.691 | FAIL | 저거래 fold 제외 (trades<10): [0, 4]; Failed folds: [1, 2, 3]; OOS Sharpe std 3.117 > 2.0 (불안정) |
-| wick_reversal | 5 | 0.000 | 1.772 | 1.316 | FAIL | 저거래 fold 제외 (trades<10): [0, 1, 2, 3]; 저거래 fold 비율 80% > 40% (신호 부족); Failed folds: [4] |
+| wick_reversal | 5 | -1.725 | 1.200 | 2.083 | FAIL | Failed folds: [1, 2, 4]; OOS Sharpe std 4.842 > 2.0 (불안정) |
 | narrow_range | 5 | -0.537 | -1.287 | 0.863 | FAIL | 저거래 fold 제외 (trades<10): [0, 3]; Failed folds: [1, 4]; OOS Sharpe std 2.695 > 2.0 (불안정) |
 | value_area | 5 | 0.062 | 0.713 | 1.155 | FAIL | 저거래 fold 제외 (trades<10): [2, 4]; Failed folds: [0, 3]; OOS Sharpe std 2.018 > 2.0 (불안정) |
 
@@ -23,11 +23,11 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | cmf | 80.6 | p100 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 60% | FAIL |
-| 2 | wick_reversal | 54.1 | p75 | 1.772 | 0.000 | 1.316 | 7.6 | 3.29% | 40% | FAIL |
-| 3 | value_area | 46.6 | p50 | 0.713 | 2.018 | 1.155 | 9.4 | 2.92% | 40% | FAIL |
-| 4 | narrow_range | 17.7 | p25 | -1.287 | 2.695 | 0.863 | 9.4 | 5.47% | 40% | FAIL |
-| 5 | elder_impulse | 7.9 | p0 | -2.941 | 3.117 | 0.691 | 9.8 | 4.17% | 40% | FAIL |
+| 1 | cmf | 76.6 | p100 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 60% | FAIL |
+| 2 | wick_reversal | 48.5 | p75 | 1.200 | 4.842 | 2.083 | 7.6 | 3.29% | 40% | FAIL |
+| 3 | value_area | 43.2 | p50 | 0.713 | 2.018 | 1.155 | 9.4 | 2.92% | 40% | FAIL |
+| 4 | narrow_range | 18.5 | p25 | -1.287 | 2.695 | 0.863 | 9.4 | 5.47% | 40% | FAIL |
+| 5 | elder_impulse | 11.3 | p0 | -2.941 | 3.117 | 0.691 | 9.8 | 4.17% | 40% | FAIL |
 
 ## IS Sharpe 음수 진단
 
@@ -75,7 +75,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 1.272 | 2.866 | 2.253 | 1.997 | 5 | 7.61% | 1.41% | PASS |
 | 4 | 2023-08-29 | 2024-02-25~2024-04-24 | -1.032 | 1.772 | 0.000 | 1.316 | 10 | 8.59% | 4.48% | FAIL |
 
-**Fail reasons:** 저거래 fold 제외 (trades<10): [0, 1, 2, 3]; 저거래 fold 비율 80% > 40% (신호 부족); Failed folds: [4]
+**Fail reasons:** Failed folds: [1, 2, 4]; OOS Sharpe std 4.842 > 2.0 (불안정)
 
 ### narrow_range
 
