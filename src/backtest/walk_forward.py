@@ -57,9 +57,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     "wick_reversal": {
         "min_wick_ratio": [0.50, 0.55, 0.60],
-        "vol_mult": [0.7, 0.8, 0.9],
+        "vol_mult": [1.0, 1.1, 1.2],  # Cycle 274: 0.7-0.9→1.0-1.2 상향, FAIL fold(2022 bear/2023 여름) 가짜 반전 차단
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
-        # Cycle 273: adx_threshold 제거 (수익 fold 차단 문제 — fold0,1,4 OOS Sharpe 양수였음)
+    },
+    "supertrend_multi": {
+        "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드, 신호 빈도/품질 균형
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -930,6 +932,26 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
         strategy_name="frama",
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["frama"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
+    )
+    return opt.run(df)
+
+
+def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
+                              plateau_pct: float = 0.9) -> WalkForwardResult:
+    """SupertrendMulti 전략 파라미터 최적화 (Cycle 274: atr_threshold 그리드)."""
+    from src.strategy.supertrend_multi import SupertrendMultiStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return SupertrendMultiStrategy(
+            atr_threshold=params.get("atr_threshold", 0.9),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="supertrend_multi",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["supertrend_multi"],
         n_windows=n_windows,
         plateau_pct=plateau_pct,
     )

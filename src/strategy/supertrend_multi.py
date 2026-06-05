@@ -29,9 +29,10 @@ class SupertrendMultiStrategy(BaseStrategy):
         (20, 3.0),
     ]
     MIN_ROWS = 25
-    ATR_THRESHOLD = 0.9  # ATR이 평균의 90% 이상이어야 신호 생성
 
-    def __init__(self) -> None:
+    def __init__(self, atr_threshold: float = 0.9) -> None:
+        # Cycle 274: atr_threshold 파라미터화 (그리드 탐색 지원)
+        self.atr_threshold = atr_threshold
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -100,8 +101,7 @@ class SupertrendMultiStrategy(BaseStrategy):
         avg_atr = float(atr.iloc[-lookback - 2: -2].mean())
         cur_atr = float(atr.iloc[-2])
         
-        # 현재 ATR이 평균의 80% 이상이면 PASS
-        return avg_atr > 0 and cur_atr >= avg_atr * self.ATR_THRESHOLD
+        return avg_atr > 0 and cur_atr >= avg_atr * self.atr_threshold
 
     def _trend_confirmation_pass(self, trends_series: List[pd.Series]) -> bool:
         """
