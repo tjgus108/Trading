@@ -55,6 +55,15 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     "wick_reversal": {"min_oos_trades": 5, "max_oos_sharpe_std": 3.0},
 }
 
+# Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
+# Cycle 277 D(ML): wick_reversal sma_sell_threshold=1.01 검증
+#   - Cycle 276에서 파라미터화 완료, 번들 OOS에서 기본값(1.03) 대신 1.01로 효과 확인
+#   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
+#   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
+BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
+    "wick_reversal": {"sma_sell_threshold": 1.01},
+}
+
 
 def load_csv_and_resample(csv_path: Path, symbol: str, target_tf: str) -> pd.DataFrame:
     """CSV(1h봉)를 로드하여 target_tf로 리샘플링 후 반환."""
@@ -335,10 +344,11 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_strategy(module_name: str, class_name: str):
-    """전략 인스턴스 생성."""
+    """전략 인스턴스 생성. BUNDLE_STRATEGY_INIT_PARAMS 오버라이드 적용."""
     mod = importlib.import_module(f"src.strategy.{module_name}")
     cls = getattr(mod, class_name)
-    return cls()
+    params = BUNDLE_STRATEGY_INIT_PARAMS.get(module_name, {})
+    return cls(**params)
 
 
 def bundle_results_to_rank_dicts(

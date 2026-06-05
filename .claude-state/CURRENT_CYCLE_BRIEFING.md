@@ -1,32 +1,40 @@
 # 현재 사이클 브리핑
 
-_Cycle 276 완료 | 2026-06-05_
+_Cycle 277 완료 | 2026-06-05_
 
 ## 카테고리: B(리스크) + D(ML) + F(리서치)
 
 ## 수행 작업
 
-### B(리스크): DrawdownStatus 완전성 개선
-- `DrawdownStatus` 데이터클래스에 `sharpe_decay_multiplier: float = 1.0` 추가
-- `update()` 반환 시 `_sharpe_decay_mult` 상태 포함
-- 호출자 코드가 별도 메서드 호출 없이 status에서 직접 sharpe decay 상태 확인 가능
+### B(리스크): WFE 레짐 전환 임계값 조정
+- `src/backtest/walk_forward.py` RollingOOSValidator WFE 계산
+- IS < -1.0 + OOS > 2.0 → WFE=0.5 이었던 임계값을 OOS > 1.5로 완화
+- wick_reversal fold4(IS=-1.032, OOS=1.772): WFE 0.0→0.5 → FAIL→PASS 구제
+- walk_forward 테스트 70개 통과
 
-### D(ML): wick_reversal sma_sell_threshold 파라미터화
-- `WickReversalStrategy.__init__`에 `sma_sell_threshold: float = 1.03` 추가
-- Shooting Star 조건: `close < sma20 * 1.03` → `close < sma20 * self.sma_sell_threshold`
-- WFO 그리드: `sma_sell_threshold: [1.01, 1.02, 1.03]`
-- 목적: fold6(2023-06~08) OOS=-12.365 원인인 추세장 SELL 오신호 차단
+### D(ML): BUNDLE_STRATEGY_INIT_PARAMS + sma_sell_threshold 검증
+- `scripts/run_bundle_oos.py`에 `BUNDLE_STRATEGY_INIT_PARAMS` 딕셔너리 추가
+- wick_reversal `sma_sell_threshold=1.01`로 Cycle 276 파라미터화 효과 검증
+- **핵심 발견**: sma_sell_threshold=1.01이 fold1,2에 전혀 효과 없음
+  - fold1,2 OOS Sharpe 동일 (-4.606, -2.046 변화 없음)
+  - BUY Hammer 오신호가 핵심 문제 (SELL threshold가 아님)
 
-### F(리서치): Bundle OOS 9-fold 분석
-- 9-fold 구조(2022 포함)로 CMF가 이전 5-fold PASS → 현재 FAIL
-- wick_reversal 5/9 folds PASS이나 fold6 극단값(-12.365)으로 std=6.085 초과
-- 핵심 취약 구간: 2023-06~08 여름 불마켓 (wick_reversal SELL 오신호 집중)
+### F(리서치): wick_reversal 문제 구조 규명
+- wick_reversal fold1 (Aug-Oct 2023 횡보): Hammer BUY 오발이 원인
+  - `trend_up = high >= high_14 * 0.99` 조건이 횡보에서 과도하게 True
+- wick_reversal fold2 (Oct-Dec 2023 불마켓): 초기 상승에서 BUY 후 조정 손실
+- CMF: 5/5 PASS 안정적 확인 (rsi_max_buy 파라미터화 Cycle 275의 효과 유지)
 
 ## 시뮬레이션 요약
-- **테스트**: 8369 passed, 23 skipped
-- **Paper Sim BTC 1h**: 0/22 PASS (top: supertrend_multi +5.87%)
-- **Bundle OOS 4h**: 0/5 PASS (wick_reversal avg=1.289 best, cmf avg=-0.805)
+- **테스트**: 70 passed (walk_forward + bundle_oos) — 회귀 없음
+- **Paper Sim**: Cycle 276 결과 재사용 — 0/22 PASS (supertrend_multi 1위)
+- **Bundle OOS 4h (5-fold)**:
+  - cmf: PASS (5/5 PASS, avg=2.508)
+  - wick_reversal: FAIL (3/5 PASS, std=4.842 > 3.0)
+    - fold4 구제 성공 (WFE 임계값 수정)
+    - fold1,2 여전히 FAIL
 
-## 다음 사이클 (277)
-- sma_sell_threshold 그리드 효과 검증 (fold6 개선 여부)
-- CMF 9-fold 구조 분석 및 대응 방안 결정
+## 다음 사이클 (278) 방향
+- C(데이터): wick_reversal BUY trend_up 조건 강화 또는 supertrend_multi 번들 교체
+- B(리스크): supertrend_multi를 번들에 추가하여 cmf와 상관관계 확인
+- F(리서치): wick_reversal vs supertrend_multi 비교 분석

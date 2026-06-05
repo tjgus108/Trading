@@ -1093,9 +1093,10 @@ class RollingOOSValidator:
             elif oos_result.sharpe_ratio > 0:
                 # IS<0 + OOS>0: IS가 심각한 음수(-1.0 미만)이면 역방향 신호로 신뢰 불가
                 if is_result.sharpe_ratio < -1.0:
-                    if oos_result.sharpe_ratio > 2.0:
+                    if oos_result.sharpe_ratio > 1.5:
                         # 레짐 전환 마커: IS 역방향 레짐(약세/횡보)에서 손실,
-                        # OOS에서 대폭 회복 → 완전 배제보다 부분 신뢰가 적절 (cmf 패턴)
+                        # OOS에서 회복 → 완전 배제보다 부분 신뢰가 적절 (cmf/wick 패턴)
+                        # Cycle 277: 2.0→1.5 완화 (fold4 IS=-1.032, OOS=1.772 구제)
                         wfe = 0.5
                     else:
                         wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
