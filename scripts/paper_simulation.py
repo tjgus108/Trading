@@ -58,8 +58,10 @@ MIN_WINDOWS = 3          # 최소 테스트 윈도우 수
 PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 
 # 전략별 파라미터 오버라이드 (빈 dict = 기본값 사용)
-# D(ML) Cycle 272 실험: cmf period=60 → rank=14 (period=20 rank=13 대비 악화) → 오버라이드 없음
-PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {}
+# C(데이터) Cycle 273 실험: cmf 1h threshold 완화 (0.05/-0.05) → 신호 빈도 개선 기대
+PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
+    "cmf": {"buy_thresh": 0.05, "sell_thresh": -0.05},
+}
 
 
 # ── 데이터 수집 ──────────────────────────────────────────────

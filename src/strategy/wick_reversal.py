@@ -4,11 +4,10 @@ WickReversalStrategy v2: 긴 꼬리(wick)를 이용한 반전 감지.
 개선 (Cycle 250): ATR 기반 최소 변동성 필터 추가 (저변동성 구간 신호 차단)
 개선 (Cycle 270): Shooting Star에 rsi < 70 추가 (강한 bull 레짐 억제)
 개선 (Cycle 271): EMA 방향 필터 실험 → 역효과 (avg 1.200→-0.416), 롤백함
-개선 (Cycle 272): ADX14 필터 추가 (adx14 < adx_threshold → 횡보 구간에서만 진입)
-- ADX > 25 = 강한 트렌드 → wick 반전 패턴 신뢰 불가 (bull/bear run에서 차단)
-- ADX < 25 = 약한/횡보 → wick 패턴 유효
-- Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.95, trend_up, vol_ok OR rsi<=70, adx14<adx_threshold) → BUY
-- Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, trend_down, rsi<70, vol_ok OR rsi>=30, adx14<adx_threshold) → SELL
+개선 (Cycle 272): ADX14 필터 추가 → Cycle 273에서 제거 (수익 구간 차단 문제 확인)
+- ADX 필터가 fold 0,1,4 (OOS Sharpe +2.761/+1.328/+0.358 구간)를 차단 → 저거래율 60%
+- Hammer (lower_wick_ratio >= self.min_wick_ratio, close > SMA20*0.95, trend_up, vol_ok OR rsi<=70) → BUY
+- Shooting Star (upper_wick_ratio >= self.min_wick_ratio, close < SMA20*1.03, trend_down, rsi<70, vol_ok OR rsi>=30) → SELL
 - ATR 필터: atr/close < min_volatility(0.002) → HOLD (저변동성 차단)
 """
 
@@ -117,32 +116,25 @@ class WickReversalStrategy(BaseStrategy):
         # RSI 14 (선택적 강화 조건)
         rsi = self._calculate_rsi(df, 14)
 
-        # ADX 14 필터: 강한 트렌드 구간(ADX>threshold) 진입 차단 (Cycle 272)
-        adx = self._calculate_adx(df, 14)
-        adx_ok = adx < self.adx_threshold
-
         bull_case = (
             f"lower_wick_ratio={lower_wick_ratio:.3f}, "
             f"close={close:.4f}, SMA20={sma20:.4f}, "
-            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_up={trend_up}, rsi={rsi:.1f}, "
-            f"adx14={adx:.1f}(<{self.adx_threshold}={adx_ok})"
+            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_up={trend_up}, rsi={rsi:.1f}"
         )
         bear_case = (
             f"upper_wick_ratio={upper_wick_ratio:.3f}, "
             f"close={close:.4f}, SMA20={sma20:.4f}, "
-            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_down={trend_down}, rsi={rsi:.1f}, "
-            f"adx14={adx:.1f}(<{self.adx_threshold}={adx_ok})"
+            f"vol={volume:.1f}, avg_vol10={avg_vol_10:.1f}, trend_down={trend_down}, rsi={rsi:.1f}"
         )
 
         # Hammer: BUY
         # 기본: lower_wick_ratio >= self.min_wick_ratio + trend_up + close > SMA20*0.95
-        # 강화: + (vol_ok OR rsi <= 70) + adx14 < adx_threshold (Cycle 272: 횡보 구간만)
+        # 강화: + (vol_ok OR rsi <= 70)
         hammer = (
             lower_wick_ratio >= self.min_wick_ratio and
             close > sma20 * 0.95 and  # Cycle 267: 0.97→0.95 완화, 하락 추세 구간 신호 빈도 개선
             trend_up and
-            (vol_ok or rsi <= 70) and
-            adx_ok
+            (vol_ok or rsi <= 70)
         )
         if hammer:
             confidence = Confidence.HIGH if lower_wick_ratio > 0.7 else Confidence.MEDIUM
@@ -164,14 +156,13 @@ class WickReversalStrategy(BaseStrategy):
         # Shooting Star: SELL
         # 기본: upper_wick_ratio >= self.min_wick_ratio + trend_down + close < SMA20*1.03
         # 강화: + rsi < 70 (Cycle 270: 강한 bull 레짐 억제 — Q4 bull 구간 오신호 차단)
-        #       + (vol_ok OR rsi >= 30) + adx14 < adx_threshold (Cycle 272: 횡보 구간만)
+        #       + (vol_ok OR rsi >= 30)
         shooting_star = (
             upper_wick_ratio >= self.min_wick_ratio and
             close < sma20 * 1.03 and
             trend_down and
             rsi < 70 and
-            (vol_ok or rsi >= 30) and
-            adx_ok
+            (vol_ok or rsi >= 30)
         )
         if shooting_star:
             confidence = Confidence.HIGH if upper_wick_ratio > 0.7 else Confidence.MEDIUM
@@ -193,8 +184,7 @@ class WickReversalStrategy(BaseStrategy):
         hold.reasoning = (
             f"패턴 없음: lower_wick_ratio={lower_wick_ratio:.3f}, "
             f"upper_wick_ratio={upper_wick_ratio:.3f}, vol_ok={vol_ok}, "
-            f"trend_up={trend_up}, trend_down={trend_down}, rsi={rsi:.1f}, "
-            f"adx14={adx:.1f}(ok={adx_ok})"
+            f"trend_up={trend_up}, trend_down={trend_down}, rsi={rsi:.1f}"
         )
         hold.bull_case = bull_case
         hold.bear_case = bear_case

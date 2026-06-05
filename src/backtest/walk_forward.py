@@ -49,17 +49,17 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     # cmf_1h: 1h 타임프레임 전용 파라미터 그리드 (D(ML) Cycle 271)
     # 기본 period=20 (4h 80시간)에 해당하는 1h 등가: period≥60
-    # 1h 논거: period=20@4h ≈ period=80@1h (동일 시간 커버리지), 신호 품질 향상
+    # Cycle 273: threshold 완화 (0.05/-0.05) — 1h 신호 빈도 부족 문제 개선
     "cmf_1h": {
         "period": [60, 75, 90],
-        "buy_thresh": [0.06, 0.07, 0.08],
-        "sell_thresh": [-0.08, -0.07, -0.06],
+        "buy_thresh": [0.05, 0.06, 0.07],
+        "sell_thresh": [-0.07, -0.06, -0.05],
     },
     "wick_reversal": {
         "min_wick_ratio": [0.50, 0.55, 0.60],
         "vol_mult": [0.7, 0.8, 0.9],
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
-        "adx_threshold": [20, 25, 30],             # Cycle 272: 횡보 구간 필터 (ADX<threshold만 진입)
+        # Cycle 273: adx_threshold 제거 (수익 fold 차단 문제 — fold0,1,4 OOS Sharpe 양수였음)
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
