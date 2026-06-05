@@ -21,12 +21,13 @@ _VOL_PERCENTILE = 0.85  # 상위 15% 볼륨 (강화)
 class CMFStrategy(BaseStrategy):
     name = "cmf"
 
-    def __init__(self, period: int = 20, buy_thresh: float = 0.08, sell_thresh: float = -0.08, high_conf: float = 0.15, vol_percentile: float = 0.85, **kwargs):
+    def __init__(self, period: int = 20, buy_thresh: float = 0.08, sell_thresh: float = -0.08, high_conf: float = 0.15, vol_percentile: float = 0.85, rsi_max_buy: float = 75.0, **kwargs):
         self.period = period
         self.buy_thresh = buy_thresh
         self.sell_thresh = sell_thresh
         self.high_conf = high_conf
         self.vol_percentile = vol_percentile
+        self.rsi_max_buy = rsi_max_buy
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
@@ -64,15 +65,16 @@ class CMFStrategy(BaseStrategy):
 
         conf = Confidence.HIGH if abs(cmf) > self.high_conf else Confidence.MEDIUM
 
-        # BUY: CMF > 0.08 AND close > ema50 AND ema20 > ema50 AND 볼륨 양호 AND RSI < 75
-        if cmf > self.buy_thresh and close > ema50 and ema20 > ema50 and vol_ratio >= self.vol_percentile and rsi < 75:
+        # BUY: CMF > 0.08 AND close > ema50 AND ema20 > ema50 AND 볼륨 양호 AND RSI < rsi_max_buy
+        # Cycle 275: rsi_max_buy 파라미터화 [75,78,80] — fold2(2023-10~12 불마켓) RSI>75 차단 문제 해결
+        if cmf > self.buy_thresh and close > ema50 and ema20 > ema50 and vol_ratio >= self.vol_percentile and rsi < self.rsi_max_buy:
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
                 reasoning=f"CMF 자금 유입+추세+RSI: CMF={cmf:.4f}, RSI={rsi:.1f}, close={close:.2f} > ema50={ema50:.2f}, ema20={ema20:.2f} > ema50, vol={vol_ratio:.2f}x",
-                invalidation=f"CMF < 0.08 또는 close < ema50 또는 ema20 < ema50 또는 RSI >= 75",
+                invalidation=f"CMF < 0.08 또는 close < ema50 또는 ema20 < ema50 또는 RSI >= {self.rsi_max_buy}",
                 bull_case=f"CMF={cmf:.4f}, 강한 자금 유입 + 상승 추세",
                 bear_case="단기 반등일 수 있음",
             )

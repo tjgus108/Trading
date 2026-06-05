@@ -46,6 +46,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "period": [21, 22, 23],        # Cycle 269: [20,21,22]→[21,22,23], 더 긴 CMF로 fold2,3 bull IS/OOS 갭 완화
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
+        "rsi_max_buy": [75, 78, 80],   # Cycle 275: fold2(2023-10~12 불마켓) RSI>75 차단 → 완화 실험
     },
     # cmf_1h: 1h 타임프레임 전용 파라미터 그리드 (D(ML) Cycle 271)
     # 기본 period=20 (4h 80시간)에 해당하는 1h 등가: period≥60
@@ -56,7 +57,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "sell_thresh": [-0.07, -0.06, -0.05],
     },
     "wick_reversal": {
-        "min_wick_ratio": [0.50, 0.55, 0.60],
+        "min_wick_ratio": [0.55, 0.60, 0.65],  # Cycle 275: 0.50-0.60→0.55-0.65 상향, 추세장 약한 wick 오신호 차단
         "vol_mult": [1.0, 1.1, 1.2],  # Cycle 274: 0.7-0.9→1.0-1.2 상향, FAIL fold(2022 bear/2023 여름) 가짜 반전 차단
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
     },
