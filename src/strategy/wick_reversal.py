@@ -30,6 +30,7 @@ class WickReversalStrategy(BaseStrategy):
         trend_period: int = 14,
         min_volatility: float = 0.002,
         adx_threshold: float = 25.0,
+        sma_sell_threshold: float = 1.03,
         **kwargs,
     ):
         self.min_wick_ratio = min_wick_ratio
@@ -38,6 +39,7 @@ class WickReversalStrategy(BaseStrategy):
         self.trend_period = trend_period
         self.min_volatility = min_volatility
         self.adx_threshold = adx_threshold
+        self.sma_sell_threshold = sma_sell_threshold
 
     MIN_ROWS = 25
 
@@ -154,12 +156,13 @@ class WickReversalStrategy(BaseStrategy):
             )
 
         # Shooting Star: SELL
-        # 기본: upper_wick_ratio >= self.min_wick_ratio + trend_down + close < SMA20*1.03
+        # 기본: upper_wick_ratio >= self.min_wick_ratio + trend_down + close < SMA20*sma_sell_threshold
         # 강화: + rsi < 70 (Cycle 270: 강한 bull 레짐 억제 — Q4 bull 구간 오신호 차단)
         #       + (vol_ok OR rsi >= 30)
+        # Cycle 276: sma_sell_threshold 파라미터화 [1.01,1.02,1.03] — 추세장 SELL 오신호 차단
         shooting_star = (
             upper_wick_ratio >= self.min_wick_ratio and
-            close < sma20 * 1.03 and
+            close < sma20 * self.sma_sell_threshold and
             trend_down and
             rsi < 70 and
             (vol_ok or rsi >= 30)
@@ -173,10 +176,10 @@ class WickReversalStrategy(BaseStrategy):
                 entry_price=entry,
                 reasoning=(
                     f"Shooting Star 패턴 (v2): upper_wick_ratio={upper_wick_ratio:.3f} >= 0.65, "
-                    f"close({close:.4f}) < SMA20*1.03({sma20*1.03:.4f}), trend_down={trend_down}, "
+                    f"close({close:.4f}) < SMA20*{self.sma_sell_threshold}({sma20*self.sma_sell_threshold:.4f}), trend_down={trend_down}, "
                     f"(vol_ok={vol_ok} OR rsi={rsi:.1f}>=30)"
                 ),
-                invalidation=f"Close above SMA20*1.03 ({sma20*1.03:.4f})",
+                invalidation=f"Close above SMA20*{self.sma_sell_threshold} ({sma20*self.sma_sell_threshold:.4f})",
                 bull_case=bull_case,
                 bear_case=bear_case,
             )

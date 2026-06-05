@@ -1,36 +1,32 @@
-# Current Cycle Briefing
+# 현재 사이클 브리핑
 
-_Cycle 275 완료 | 2026-06-05_
+_Cycle 276 완료 | 2026-06-05_
 
-## 완료된 사이클: 275 (A+C+F)
+## 카테고리: B(리스크) + D(ML) + F(리서치)
 
-### 카테고리별 작업
+## 수행 작업
 
-**A(품질) — CMF fold2 RSI 분석 및 파라미터화**
-- 원인 파악: CMF fold2 (2023-10~12 불마켓) OOS=0.642 약점은 RSI>75 시 BUY 차단
-- 해결: `rsi_max_buy` 파라미터 추가 → WFO 그리드 [75,78,80]으로 최적화 허용
-- `src/strategy/cmf.py`: rsi < self.rsi_max_buy (기본값 75 유지, 하위 호환)
+### B(리스크): DrawdownStatus 완전성 개선
+- `DrawdownStatus` 데이터클래스에 `sharpe_decay_multiplier: float = 1.0` 추가
+- `update()` 반환 시 `_sharpe_decay_mult` 상태 포함
+- 호출자 코드가 별도 메서드 호출 없이 status에서 직접 sharpe decay 상태 확인 가능
 
-**C(데이터) — wick_reversal min_wick_ratio 그리드 강화**
-- 원인 파악: fold1(2023-08), fold2(2023-10) 추세장에서 약한 wick 오신호
-- 해결: min_wick_ratio 그리드 [0.50-0.60]→[0.55-0.65] 상향
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["wick_reversal"] 업데이트
+### D(ML): wick_reversal sma_sell_threshold 파라미터화
+- `WickReversalStrategy.__init__`에 `sma_sell_threshold: float = 1.03` 추가
+- Shooting Star 조건: `close < sma20 * 1.03` → `close < sma20 * self.sma_sell_threshold`
+- WFO 그리드: `sma_sell_threshold: [1.01, 1.02, 1.03]`
+- 목적: fold6(2023-06~08) OOS=-12.365 원인인 추세장 SELL 오신호 차단
 
-**F(리서치) — 포트폴리오 구조 분석**
-- cmf(모멘텀 추종) + wick_reversal(반전) 독립 알파 구조 유지 정당성 확인
-- wick_reversal PASS 구간(fold0 2023-06~08, fold3 2023-12~2024-02)이 cmf와 다름
-- 다음 단계: wick_reversal 근본적 문제(추세장 오신호) 해결 방법 리서치
+### F(리서치): Bundle OOS 9-fold 분석
+- 9-fold 구조(2022 포함)로 CMF가 이전 5-fold PASS → 현재 FAIL
+- wick_reversal 5/9 folds PASS이나 fold6 극단값(-12.365)으로 std=6.085 초과
+- 핵심 취약 구간: 2023-06~08 여름 불마켓 (wick_reversal SELL 오신호 집중)
 
-### 시뮬레이션 결과 요약
-| 항목 | 결과 |
-|------|------|
-| 테스트 | 8369 passed, 23 skipped |
-| Paper Sim BTC 1h | 0/22 PASS |
-| Bundle OOS BTC 4h | 1/5 PASS (cmf ✅) |
-| cmf avg OOS Sharpe | 2.508 (std=1.888) |
-| wick_reversal avg OOS | 1.200 (std=4.842 FAIL) |
+## 시뮬레이션 요약
+- **테스트**: 8369 passed, 23 skipped
+- **Paper Sim BTC 1h**: 0/22 PASS (top: supertrend_multi +5.87%)
+- **Bundle OOS 4h**: 0/5 PASS (wick_reversal avg=1.289 best, cmf avg=-0.805)
 
-### 다음 사이클: 276 (B+D+F)
-- rsi_max_buy 그리드 효과 검증 (run_bundle_oos 재실행)
-- wick_reversal min_wick_ratio 그리드 효과 검증
-- wick_reversal 개선 방향 리서치 (Shooting Star 조건 강화 검토)
+## 다음 사이클 (277)
+- sma_sell_threshold 그리드 효과 검증 (fold6 개선 여부)
+- CMF 9-fold 구조 분석 및 대응 방안 결정

@@ -1,3 +1,41 @@
+## [2026-06-05] Cycle 276 — B(리스크) + D(ML) + F(리서치)
+
+**[B] 리스크: DrawdownStatus에 sharpe_decay_multiplier 추가**
+1. `src/risk/drawdown_monitor.py`: `DrawdownStatus` 데이터클래스에 `sharpe_decay_multiplier: float = 1.0` 필드 추가
+   - 기존 `atr_vol_multiplier`와 동일한 패턴, `_sharpe_decay_mult` 상태를 status에 반영
+   - `update()` 반환 시 `sharpe_decay_multiplier=self._sharpe_decay_mult` 포함
+   - 호출자가 `get_sharpe_decay_multiplier()` 별도 호출 없이 status에서 직접 확인 가능
+
+**[D] ML: wick_reversal Shooting Star SMA 조건 파라미터화**
+2. `src/strategy/wick_reversal.py`: `sma_sell_threshold: float = 1.03` 파라미터 추가
+   - 기존 하드코딩 `close < sma20 * 1.03` → `close < sma20 * self.sma_sell_threshold`
+   - fold6(2023-06~08) OOS=-12.365 핵심 원인: 여름 불마켓에서 Shooting Star SELL 오신호 과다
+   - sma_sell_threshold=1.01 적용 시 close가 SMA20에 훨씬 근접해야 SELL 신호 → 상승장 오신호 차단 기대
+3. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["wick_reversal"]에 `sma_sell_threshold: [1.01, 1.02, 1.03]` 추가
+   - optimize_wick_reversal() factory에도 `sma_sell_threshold` 파라미터 전달 추가
+
+**[F] 리서치: Bundle OOS 9-fold 결과 분석**
+- CMF: FAIL (avg OOS=-0.805, std=3.854) — 9-fold 구조(2022 포함)로 이전 5-fold PASS와 다름
+  - 2022 베어마켓(fold0, fold3), 2023 여름(fold5, fold6)에서 FAIL
+  - rsi_max_buy [75→78→80] 효과: fold7,8(2023 Q3~Q4 불마켓)에서 4 folds PASS — 부분적 개선
+- wick_reversal: FAIL (avg OOS=1.289, std=6.085) — fold6(2023-06~08 OOS=-12.365) 핵심 문제
+  - 5/9 folds PASS (fold1,2,4,7,8) — 반전 신호로서 특정 구간에서 강점 확인
+  - fold6 문제: 여름 2023 강세장에서 Shooting Star SELL 대량 오신호
+  - min_wick_ratio [0.55-0.65] 변경: fold6 개선 없음 → sma_sell_threshold 파라미터화로 접근 전환
+- 리서치 결론: wick_reversal은 레인지/베어 구간에서 효과적, 추세장 SELL 오신호가 핵심 약점
+  - sma_sell_threshold [1.01,1.02,1.03] WFO로 추세장 SELL 기준 강화 시 fold6 개선 가능성
+
+**시뮬레이션 결과 (Cycle 276):**
+- 테스트: **8369 passed, 23 skipped** — 회귀 없음 (targeted test: 227 passed)
+- Paper Sim BTC 1h (8 windows): 0/22 PASS
+  - top: supertrend_multi +5.87%, wick_reversal rank=22 AvgSharpe=-2.79
+  - ETH/SOL wick_reversal: 0 trades (합성 데이터 + 높은 파라미터 임계값)
+- Bundle OOS BTC 4h (9-fold): **0/5 PASS** (cmf 이전 PASS 소실 — 9-fold 구조 변경 영향)
+  - cmf: FAIL avg=-0.805, std=3.854 (3/9 folds PASS: fold1,7,8)
+  - wick_reversal: FAIL avg=1.289, std=6.085 (5/9 folds PASS, but fold6=-12.365 극단)
+
+---
+
 ## [2026-06-05] Cycle 275 — A(품질) + C(데이터) + F(리서치)
 
 **[A] 품질: CMF rsi_max_buy 파라미터화**
@@ -6277,6 +6315,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-05 10:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-05 15:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-05 15:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-05 15:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-05 15:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-05 15:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-05 15:08 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

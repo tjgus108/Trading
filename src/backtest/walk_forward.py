@@ -60,6 +60,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "min_wick_ratio": [0.55, 0.60, 0.65],  # Cycle 275: 0.50-0.60→0.55-0.65 상향, 추세장 약한 wick 오신호 차단
         "vol_mult": [1.0, 1.1, 1.2],  # Cycle 274: 0.7-0.9→1.0-1.2 상향, FAIL fold(2022 bear/2023 여름) 가짜 반전 차단
         "min_volatility": [0.002, 0.003, 0.004],  # Cycle 265: 1h 노이즈 차단, 0.002 유지로 4h 거래 보호
+        "sma_sell_threshold": [1.01, 1.02, 1.03],  # Cycle 276: Shooting Star SMA 조건 파라미터화, 추세장 SELL 오신호 차단
     },
     "supertrend_multi": {
         "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드, 신호 빈도/품질 균형
@@ -839,6 +840,7 @@ def optimize_wick_reversal(df: pd.DataFrame, n_windows: int = 3,
             vol_mult=params.get("vol_mult", 0.8),
             min_volatility=params.get("min_volatility", 0.002),
             adx_threshold=params.get("adx_threshold", 25.0),
+            sma_sell_threshold=params.get("sma_sell_threshold", 1.03),
         )
 
     # 타임프레임별 min_volatility 그리드 분리:

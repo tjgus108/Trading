@@ -77,6 +77,7 @@ class DrawdownStatus:
     rolling_mdd_short_pct: float = 0.0  # 단기 롤링(20봉) MDD — 장기 대비 조기 경보용
     kelly_fraction_multiplier: float = 1.0  # Kelly fraction 축소 배수 (MDD > kelly_reduce_at_mdd 시 0.5)
     atr_vol_multiplier: float = 1.0  # ATR 변동성 필터 배수 (ATR 급등 시 0.5)
+    sharpe_decay_multiplier: float = 1.0  # OOS Sharpe decay 필터 배수 (decay 감지 시 0.5)
 
 
 class DrawdownMonitor:
@@ -661,6 +662,7 @@ class DrawdownMonitor:
             rolling_mdd_short_pct=self.rolling_mdd(window=20),
             kelly_fraction_multiplier=self.get_kelly_fraction_multiplier(),
             atr_vol_multiplier=self._atr_vol_mult,
+            sharpe_decay_multiplier=self._sharpe_decay_mult,
         )
 
     def _check_tiered(
