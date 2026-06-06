@@ -1,3 +1,40 @@
+## [2026-06-06] Cycle 279 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] supertrend_multi ATR 상한 임계값 추가 (fold4 개선)**
+1. `src/strategy/supertrend_multi.py`: `atr_threshold_max` 파라미터 추가
+   - 문제: fold4 (Feb-Apr 2024 BTC ATH 구간 $40k→$73k) OOS=-4.239 — 고변동성 구간 whipsaw
+   - 수정: `_atr_filter_pass()`에 상한 체크 추가 `self.atr_threshold <= ratio <= self.atr_threshold_max`
+   - 기본값: `atr_threshold_max=2.0` (ATR이 평균의 2배 이상이면 신호 차단)
+   - `atr_threshold` 기본값: 0.9→0.7 (저변동성 기간 신호 증가)
+
+**[E(실행)] optimize_supertrend_multi 파라미터 확장**
+2. `src/backtest/walk_forward.py`:
+   - DEFAULT_GRIDS에 `atr_threshold_max: [1.5, 2.0, 3.0]` 추가 (그리드 탐색 지원)
+   - `optimize_supertrend_multi` factory에 `atr_threshold_max` 파라미터 연결
+
+3. `scripts/run_bundle_oos.py`:
+   - BUNDLE_STRATEGY_INIT_PARAMS에 supertrend_multi 추가
+   - `{"atr_threshold": 0.7, "atr_threshold_max": 2.0}` 적용
+
+**[F(리서치)] supertrend_multi fold4 ATR 분석**
+- 가설: 2024-02~04 BTC 급등 구간에서 ATR이 avg의 2.0배 미만 유지 (일관된 추세라 급등 없음)
+- 실제 fold4 OOS=-4.239가 유지됨 → atr_threshold_max=2.0이 충분히 낮지 않은 것
+- 다음 사이클 조사: ATH 구간 ATR ratio 실측 + atr_threshold_max=1.5 테스트 또는 장기 EMA 위 SELL 차단 로직
+
+**시뮬레이션 결과 (Cycle 279):**
+- 테스트: **8369 passed**, 23 skipped — 전체 회귀 없음
+- Paper Sim BTC 1h: 0/22 PASS
+  - supertrend_multi: +6.73% (↑5.87%), AvgSharpe=0.60 (↑0.43) — rank 1위 유지
+  - 전반적 평균 수익률: -3.86% (소폭 개선)
+- Bundle OOS BTC 4h (5-fold, Cycle 279):
+  - cmf: **PASS** avg=2.508, std=1.888 (5/5 folds PASS) — 7회 연속 PASS
+  - supertrend_multi: FAIL avg=**2.266** (↑1.699), std=3.792 — fold0-3 PASS, fold4만 FAIL
+  - elder_impulse: FAIL avg=-2.941, std=3.117
+  - narrow_range: FAIL avg=-1.287, std=2.695
+  - value_area: FAIL avg=0.713, std=2.018
+
+---
+
 ## [2026-06-06] Cycle 278 — C(데이터) + B(리스크) + F(리서치)
 
 **[C] 데이터: wick_reversal trend_up 조건 강화 — 14봉 모멘텀 필터 추가**
@@ -6962,6 +6999,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-06 00:16 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-06 05:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-06 05:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-06 05:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-06 05:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-06 05:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-06 05:08 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

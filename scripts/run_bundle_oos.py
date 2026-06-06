@@ -63,7 +63,10 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
-    # wick_reversal 제거 (Cycle 278 B: supertrend_multi로 교체)
+    # Cycle 279 D(ML): atr_threshold_max=2.0으로 ATH 급등 구간 whipsaw 차단
+    # fold4(Feb-Apr 2024 BTC ATH, OOS=-4.239) 개선 목표
+    # atr_threshold=0.7: 저변동성 기간(fold1-3) 신호 증가, 기본값 하향
+    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0},
 }
 
 

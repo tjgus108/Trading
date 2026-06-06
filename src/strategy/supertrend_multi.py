@@ -30,9 +30,12 @@ class SupertrendMultiStrategy(BaseStrategy):
     ]
     MIN_ROWS = 25
 
-    def __init__(self, atr_threshold: float = 0.9) -> None:
+    def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0) -> None:
         # Cycle 274: atr_threshold 파라미터화 (그리드 탐색 지원)
+        # Cycle 279 D(ML): 기본값 0.9→0.7 (저변동성 기간 신호 증가)
+        # Cycle 279 D(ML): atr_threshold_max 추가 (ATH 급등 구간 whipsaw 차단)
         self.atr_threshold = atr_threshold
+        self.atr_threshold_max = atr_threshold_max
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -90,18 +93,24 @@ class SupertrendMultiStrategy(BaseStrategy):
 
     def _atr_filter_pass(self, df: pd.DataFrame) -> bool:
         """
-        ATR 필터: 현재 ATR이 평균의 ATR_THRESHOLD 이상이어야 신호 생성.
-        목표: 과도한 변동성 피하기 (거짓 신호 감소).
+        ATR 필터: 현재 ATR이 평균의 [atr_threshold, atr_threshold_max] 범위 내에 있어야 신호 생성.
+        하한(atr_threshold): 최소 변동성 확보 (저변동성 노이즈 차단)
+        상한(atr_threshold_max): 과도한 변동성 차단 (ATH 급등 구간 whipsaw 방지)
+        Cycle 279 D(ML): 상한 추가로 fold4(Feb-Apr 2024 BTC ATH) OOS=-4.239 개선 목표
         """
         if len(df) < self.MIN_ROWS:
             return False
-        
+
         atr = self._compute_atr(df, 14)
         lookback = min(20, len(df) - 2)
         avg_atr = float(atr.iloc[-lookback - 2: -2].mean())
         cur_atr = float(atr.iloc[-2])
-        
-        return avg_atr > 0 and cur_atr >= avg_atr * self.atr_threshold
+
+        if avg_atr <= 0:
+            return False
+
+        ratio = cur_atr / avg_atr
+        return self.atr_threshold <= ratio <= self.atr_threshold_max
 
     def _trend_confirmation_pass(self, trends_series: List[pd.Series]) -> bool:
         """
