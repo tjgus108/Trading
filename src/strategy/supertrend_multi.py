@@ -31,16 +31,20 @@ class SupertrendMultiStrategy(BaseStrategy):
     MIN_ROWS = 25
 
     def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0,
-                 ema_filter: bool = True, confidence_filter: bool = False) -> None:
-        # Cycle 274: atr_threshold 파라미터화 (그리드 탐색 지원)
+                 ema_filter: bool = True, confidence_filter: bool = False,
+                 rsi_ob_filter: bool = False, rsi_ob_threshold: float = 75.0) -> None:
+        # Cycle 274: atr_threshold 파라미터화
         # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
-        # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단 (ATH 구간 fold4 개선)
+        # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단
         # Cycle 281 B(리스크): confidence_filter 추가 — MEDIUM 신호 HOLD 처리
-        #   fold4 ATH 구간 오신호 대부분 MEDIUM → HIGH만 통과시켜 fold4 OOS 개선 목표
+        # Cycle 282 B(리스크): rsi_ob_filter 추가 — RSI > rsi_ob_threshold 시 BUY 차단
+        #   fold4 ATH(BTC 73k, RSI>80) BUY 13건 → RSI 과매수 구간 진입 차단
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
         self.ema_filter = ema_filter
         self.confidence_filter = confidence_filter
+        self.rsi_ob_filter = rsi_ob_filter
+        self.rsi_ob_threshold = rsi_ob_threshold
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -192,7 +196,23 @@ class SupertrendMultiStrategy(BaseStrategy):
                 ema200 = float(df["close"].ewm(span=200, adjust=False).mean().iloc[-2])
                 ema200_bullish = entry > ema200
 
+        # RSI 과매수 BUY 차단 (Cycle 282 B(리스크)): fold4 ATH BUY 13건 제거 목표
+        rsi_ob_blocked = False
+        if self.rsi_ob_filter and all_bullish and trend_confirmed:
+            if "rsi14" in df.columns:
+                rsi_val = float(df["rsi14"].iloc[-2])
+            else:
+                delta = df["close"].diff()
+                gain = delta.clip(lower=0).ewm(alpha=1 / 14, adjust=False).mean()
+                loss = (-delta.clip(upper=0)).ewm(alpha=1 / 14, adjust=False).mean()
+                rs = gain / loss.replace(0, float("inf"))
+                rsi_val = float((100 - 100 / (1 + rs)).iloc[-2])
+            if rsi_val > self.rsi_ob_threshold:
+                rsi_ob_blocked = True
+
         if all_bullish and trend_confirmed:
+            if rsi_ob_blocked:
+                return self._hold(df, f"BUY 차단: RSI={rsi_val:.1f} > {self.rsi_ob_threshold} (rsi_ob_filter). trends={trend_str}")
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             # confidence_filter는 SELL만 적용 — BUY는 MEDIUM도 허용 (bull 구간 upside 보존)
             return Signal(

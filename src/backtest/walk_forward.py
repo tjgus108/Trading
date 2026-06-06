@@ -63,10 +63,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "sma_sell_threshold": [1.01, 1.02, 1.03],  # Cycle 276: Shooting Star SMA 조건 파라미터화, 추세장 SELL 오신호 차단
     },
     "supertrend_multi": {
-        "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드, 신호 빈도/품질 균형
-        "atr_threshold_max": [1.5, 2.0, 3.0],  # Cycle 279 D(ML): 상한 추가, ATH 급등 whipsaw 차단
-        "ema_filter": [True, False],  # Cycle 280 A(품질): EMA200 SELL 차단 (fold4 ATH 구간 개선)
-        "confidence_filter": [True, False],  # Cycle 281 B(리스크): MEDIUM 신호 HOLD 처리 (fold4 오신호 대부분 MEDIUM)
+        "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드
+        "atr_threshold_max": [1.5, 2.0, 3.0],  # Cycle 279 D(ML): 상한 추가
+        "ema_filter": [True, False],  # Cycle 280 A(품질): EMA200 SELL 차단
+        "confidence_filter": [True, False],  # Cycle 281 B(리스크): MEDIUM 신호 HOLD
+        "rsi_ob_filter": [True, False],  # Cycle 282 B(리스크): RSI 과매수 BUY 차단
+        "rsi_ob_threshold": [75, 78, 80],  # Cycle 282 D(ML): fold4 ATH(RSI>80) BUY 차단 임계값
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -955,6 +957,8 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
             atr_threshold_max=params.get("atr_threshold_max", 2.0),
             ema_filter=params.get("ema_filter", True),
             confidence_filter=params.get("confidence_filter", False),
+            rsi_ob_filter=params.get("rsi_ob_filter", False),
+            rsi_ob_threshold=params.get("rsi_ob_threshold", 75.0),
         )
 
     opt = WalkForwardOptimizer(

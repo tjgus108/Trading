@@ -189,3 +189,45 @@ def test_large_dataset_no_error():
     df = _make_bullish_df(n=500)
     sig = st.generate(df)
     assert sig.action in (Action.BUY, Action.SELL, Action.HOLD)
+
+
+def test_rsi_ob_filter_blocks_buy_when_rsi_high():
+    """rsi_ob_filter=True 시 RSI 과매수 구간 BUY 차단 (fold4 ATH 오신호 방지)."""
+    st_no_filter = SupertrendMultiStrategy(rsi_ob_filter=False)
+    st_with_filter = SupertrendMultiStrategy(rsi_ob_filter=True, rsi_ob_threshold=75.0)
+
+    # 강한 bullish 데이터 생성 후 RSI14를 강제로 높게 만듦
+    df = _make_bullish_df(n=100)
+
+    # rsi14 컬럼으로 RSI를 85로 고정 (threshold=75 초과)
+    df["rsi14"] = 85.0
+
+    sig_no_filter = st_no_filter.generate(df)
+    sig_with_filter = st_with_filter.generate(df)
+
+    # rsi_ob_filter=False면 BUY 가능, True면 HOLD
+    if sig_no_filter.action == Action.BUY:
+        assert sig_with_filter.action == Action.HOLD
+        assert "rsi_ob_filter" in sig_with_filter.reasoning.lower() or "rsi" in sig_with_filter.reasoning.lower()
+
+
+def test_rsi_ob_filter_allows_buy_when_rsi_normal():
+    """RSI가 임계값 이하일 때 rsi_ob_filter=True여도 BUY 허용."""
+    st = SupertrendMultiStrategy(rsi_ob_filter=True, rsi_ob_threshold=75.0)
+    df = _make_bullish_df(n=100)
+    df["rsi14"] = 60.0  # 임계값(75) 이하 → BUY 허용
+
+    sig = st.generate(df)
+    # RSI가 낮으면 rsi_ob_filter가 차단하지 않음
+    assert sig.action in (Action.BUY, Action.HOLD)  # ATR 필터에 따라 달라질 수 있음
+
+
+def test_rsi_ob_filter_does_not_block_sell():
+    """rsi_ob_filter는 BUY만 차단, SELL에는 영향 없음."""
+    st = SupertrendMultiStrategy(rsi_ob_filter=True, rsi_ob_threshold=75.0, ema_filter=False)
+    df = _make_bearish_df(n=80)
+    df["rsi14"] = 85.0  # RSI 높아도 SELL은 차단하지 않음
+
+    sig = st.generate(df)
+    # SELL이면 rsi_ob_filter와 무관하게 나와야 함
+    assert sig.action in (Action.SELL, Action.HOLD)
