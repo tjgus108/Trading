@@ -49,6 +49,7 @@ _Last updated: 2026-06-06 (Cycle 280 완료)_
 - Bundle OOS BTC 4h (5-fold, CSV, Cycle 280):
   - cmf: **PASS** avg=2.508, std=1.888 ← 8회 연속 PASS
   - supertrend_multi: FAIL avg=2.806 (↑2.266), std=2.655 (↓3.792), fold4: -1.539 (↑-4.239)
+  - Note: paper_sim은 ema_filter로 인한 변화 없음 (1h에서 SELL 차단/수익 상쇄)
   - elder_impulse: FAIL avg=-2.941, std=3.117
   - narrow_range: FAIL avg=-1.287, std=2.695
   - value_area: FAIL avg=0.713, std=2.018
