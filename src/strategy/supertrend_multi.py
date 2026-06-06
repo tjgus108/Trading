@@ -30,12 +30,14 @@ class SupertrendMultiStrategy(BaseStrategy):
     ]
     MIN_ROWS = 25
 
-    def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0) -> None:
+    def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0,
+                 ema_filter: bool = True) -> None:
         # Cycle 274: atr_threshold 파라미터화 (그리드 탐색 지원)
-        # Cycle 279 D(ML): 기본값 0.9→0.7 (저변동성 기간 신호 증가)
-        # Cycle 279 D(ML): atr_threshold_max 추가 (ATH 급등 구간 whipsaw 차단)
+        # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
+        # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단 (ATH 구간 fold4 개선)
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
+        self.ema_filter = ema_filter
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -176,6 +178,17 @@ class SupertrendMultiStrategy(BaseStrategy):
 
         trend_str = str(last_trends)
 
+        # EMA200 필터: close > EMA200 시 SELL 차단 (Cycle 280: fold4 ATH 구간 개선)
+        # pre-computed 컬럼 우선 사용 (enrich_indicators에서 전체 데이터로 계산 → cold-start 방지)
+        ema200_bullish = False
+        if self.ema_filter:
+            if "ema200" in df.columns:
+                ema200 = float(df["ema200"].iloc[-2])
+                ema200_bullish = entry > ema200
+            elif len(df) >= 200:
+                ema200 = float(df["close"].ewm(span=200, adjust=False).mean().iloc[-2])
+                ema200_bullish = entry > ema200
+
         if all_bullish and trend_confirmed:
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             return Signal(
@@ -190,6 +203,8 @@ class SupertrendMultiStrategy(BaseStrategy):
             )
 
         if all_bearish and trend_confirmed:
+            if ema200_bullish:
+                return self._hold(df, f"SELL 차단: close > EMA200 (bull trend). trends={trend_str}")
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,

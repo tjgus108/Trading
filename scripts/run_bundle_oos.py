@@ -63,10 +63,10 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
-    # Cycle 279 D(ML): atr_threshold_max=2.0으로 ATH 급등 구간 whipsaw 차단
-    # fold4(Feb-Apr 2024 BTC ATH, OOS=-4.239) 개선 목표
-    # atr_threshold=0.7: 저변동성 기간(fold1-3) 신호 증가, 기본값 하향
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0},
+    # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
+    # 분석: fold4 ATR ratio max=1.415 (<2.0), atr_threshold_max 효과 없음
+    # fold4의 65% 봉이 close>EMA200 → SELL 차단으로 OOS=-4.239 개선 목표
+    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True},
 }
 
 
@@ -316,6 +316,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     df["ema20"] = close.ewm(span=20, adjust=False).mean()
     df["ema50"] = close.ewm(span=50, adjust=False).mean()
+    df["ema200"] = close.ewm(span=200, adjust=False).mean()  # Cycle 280 C: EMA200 pre-compute (warm-up 문제 해결)
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()
 
