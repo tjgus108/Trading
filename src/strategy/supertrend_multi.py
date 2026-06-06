@@ -31,13 +31,16 @@ class SupertrendMultiStrategy(BaseStrategy):
     MIN_ROWS = 25
 
     def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0,
-                 ema_filter: bool = True) -> None:
+                 ema_filter: bool = True, confidence_filter: bool = False) -> None:
         # Cycle 274: atr_threshold 파라미터화 (그리드 탐색 지원)
         # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
         # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단 (ATH 구간 fold4 개선)
+        # Cycle 281 B(리스크): confidence_filter 추가 — MEDIUM 신호 HOLD 처리
+        #   fold4 ATH 구간 오신호 대부분 MEDIUM → HIGH만 통과시켜 fold4 OOS 개선 목표
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
         self.ema_filter = ema_filter
+        self.confidence_filter = confidence_filter
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -191,6 +194,7 @@ class SupertrendMultiStrategy(BaseStrategy):
 
         if all_bullish and trend_confirmed:
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
+            # confidence_filter는 SELL만 적용 — BUY는 MEDIUM도 허용 (bull 구간 upside 보존)
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -206,6 +210,8 @@ class SupertrendMultiStrategy(BaseStrategy):
             if ema200_bullish:
                 return self._hold(df, f"SELL 차단: close > EMA200 (bull trend). trends={trend_str}")
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
+            if self.confidence_filter and conf == Confidence.MEDIUM:
+                return self._hold(df, f"SELL 차단: MEDIUM confidence (confidence_filter=True). trends={trend_str}")
             return Signal(
                 action=Action.SELL,
                 confidence=conf,

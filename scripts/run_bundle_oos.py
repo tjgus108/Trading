@@ -64,9 +64,9 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
-    # 분석: fold4 ATR ratio max=1.415 (<2.0), atr_threshold_max 효과 없음
-    # fold4의 65% 봉이 close>EMA200 → SELL 차단으로 OOS=-4.239 개선 목표
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True},
+    # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
+    #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표
+    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True},
 }
 
 

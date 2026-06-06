@@ -66,6 +66,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드, 신호 빈도/품질 균형
         "atr_threshold_max": [1.5, 2.0, 3.0],  # Cycle 279 D(ML): 상한 추가, ATH 급등 whipsaw 차단
         "ema_filter": [True, False],  # Cycle 280 A(품질): EMA200 SELL 차단 (fold4 ATH 구간 개선)
+        "confidence_filter": [True, False],  # Cycle 281 B(리스크): MEDIUM 신호 HOLD 처리 (fold4 오신호 대부분 MEDIUM)
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -953,6 +954,7 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
             atr_threshold=params.get("atr_threshold", 0.7),
             atr_threshold_max=params.get("atr_threshold_max", 2.0),
             ema_filter=params.get("ema_filter", True),
+            confidence_filter=params.get("confidence_filter", False),
         )
 
     opt = WalkForwardOptimizer(
