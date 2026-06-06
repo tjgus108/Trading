@@ -40,7 +40,7 @@ REPORT_PATH = ROOT / ".claude-state" / "BUNDLE_OOS_REPORT.md"
 BUNDLE_STRATEGIES = [
     ("cmf", "CMFStrategy"),
     ("elder_impulse", "ElderImpulseStrategy"),
-    ("wick_reversal", "WickReversalStrategy"),
+    ("supertrend_multi", "SupertrendMultiStrategy"),  # Cycle 278 B: wick_reversal 교체 (std=4.842 >> 3.0, 3회 연속 FAIL)
     ("narrow_range", "NarrowRangeStrategy"),
     ("value_area", "ValueAreaStrategy"),
 ]
@@ -52,7 +52,9 @@ BUNDLE_STRATEGIES = [
 # C(데이터) Cycle 270: wick_reversal std=4.842 → max_oos_sharpe_std=3.0으로 완화 (RSI 필터와 병용)
 BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     "cmf": {"min_wfe": 0.4, "sharpe_decay_max": 0.40},
-    "wick_reversal": {"min_oos_trades": 5, "max_oos_sharpe_std": 3.0},
+    # Cycle 278 B: supertrend_multi 4h 저거래 문제 — 3개 Supertrend 합의 조건으로 4h에서 신호 희소
+    # min_oos_trades=3으로 완화하여 실질 OOS Sharpe 측정 가능하게 함
+    "supertrend_multi": {"min_oos_trades": 3},
 }
 
 # Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
@@ -61,7 +63,7 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
-    "wick_reversal": {"sma_sell_threshold": 1.01},
+    # wick_reversal 제거 (Cycle 278 B: supertrend_multi로 교체)
 }
 
 

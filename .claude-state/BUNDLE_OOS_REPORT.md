@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-05T20:20:56.623004Z_
+_Generated: 2026-06-06T00:18:48.117730Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -10,12 +10,12 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 |----------|-------|---------|----------------|------------|----------|--------------|
 | cmf | 5 | 1.136 | 2.508 | 1.387 | PASS | - |
 | elder_impulse | 5 | -0.723 | -2.941 | 0.691 | FAIL | 저거래 fold 제외 (trades<10): [0, 4]; Failed folds: [1, 2, 3]; OOS Sharpe std 3.117 > 2.0 (불안정) |
-| wick_reversal | 5 | -0.549 | 1.200 | 2.083 | FAIL | Failed folds: [1, 2]; OOS Sharpe std 4.842 > 3.0 (불안정) |
+| supertrend_multi | 5 | 0.742 | 1.699 | 1.973 | FAIL | Failed folds: [3, 4]; OOS Sharpe std 3.769 > 2.0 (불안정) |
 | narrow_range | 5 | -0.537 | -1.287 | 0.863 | FAIL | 저거래 fold 제외 (trades<10): [0, 3]; Failed folds: [1, 4]; OOS Sharpe std 2.695 > 2.0 (불안정) |
 | value_area | 5 | 0.062 | 0.713 | 1.155 | FAIL | 저거래 fold 제외 (trades<10): [2, 4]; Failed folds: [0, 3]; OOS Sharpe std 2.018 > 2.0 (불안정) |
 
 **PASS: 1/5** (cmf)
-**FAIL: 4/5** (elder_impulse, wick_reversal, narrow_range, value_area)
+**FAIL: 4/5** (elder_impulse, supertrend_multi, narrow_range, value_area)
 
 ## Composite Rank Score
 
@@ -23,11 +23,11 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | cmf | 76.6 | p100 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
-| 2 | wick_reversal | 51.9 | p75 | 1.200 | 4.842 | 2.083 | 7.6 | 3.29% | 60% | FAIL |
-| 3 | value_area | 43.2 | p50 | 0.713 | 2.018 | 1.155 | 9.4 | 2.92% | 40% | FAIL |
-| 4 | narrow_range | 18.5 | p25 | -1.287 | 2.695 | 0.863 | 9.4 | 5.47% | 40% | FAIL |
-| 5 | elder_impulse | 11.3 | p0 | -2.941 | 3.117 | 0.691 | 9.8 | 4.17% | 40% | FAIL |
+| 1 | cmf | 77.5 | p100 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
+| 2 | supertrend_multi | 54.4 | p75 | 1.699 | 3.769 | 1.973 | 8.2 | 3.53% | 60% | FAIL |
+| 3 | value_area | 42.8 | p50 | 0.713 | 2.018 | 1.155 | 9.4 | 2.92% | 40% | FAIL |
+| 4 | narrow_range | 17.0 | p25 | -1.287 | 2.695 | 0.863 | 9.4 | 5.47% | 40% | FAIL |
+| 5 | elder_impulse | 9.1 | p0 | -2.941 | 3.117 | 0.691 | 9.8 | 4.17% | 40% | FAIL |
 
 ## IS Sharpe 음수 진단
 
@@ -35,7 +35,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 |----------|-------------|-----------|----------|------|
 | cmf | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
 | elder_impulse | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
-| wick_reversal | 2 | 5 | 40% | 🟡 IS 일부 음수 |
+| supertrend_multi | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
 | narrow_range | 2 | 5 | 40% | 🟡 IS 일부 음수 |
 | value_area | 2 | 5 | 40% | 🟡 IS 일부 음수 |
 
@@ -63,17 +63,17 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 **Fail reasons:** 저거래 fold 제외 (trades<10): [0, 4]; Failed folds: [1, 2, 3]; OOS Sharpe std 3.117 > 2.0 (불안정)
 
-### wick_reversal
+### supertrend_multi
 
 | Fold | IS Start | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | IS MDD | OOS MDD | Pass |
 |------|----------|------------|-----------|------------|-----|--------|------------|-------|---------|------|
-| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -1.598 | 8.015 | 0.500 | 5.996 | 8 | 9.01% | 1.07% | PASS |
-| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | 0.590 | -4.606 | -7.807 | 0.408 | 8 | 8.85% | 6.42% | FAIL |
-| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | 0.573 | -2.046 | -3.571 | 0.696 | 7 | 7.74% | 3.08% | FAIL |
-| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 1.272 | 2.866 | 2.253 | 1.997 | 5 | 7.61% | 1.41% | PASS |
-| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | -1.032 | 1.772 | 0.500 | 1.316 | 10 | 8.59% | 4.48% | PASS |
+| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -1.778 | 2.251 | 0.500 | 1.371 | 12 | 16.20% | 5.81% | PASS |
+| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | 0.975 | 5.423 | 5.562 | 2.931 | 7 | 10.17% | 1.05% | PASS |
+| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | 1.616 | 4.265 | 2.639 | 3.723 | 3 | 10.34% | 1.03% | PASS |
+| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 3.387 | 0.797 | 0.235 | 1.259 | 3 | 5.81% | 1.39% | FAIL |
+| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | 1.590 | -4.239 | -2.666 | 0.580 | 16 | 4.41% | 8.35% | FAIL |
 
-**Fail reasons:** Failed folds: [1, 2]; OOS Sharpe std 4.842 > 3.0 (불안정)
+**Fail reasons:** Failed folds: [3, 4]; OOS Sharpe std 3.769 > 2.0 (불안정)
 
 ### narrow_range
 

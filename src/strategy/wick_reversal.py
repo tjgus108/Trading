@@ -115,6 +115,11 @@ class WickReversalStrategy(BaseStrategy):
         trend_up = high >= high_14 * 0.99
         trend_down = low <= low_14 * 1.01
 
+        # 14봉 모멘텀 확인: close가 14봉 이전 close보다 높아야 상승 모멘텀으로 판정
+        # Cycle 278 C: fold1 (Aug-Oct 2023 횡보) 오신호 차단 — 횡보구간에서 close ≈ ref_close
+        ref_close_14 = float(df["close"].iloc[-trend_lookback - 1])
+        has_momentum = close > ref_close_14
+
         # RSI 14 (선택적 강화 조건)
         rsi = self._calculate_rsi(df, 14)
 
@@ -136,6 +141,7 @@ class WickReversalStrategy(BaseStrategy):
             lower_wick_ratio >= self.min_wick_ratio and
             close > sma20 * 0.95 and  # Cycle 267: 0.97→0.95 완화, 하락 추세 구간 신호 빈도 개선
             trend_up and
+            has_momentum and  # Cycle 278 C: 14봉 양(+) 모멘텀 필수 (횡보 오신호 차단)
             (vol_ok or rsi <= 70)
         )
         if hammer:

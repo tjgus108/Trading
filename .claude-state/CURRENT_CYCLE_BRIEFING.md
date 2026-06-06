@@ -1,40 +1,39 @@
-# 현재 사이클 브리핑
+# Current Cycle Briefing
 
-_Cycle 277 완료 | 2026-06-05_
+_Cycle 278 완료 | 2026-06-06_
 
-## 카테고리: B(리스크) + D(ML) + F(리서치)
+## 카테고리: C(데이터) + B(리스크) + F(리서치)
 
-## 수행 작업
+## 핵심 변경사항
 
-### B(리스크): WFE 레짐 전환 임계값 조정
-- `src/backtest/walk_forward.py` RollingOOSValidator WFE 계산
-- IS < -1.0 + OOS > 2.0 → WFE=0.5 이었던 임계값을 OOS > 1.5로 완화
-- wick_reversal fold4(IS=-1.032, OOS=1.772): WFE 0.0→0.5 → FAIL→PASS 구제
-- walk_forward 테스트 70개 통과
+1. **wick_reversal 모멘텀 필터 추가** (`src/strategy/wick_reversal.py`)
+   - 14봉 양(+) 모멘텀 `has_momentum = close > ref_close_14` 추가
+   - Hammer BUY 조건에 필수 조건으로 포함
+   - fold1 (Aug-Oct 2023 횡보) 오신호 감소 목적
 
-### D(ML): BUNDLE_STRATEGY_INIT_PARAMS + sma_sell_threshold 검증
-- `scripts/run_bundle_oos.py`에 `BUNDLE_STRATEGY_INIT_PARAMS` 딕셔너리 추가
-- wick_reversal `sma_sell_threshold=1.01`로 Cycle 276 파라미터화 효과 검증
-- **핵심 발견**: sma_sell_threshold=1.01이 fold1,2에 전혀 효과 없음
-  - fold1,2 OOS Sharpe 동일 (-4.606, -2.046 변화 없음)
-  - BUY Hammer 오신호가 핵심 문제 (SELL threshold가 아님)
+2. **Bundle에서 wick_reversal → supertrend_multi 교체** (`scripts/run_bundle_oos.py`)
+   - wick_reversal: 3회 연속 FAIL, std=4.842 → 제거
+   - supertrend_multi: Paper Sim BTC 1h 4연속 1위 (+5.87%) → 추가
+   - min_oos_trades=3 오버라이드 (4h 신호 희소 완화)
 
-### F(리서치): wick_reversal 문제 구조 규명
-- wick_reversal fold1 (Aug-Oct 2023 횡보): Hammer BUY 오발이 원인
-  - `trend_up = high >= high_14 * 0.99` 조건이 횡보에서 과도하게 True
-- wick_reversal fold2 (Oct-Dec 2023 불마켓): 초기 상승에서 BUY 후 조정 손실
-- CMF: 5/5 PASS 안정적 확인 (rsi_max_buy 파라미터화 Cycle 275의 효과 유지)
+## 시뮬레이션 결과
 
-## 시뮬레이션 요약
-- **테스트**: 70 passed (walk_forward + bundle_oos) — 회귀 없음
-- **Paper Sim**: Cycle 276 결과 재사용 — 0/22 PASS (supertrend_multi 1위)
-- **Bundle OOS 4h (5-fold)**:
-  - cmf: PASS (5/5 PASS, avg=2.508)
-  - wick_reversal: FAIL (3/5 PASS, std=4.842 > 3.0)
-    - fold4 구제 성공 (WFE 임계값 수정)
-    - fold1,2 여전히 FAIL
+| 항목 | 결과 |
+|------|------|
+| 테스트 | 8369 passed (회귀 없음) |
+| Paper Sim BTC 1h | 0/22 PASS, 1위: supertrend_multi +5.87% |
+| Bundle OOS BTC 4h | 1/5 PASS: cmf (avg=2.508, std=1.888) |
+| supertrend_multi OOS | avg=1.699, std=3.769, fold4: OOS=-4.239 |
 
-## 다음 사이클 (278) 방향
-- C(데이터): wick_reversal BUY trend_up 조건 강화 또는 supertrend_multi 번들 교체
-- B(리스크): supertrend_multi를 번들에 추가하여 cmf와 상관관계 확인
-- F(리서치): wick_reversal vs supertrend_multi 비교 분석
+## Cycle 279 준비
+
+**카테고리**: D(ML) + E(실행) + F(리서치)
+
+**주요 과제**:
+- supertrend_multi fold4 (Feb-Apr 2024 BTC ATH) OOS=-4.239 원인 규명
+- ATR 상한 임계값 추가 or atr_threshold 조정 실험
+- Bundle OOS 2번째 PASS 전략 달성 목표
+
+## 환경 상태
+- 거래소 API: 차단 (SSL) → CSV fallback 사용
+- BTC 데이터: synthetic CSV 2023-01~2024-05 (12000 rows 1h)
