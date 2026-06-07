@@ -65,8 +65,11 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
-    #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True},
+    #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)
+    # Cycle 283 B(리스크): rsi_ob_filter=True, rsi_ob_threshold=80 추가 — fold4 ATH BUY 차단
+    #   rsi14 pre-compute 확인(C(데이터)): enrich_indicators()에 이미 존재 → cold-start 문제 해결됨
+    #   목표: fold4 OOS=-1.539 → ≥0, std: 2.655 → <2.0
+    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80},
 }
 
 

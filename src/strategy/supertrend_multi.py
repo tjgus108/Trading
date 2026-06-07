@@ -32,19 +32,22 @@ class SupertrendMultiStrategy(BaseStrategy):
 
     def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0,
                  ema_filter: bool = True, confidence_filter: bool = False,
-                 rsi_ob_filter: bool = False, rsi_ob_threshold: float = 75.0) -> None:
+                 rsi_ob_filter: bool = False, rsi_ob_threshold: float = 75.0,
+                 trend_confirm_bars: int = 2) -> None:
         # Cycle 274: atr_threshold 파라미터화
         # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
         # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단
         # Cycle 281 B(리스크): confidence_filter 추가 — MEDIUM 신호 HOLD 처리
         # Cycle 282 B(리스크): rsi_ob_filter 추가 — RSI > rsi_ob_threshold 시 BUY 차단
-        #   fold4 ATH(BTC 73k, RSI>80) BUY 13건 → RSI 과매수 구간 진입 차단
+        # Cycle 283 B(리스크): trend_confirm_bars 파라미터화 — 2→3으로 증가 시 post-ATH whipsaw 감소
+        #   fold4 진단: RSI<75 신호 13건 → RSI 필터 비효과적, 연속 확인 강화로 재진입 억제
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
         self.ema_filter = ema_filter
         self.confidence_filter = confidence_filter
         self.rsi_ob_filter = rsi_ob_filter
         self.rsi_ob_threshold = rsi_ob_threshold
+        self.trend_confirm_bars = max(2, int(trend_confirm_bars))
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -123,24 +126,21 @@ class SupertrendMultiStrategy(BaseStrategy):
 
     def _trend_confirmation_pass(self, trends_series: List[pd.Series]) -> bool:
         """
-        추세 확인: 지난 2봉 모두 같은 추세 방향이어야 신호 생성.
+        추세 확인: 지난 trend_confirm_bars봉 모두 같은 추세 방향이어야 신호 생성.
         목표: 추세 전환 초기의 거짓 신호 제거.
+        trend_confirm_bars=3: post-ATH 재진입 억제 (Cycle 283 B(리스크))
         """
         if not trends_series:
             return False
-        
-        # 각 Supertrend의 마지막 2봉(iloc[-2], iloc[-1]) 추세 비교
+
         for trend_series in trends_series:
-            if len(trend_series) < 2:
+            if len(trend_series) < self.trend_confirm_bars:
                 return False
-            
-            # 마지막 완성봉(-2)과 현재봉(-1)의 추세가 모두 같아야 함
-            t_minus_2 = int(trend_series.iloc[-2])
-            t_minus_1 = int(trend_series.iloc[-1])
-            
-            if t_minus_2 != t_minus_1:
+            # 마지막 trend_confirm_bars봉이 모두 동일한 방향이어야 함
+            recent = [int(trend_series.iloc[-(i + 1)]) for i in range(self.trend_confirm_bars)]
+            if len(set(recent)) > 1:
                 return False
-        
+
         return True
 
     def generate(self, df: pd.DataFrame) -> Signal:

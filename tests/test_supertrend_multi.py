@@ -231,3 +231,31 @@ def test_rsi_ob_filter_does_not_block_sell():
     sig = st.generate(df)
     # SELL이면 rsi_ob_filter와 무관하게 나와야 함
     assert sig.action in (Action.SELL, Action.HOLD)
+
+
+def test_trend_confirm_bars_default():
+    """기본값(trend_confirm_bars=2)이 정상 작동."""
+    st = SupertrendMultiStrategy(trend_confirm_bars=2)
+    df = _make_bullish_df(n=80)
+    sig = st.generate(df)
+    assert sig.action in (Action.BUY, Action.HOLD)
+
+
+def test_trend_confirm_bars_3_reduces_signals():
+    """trend_confirm_bars=3이 2보다 신호 생성 조건을 더 엄격하게 제한."""
+    st2 = SupertrendMultiStrategy(trend_confirm_bars=2)
+    st3 = SupertrendMultiStrategy(trend_confirm_bars=3)
+
+    # trend_confirm_bars=3은 마지막 3봉이 같은 방향이어야 신호 생성
+    # BUY 신호가 발생할 때 st3는 HOLD일 수 있음 (더 엄격)
+    df = _make_bullish_df(n=80)
+    sig2 = st2.generate(df)
+    sig3 = st3.generate(df)
+
+    # sig3가 HOLD거나 sig2와 동일한 방향 — 절대 sig2보다 덜 제한적일 수 없음
+    if sig2.action == Action.HOLD:
+        # sig2가 HOLD면 sig3도 반드시 HOLD
+        assert sig3.action == Action.HOLD
+    else:
+        # sig2가 BUY면 sig3는 BUY 또는 HOLD (더 엄격할 수 있음)
+        assert sig3.action in (Action.BUY, Action.HOLD)
