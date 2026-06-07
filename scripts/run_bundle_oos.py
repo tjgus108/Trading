@@ -68,8 +68,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)
     # Cycle 283 B(리스크): rsi_ob_filter=True, rsi_ob_threshold=80 추가 — fold4 ATH BUY 차단
     #   rsi14 pre-compute 확인(C(데이터)): enrich_indicators()에 이미 존재 → cold-start 문제 해결됨
-    #   목표: fold4 OOS=-1.539 → ≥0, std: 2.655 → <2.0
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80},
+    # Cycle 284 D(ML): trend_confirm_bars=3 추가 — post-ATH whipsaw 억제 (Cycle 283에서 파라미터화 완료)
+    #   cmf_confirm=True 추가 — CMF>0 시에만 BUY (ATH 이후 자금 이탈 선행 감지)
+    #   근거: cmf fold4 PASS(OOS=1.451) vs supertrend fold4 FAIL(OOS=-1.538) — 같은 ATH correction 구간
+    #   목표: fold4 OOS=-1.538 → ≥0, std: 2.655 → <2.0
+    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 3, "cmf_confirm": True},
 }
 
 

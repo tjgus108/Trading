@@ -33,14 +33,16 @@ class SupertrendMultiStrategy(BaseStrategy):
     def __init__(self, atr_threshold: float = 0.7, atr_threshold_max: float = 2.0,
                  ema_filter: bool = True, confidence_filter: bool = False,
                  rsi_ob_filter: bool = False, rsi_ob_threshold: float = 75.0,
-                 trend_confirm_bars: int = 2) -> None:
+                 trend_confirm_bars: int = 2, cmf_confirm: bool = False,
+                 cmf_period: int = 20) -> None:
         # Cycle 274: atr_threshold 파라미터화
         # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
         # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단
         # Cycle 281 B(리스크): confidence_filter 추가 — MEDIUM 신호 HOLD 처리
         # Cycle 282 B(리스크): rsi_ob_filter 추가 — RSI > rsi_ob_threshold 시 BUY 차단
         # Cycle 283 B(리스크): trend_confirm_bars 파라미터화 — 2→3으로 증가 시 post-ATH whipsaw 감소
-        #   fold4 진단: RSI<75 신호 13건 → RSI 필터 비효과적, 연속 확인 강화로 재진입 억제
+        # Cycle 284 D(ML): cmf_confirm 추가 — CMF>0 시에만 BUY 허용 (ATH 이후 자금 이탈 선행 감지)
+        #   근거: cmf fold4 PASS(OOS=1.451) vs supertrend fold4 FAIL(OOS=-1.538) — CMF가 ATH 이후 자금이탈 빠르게 감지
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
         self.ema_filter = ema_filter
@@ -48,6 +50,8 @@ class SupertrendMultiStrategy(BaseStrategy):
         self.rsi_ob_filter = rsi_ob_filter
         self.rsi_ob_threshold = rsi_ob_threshold
         self.trend_confirm_bars = max(2, int(trend_confirm_bars))
+        self.cmf_confirm = cmf_confirm
+        self.cmf_period = max(5, int(cmf_period))
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -102,6 +106,21 @@ class SupertrendMultiStrategy(BaseStrategy):
                 trend[i] = trend[i - 1]
 
         return pd.Series(trend, index=df.index, dtype=int)
+
+    def _compute_cmf(self, df: pd.DataFrame) -> float:
+        """Chaikin Money Flow: ((close-low)-(high-close))/(high-low) 가중 평균."""
+        idx = len(df) - 2
+        start = max(0, idx - self.cmf_period + 1)
+        h = df["high"].iloc[start: idx + 1]
+        l = df["low"].iloc[start: idx + 1]
+        c = df["close"].iloc[start: idx + 1]
+        v = df["volume"].iloc[start: idx + 1]
+        hl_range = h - l
+        mfm = ((c - l) - (h - c)) / hl_range.where(hl_range != 0, 1.0)
+        vol_sum = float(v.sum())
+        if vol_sum <= 0:
+            return 0.0
+        return float((mfm * v).sum() / vol_sum)
 
     def _atr_filter_pass(self, df: pd.DataFrame) -> bool:
         """
@@ -213,6 +232,10 @@ class SupertrendMultiStrategy(BaseStrategy):
         if all_bullish and trend_confirmed:
             if rsi_ob_blocked:
                 return self._hold(df, f"BUY 차단: RSI={rsi_val:.1f} > {self.rsi_ob_threshold} (rsi_ob_filter). trends={trend_str}")
+            if self.cmf_confirm:
+                cmf_val = self._compute_cmf(df)
+                if cmf_val <= 0:
+                    return self._hold(df, f"BUY 차단: CMF={cmf_val:.4f} <= 0 (cmf_confirm). trends={trend_str}")
             conf = Confidence.HIGH if vol_high else Confidence.MEDIUM
             # confidence_filter는 SELL만 적용 — BUY는 MEDIUM도 허용 (bull 구간 upside 보존)
             return Signal(

@@ -70,6 +70,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "rsi_ob_filter": [True, False],  # Cycle 282 B(리스크): RSI 과매수 BUY 차단
         "rsi_ob_threshold": [75, 78, 80],  # Cycle 282 D(ML): fold4 ATH(RSI>80) BUY 차단 임계값
         "trend_confirm_bars": [2, 3],  # Cycle 283 B(리스크): 연속 확인 봉 수 — 3은 post-ATH whipsaw 억제
+        "cmf_confirm": [True, False],  # Cycle 284 D(ML): CMF>0 시에만 BUY — ATH 이후 자금이탈 선행 감지
     },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
@@ -961,6 +962,7 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
             rsi_ob_filter=params.get("rsi_ob_filter", False),
             rsi_ob_threshold=params.get("rsi_ob_threshold", 75.0),
             trend_confirm_bars=params.get("trend_confirm_bars", 2),
+            cmf_confirm=params.get("cmf_confirm", False),
         )
 
     opt = WalkForwardOptimizer(

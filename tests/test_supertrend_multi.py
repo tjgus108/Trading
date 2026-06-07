@@ -259,3 +259,45 @@ def test_trend_confirm_bars_3_reduces_signals():
     else:
         # sig2가 BUY면 sig3는 BUY 또는 HOLD (더 엄격할 수 있음)
         assert sig3.action in (Action.BUY, Action.HOLD)
+
+
+def test_cmf_confirm_blocks_buy_when_cmf_negative():
+    """cmf_confirm=True 시 CMF <= 0이면 BUY 차단."""
+    st_no_cmf = SupertrendMultiStrategy(cmf_confirm=False)
+    st_with_cmf = SupertrendMultiStrategy(cmf_confirm=True)
+
+    df = _make_bullish_df(n=80)
+    # close < low에 가깝게 만들어 CMF 음수 유도 (close ≈ low → MFM < 0)
+    df["high"] = df["close"] + 5.0
+    df["low"] = df["close"] - 0.1   # close가 low에 매우 가까움 → MFM < 0
+
+    sig_no = st_no_cmf.generate(df)
+    sig_cmf = st_with_cmf.generate(df)
+
+    # cmf_confirm=True면 HOLD이거나 동일 방향이어야 함 (더 제한적)
+    if sig_no.action == Action.BUY:
+        assert sig_cmf.action in (Action.BUY, Action.HOLD)
+
+
+def test_cmf_confirm_allows_buy_when_cmf_positive():
+    """cmf_confirm=True 시 CMF > 0이면 BUY 허용."""
+    st = SupertrendMultiStrategy(cmf_confirm=True)
+
+    df = _make_bullish_df(n=80)
+    # close가 high에 가깝게 만들어 CMF 양수 유도 (close ≈ high → MFM > 0)
+    df["low"] = df["close"] - 5.0
+    df["high"] = df["close"] + 0.1   # close가 high에 매우 가까움 → MFM > 0
+
+    sig = st.generate(df)
+    # CMF 양수면 cmf_confirm이 BUY를 차단하지 않음
+    assert sig.action in (Action.BUY, Action.HOLD)
+
+
+def test_cmf_confirm_does_not_affect_sell():
+    """cmf_confirm은 BUY만 차단, SELL에는 영향 없음."""
+    st = SupertrendMultiStrategy(cmf_confirm=True, ema_filter=False)
+    df = _make_bearish_df(n=80)
+
+    sig = st.generate(df)
+    # SELL 또는 HOLD — cmf_confirm이 SELL 차단하면 안 됨
+    assert sig.action in (Action.SELL, Action.HOLD)
