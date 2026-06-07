@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-06-07T20:13:28.324375Z_
+_Generated: 2026-06-07T20:20:24.704995Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-06-07T20:20:54.357082Z_
+_Generated: 2026-06-07T20:27:51.618971Z_
 _Symbol: BTC/USDT_
 _Data Source: CSV fallback BTC/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
@@ -155,7 +155,7 @@ _0/N PASS 상황에서도 전략 간 상대 우위를 파악할 수 있는 보�
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-06-07T20:28:19.214417Z_
+_Generated: 2026-06-07T20:35:15.839141Z_
 _Symbol: ETH/USDT_
 _Data Source: CSV fallback ETH/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
@@ -303,7 +303,7 @@ _0/N PASS 상황에서도 전략 간 상대 우위를 파악할 수 있는 보�
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-06-07T20:35:23.641101Z_
+_Generated: 2026-06-07T20:42:22.390712Z_
 _Symbol: SOL/USDT_
 _Data Source: CSV fallback SOL/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
