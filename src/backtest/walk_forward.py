@@ -63,7 +63,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "sma_sell_threshold": [1.01, 1.02, 1.03],  # Cycle 276: Shooting Star SMA 조건 파라미터화, 추세장 SELL 오신호 차단
     },
     "supertrend_multi": {
-        "atr_threshold": [0.7, 0.8, 0.9],  # Cycle 274: ATR 임계값 그리드
+        "atr_threshold": [0.5, 0.6, 0.7],  # Cycle 286 D(ML): 하한 확장 (0.5, 0.6 추가) — fold4 ATH 신호 부족 해결
         "atr_threshold_max": [1.5, 2.0, 3.0],  # Cycle 279 D(ML): 상한 추가
         "ema_filter": [True, False],  # Cycle 280 A(품질): EMA200 SELL 차단
         "confidence_filter": [True, False],  # Cycle 281 B(리스크): MEDIUM 신호 HOLD
