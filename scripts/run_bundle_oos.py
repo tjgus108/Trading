@@ -77,7 +77,10 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # A(품질) Cycle 285: trend_confirm_bars=3→2 복귀
     #   목적: fold3 excluded (2 trades < 3, trend_confirm_bars=3 원인) 해결
     #   cmf_confirm=True 유지 — fold4 개선(-1.538→-0.006) 핵심 기여 확인 목적
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": True},
+    # B(리스크) Cycle 286: atr_threshold=0.7→0.5 완화
+    #   fold4 OOS(2024-02~04 ATH 전후) 거래 부족 원인: ATR 비율이 0.7 미만 → 신호 생성 억제
+    #   0.5로 낮추면 ATH 구간 저변동성 구간에서도 신호 생성 가능 → OOS trades ≥ 3 목표
+    "supertrend_multi": {"atr_threshold": 0.5, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": True},
 }
 
 
