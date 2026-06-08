@@ -818,6 +818,8 @@ class WalkForwardTrainer:
         decay: float = 0.85,
         fold_sharpes: Optional[List[tuple]] = None,
         sign_reversal_penalty: float = 0.3,
+        oos_sharpes: Optional[List[float]] = None,
+        oos_sharpe_scale: float = 2.0,
     ) -> List[float]:
         """
         시간 순서를 반영한 앙상블 가중치 계산.
@@ -832,6 +834,13 @@ class WalkForwardTrainer:
             fold_sharpes: 각 fold의 (is_sharpe, oos_sharpe) 튜플 리스트 (선택).
                           IS < -1.0 이고 OOS > 0인 역방향 fold는 sign_reversal_penalty 적용.
             sign_reversal_penalty: 역방향 fold 가중치 감소 계수 (0=완전 제거, 1=패널티 없음).
+            oos_sharpes: 각 모델에 대응하는 Bundle OOS Sharpe 리스트 (선택).
+                         Bundle OOS 결과(예: cmf=2.508, supertrend_multi=3.674)를
+                         앙상블 가중치에 반영할 때 사용. 값이 클수록 가중치 증폭.
+                         범위 [0.5, 2.0]으로 클리핑된 배율로 적용.
+            oos_sharpe_scale: OOS Sharpe를 배율로 변환하는 정규화 기준 (기본 2.0).
+                              oos_sharpe / oos_sharpe_scale = 1.0이면 배율 없음.
+                              예: oos_sharpe=3.674, scale=2.0 → 배율 min(2.0, 3.674/2.0)=1.837
 
         Returns:
             List[float]: 정규화 가중치 (합=1.0)
@@ -855,6 +864,14 @@ class WalkForwardTrainer:
                 is_s, oos_s = fold_sharpes[i]
                 if is_s < -1.0 and oos_s > 0:
                     weight *= sign_reversal_penalty
+            # Bundle OOS Sharpe 기반 배율 (oos_sharpe_scale 기준 정규화, [0.5, 2.0] 클리핑)
+            if oos_sharpes and i < len(oos_sharpes):
+                oos_s = oos_sharpes[i]
+                if oos_s > 0 and oos_sharpe_scale > 0:
+                    oos_mult = float(np.clip(oos_s / oos_sharpe_scale, 0.5, 2.0))
+                else:
+                    oos_mult = 0.5  # 음수 OOS Sharpe → 패널티
+                weight *= oos_mult
             raw.append(weight)
 
         total = sum(raw)

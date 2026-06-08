@@ -195,10 +195,6 @@ class TWAPExecutor:
             raise ValueError(
                 f"price_limit must be > 0 in dry_run mode, got {price_limit}"
             )
-        slice_qty = total_qty / self.n_slices
-
-        # Order book depth 기반 동적 슬라이스 조정
-
 
         # Volume-weighted slice sizes
         if volume_weights is not None and len(volume_weights) == self.n_slices and sum(volume_weights) > 0:
@@ -435,7 +431,7 @@ class TWAPExecutor:
             return 0.0
 
         if daily_volume is None or daily_volume <= 0:
-            base = 0.00055  # Bybit taker fee 0.055% — PaperTrader fee_rate와 일관성
+            base = 0.00055  # 거래량 미제공 시 기본 시장충격 추정 (0.055%, bid-ask spread 프록시)
         else:
             ratio = qty / daily_volume
             # ratio는 항상 양수 (qty > 0, daily_volume > 0)

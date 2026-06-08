@@ -547,7 +547,7 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     _days_str = f"{_idx_diff.days}일" if hasattr(_idx_diff, 'days') else f"{len(df)}봉"
     lines.append(f"_Data Range: {df.index[0]} ~ {df.index[-1]} ({_days_str})_")
     lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={TRAIN_HOURS}h, test={TEST_HOURS}h)_")
-    lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.1% | Slippage: 0.05%_")
+    lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_")
     lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_\n")
 
     # CPCV 글로벌 ML 정확도 섹션
@@ -1048,7 +1048,7 @@ def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
             "step_hours": STEP_HOURS,
             "pass_ratio": PASS_RATIO,
             "initial_balance": 10_000,
-            "fee_rate": 0.001,
+            "fee_rate": 0.00055,
             "slippage_pct": 0.0005,
             "synthetic_data_mode": "BlockBootstrap" if USE_BLOCK_BOOTSTRAP else "GBM",
             "block_bootstrap_block_size": BLOCK_BOOTSTRAP_BLOCK_SIZE if USE_BLOCK_BOOTSTRAP else None,

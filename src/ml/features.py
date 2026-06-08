@@ -506,14 +506,16 @@ def detect_regime(df: pd.DataFrame, lookback: int = 20) -> str:
     low20 = np.min(low[-lookback:])
     channel_width = (high20 - low20) / (low20 + 1e-9)
 
-    # 이전 60봉 채널 폭 중앙값
+    # 이전 60봉 채널 폭 중앙값 (pandas rolling으로 벡터화)
     lookback_long2 = min(60, len(close) - lookback)
     if lookback_long2 > 0:
-        channel_widths_hist = [
-            (np.max(high[i:i+lookback]) - np.min(low[i:i+lookback])) / (np.min(low[i:i+lookback]) + 1e-9)
-            for i in range(lookback_long2)
-        ]
-        channel_median = float(np.median(channel_widths_hist)) if channel_widths_hist else channel_width
+        end_idx = lookback_long2 + lookback
+        h_s = pd.Series(high[:end_idx])
+        l_s = pd.Series(low[:end_idx])
+        roll_h = h_s.rolling(lookback).max()
+        roll_l = l_s.rolling(lookback).min()
+        widths = ((roll_h - roll_l) / (roll_l + 1e-9)).iloc[lookback - 1 : lookback - 1 + lookback_long2]
+        channel_median = float(widths.median()) if len(widths) > 0 else channel_width
     else:
         channel_median = channel_width
 

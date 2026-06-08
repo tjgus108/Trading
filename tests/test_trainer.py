@@ -476,6 +476,32 @@ class TestComputeEnsembleWeightRecency:
         weights = trainer.compute_ensemble_weight_recency(results)
         assert all(abs(w - 0.5) < 1e-6 for w in weights)
 
+    def test_oos_sharpes_boosts_high_oos(self):
+        """높은 OOS Sharpe 모델에 가중치 부여."""
+        trainer = WalkForwardTrainer()
+        results = [
+            self._make_result(0.60, 0.60),
+            self._make_result(0.60, 0.60),
+        ]
+        # 두 번째 모델에 높은 OOS Sharpe 부여
+        w_no = trainer.compute_ensemble_weight_recency(results, decay=1.0)
+        w_oos = trainer.compute_ensemble_weight_recency(results, decay=1.0, oos_sharpes=[0.5, 3.674])
+        assert sum(w_oos) == pytest.approx(1.0, abs=1e-6)
+        assert w_oos[1] > w_no[1]
+
+    def test_oos_sharpes_penalizes_negative(self):
+        """음수 OOS Sharpe → 최솟값 배율(0.5) 적용으로 가중치 감소."""
+        trainer = WalkForwardTrainer()
+        results = [
+            self._make_result(0.60, 0.60),
+            self._make_result(0.60, 0.60),
+        ]
+        w_no = trainer.compute_ensemble_weight_recency(results, decay=1.0)
+        w_oos = trainer.compute_ensemble_weight_recency(results, decay=1.0, oos_sharpes=[-1.0, 2.0])
+        assert sum(w_oos) == pytest.approx(1.0, abs=1e-6)
+        # 첫 번째(음수 OOS)는 비중 감소
+        assert w_oos[0] < w_no[0]
+
 
 # ---------------------------------------------------------------------------
 # combinatorial_purged_cv
