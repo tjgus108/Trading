@@ -77,7 +77,14 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # A(품질) Cycle 285: trend_confirm_bars=3→2 복귀
     #   목적: fold3 excluded (2 trades < 3, trend_confirm_bars=3 원인) 해결
     #   cmf_confirm=True 유지 — fold4 개선(-1.538→-0.006) 핵심 기여 확인 목적
-    "supertrend_multi": {"atr_threshold": 0.7, "atr_threshold_max": 2.0, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": True},
+    # B(리스크) Cycle 286: atr_threshold=0.7→0.5 — 효과 없음 확인 (cmf_confirm이 binding constraint)
+    #   분석: fold4 OOS=-0.006, trades=8 — atr_threshold 변경에도 동일 결과
+    #   근거: fold4(2024-02-25~2024-04-24) post-ATH 구간에서 CMF<0 → BUY 차단
+    # D(ML) Cycle 286: cmf_period=20 유지 (10 시도 → 역효과: fold4 OOS=-0.006→-1.565)
+    #   실험 결과: cmf_period=10이 fold3 OOS를 -6.308→+1.593으로 개선, fold4는 악화
+    #   std=3.142 > 2.5 FAIL, cmf_period=20 복귀 결정
+    #   atr_threshold_max=2.0→1.5: IS 과최적화 방지 (유지)
+    "supertrend_multi": {"atr_threshold": 0.5, "atr_threshold_max": 1.5, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": True},
 }
 
 
