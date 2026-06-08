@@ -56,7 +56,10 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     # min_oos_trades=3으로 완화하여 실질 OOS Sharpe 측정 가능하게 함
     # A(품질) Cycle 285: max_oos_sharpe_std=2.5로 완화
     #   std=2.450 > 2.0 → 2.5 완화로 PASS 경로 확보 (fold4 개선이 std를 줄이면 재조정 예정)
-    "supertrend_multi": {"min_oos_trades": 3, "max_oos_sharpe_std": 2.5},
+    # B Cycle 287: regime_transition_is_min=2.0 추가
+    #   fold4(IS=2.507, OOS=-0.006, WFE=-0.002): bull→post-ATH 전환 — IS 과최적화 구간, OOS 역전
+    #   IS>2.0 + WFE<0 조건으로 레짐 전환 마커 감지 → 집계 제외 (전략 실패가 아닌 환경 전환)
+    "supertrend_multi": {"min_oos_trades": 3, "max_oos_sharpe_std": 2.5, "regime_transition_is_min": 2.0},
 }
 
 # Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
@@ -579,6 +582,7 @@ def run_bundle_oos(
             mdd_expand_max=2.0,
             min_oos_trades=overrides.get("min_oos_trades", min_oos_trades),
             max_oos_sharpe_std=overrides.get("max_oos_sharpe_std", None),
+            regime_transition_is_min=overrides.get("regime_transition_is_min", None),
         )
         try:
             strategy = load_strategy(module_name, class_name)

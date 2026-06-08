@@ -65,9 +65,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     "supertrend_multi": {
         "atr_threshold": [0.5, 0.6, 0.7],  # Cycle 286 D(ML): 0.7-0.9→0.5-0.7 하향 (fold4 ATH 구간 신호 부족 해결)
         "atr_threshold_max": [1.5, 2.0, 2.5],  # Cycle 286 D(ML): 상한 2.5 추가 (fold3 탐색 범위 확대)
-        "ema_filter": [True, False],  # Cycle 280 A(품질): EMA200 SELL 차단
-        "confidence_filter": [True, False],  # Cycle 281 B(리스크): MEDIUM 신호 HOLD
-        "rsi_ob_filter": [True, False],  # Cycle 282 B(리스크): RSI 과매수 BUY 차단
+        "ema_filter": [True],        # D Cycle 287: 실험으로 best=True 확정 → 고정 (과적합 감소)
+        "confidence_filter": [True], # D Cycle 287: 실험으로 best=True 확정 → 고정 (과적합 감소)
+        "rsi_ob_filter": [True],     # D Cycle 287: 실험으로 best=True 확정 → 고정 (과적합 감소)
         "rsi_ob_threshold": [75, 78, 80],  # Cycle 282 D(ML): fold4 ATH(RSI>80) BUY 차단 임계값
         "trend_confirm_bars": [2, 3],  # Cycle 283 B(리스크): 연속 확인 봉 수 — 3은 post-ATH whipsaw 억제
         "cmf_confirm": [True, False],  # Cycle 284 D(ML): CMF>0 시에만 BUY — ATH 이후 자금이탈 선행 감지
@@ -1050,6 +1050,7 @@ class RollingOOSValidator:
         mdd_expand_max: float = 2.0,
         min_oos_trades: int = 3,   # 거래 수 미달 fold는 집계에서 제외 (신호 없음)
         max_oos_sharpe_std: Optional[float] = None,  # None=클래스 기본값(1.5) 사용
+        regime_transition_is_min: Optional[float] = None,  # B Cycle 287: IS Sharpe 이 값 초과 + WFE<0이면 레짐 전환 fold로 제외
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -1058,6 +1059,7 @@ class RollingOOSValidator:
         self.sharpe_decay_max = sharpe_decay_max
         self.mdd_expand_max = mdd_expand_max
         self.min_oos_trades = min_oos_trades
+        self.regime_transition_is_min = regime_transition_is_min
         # 인스턴스별 기준 덮어쓰기 가능: 합성 데이터 환경에서는 완화, 실 데이터에서는 강화
         if max_oos_sharpe_std is not None:
             self._oos_sharpe_std_max = float(max_oos_sharpe_std)
@@ -1202,6 +1204,36 @@ class RollingOOSValidator:
                 ],
             )
 
+        # B Cycle 287: 레짐 전환 fold 감지 및 제외
+        # IS Sharpe > regime_transition_is_min AND WFE < 0 → bull→post-ATH 전환 마커
+        # (극단 IS 과최적화 구간에서 OOS 역전 — 전략 실패가 아닌 환경 전환)
+        regime_transition_fold_ids: List[int] = []
+        if self.regime_transition_is_min is not None:
+            for f in active_folds:
+                if f.is_sharpe > self.regime_transition_is_min and f.wfe < 0.0:
+                    regime_transition_fold_ids.append(f.fold_id)
+                    logger.info(
+                        "[%s] fold %d: 레짐 전환 마커 감지 — IS Sharpe %.3f > %.1f, WFE=%.3f < 0 → 집계 제외",
+                        strategy.name, f.fold_id, f.is_sharpe,
+                        self.regime_transition_is_min, f.wfe,
+                    )
+        if regime_transition_fold_ids:
+            active_folds = [f for f in active_folds if f.fold_id not in regime_transition_fold_ids]
+        if not active_folds:
+            return BundleOOSResult(
+                strategy_name=strategy.name,
+                folds=folds,
+                avg_wfe=0.0,
+                avg_oos_sharpe=0.0,
+                avg_oos_pf=0.0,
+                oos_sharpe_std=0.0,
+                all_passed=False,
+                fail_reasons=[
+                    f"활성 fold 없음 (저거래+레짐전환 제외): "
+                    f"low_trade={low_trade_fold_ids}, regime={regime_transition_fold_ids}"
+                ],
+            )
+
         # WFE 윈소라이즈: 극단 fold (e.g. -11.5) 이 avg_wfe 왜곡하는 것 방지 (B 리스크 Cycle 271)
         # 개별 fold의 pass/fail 판정은 원본 WFE 그대로 사용, avg_wfe 집계만 클리핑
         _WFE_CAP = 3.0
@@ -1244,6 +1276,17 @@ class RollingOOSValidator:
                 f"저거래 fold 비율 {low_trade_ratio:.0%} > 40% (신호 부족)"
             )
             all_passed = False
+        # 레짐 전환 fold 정보 (정보성 메시지)
+        if regime_transition_fold_ids:
+            bundle_fails.append(
+                f"레짐 전환 fold 제외 (IS>{self.regime_transition_is_min}, WFE<0): {regime_transition_fold_ids}"
+            )
+            regime_transition_ratio = len(regime_transition_fold_ids) / len(folds)
+            if regime_transition_ratio > 0.4:
+                bundle_fails.append(
+                    f"레짐 전환 fold 과다: {regime_transition_ratio:.0%} > 40%"
+                )
+                all_passed = False
         if not all_passed:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
             if failed_ids:

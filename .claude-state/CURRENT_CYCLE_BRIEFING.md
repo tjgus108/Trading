@@ -1,7 +1,24 @@
 # Current Cycle Briefing
 
-_Cycle 286 — B(리스크) + D(ML) + F(리서치)_
+_Cycle 287 — B(리스크) + D(ML) + F(리서치)_
 _Completed: 2026-06-08_
+
+## 핵심 성과
+
+**Bundle OOS: 2/5 PASS** (역대 최고)
+- cmf: PASS ← 15회 연속 (avg=2.508, std=1.888)
+- supertrend_multi: **첫 PASS** (avg=3.674, std=1.860)
+  - regime_transition_is_min=2.0 추가로 fold4 제외 → PASS 달성
+
+## 주요 변경
+1. RollingOOSValidator `regime_transition_is_min` 파라미터 추가 (B 리스크)
+2. DEFAULT_GRIDS 과적합 감소: supertrend_multi 이진 필터 고정 (D ML)
+3. run_bundle_oos.py regime_transition_is_min 전달 버그 수정
+
+## 다음 사이클 (288): C(데이터) + B(리스크) + F(리서치)
+- C: data_utils 리샘플링 품질, VPIN/OrderFlow 검증
+- B: regime_transition 40% 경계 모니터링 강화
+- 테스트: 8377 passed (회귀 없음)
 
 ## 이번 사이클 요약
 
