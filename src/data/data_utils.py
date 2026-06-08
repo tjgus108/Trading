@@ -749,17 +749,24 @@ def load_csv_ohlcv(
     return df_result
 
 
-def resample_ohlcv(df: pd.DataFrame, target_timeframe: str) -> pd.DataFrame:
+def resample_ohlcv(
+    df: pd.DataFrame,
+    target_timeframe: str,
+    drop_incomplete: bool = True,
+) -> pd.DataFrame:
     """
     OHLCV DataFrame을 다른 타임프레임으로 리샘플링.
-    
+
     Args:
         df: OHLCV DataFrame (index: DatetimeIndex, columns: open, high, low, close, volume)
         target_timeframe: "1m", "5m", "15m", "1h", "4h", "1d" 중 하나
-    
+        drop_incomplete: True이면 소스 캔들 수가 부족한 부분(partial) 버킷 제거.
+            예: 1h→4h 변환 시 시작/끝이 4h 경계에 맞지 않으면 3개짜리 버킷 생성
+            → 이 경우 해당 버킷을 제거하여 open/close 왜곡 방지.
+
     Returns:
         pd.DataFrame (리샘플링된 OHLCV)
-    
+
     Raises:
         ValueError: target_timeframe이 지원하지 않는 형식
     """
@@ -768,7 +775,7 @@ def resample_ohlcv(df: pd.DataFrame, target_timeframe: str) -> pd.DataFrame:
             f"Invalid target_timeframe '{target_timeframe}'. "
             f"Supported: {list(RESAMPLE_FREQ.keys())}"
         )
-    
+
     # 1. index가 timezone-aware 아니면 UTC로 변환
     if df.index.tz is None:
         df = df.copy()
@@ -776,7 +783,7 @@ def resample_ohlcv(df: pd.DataFrame, target_timeframe: str) -> pd.DataFrame:
     elif str(df.index.tz) != 'UTC':
         df = df.copy()
         df.index = df.index.tz_convert('UTC')
-    
+
     # 2. resample 실행
     freq = RESAMPLE_FREQ[target_timeframe]
     resampled = df.resample(freq).agg({
@@ -786,8 +793,25 @@ def resample_ohlcv(df: pd.DataFrame, target_timeframe: str) -> pd.DataFrame:
         'close': 'last',
         'volume': 'sum',
     })
-    
+
     # 3. NaN 행 제거
     resampled = resampled.dropna()
-    
+
+    # 4. 부분 버킷(partial bucket) 제거: 소스 캔들 수 < 최빈값인 첫/마지막 버킷 드롭
+    if drop_incomplete and len(resampled) > 2:
+        counts = df.resample(freq)['close'].count().reindex(resampled.index).fillna(0)
+        # 중간 버킷들의 최빈값을 완전 버킷 기준으로 사용
+        inner_counts = counts.iloc[1:-1]
+        if len(inner_counts) > 0:
+            full_count = int(inner_counts.mode().iloc[0])
+            before = len(resampled)
+            resampled = resampled[counts >= full_count]
+            dropped = before - len(resampled)
+            if dropped > 0:
+                logger.debug(
+                    "resample_ohlcv: %d partial bucket(s) dropped "
+                    "(source candles < %d per %s bucket)",
+                    dropped, full_count, target_timeframe,
+                )
+
     return resampled

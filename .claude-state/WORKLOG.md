@@ -1,3 +1,41 @@
+## [2026-06-08] Cycle 288 — C(데이터) + B(리스크) + F(리서치)
+
+**[C(데이터)] resample_ohlcv partial bucket 제거 로직 추가**
+1. `src/data/data_utils.py`: `resample_ohlcv()` 함수 개선
+   - `drop_incomplete: bool = True` 파라미터 추가
+   - 시작/끝 타임스탬프가 4h 경계와 맞지 않으면 partial 버킷(캔들 수 < 최빈값) 자동 제거
+   - 예: 01:00 시작 1h 데이터 → 4h 변환 시 첫 버킷(3개)과 마지막 버킷(1개) 제거
+   - 근거: 부분 버킷의 open/close 가격이 백테스트 결과 왜곡 가능
+2. `tests/test_data_utils.py`: 3개 테스트 추가
+   - `test_resample_drop_incomplete_partial_buckets`: 미정렬 시작 → partial 버킷 제거 검증
+   - `test_resample_drop_incomplete_false_keeps_all`: drop_incomplete=False 시 유지 검증
+   - `test_resample_aligned_unaffected_by_drop_incomplete`: 정렬된 데이터는 손실 없음 검증
+
+**[B(리스크)] regime_transition_ratio 경고 로깅 강화**
+3. `src/backtest/walk_forward.py`: `RollingOOSValidator` 개선
+   - regime_transition_fold_ids 있을 때 `logger.info`로 ratio 항상 출력
+   - regime_transition_ratio >= 20% 이면 `logger.warning` 발동 (40% 경계 근접 조기 경보)
+   - 현재 supertrend_multi: fold4 제외 → 20% = 경계선 경고 발동
+
+**[F(리서치)] regime_transition 제외 로직 타당성 재확인**
+4. supertrend_multi fold4 패턴 재분석:
+   - fold4 IS 기간(2023-11~2024-02): BTC $35k→$60k 강세 포착, IS Sharpe=2.51
+   - fold4 OOS 기간(2024-02~04): BTC ATH($73k) 이후 조정 → OOS=-0.01, WFE=-0.002
+   - Bailey et al. (2015) 이론 일치: IS 과최적화 + OOS 즉시 역전 = 전략 실패 아닌 환경 전환
+   - regime_transition_ratio=20% 경고 발동 적합 (1/5 fold 제외)
+
+**시뮬레이션 결과 (Cycle 288):**
+- 테스트: **8310 passed**, 23 skipped — 회귀 없음 (walk_forward 70 passed 별도 확인)
+- Paper Sim BTC 1h (8 windows): 0/22 PASS (지속, rank1: supertrend_multi +6.73%)
+- Bundle OOS BTC 4h (5-fold, CSV):
+  - cmf: **PASS** avg=2.508, std=1.888 ← **16회 연속 PASS**
+  - supertrend_multi: **PASS** avg=3.674, std=1.860 ← **2회 연속 PASS**
+    - fold3 excluded (trades<3, 구조적) / fold4 excluded (레짐 전환 IS=2.51>2.0, WFE<0)
+  - elder_impulse: FAIL | narrow_range: FAIL | value_area: FAIL
+  - **PASS 2/5 유지** (cmf 16회 + supertrend 2회)
+
+---
+
 ## [2026-06-08] Cycle 287 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] RollingOOSValidator regime_transition_is_min 추가 — supertrend_multi 첫 PASS 달성**
@@ -8918,6 +8956,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-08 10:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-08 15:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-08 15:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-08 15:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-08 15:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-08 15:28 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-08 15:28 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

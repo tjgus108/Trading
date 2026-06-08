@@ -1,47 +1,31 @@
 # Current Cycle Briefing
 
-_Cycle 287 — B(리스크) + D(ML) + F(리서치)_
+_Cycle 288 — C(데이터) + B(리스크) + F(리서치)_
 _Completed: 2026-06-08_
 
 ## 핵심 성과
 
-**Bundle OOS: 2/5 PASS** (역대 최고)
-- cmf: PASS ← 15회 연속 (avg=2.508, std=1.888)
-- supertrend_multi: **첫 PASS** (avg=3.674, std=1.860)
-  - regime_transition_is_min=2.0 추가로 fold4 제외 → PASS 달성
+**Bundle OOS: 2/5 PASS 유지** (2회 연속)
+- cmf: PASS ← **16회 연속** (avg=2.508, std=1.888)
+- supertrend_multi: PASS ← **2회 연속** (avg=3.674, std=1.860)
+  - fold3 excluded (trades<3) / fold4 excluded (레짐 전환 20%)
 
 ## 주요 변경
-1. RollingOOSValidator `regime_transition_is_min` 파라미터 추가 (B 리스크)
-2. DEFAULT_GRIDS 과적합 감소: supertrend_multi 이진 필터 고정 (D ML)
-3. run_bundle_oos.py regime_transition_is_min 전달 버그 수정
+1. `resample_ohlcv()` partial bucket 자동 제거 기능 추가 (C 데이터)
+   - drop_incomplete=True: 소스 캔들 수 부족한 첫/마지막 4h 버킷 제거
+   - 백테스트 open/close 왜곡 방지
+2. RollingOOSValidator regime_transition_ratio 경고 로깅 강화 (B 리스크)
+   - ratio >= 20% → logger.warning 발동 (40% 경계 조기 경보)
+   - supertrend_multi: 현재 20% 경보 발동 중 (fold4 레짐 전환)
+3. 3개 resample 테스트 추가 (C 데이터)
+   - test_data_utils.py: 28 passed
 
-## 다음 사이클 (288): C(데이터) + B(리스크) + F(리서치)
-- C: data_utils 리샘플링 품질, VPIN/OrderFlow 검증
-- B: regime_transition 40% 경계 모니터링 강화
-- 테스트: 8377 passed (회귀 없음)
+## 다음 사이클 (289): D(ML) + E(실행) + F(리서치)
+- D: ML 앙상블 가중치 재검토, RF 피처 중요도 분석
+- E: Paper Sim 0/22 PASS 원인 추가 분석 (수수료 vs 신호 품질)
+- F: 4h Paper Sim 도입 타당성 검토
 
-## 이번 사이클 요약
-
-### 수행 카테고리
-- **B(리스크)**: supertrend_multi atr_threshold 완화 실험
-- **D(ML)**: DEFAULT_GRIDS 탐색 범위 확대 + cmf_period 실험
-- **F(리서치)**: fold4 구조적 문제 분석
-
-### 핵심 발견
-1. **atr_threshold=0.5 무효**: fold4 OOS=-0.006, trades=8 — 변화 없음
-   - 이유: cmf_confirm=True가 binding constraint (ATR 전에 CMF로 BUY 차단)
-2. **cmf_period=10 역효과**: fold3 OOS 개선(+1.593)이지만 fold4 OOS 악화(-1.565), std=3.142 FAIL
-3. **레짐 전환 확인**: fold4 IS(강세장)→OOS(post-ATH) 구조적 문제 → 파라미터로 해결 불가
-
-### 코드 변경
-1. `scripts/run_bundle_oos.py`: atr_threshold=0.5, atr_threshold_max=1.5 (cmf_period=20 유지)
-2. `src/backtest/walk_forward.py`: DEFAULT_GRIDS atr_threshold [0.5-0.7], atr_threshold_max [1.5-2.5]
-
-### 시뮬레이션 결과
-- Tests: 8377 passed, 23 skipped
-- Paper Sim BTC 1h: 0/22 PASS (rank1: supertrend_multi score=73.9)
-- Bundle OOS: cmf PASS (14회 연속), supertrend_multi FAIL (변화 없음)
-
-### 다음 방향
-- min_wfe 완화 또는 레짐 감지 로직 추가 (B+D)
-- cmf_period=15 중간값 탐색 (D)
+## 테스트 현황
+- 8310 passed (walk_forward 70 별도 확인) — 회귀 없음
+- Paper Sim BTC 1h: 0/22 PASS (rank1: supertrend_multi +6.73%)
+- Bundle OOS: 2/5 PASS 유지

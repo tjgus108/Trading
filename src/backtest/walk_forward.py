@@ -1282,6 +1282,18 @@ class RollingOOSValidator:
                 f"레짐 전환 fold 제외 (IS>{self.regime_transition_is_min}, WFE<0): {regime_transition_fold_ids}"
             )
             regime_transition_ratio = len(regime_transition_fold_ids) / len(folds)
+            logger.info(
+                "[%s] regime_transition_ratio=%.0f%% (%d/%d folds excluded as regime transitions)",
+                strategy.name, regime_transition_ratio * 100,
+                len(regime_transition_fold_ids), len(folds),
+            )
+            # B Cycle 288: 20% 이상이면 WARN — 40% 경계에 근접 중
+            if regime_transition_ratio >= 0.2:
+                logger.warning(
+                    "[%s] [WARN] regime_transition_ratio=%.0f%% — approaching 40%% limit. "
+                    "Excluded folds: %s. Review IS/OOS conditions or widen data range.",
+                    strategy.name, regime_transition_ratio * 100, regime_transition_fold_ids,
+                )
             if regime_transition_ratio > 0.4:
                 bundle_fails.append(
                     f"레짐 전환 fold 과다: {regime_transition_ratio:.0%} > 40%"

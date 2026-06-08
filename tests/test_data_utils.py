@@ -458,7 +458,7 @@ class TestCsvLoader:
     def test_resample_invalid_timeframe(self):
         """잘못된 timeframe → ValueError."""
         from src.data.data_utils import resample_ohlcv
-        
+
         dates = pd.date_range('2024-01-01', periods=10, freq='1h', tz='UTC')
         df = pd.DataFrame({
             'open': [50000] * 10,
@@ -467,6 +467,59 @@ class TestCsvLoader:
             'close': [50050] * 10,
             'volume': [1000] * 10,
         }, index=dates)
-        
+
         with pytest.raises(ValueError):
             resample_ohlcv(df, 'invalid_timeframe')
+
+    def test_resample_drop_incomplete_partial_buckets(self):
+        """misaligned 시작(01:00)이면 partial 버킷 제거 후 완전 4h 버킷만 남음."""
+        from src.data.data_utils import resample_ohlcv
+
+        # 01:00 시작 — 첫 4h 버킷(00:00-04:00)은 3개 candle, 마지막 버킷은 1개
+        dates = pd.date_range('2024-01-01 01:00', periods=16, freq='1h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000 + i * 10 for i in range(16)],
+            'high': [50100 + i * 10 for i in range(16)],
+            'low':  [49900 + i * 10 for i in range(16)],
+            'close': [50050 + i * 10 for i in range(16)],
+            'volume': [1000] * 16,
+        }, index=dates)
+
+        df_4h = resample_ohlcv(df, '4h', drop_incomplete=True)
+        # 완전한 버킷만 남아야 함 (04:00, 08:00, 12:00 = 3개)
+        assert len(df_4h) == 3, f"Expected 3 complete buckets, got {len(df_4h)}"
+        # 첫 버킷이 04:00이어야 함 (00:00 partial 버킷 제거됨)
+        assert df_4h.index[0] == pd.Timestamp('2024-01-01 04:00:00', tz='UTC')
+
+    def test_resample_drop_incomplete_false_keeps_all(self):
+        """drop_incomplete=False이면 partial 버킷도 유지."""
+        from src.data.data_utils import resample_ohlcv
+
+        dates = pd.date_range('2024-01-01 01:00', periods=16, freq='1h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000] * 16,
+            'high': [50100] * 16,
+            'low':  [49900] * 16,
+            'close': [50050] * 16,
+            'volume': [1000] * 16,
+        }, index=dates)
+
+        df_4h = resample_ohlcv(df, '4h', drop_incomplete=False)
+        # partial 버킷 포함: 5개 (00:00, 04:00, 08:00, 12:00, 16:00)
+        assert len(df_4h) == 5, f"Expected 5 buckets with partial, got {len(df_4h)}"
+
+    def test_resample_aligned_unaffected_by_drop_incomplete(self):
+        """정렬된 데이터(00:00 시작)는 drop_incomplete=True여도 손실 없음."""
+        from src.data.data_utils import resample_ohlcv
+
+        dates = pd.date_range('2024-01-01 00:00', periods=16, freq='1h', tz='UTC')
+        df = pd.DataFrame({
+            'open': [50000] * 16,
+            'high': [50100] * 16,
+            'low':  [49900] * 16,
+            'close': [50050] * 16,
+            'volume': [1000] * 16,
+        }, index=dates)
+
+        df_4h = resample_ohlcv(df, '4h', drop_incomplete=True)
+        assert len(df_4h) == 4  # 16 / 4 = 4 완전한 버킷
