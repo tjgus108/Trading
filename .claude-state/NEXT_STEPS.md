@@ -53,7 +53,7 @@ _Last updated: 2026-06-08 (Cycle 286 완료)_
 
 ### 핵심 메트릭 (Cycle 286)
 - 테스트: **8377 passed** — 회귀 없음
-- Paper Sim BTC 1h: 실행 중 (이전 결과: 0/22 PASS)
+- Paper Sim BTC 1h: 0/22 PASS (8 windows, rank1: supertrend_multi +6.73%, 2/8 Consistency)
 - Bundle OOS BTC 4h (5-fold, CSV, Cycle 286):
   - cmf: **PASS** avg=2.508, std=1.888 ← **14회 연속 PASS**
   - supertrend_multi: FAIL avg=2.754, std=2.386 (atr_threshold 완화 효과 없음)

@@ -20,7 +20,9 @@
 
 **시뮬레이션 결과 (Cycle 286):**
 - 테스트: **8377 passed** (targeted: 110 passed) — 회귀 없음
-- Paper Sim BTC 1h: 실행 중 (완료 시 업데이트)
+- Paper Sim BTC 1h: 0/22 PASS (8 windows, 2023-01~2024-05)
+  - rank1: supertrend_multi +6.73% (Sharpe=0.60, 2/8 Consistency) — 절대 PASS 기준 미달
+  - rank2: price_cluster +2.50%, rank3: positional_scaling +1.40%
 - Bundle OOS BTC 4h (5-fold, CSV, Cycle 286):
   - cmf: **PASS** avg=2.508, std=1.888 ← **14회 연속 PASS** (변화 없음)
   - supertrend_multi: FAIL avg=2.754, std=2.386 (변화 없음)
