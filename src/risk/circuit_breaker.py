@@ -353,11 +353,18 @@ class CircuitBreaker:
         return self._make_result(False, "", worst)
 
     # ── 리셋 ──────────────────────────────────────────────────────────────────
-    def reset_daily(self, daily_start_balance: float):
-        """매일 자정 리셋 — 일일 트리거만 해제, 전체 낙폭 트리거는 수동 해제 필요."""
+    def reset_daily(self, daily_start_balance: float, preserve_price_history: bool = False):
+        """매일 자정 리셋 — 일일 트리거만 해제, 전체 낙폭 트리거는 수동 해제 필요.
+
+        Args:
+            preserve_price_history: True이면 _price_history를 초기화하지 않는다.
+                4h 이상 타임프레임에서 rapid_decline 감지 윈도우가 일 경계를
+                넘을 때 사용. 기본 False (기존 동작 유지).
+        """
         self._daily_start_balance = daily_start_balance
         self._daily_trade_count = 0
-        self._price_history.clear()
+        if not preserve_price_history:
+            self._price_history.clear()
         self._rapid_decline_cooldown = 0
         if self._triggered and ("일일" in self._reason or "거래 횟수" in self._reason
                                 or "플래시" in self._reason or "급속" in self._reason):
