@@ -1134,6 +1134,12 @@ class RollingOOSValidator:
                     f"OOS MDD {oos_result.max_drawdown:.1%} > "
                     f"IS×{self.mdd_expand_max} ({is_result.max_drawdown * self.mdd_expand_max:.1%})"
                 )
+            # A(품질) Cycle 290: IS Sharpe 극단 과최적화 마커
+            # IS > 5.0 && OOS < 0 → 합성 데이터 과최적화 징후
+            if is_result.sharpe_ratio > 5.0 and oos_result.sharpe_ratio < 0.0:
+                fold_fails.append(
+                    f"IS 극단 과최적화 (IS={is_result.sharpe_ratio:.2f}>5.0, OOS={oos_result.sharpe_ratio:.2f}<0)"
+                )
 
             # C(데이터) Cycle 268: fold 날짜 추출 (datetime index 있을 때만)
             _is_start = _oos_start = _oos_end = None

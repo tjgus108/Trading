@@ -46,12 +46,22 @@ CSV_PATH = STATE_DIR / "QUALITY_AUDIT.csv"
 # data/historical/{exchange}/{pair}/{timeframe}.csv 구조
 CSV_DATA_DIR: Optional[Path] = None
 
+# 활성 타임프레임 (--timeframe으로 설정, 기본 1h)
+# Cycle 290 C: 4h 지원 추가 — 1h CSV를 resample하여 사용
+ACTIVE_TIMEFRAME: str = "1h"
+
+# 타임프레임별 1h 대비 캔들 비율 (1h=1, 4h=0.25 등)
+_TF_CANDLE_RATIO: Dict[str, float] = {
+    "1m": 1/60, "5m": 1/12, "15m": 1/4, "1h": 1.0, "4h": 0.25, "1d": 1/24
+}
+
 # Walk-Forward 설정 (Cycle 211: 7일 train/28일 test → 학술 최적 조합 반영)
 # Cycle 210 리서치: 7d train/28d test가 81개 WF 조합 중 Sharpe 최고(1.252)
 # fold당 30 trades 목표: 1h봉 60일(1440h) 테스트 윈도우가 유리
-TRAIN_HOURS = 24 * 210   # 훈련: 7개월 (210일, IS 충분 확보)
-TEST_HOURS = 24 * 60     # 테스트: 2개월 (60일, fold당 거래 수 ↑)
-STEP_HOURS = 24 * 30     # 롤링 간격: 1개월 (겹침 허용으로 윈도우 수 유지)
+# NOTE: 실제 캔들 수 = 아래 값 × _TF_CANDLE_RATIO[ACTIVE_TIMEFRAME]
+TRAIN_HOURS = 24 * 210   # 훈련: 7개월 (210일, 1h 기준 캔들 수)
+TEST_HOURS = 24 * 60     # 테스트: 2개월 (60일, 1h 기준 캔들 수)
+STEP_HOURS = 24 * 30     # 롤링 간격: 1개월 (1h 기준 캔들 수)
 MIN_WINDOWS = 3          # 최소 테스트 윈도우 수
 
 # 전략 통과 기준: 테스트 윈도우 중 과반수에서 통과해야 PASS
@@ -334,13 +344,18 @@ def make_walk_forward_windows(df: pd.DataFrame) -> List[Tuple[pd.DataFrame, pd.D
     """데이터를 훈련/테스트 윈도우로 분할.
     Returns: [(train_df, test_df), ...]
     """
+    ratio = _TF_CANDLE_RATIO.get(ACTIVE_TIMEFRAME, 1.0)
+    train_c = max(10, int(TRAIN_HOURS * ratio))
+    test_c = max(5, int(TEST_HOURS * ratio))
+    step_c = max(1, int(STEP_HOURS * ratio))
+
     n = len(df)
     windows = []
     start = 0
 
     while True:
-        train_end = start + TRAIN_HOURS
-        test_end = train_end + TEST_HOURS
+        train_end = start + train_c
+        test_end = train_end + test_c
 
         if test_end > n:
             break
@@ -349,7 +364,7 @@ def make_walk_forward_windows(df: pd.DataFrame) -> List[Tuple[pd.DataFrame, pd.D
         test_df = df.iloc[train_end:test_end]
         windows.append((train_df, test_df))
 
-        start += STEP_HOURS
+        start += step_c
 
     # 최소 윈도우 수 미달 시 전체를 단일 윈도우로 사용
     if len(windows) < MIN_WINDOWS:
@@ -362,7 +377,7 @@ def make_walk_forward_windows(df: pd.DataFrame) -> List[Tuple[pd.DataFrame, pd.D
             print(f"[WF] 데이터 너무 적어 전체 데이터 단일 평가")
     else:
         print(f"[WF] Walk-Forward {len(windows)}개 윈도우 생성 "
-              f"(train={TRAIN_HOURS}h, test={TEST_HOURS}h, step={STEP_HOURS}h)")
+              f"(train={train_c}, test={test_c}, step={step_c} candles [{ACTIVE_TIMEFRAME}])")
 
     return windows
 
@@ -546,7 +561,10 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     _idx_diff = df.index[-1] - df.index[0]
     _days_str = f"{_idx_diff.days}일" if hasattr(_idx_diff, 'days') else f"{len(df)}봉"
     lines.append(f"_Data Range: {df.index[0]} ~ {df.index[-1]} ({_days_str})_")
-    lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={TRAIN_HOURS}h, test={TEST_HOURS}h)_")
+    _ratio = _TF_CANDLE_RATIO.get(ACTIVE_TIMEFRAME, 1.0)
+    _train_c = max(10, int(TRAIN_HOURS * _ratio))
+    _test_c = max(5, int(TEST_HOURS * _ratio))
+    lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={_train_c}, test={_test_c} candles [{ACTIVE_TIMEFRAME}])_")
     lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_")
     lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_\n")
 
@@ -808,16 +826,20 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
+    # 데이터 수집: 항상 1h로 먼저 로드 후 필요 시 리샘플링
+    tf = ACTIVE_TIMEFRAME
+    base_candles = 8640  # 1h 기준 12개월
+
     # CSV 모드: --csv-dir 지정 시 CSV 우선 (거래소 API 스킵)
     if CSV_DATA_DIR is not None:
         df = load_ohlcv_from_csv_dir(CSV_DATA_DIR, symbol, "1h")
         data_source = f"CSV {symbol} 1h ({CSV_DATA_DIR})"
         if df is None:
             print(f"[{symbol}][WARN] CSV 로드 실패 — 거래소 API 시도", flush=True)
-            df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
+            df = fetch_real_data_paginated(symbol, "1h", total_candles=base_candles)
             data_source = f"Bybit {symbol} 1h (paginated)"
     else:
-        df = fetch_real_data_paginated(symbol, "1h", total_candles=8640)
+        df = fetch_real_data_paginated(symbol, "1h", total_candles=base_candles)
         data_source = f"Bybit {symbol} 1h (paginated)"
         # 거래소 실패 시 CSV fallback (data/historical 자동 탐색)
         if df is None:
@@ -827,6 +849,17 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
                 if df is not None:
                     data_source = f"CSV fallback {symbol} 1h ({default_csv_dir})"
                     print(f"[{symbol}][FALLBACK] data/historical/ CSV 로드 성공", flush=True)
+
+    # 타임프레임 리샘플링 (1h != ACTIVE_TIMEFRAME인 경우)
+    if df is not None and tf != "1h":
+        from src.data.data_utils import resample_ohlcv
+        try:
+            df = resample_ohlcv(df, tf)
+            data_source = data_source.replace(" 1h ", f" {tf} (resampled from 1h) ")
+            print(f"[{symbol}][DATA] Resampled to {tf}: {len(df)} candles", flush=True)
+        except Exception as e:
+            print(f"[{symbol}][WARN] Resample {tf} 실패: {e} — 1h 유지", flush=True)
+            tf = "1h"
 
     if df is None:
         # 심볼별 다른 seed → 서로 다른 합성 데이터 생성
@@ -846,8 +879,15 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
         else:
             df = make_synthetic_data(8640, seed=symbol_seed)
             data_source = f"Synthetic GBM x8640 ({symbol}-like, seed={symbol_seed})"
-        # 합성 데이터에도 enrich_indicators 적용 — make_synthetic_data에 없는
-        # ema20, donchian_high/low, vwap, vwap20 등의 지표를 추가
+        # 합성 데이터도 ACTIVE_TIMEFRAME으로 리샘플링 (1h != tf인 경우)
+        if tf != "1h":
+            from src.data.data_utils import resample_ohlcv
+            try:
+                df = resample_ohlcv(df, tf)
+                data_source += f" [{tf}]"
+                print(f"[{symbol}][DATA] Synthetic resampled to {tf}: {len(df)} candles", flush=True)
+            except Exception as e:
+                print(f"[{symbol}][WARN] Synthetic resample {tf} 실패: {e} — 1h 유지", flush=True)
         df = enrich_indicators(df)
     else:
         df = enrich_indicators(df)
@@ -909,8 +949,9 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
                 continue
             try:
                 strategy_inst = strategy_cls()
-                # 전체 데이터 중 마지막 TEST_HOURS 구간 사용 (빠른 평가)
-                eval_len = min(TEST_HOURS + 100, len(df))
+                # 전체 데이터 중 마지막 테스트 윈도우 구간 사용 (빠른 평가)
+                _test_candles = max(5, int(TEST_HOURS * _TF_CANDLE_RATIO.get(ACTIVE_TIMEFRAME, 1.0)))
+                eval_len = min(_test_candles + 100, len(df))
                 eval_df = df.iloc[-eval_len:]
                 pc = engine.perturbation_check(
                     strategy_inst, perturb_params, eval_df, perturbation_pcts=[0.1],
@@ -985,7 +1026,7 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
 def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
-    print(f"Symbols: {', '.join(SYMBOLS)}")
+    print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
     print(f"Regime Weights: {'ON' if USE_REGIME_WEIGHTS else 'OFF'}")
     print("=" * 70)
 
@@ -1043,6 +1084,7 @@ def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
             "generated": datetime.utcnow().isoformat() + "Z",
             "symbols": list(all_symbol_results.keys()),
             "strategies_loaded": len(pass_list),
+            "timeframe": ACTIVE_TIMEFRAME,
             "train_hours": TRAIN_HOURS,
             "test_hours": TEST_HOURS,
             "step_hours": STEP_HOURS,
@@ -1118,6 +1160,12 @@ if __name__ == "__main__":
         default=None,
         help="실행할 심볼 목록 (기본: BTC/USDT ETH/USDT SOL/USDT, 예: --symbols BTC/USDT)",
     )
+    parser.add_argument(
+        "--timeframe",
+        type=str,
+        default="1h",
+        help="타임프레임 (기본: 1h, 예: 4h — 1h CSV를 리샘플링하여 사용)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1142,4 +1190,10 @@ if __name__ == "__main__":
     if args.symbols is not None:
         _this.SYMBOLS = args.symbols
         print(f"[CONFIG] Symbols overridden: {_this.SYMBOLS}", flush=True)
+    if args.timeframe != "1h":
+        if args.timeframe not in _TF_CANDLE_RATIO:
+            print(f"[CONFIG] 지원하지 않는 timeframe: {args.timeframe} — 1h 사용", flush=True)
+        else:
+            _this.ACTIVE_TIMEFRAME = args.timeframe
+            print(f"[CONFIG] Timeframe overridden: {args.timeframe}", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

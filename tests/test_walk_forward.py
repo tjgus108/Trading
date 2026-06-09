@@ -1597,3 +1597,64 @@ class TestSharpeICEdgeCases:
         assert results[0].best_params == results[1].best_params, (
             f"Deterministic failure: {results[0].best_params} != {results[1].best_params}"
         )
+
+
+# Cycle 290 A(품질): IS 극단 과최적화 마커 테스트
+def test_rolling_oos_extreme_is_overfit_marker():
+    """IS Sharpe > 5.0 && OOS Sharpe < 0 → fold fail_reasons에 과최적화 마커 추가."""
+    from src.backtest.walk_forward import RollingOOSValidator, OOSFoldResult
+    import pandas as pd, numpy as np
+
+    class AlwaysBuyFixed(BaseStrategy):
+        name = "always_buy_fixed"
+        def generate(self, df):
+            last = df.iloc[-1]
+            return Signal(
+                action=Action.BUY, confidence=Confidence.HIGH,
+                strategy=self.name, entry_price=float(last["close"]),
+                reasoning="test", invalidation="none",
+            )
+
+    # 강한 상승 IS + 하락 OOS 생성 (과최적화 시나리오)
+    np.random.seed(42)
+    n_is, n_oos = 200, 100
+    # IS: 강한 상승 추세 → AlwaysBuy가 좋은 IS Sharpe 생성
+    is_prices = 100 * np.cumprod(1 + 0.005 + np.random.randn(n_is) * 0.003)
+    # OOS: 강한 하락 추세 → AlwaysBuy가 나쁜 OOS Sharpe 생성
+    oos_prices = is_prices[-1] * np.cumprod(1 - 0.008 + np.random.randn(n_oos) * 0.003)
+    all_prices = np.concatenate([is_prices, oos_prices])
+
+    df_full = pd.DataFrame({
+        "open": all_prices * 0.999,
+        "high": all_prices * 1.01,
+        "low": all_prices * 0.99,
+        "close": all_prices,
+        "volume": np.full(len(all_prices), 1000.0),
+        "atr14": np.full(len(all_prices), 2.0),
+        "rsi14": np.full(len(all_prices), 50.0),
+        "ema20": all_prices, "ema50": all_prices, "ema9": all_prices,
+        "ema21": all_prices, "vwap": all_prices,
+        "donchian_high": all_prices * 1.01, "donchian_low": all_prices * 0.99,
+        "volume_ma20": np.full(len(all_prices), 1000.0),
+        "macd": np.zeros(len(all_prices)), "macd_signal": np.zeros(len(all_prices)),
+        "bb_upper": all_prices * 1.01, "bb_lower": all_prices * 0.99,
+        "adx": np.full(len(all_prices), 30.0),
+        "plus_di": np.full(len(all_prices), 25.0),
+        "minus_di": np.full(len(all_prices), 15.0),
+    })
+
+    v = RollingOOSValidator(is_bars=n_is, oos_bars=n_oos, slide_bars=n_oos)
+    result = v.validate(AlwaysBuyFixed(), df_full)
+
+    # fold가 생성되었는지 확인
+    assert len(result.folds) >= 1
+
+    # IS Sharpe > 5 && OOS < 0인 fold가 있으면 과최적화 마커가 fail_reasons에 포함
+    for fold in result.folds:
+        if fold.is_sharpe > 5.0 and fold.oos_sharpe < 0.0:
+            has_overfit_marker = any("극단 과최적화" in r for r in fold.fail_reasons)
+            assert has_overfit_marker, (
+                f"IS={fold.is_sharpe:.2f}>5.0, OOS={fold.oos_sharpe:.2f}<0 인데 "
+                f"과최적화 마커 없음: {fold.fail_reasons}"
+            )
+            break

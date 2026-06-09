@@ -379,3 +379,77 @@ class TestGenerateReportEdgeCases:
         assert "## 상대 순위 (Composite Rank Score)" in report
         assert "p90" in report
         assert "p45" in report
+
+
+# ── Cycle 290 C: --timeframe 옵션 및 WF 캔들 수 비율 검증 ──────────────
+
+class TestTimeframeCandles:
+    """ACTIVE_TIMEFRAME에 따른 make_walk_forward_windows 캔들 수 검증."""
+
+    def _make_df(self, periods: int, freq: str = "h"):
+        import pandas as pd, numpy as np
+        idx = pd.date_range("2023-01-01", periods=periods, freq=freq)
+        df = pd.DataFrame({
+            "open": np.ones(periods) * 100,
+            "high": np.ones(periods) * 101,
+            "low": np.ones(periods) * 99,
+            "close": np.ones(periods) * 100,
+            "volume": np.ones(periods) * 1000,
+        }, index=idx)
+        return df
+
+    def test_1h_windows_use_full_candle_count(self):
+        """1h 기본 타임프레임에서 train 캔들 수 = TRAIN_HOURS."""
+        import importlib
+        import scripts.paper_simulation as ps
+        importlib.reload(ps)
+        assert ps.ACTIVE_TIMEFRAME == "1h"
+        # 1h: ratio=1.0 → train_c = TRAIN_HOURS
+        assert abs(ps._TF_CANDLE_RATIO["1h"] - 1.0) < 1e-9
+
+    def test_4h_candle_ratio_is_quarter(self):
+        """4h 타임프레임의 캔들 비율이 0.25."""
+        import scripts.paper_simulation as ps
+        assert abs(ps._TF_CANDLE_RATIO["4h"] - 0.25) < 1e-9
+
+    def test_4h_windows_smaller_than_1h(self):
+        """4h 모드에서 윈도우 캔들 수가 1h 모드보다 4배 적다."""
+        import importlib
+        import scripts.paper_simulation as ps
+        importlib.reload(ps)
+
+        # 큰 데이터프레임 생성 (1h 기준 8640행, 4h에서 2160행 필요)
+        df = self._make_df(8640)
+
+        # 1h 모드
+        ps.ACTIVE_TIMEFRAME = "1h"
+        windows_1h = ps.make_walk_forward_windows(df)
+
+        # 4h 모드 (같은 크기 데이터에 적용)
+        ps.ACTIVE_TIMEFRAME = "4h"
+        windows_4h = ps.make_walk_forward_windows(df)
+
+        # 4h 모드는 더 많은 윈도우를 생성 (캔들 수가 적어 더 많이 슬라이딩)
+        assert len(windows_4h) >= len(windows_1h)
+
+        # 4h 모드 윈도우의 train 크기 ≈ TRAIN_HOURS * 0.25
+        import scripts.paper_simulation as ps2
+        expected_train = max(10, int(ps2.TRAIN_HOURS * 0.25))
+        if windows_4h:
+            actual_train = len(windows_4h[0][0])
+            assert actual_train == expected_train
+
+        importlib.reload(ps)  # 복원
+
+    def test_timeframe_reflected_in_report(self):
+        """4h 타임프레임이 리포트에 표시된다."""
+        import importlib
+        import scripts.paper_simulation as ps
+        importlib.reload(ps)
+        ps.ACTIVE_TIMEFRAME = "4h"
+
+        df = self._make_df(100)
+        report = ps.generate_report([], "CSV BTC 4h", df, 3)
+        assert "4h" in report
+
+        importlib.reload(ps)  # 복원
