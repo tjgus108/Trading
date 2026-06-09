@@ -661,6 +661,26 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
             )
         lines.append("")
 
+        # --verbose-windows N: 상위 N개 전략의 window별 상세 결과 출력
+        import sys as _sys
+        _verbose_n = getattr(_sys.modules[__name__], "VERBOSE_WINDOWS", 0)
+        if _verbose_n > 0:
+            lines.append(f"## Window별 상세 결과 (상위 {_verbose_n}개 전략)\n")
+            lines.append("_FAIL 원인 진단용: 각 window에서 어떤 기준이 미달했는지 확인_\n")
+            for r in ranked[:_verbose_n]:
+                lines.append(f"### `{r['name']}` (Score={r.get('rank_score', 0):.1f}, Consist={r['passed_windows']}/{r['total_windows']})\n")
+                lines.append("| Win | Sharpe | PF | Trades | MDD | Market | Pass | Fail Reasons |")
+                lines.append("|-----|--------|----|--------|-----|--------|------|--------------|")
+                for wr in r.get("window_results", []):
+                    p_w = "✓" if wr["passed"] else "✗"
+                    reasons = "; ".join(wr.get("fail_reasons", []))[:80] if not wr["passed"] else "-"
+                    mkt = wr.get("market_state", "?")
+                    lines.append(
+                        f"| {wr['window']} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
+                        f"{wr['trades']} | {wr['max_dd']:.1%} | {mkt} | {p_w} | {reasons} |"
+                    )
+                lines.append("")
+
     # 전체 결과
     lines.append("## 전체 결과\n")
     if has_robustness:
@@ -809,6 +829,10 @@ BLOCK_BOOTSTRAP_BLOCK_SIZE = int(_os.environ.get("PAPER_SIM_BLOCK_SIZE", "24"))
 # Regime weighting: HIGH_VOL fold 다운웨이팅 (Cycle 234 walk_forward.py와 동일 로직)
 # 환경변수 PAPER_SIM_REGIME_WEIGHTS=1 로 활성화
 USE_REGIME_WEIGHTS = _os.environ.get("PAPER_SIM_REGIME_WEIGHTS", "0") == "1"
+
+# Window별 상세 출력: --verbose-windows N 으로 활성화
+# 상위 N개 전략의 window별 Sharpe/PF/Trades/MDD/PASS 상세를 리포트에 포함
+VERBOSE_WINDOWS: int = 0
 
 # Perturbation check: 각 전략의 파라미터 섭동 안정성 검증 (--perturbation-check로 활성화)
 USE_PERTURBATION_CHECK = False
@@ -1166,6 +1190,13 @@ if __name__ == "__main__":
         default="1h",
         help="타임프레임 (기본: 1h, 예: 4h — 1h CSV를 리샘플링하여 사용)",
     )
+    parser.add_argument(
+        "--verbose-windows",
+        type=int,
+        default=0,
+        metavar="N",
+        help="상위 N개 전략의 window별 상세 결과를 리포트에 포함 (기본: 0=비활성, 예: --verbose-windows 5)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1196,4 +1227,7 @@ if __name__ == "__main__":
         else:
             _this.ACTIVE_TIMEFRAME = args.timeframe
             print(f"[CONFIG] Timeframe overridden: {args.timeframe}", flush=True)
+    if args.verbose_windows > 0:
+        _this.VERBOSE_WINDOWS = args.verbose_windows
+        print(f"[CONFIG] Verbose windows enabled: top {args.verbose_windows} strategies", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))
