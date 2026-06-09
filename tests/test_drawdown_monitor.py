@@ -868,6 +868,37 @@ class TestMddKillSwitch:
         assert status["current_mdd"] == pytest.approx(0.16)
         assert status["threshold"] == pytest.approx(0.15)
 
+    def test_regime_bear_tightens_kill_threshold(self):
+        """BEAR 레짐 시 multiplier가 1.2x로 축소 → 더 빨리 kill."""
+        m = DrawdownMonitor()
+        # backtest_mdd=0.10, current_mdd=0.13
+        # 기본(1.5): threshold=0.15 → no kill
+        assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5) is False
+        # BEAR(1.2): threshold=0.12 → kill
+        assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="BEAR") is True
+
+    def test_regime_crisis_kills_at_backtest_mdd(self):
+        """CRISIS 레짐 시 multiplier=1.0 → backtest MDD 초과 즉시 kill."""
+        m = DrawdownMonitor()
+        # backtest_mdd=0.10, current_mdd=0.11 (backtest 대비 110%)
+        assert m.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="CRISIS") is True
+
+    def test_regime_bull_unchanged_threshold(self):
+        """BULL 레짐 시 multiplier 변화 없음."""
+        m = DrawdownMonitor()
+        # 기본과 동일: threshold=0.15
+        assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="BULL") is False
+        assert m.should_kill_strategy(0.16, 0.10, multiplier=1.5, regime="BULL") is True
+
+    def test_get_kill_switch_status_includes_effective_multiplier(self):
+        """get_kill_switch_status에 effective_multiplier 필드 포함."""
+        m = DrawdownMonitor()
+        status = m.get_kill_switch_status(0.13, 0.10, multiplier=1.5, regime="BEAR")
+        assert "effective_multiplier" in status
+        assert status["effective_multiplier"] == pytest.approx(1.2)
+        assert status["threshold"] == pytest.approx(0.12)
+        assert status["should_kill"] is True
+
 
 # ── kelly_reduce_at_mdd 단위 테스트 ──────────────────────────────────────
 

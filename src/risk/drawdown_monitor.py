@@ -761,11 +761,30 @@ class DrawdownMonitor:
 
     # ── MDD Kill Switch ────────────────────────────────────────
 
+    # 레짐별 kill multiplier 상한 — bear/crisis 구간에서 더 빨리 kill
+    _REGIME_KILL_MULTIPLIER_MAX: dict = {
+        'TREND_UP':   1.5,   # 상승장: 기본 multiplier 유지
+        'RANGING':    1.5,   # 횡보: 기본 유지
+        'TREND_DOWN': 1.2,   # 하락장: 1.2x까지 축소 (더 빠른 kill)
+        'HIGH_VOL':   1.0,   # 고변동성: backtest MDD 초과 즉시 kill
+        'BULL':       1.5,
+        'BEAR':       1.2,
+        'CRISIS':     1.0,
+    }
+
+    def _effective_kill_multiplier(self, multiplier: float, regime: Optional[str] = None) -> float:
+        """레짐을 반영한 실효 kill multiplier 반환."""
+        if regime is None:
+            return multiplier
+        cap = self._REGIME_KILL_MULTIPLIER_MAX.get(regime.upper(), multiplier)
+        return min(multiplier, cap)
+
     def should_kill_strategy(
         self,
         current_mdd: float,
         backtest_mdd: float,
         multiplier: float = 1.5,
+        regime: Optional[str] = None,
     ) -> bool:
         """현재 MDD가 백테스트 MDD의 multiplier배를 초과하면 전략 kill 권장.
 
@@ -773,13 +792,16 @@ class DrawdownMonitor:
             current_mdd: 현재 실시간 MDD (0~1 비율). 음수이면 abs() 처리.
             backtest_mdd: 백테스트에서 관측된 MDD (0~1 비율). 음수이면 abs() 처리.
             multiplier: 초과 배수 기준 (기본 1.5).
+            regime: 현재 시장 레짐 (선택). BEAR/CRISIS/HIGH_VOL 시 multiplier를 축소.
+                    None이면 레짐 무관 (multiplier 그대로 사용).
 
         Returns:
             True이면 전략 kill 권장.
         """
         current_mdd = abs(current_mdd)
         backtest_mdd = abs(backtest_mdd)
-        threshold = backtest_mdd * multiplier
+        eff_mult = self._effective_kill_multiplier(multiplier, regime)
+        threshold = backtest_mdd * eff_mult
         return current_mdd > threshold
 
     def get_kill_switch_status(
@@ -787,6 +809,7 @@ class DrawdownMonitor:
         current_mdd: float,
         backtest_mdd: float,
         multiplier: float = 1.5,
+        regime: Optional[str] = None,
     ) -> dict:
         """Kill switch 상태를 dict로 반환.
 
@@ -794,18 +817,21 @@ class DrawdownMonitor:
             current_mdd: 현재 실시간 MDD (0~1 비율). 음수이면 abs() 처리.
             backtest_mdd: 백테스트에서 관측된 MDD (0~1 비율). 음수이면 abs() 처리.
             multiplier: 초과 배수 기준 (기본 1.5).
+            regime: 현재 시장 레짐 (선택). BEAR/CRISIS/HIGH_VOL 시 multiplier를 축소.
 
         Returns:
             {
                 "should_kill": bool,
                 "current_mdd": float,
                 "threshold": float,
+                "effective_multiplier": float,  # 레짐 반영 후 실제 적용 배수
                 "ratio": float,   # current_mdd / backtest_mdd (backtest_mdd=0이면 inf 또는 0)
             }
         """
         current_mdd = abs(current_mdd)
         backtest_mdd = abs(backtest_mdd)
-        threshold = backtest_mdd * multiplier
+        eff_mult = self._effective_kill_multiplier(multiplier, regime)
+        threshold = backtest_mdd * eff_mult
         if backtest_mdd > 0:
             ratio = current_mdd / backtest_mdd
         else:
@@ -814,6 +840,7 @@ class DrawdownMonitor:
             "should_kill": current_mdd > threshold,
             "current_mdd": current_mdd,
             "threshold": threshold,
+            "effective_multiplier": eff_mult,
             "ratio": ratio,
         }
 

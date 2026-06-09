@@ -864,13 +864,15 @@ class WalkForwardTrainer:
                 is_s, oos_s = fold_sharpes[i]
                 if is_s < -1.0 and oos_s > 0:
                     weight *= sign_reversal_penalty
-            # Bundle OOS Sharpe 기반 배율 (oos_sharpe_scale 기준 정규화, [0.5, 2.0] 클리핑)
+            # Bundle OOS Sharpe 기반 배율 (oos_sharpe_scale 기준 정규화, [0.1, 2.0] 클리핑)
+            # 음수 OOS Sharpe: 절댓값 기반 비례 페널티 (0~-2→0.5~0.1, <-2→0.1 하한)
             if oos_sharpes and i < len(oos_sharpes):
                 oos_s = oos_sharpes[i]
                 if oos_s > 0 and oos_sharpe_scale > 0:
                     oos_mult = float(np.clip(oos_s / oos_sharpe_scale, 0.5, 2.0))
                 else:
-                    oos_mult = 0.5  # 음수 OOS Sharpe → 패널티
+                    # 음수 Sharpe: 절댓값이 클수록 더 큰 패널티 (최소 0.1)
+                    oos_mult = float(np.clip(0.5 + oos_s * 0.2, 0.1, 0.5))
                 weight *= oos_mult
             raw.append(weight)
 

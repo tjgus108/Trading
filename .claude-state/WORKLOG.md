@@ -1,3 +1,40 @@
+## [2026-06-09] Cycle 291 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor 레짐 기반 Kill Switch 강화**
+1. `src/risk/drawdown_monitor.py`: `should_kill_strategy()` + `get_kill_switch_status()`에 `regime` 파라미터 추가
+   - `_REGIME_KILL_MULTIPLIER_MAX` 딕트: TREND_UP=1.5, TREND_DOWN=1.2, HIGH_VOL=1.0, CRISIS=1.0
+   - `_effective_kill_multiplier(multiplier, regime)`: 레짐 반영 실효 배수 반환
+   - BEAR/TREND_DOWN 시 threshold 1.2x로 축소 → 더 빠른 전략 kill
+   - CRISIS/HIGH_VOL 시 threshold 1.0x → backtest MDD 초과 즉시 kill
+   - `get_kill_switch_status()` 반환 dict에 `effective_multiplier` 필드 추가
+
+**[D(ML)] 음수 OOS Sharpe 비례 패널티 강화**
+2. `src/ml/trainer.py`: `compute_ensemble_weight_recency()` OOS 패널티 개선
+   - 기존: 음수 OOS → 고정 0.5x 패널티
+   - 개선: `clip(0.5 + oos_s * 0.2, 0.1, 0.5)` — 더 음수일수록 더 낮은 가중치
+     - OOS=-0.5 → mult≈0.4, OOS=-2.0 → mult=0.1 (최소값)
+   - 근거: cmf OOS avg=-0.805 vs supertrend_multi OOS avg=4.880 격차를 앙상블에 반영
+
+**[F(리서치)] 9-fold vs 5-fold 데이터 범위 변화 분석**
+- Bundle OOS 9-fold (2022~2024) 결과: PASS 0/5 (이전 2/5)
+  - cmf: avg=-0.805 (이전 avg=2.508) — 2022 베어마켓 포함으로 역전
+  - supertrend_multi: avg=4.880, std=2.506 (threshold=2.5) — 경계값
+- fold 구조 변화 원인: 데이터 시작점 2022-01-01 (9-fold) vs 이전 5-fold
+- cmf 레짐 의존성 확인: fold7,8 (2023 Q4 불장) Sharpe=2.677/4.473 PASS
+- 결론: cmf는 레짐 필터링 없이 단순 4h 4회 연속 PASS 해석은 과도한 낙관
+
+**시뮬레이션 결과 (Cycle 291):**
+- 테스트: **8392 passed** (5개 추가) — 회귀 없음
+- Paper Sim BTC 4h (8 windows): 0/22 PASS
+  - rank1: cmf (score=68.3, Sharpe=1.25, trades=23)
+  - rank2: lob_maker (score=63.8, Sharpe=1.18)
+- Bundle OOS BTC 4h (9-fold, 2022~2024):
+  - cmf: FAIL avg=-0.805, std=3.854 (2022 베어 포함)
+  - supertrend_multi: FAIL avg=4.880, std=2.506 (std 경계)
+  - **총 PASS: 0/5**
+
+---
+
 ## [2026-06-09] Cycle 290 — A(품질) + C(데이터) + F(리서치)
 
 **[C(데이터)] paper_simulation.py --timeframe 옵션 추가 (4h 지원)**
@@ -9504,6 +9541,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-09 00:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-09 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-09 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-09 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-09 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-09 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-09 05:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -490,7 +490,7 @@ class TestComputeEnsembleWeightRecency:
         assert w_oos[1] > w_no[1]
 
     def test_oos_sharpes_penalizes_negative(self):
-        """음수 OOS Sharpe → 최솟값 배율(0.5) 적용으로 가중치 감소."""
+        """음수 OOS Sharpe → 비례 페널티 적용으로 가중치 감소."""
         trainer = WalkForwardTrainer()
         results = [
             self._make_result(0.60, 0.60),
@@ -501,6 +501,22 @@ class TestComputeEnsembleWeightRecency:
         assert sum(w_oos) == pytest.approx(1.0, abs=1e-6)
         # 첫 번째(음수 OOS)는 비중 감소
         assert w_oos[0] < w_no[0]
+
+    def test_oos_sharpes_severe_negative_more_penalty(self):
+        """OOS Sharpe 더 음수일수록 더 큰 페널티 (비례 감소)."""
+        trainer = WalkForwardTrainer()
+        results = [
+            self._make_result(0.60, 0.60),
+            self._make_result(0.60, 0.60),
+            self._make_result(0.60, 0.60),
+        ]
+        w = trainer.compute_ensemble_weight_recency(
+            results, decay=1.0,
+            oos_sharpes=[-0.5, -2.0, 2.0],
+        )
+        assert sum(w) == pytest.approx(1.0, abs=1e-4)
+        # -0.5 > -2.0 이므로 첫 번째가 두 번째보다 비중 높아야 함
+        assert w[0] > w[1]
 
 
 # ---------------------------------------------------------------------------
