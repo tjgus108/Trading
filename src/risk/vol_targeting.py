@@ -27,6 +27,38 @@ logger = logging.getLogger(__name__)
 class VolTargeting:
     """목표 변동성 기반 포지션 사이즈 조정기."""
 
+    # 타임프레임별 하루 캔들 수 (연환산 = 252 * candles_per_day)
+    _TF_CANDLES_PER_DAY: dict = {
+        "1m": 1440, "5m": 288, "15m": 96,
+        "1h": 24, "4h": 6, "1d": 1,
+    }
+
+    @classmethod
+    def for_timeframe(cls, timeframe: str, **kwargs) -> "VolTargeting":
+        """타임프레임에 맞는 annualization 팩터로 VolTargeting 인스턴스 생성.
+
+        기본 annualization=252*24는 1h 전용. 4h 캔들(PASS 전략 평가 기준)에서
+        이 메서드 없이 생성하면 실현 변동성이 2배 과장되어 포지션이 50% 축소됨.
+
+        Args:
+            timeframe: 타임프레임 문자열 ("1m", "5m", "15m", "1h", "4h", "1d").
+            **kwargs: VolTargeting 생성자 추가 파라미터 (target_vol, max_scalar 등).
+
+        Returns:
+            올바른 annualization이 적용된 VolTargeting 인스턴스.
+
+        Examples:
+            >>> vt = VolTargeting.for_timeframe("4h")
+            >>> vt.annualization  # 252 * 6 = 1512
+        """
+        candles_per_day = cls._TF_CANDLES_PER_DAY.get(timeframe)
+        if candles_per_day is None:
+            raise ValueError(
+                f"Unknown timeframe: {timeframe!r}. "
+                f"Supported: {list(cls._TF_CANDLES_PER_DAY)}"
+            )
+        return cls(annualization=252 * candles_per_day, **kwargs)
+
     def __init__(
         self,
         target_vol: float = 0.20,       # 연환산 목표 변동성 (20%)

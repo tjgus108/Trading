@@ -71,6 +71,10 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 # Cycle 274: cmf threshold 실험 종료 (0.05/-0.05 효과 미미) → 기본값(0.08/-0.08) 복원
 PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {}
 
+# 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
+# 활성화 시 generate_report()에서 상위 5개 전략의 윈도우별 Sharpe/PF/Trades 출력
+VERBOSE_WINDOWS: bool = False
+
 
 # ── 데이터 수집 ──────────────────────────────────────────────
 
@@ -709,6 +713,30 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                 lines.append(f"| {reason} | {cnt} |")
             lines.append("")
 
+    # 윈도우별 상세 분석 (--verbose-windows 활성화 시)
+    _this_mod = sys.modules[__name__]
+    if getattr(_this_mod, "VERBOSE_WINDOWS", False):
+        has_scores = any("rank_score" in r for r in results)
+        top_strats = sorted(results, key=lambda x: x.get("rank_score", x.get("avg_sharpe", 0)), reverse=True)[:5]
+        if top_strats:
+            lines.append("## 윈도우별 상세 분석 (상위 5 전략)\n")
+            lines.append("_각 전략의 윈도우별 Sharpe/PF/Trades/Pass 상세. FAIL 원인 진단용._\n")
+            for r in top_strats:
+                lines.append(f"### `{r['name']}` (rank_score={r.get('rank_score', 0):.1f}, consistency={r['passed_windows']}/{r['total_windows']})\n")
+                lines.append("| Window | Sharpe | PF | Trades | MDD | Market | Pass | Fail Reasons |")
+                lines.append("|--------|--------|-----|--------|-----|--------|------|--------------|")
+                for wr in r.get("window_results", []):
+                    if "error" in wr:
+                        lines.append(f"| W{wr['window']} | ERROR | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
+                        continue
+                    p = "✅" if wr["passed"] else "❌"
+                    reasons = "; ".join(wr.get("fail_reasons", [])[:2])
+                    lines.append(
+                        f"| W{wr['window']} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
+                        f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | {p} | {reasons} |"
+                    )
+                lines.append("")
+
     # 포트폴리오
     if results:
         passed_strats = [r for r in results if r["overall_passed"]]
@@ -1166,6 +1194,12 @@ if __name__ == "__main__":
         default="1h",
         help="타임프레임 (기본: 1h, 예: 4h — 1h CSV를 리샘플링하여 사용)",
     )
+    parser.add_argument(
+        "--verbose-windows",
+        action="store_true",
+        default=False,
+        help="윈도우별 상세 분석 출력: 상위 5 전략의 윈도우별 Sharpe/PF/Trades/Pass 테이블 추가",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1196,4 +1230,7 @@ if __name__ == "__main__":
         else:
             _this.ACTIVE_TIMEFRAME = args.timeframe
             print(f"[CONFIG] Timeframe overridden: {args.timeframe}", flush=True)
+    if args.verbose_windows:
+        _this.VERBOSE_WINDOWS = True
+        print("[CONFIG] Verbose windows enabled: per-window detail for top 5 strategies", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))
