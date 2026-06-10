@@ -463,16 +463,20 @@ def format_fold_detail(name: str, r: BundleOOSResult) -> str:
 
     # C(데이터) Cycle 268: 날짜 컬럼 포함 여부 결정
     has_dates = any(getattr(f, 'oos_start_date', None) is not None for f in r.folds)
+    # D(ML) Cycle 294: 레짐 컬럼 포함 여부 결정
+    has_regime = any(getattr(f, 'oos_regime', None) is not None for f in r.folds)
 
     lines = [f"### {name}\n"]
     if has_dates:
+        regime_col = " Regime |" if has_regime else ""
+        regime_sep = "--------|" if has_regime else ""
         lines.append(
             "| Fold | IS Start | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | "
-            "IS MDD | OOS MDD | Pass |"
+            f"IS MDD | OOS MDD | Pass |{regime_col}"
         )
         lines.append(
             "|------|----------|------------|-----------|------------|-----|--------|------------|"
-            "-------|---------|------|"
+            f"-------|---------|------|{regime_sep}"
         )
         for f in r.folds:
             pass_str = "PASS" if f.passed else "FAIL"
@@ -480,10 +484,11 @@ def format_fold_detail(name: str, r: BundleOOSResult) -> str:
             oos_start = getattr(f, 'oos_start_date', None) or "-"
             oos_end = getattr(f, 'oos_end_date', None) or "-"
             oos_period = f"{oos_start}~{oos_end}" if oos_start != "-" else "-"
+            regime_cell = f" {getattr(f, 'oos_regime', '-') or '-'} |" if has_regime else ""
             lines.append(
                 f"| {f.fold_id} | {is_start} | {oos_period} | {f.is_sharpe:.3f} | {f.oos_sharpe:.3f} | "
                 f"{f.wfe:.3f} | {f.oos_pf:.3f} | {f.oos_trades} | "
-                f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |"
+                f"{f.is_mdd:.2%} | {f.oos_mdd:.2%} | {pass_str} |{regime_cell}"
             )
     else:
         lines.append(
