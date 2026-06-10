@@ -69,6 +69,8 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 
 # 전략별 파라미터 오버라이드 (빈 dict = 기본값 사용)
 # Cycle 274: cmf threshold 실험 종료 (0.05/-0.05 효과 미미) → 기본값(0.08/-0.08) 복원
+# Cycle 294: cmf vol_percentile=1.0 실험 → 역효과 (PF 1.24→1.10, Sharpe 1.25→-0.12) 원복
+# Cycle 294: supertrend_multi Bundle OOS 파라미터 동기화 실험 → 역효과 (trades 8→7) 원복
 PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {}
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)

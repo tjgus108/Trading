@@ -47,6 +47,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "buy_thresh": [0.08, 0.09, 0.10],  # Cycle 267: 보수화 (0.07-0.09→0.08-0.10), fold0/1 고Sharpe 안정화
         "sell_thresh": [-0.10, -0.09, -0.08],  # Cycle 267: buy_thresh 대칭 이동
         "rsi_max_buy": [75, 78, 80],   # Cycle 275: fold2(2023-10~12 불마켓) RSI>75 차단 → 완화 실험
+        "vol_percentile": [0.85, 1.0, 1.1],  # Cycle 294 D(ML): 볼륨 필터 강도 — 1.0=중앙값 이상, 1.1=10% 초과
     },
     # cmf_1h: 1h 타임프레임 전용 파라미터 그리드 (D(ML) Cycle 271)
     # 기본 period=20 (4h 80시간)에 해당하는 1h 등가: period≥60
@@ -997,6 +998,8 @@ class OOSFoldResult:
     is_start_date: Optional[str] = None
     oos_start_date: Optional[str] = None
     oos_end_date: Optional[str] = None
+    # D(ML) Cycle 294: OOS 구간 레짐 (EMA20 기울기 기반: bull/bear/sideways/unknown)
+    oos_regime: Optional[str] = None
 
 
 @dataclass
@@ -1029,7 +1032,49 @@ class BundleOOSResult:
             lines.append(f"  dsr_pvalue: {self.dsr_pvalue:.4f} ({sig_tag})")
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
+        # D(ML) Cycle 294: 레짐별 OOS Sharpe 요약
+        regime_folds: dict = {}
+        for f in self.folds:
+            r = f.oos_regime or "unknown"
+            regime_folds.setdefault(r, []).append(f.oos_sharpe)
+        if regime_folds:
+            regime_parts = []
+            for rname in ("bull", "sideways", "bear", "unknown"):
+                if rname in regime_folds:
+                    sharpes = regime_folds[rname]
+                    avg = sum(sharpes) / len(sharpes)
+                    regime_parts.append(f"{rname}={avg:.2f}(n={len(sharpes)})")
+            if regime_parts:
+                lines.append(f"  regime_sharpe: {', '.join(regime_parts)}")
         return "\n".join(lines)
+
+def _detect_oos_regime(df: pd.DataFrame) -> str:
+    """OOS df의 시장 레짐 감지 (EMA20 기울기 기반).
+
+    EMA20의 초반 1/3 구간과 후반 1/3 구간의 평균을 비교:
+    - slope > +3%: bull (상승 추세)
+    - slope < -3%: bear (하락 추세)
+    - otherwise:   sideways (횡보)
+
+    반환: "bull" | "bear" | "sideways" | "unknown"
+    """
+    if df is None or len(df) < 20 or "close" not in df.columns:
+        return "unknown"
+    close = df["close"]
+    ema20 = close.ewm(span=20, adjust=False).mean()
+    n = len(ema20)
+    third = max(1, n // 3)
+    early = float(ema20.iloc[:third].mean())
+    late = float(ema20.iloc[-third:].mean())
+    if early <= 0:
+        return "unknown"
+    slope_pct = (late - early) / early
+    if slope_pct > 0.03:
+        return "bull"
+    elif slope_pct < -0.03:
+        return "bear"
+    return "sideways"
+
 
 class RollingOOSValidator:
     """Rolling IS/OOS 검증기 (파라미터 최적화 없이 고정 전략 평가).
@@ -1151,6 +1196,9 @@ class RollingOOSValidator:
             except Exception:
                 pass
 
+            # D(ML) Cycle 294: OOS 구간 레짐 감지 (bull/bear/sideways)
+            _oos_regime = _detect_oos_regime(oos_df)
+
             fold = OOSFoldResult(
                 fold_id=fold_id,
                 is_sharpe=round(is_result.sharpe_ratio, 3),
@@ -1165,12 +1213,13 @@ class RollingOOSValidator:
                 is_start_date=_is_start,
                 oos_start_date=_oos_start,
                 oos_end_date=_oos_end,
+                oos_regime=_oos_regime,
             )
             folds.append(fold)
 
             logger.info(
-                "OOS Fold %d: IS_Sharpe=%.2f OOS_Sharpe=%.2f WFE=%.3f PF=%.2f %s",
-                fold_id, is_result.sharpe_ratio, oos_result.sharpe_ratio,
+                "OOS Fold %d [%s]: IS_Sharpe=%.2f OOS_Sharpe=%.2f WFE=%.3f PF=%.2f %s",
+                fold_id, _oos_regime, is_result.sharpe_ratio, oos_result.sharpe_ratio,
                 wfe, oos_result.profit_factor, "PASS" if fold.passed else "FAIL",
             )
 
