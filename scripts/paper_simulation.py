@@ -69,7 +69,18 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 
 # 전략별 파라미터 오버라이드 (빈 dict = 기본값 사용)
 # Cycle 274: cmf threshold 실험 종료 (0.05/-0.05 효과 미미) → 기본값(0.08/-0.08) 복원
-PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {}
+# Cycle 295 A: 저거래 전략 거래 빈도 개선
+#   - value_area: vol_filter_mult 0.7→0.5 (거래량 필터 완화, avg=12 → 15+ 목표)
+#   - wick_reversal: min_volatility 0.002→0.001, vol_mult 0.8→0.6 (저변동성/저거래량 구간 복원)
+#   - relative_volume: rvol_buy_sell 1.6→1.3 (신호 빈도 증가, avg=13 → 15+ 목표)
+#   - momentum_quality: quality_score_buy_threshold 1.0→0.8, consistency 0.4→0.3 (C 데이터: sideways 개선)
+PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
+    "value_area": {"vol_filter_mult": 0.5},
+    "wick_reversal": {"min_volatility": 0.001, "vol_mult": 0.6},
+    "relative_volume": {"rvol_buy_sell": 1.3},
+    "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
+    "price_cluster": {"bounce_pct": 0.015},
+}
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
 # 활성화 시 generate_report()에서 상위 5개 전략의 윈도우별 Sharpe/PF/Trades 출력

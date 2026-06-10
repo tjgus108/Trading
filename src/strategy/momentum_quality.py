@@ -19,6 +19,15 @@ _MIN_ROWS = 25
 class MomentumQualityStrategy(BaseStrategy):
     name = "momentum_quality"
 
+    def __init__(
+        self,
+        quality_score_buy_threshold: float = 1.0,
+        consistency_buy_threshold: float = 0.4,
+        **kwargs,
+    ):
+        self.quality_score_buy_threshold = quality_score_buy_threshold
+        self.consistency_buy_threshold = consistency_buy_threshold
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < _MIN_ROWS:
             return self._hold(df, f"Insufficient data: {len(df)} < {_MIN_ROWS}")
@@ -54,7 +63,7 @@ class MomentumQualityStrategy(BaseStrategy):
             f"consistency={consistency_val:.2f} curr_close={curr_close:.4f}"
         )
 
-        if quality_score_val > 1.0 and mom20_val > 0 and consistency_val > 0.4:
+        if quality_score_val > self.quality_score_buy_threshold and mom20_val > 0 and consistency_val > self.consistency_buy_threshold:
             conf = Confidence.HIGH if quality_score_val > 1.5 else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,

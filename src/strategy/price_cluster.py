@@ -60,6 +60,9 @@ def _find_cluster(
 class PriceClusterStrategy(BaseStrategy):
     name = "price_cluster"
 
+    def __init__(self, bounce_pct: float = _BOUNCE_PCT, **kwargs):
+        self.bounce_pct = bounce_pct
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < _MIN_ROWS:
             return self._hold(df, "Insufficient data")
@@ -89,8 +92,8 @@ class PriceClusterStrategy(BaseStrategy):
         
         confidence = Confidence.HIGH if is_high_confidence else Confidence.MEDIUM
 
-        # Threshold 계산: cluster 경계 가격 기준 1% (가격 스케일에 비례)
-        threshold = max(cluster_low * _BOUNCE_PCT, 0.001)
+        # Threshold 계산: cluster 경계 가격 기준 비율 (가격 스케일에 비례)
+        threshold = max(cluster_low * self.bounce_pct, 0.001)
 
         # BUY: 이전 봉이 cluster_low 아래 (threshold 내), 현재 봉이 cluster_low 이상
         if (prev_close < cluster_low and 
