@@ -87,6 +87,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
     },
+    # Cycle 295 C(데이터): momentum_quality sideways 후보 최적화 그리드
+    "momentum_quality": {
+        "buy_threshold": [0.8, 0.9, 1.0],      # 0.8-1.0: 신호 감도 조절
+        "sell_threshold": [-0.4, -0.5, -0.6],  # -0.4~-0.6: 숏 신호 감도 조절
+    },
 }
 
 # 과최적화 판단 기준
@@ -200,6 +205,7 @@ class WalkForwardOptimizer:
         fold_decay: float = 0.0,  # time-decay: 0=동일가중, 양수=최근fold에 지수적 가중치
         use_regime_weights: bool = False,  # HIGH_VOL fold 다운웨이팅
         trades_regularization_scale: float = 0.0,  # IS 거래 수 기반 정규화 계수
+        pf_regularization_scale: float = 0.0,    # IS 수익 팩터 기반 정규화 계수
     ):
         """
         Args:
@@ -221,6 +227,10 @@ class WalkForwardOptimizer:
                         양수면 Score += scale * min(1.0, is_trades/30) 추가.
                         sideways 구간에서 Sharpe=0이 다수일 때 거래 수가 더 많은
                         파라미터를 선호하도록 유도 (supertrend_multi 0-trades 문제 완화).
+            pf_regularization_scale: IS 수익 팩터 기반 정규화 계수.
+                        0.0(기본)이면 기존 동작 유지.
+                        양수면 Score += scale * min(1.0, is_pf/2.0) 추가.
+                        OOS PF 1.5 미달 시 IS 단계에서 PF 높은 파라미터 선호 유도.
         """
         if fold_decay < 0:
             raise ValueError(
@@ -236,6 +246,7 @@ class WalkForwardOptimizer:
         self.fold_decay = fold_decay
         self.use_regime_weights = use_regime_weights
         self.trades_regularization_scale = trades_regularization_scale
+        self.pf_regularization_scale = pf_regularization_scale
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -310,6 +321,7 @@ class WalkForwardOptimizer:
                 stability_lambda=self.stability_lambda,
                 plateau_pct=self.plateau_pct,
                 trades_regularization_scale=self.trades_regularization_scale,
+                pf_regularization_scale=self.pf_regularization_scale,
             )
 
             # OOS 검증
@@ -553,12 +565,14 @@ class WalkForwardOptimizer:
         stability_lambda: float = 0.5,
         plateau_pct: float = 0.9,
         trades_regularization_scale: float = 0.0,
+        pf_regularization_scale: float = 0.0,
     ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색.
 
-        목적함수: Score = Sharpe - λ * CV [+ γ * min(1, trades/30)]
+        목적함수: Score = Sharpe - λ * CV [+ γ * min(1, trades/30)] [+ δ * min(1, pf/2)]
         λ=0이면 순수 Sharpe 최대화.
         γ>0이면 IS 거래 수 기반 정규화 추가 (sideways 0-trades 타이브레이커).
+        δ>0이면 IS PF 기반 정규화 추가 (OOS PF < 1.5 전략 IS 단계에서 PF 향상 유도).
 
         플래토 룰 (plateau_pct):
           1. 모든 파라미터의 IS Sharpe 계산
@@ -567,11 +581,13 @@ class WalkForwardOptimizer:
           → 극단적 파라미터 배제 → 과최적화 방지
         """
         _TARGET_IS_TRADES = 30  # 정규화 기준 거래 수
+        _TARGET_IS_PF = 2.0    # PF 정규화 기준 (min(1, pf/2) → pf=2.0 이상이면 만점)
 
         best_params = combinations[0]
         best_score = -999.0
         param_is_sharpes: Dict[str, float] = {}
         param_is_trades: Dict[str, int] = {}  # 거래 수 기반 정규화용
+        param_is_pf: Dict[str, float] = {}    # PF 기반 정규화용
         # 그리드 탐색 중 파라미터값 누적 (CV 계산용)
         param_value_lists: Dict[str, list] = {}
 
@@ -583,6 +599,7 @@ class WalkForwardOptimizer:
                 param_key = str(sorted(params.items()))
                 param_is_sharpes[param_key] = round(sharpe, 4)
                 param_is_trades[param_key] = result.total_trades
+                param_is_pf[param_key] = result.profit_factor
                 # 파라미터별 값 수집 (CV 계산용)
                 for k, v in params.items():
                     param_value_lists.setdefault(k, []).append(float(v))
@@ -613,6 +630,10 @@ class WalkForwardOptimizer:
                 trades = param_is_trades.get(param_key, 0)
                 trades_norm = min(1.0, trades / _TARGET_IS_TRADES)
                 score += trades_regularization_scale * trades_norm
+            if pf_regularization_scale > 0.0:
+                pf = param_is_pf.get(param_key, 0.0)
+                pf_norm = min(1.0, pf / _TARGET_IS_PF)
+                score += pf_regularization_scale * pf_norm
             if score > best_score:
                 best_score = score
                 best_params = params
@@ -991,6 +1012,32 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
         n_windows=n_windows,
         plateau_pct=plateau_pct,
         trades_regularization_scale=0.1,  # sideways 0-trades 타이브레이커 (Cycle 294 E)
+    )
+    return opt.run(df)
+
+
+def optimize_momentum_quality(df: pd.DataFrame, n_windows: int = 3,
+                               plateau_pct: float = 0.9) -> WalkForwardResult:
+    """MomentumQuality 전략 파라미터 최적화 (Cycle 295 C: PF 1.5 미달 개선).
+
+    목적함수: Score = Sharpe - λ*CV + δ*min(1, PF/2)
+    pf_regularization_scale=0.1로 IS 단계에서 PF 높은 파라미터 선호.
+    """
+    from src.strategy.momentum_quality import MomentumQualityStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return MomentumQualityStrategy(
+            buy_threshold=params.get("buy_threshold", 1.0),
+            sell_threshold=params.get("sell_threshold", -0.5),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="momentum_quality",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["momentum_quality"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
+        pf_regularization_scale=0.1,  # OOS PF 1.5 미달 개선 (Cycle 295 C)
     )
     return opt.run(df)
 
