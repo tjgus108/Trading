@@ -881,6 +881,82 @@ class WalkForwardTrainer:
             return [1.0 / n] * n
         return [round(w / total, 6) for w in raw]
 
+    def compute_ensemble_weight_regime_aware(
+        self,
+        results: List["TrainingResult"],
+        strategy_names: List[str],
+        regime: str,
+        baseline: float = 0.50,
+        oos_sharpes: Optional[List[float]] = None,
+        oos_sharpe_scale: float = 2.0,
+    ) -> List[float]:
+        """
+        레짐 조건부 앙상블 가중치 계산.
+
+        특정 레짐에서 성능이 저하되는 전략(cmf: bull 전용, supertrend_multi: trend 전용)에
+        패널티를 부여하여 레짐 부적합 신호의 앙상블 영향을 축소.
+
+        레짐별 전략 적합성 (Cycle 293 verbose-windows 분석 결과):
+          BULL:     cmf(✅ W1: Sharpe=6.97) + supertrend_multi(✅ 추세 추종)
+          SIDEWAYS: cmf(❌ 0 PASS, PF<1.5) — 0.3x 패널티
+                    supertrend_multi(❌ 0 trades W5-W7) — 0.2x 패널티
+          BEAR:     cmf(⚠️ 역방향 가능성) — 0.5x 패널티
+                    supertrend_multi(⚠️ 추세 반대) — 0.4x 패널티
+
+        Args:
+            results: TrainingResult 리스트
+            strategy_names: 각 TrainingResult에 대응하는 전략명 리스트
+            regime: 현재 시장 레짐 ("BULL", "BEAR", "SIDEWAYS", "HIGH_VOL", 기타)
+            baseline: 기준 정확도 (기본 0.50)
+            oos_sharpes: 각 모델의 Bundle OOS Sharpe (선택)
+            oos_sharpe_scale: OOS Sharpe 배율 정규화 기준 (기본 2.0)
+
+        Returns:
+            List[float]: 정규화된 앙상블 가중치 (합=1.0)
+        """
+        # 레짐별 전략 패널티 계수
+        # 값이 작을수록 해당 레짐에서 전략 가중치 감소
+        _REGIME_STRATEGY_PENALTY: Dict[str, Dict[str, float]] = {
+            "BULL":     {"cmf": 1.0, "supertrend_multi": 1.0},
+            "SIDEWAYS": {"cmf": 0.3, "supertrend_multi": 0.2},
+            "BEAR":     {"cmf": 0.5, "supertrend_multi": 0.4},
+            "HIGH_VOL": {"cmf": 0.7, "supertrend_multi": 0.6},
+        }
+        regime_penalties = _REGIME_STRATEGY_PENALTY.get(regime.upper(), {})
+
+        n = len(results)
+        if n == 0:
+            return []
+
+        raw = []
+        for i, r in enumerate(results):
+            if not r.passed:
+                raw.append(0.0)
+                continue
+            score = (r.val_accuracy + r.test_accuracy) / 2.0 - baseline
+            score = max(0.0, score)
+
+            # 레짐 패널티 적용
+            sname = strategy_names[i] if i < len(strategy_names) else ""
+            regime_factor = regime_penalties.get(sname, 1.0)
+            score *= regime_factor
+
+            # Bundle OOS Sharpe 배율 (양수 시 증폭, 음수 시 패널티)
+            if oos_sharpes and i < len(oos_sharpes):
+                oos_s = oos_sharpes[i]
+                if oos_s > 0 and oos_sharpe_scale > 0:
+                    oos_mult = float(np.clip(oos_s / oos_sharpe_scale, 0.5, 2.0))
+                else:
+                    oos_mult = float(np.clip(0.5 + oos_s * 0.2, 0.1, 0.5))
+                score *= oos_mult
+
+            raw.append(score)
+
+        total = sum(raw)
+        if total <= 0.0:
+            return [1.0 / n] * n
+        return [round(w / total, 6) for w in raw]
+
     def save(self, path: Optional[str] = None) -> str:
         """학습된 모델을 pkl로 저장. path 없으면 자동 생성."""
         if self._trained_model is None:

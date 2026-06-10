@@ -199,6 +199,7 @@ class WalkForwardOptimizer:
         plateau_pct: float = 0.9,  # 플래토 룰: IS 최고 Sharpe의 이 비율 이상인 파라미터 집합 중 중간값 선택
         fold_decay: float = 0.0,  # time-decay: 0=동일가중, 양수=최근fold에 지수적 가중치
         use_regime_weights: bool = False,  # HIGH_VOL fold 다운웨이팅
+        trades_regularization_scale: float = 0.0,  # IS 거래 수 기반 정규화 계수
     ):
         """
         Args:
@@ -215,6 +216,11 @@ class WalkForwardOptimizer:
             fold_decay: time-decay 계수. 0이면 동일 가중치(기존 동작).
                         양수면 w_i = exp(fold_decay * i) (i가 클수록 최근 fold).
                         weighted_oos_sharpe 계산에만 사용; PASS/FAIL은 avg_oos_sharpe 기준.
+            trades_regularization_scale: IS 거래 수 기반 정규화 계수.
+                        0.0(기본)이면 기존 동작 유지.
+                        양수면 Score += scale * min(1.0, is_trades/30) 추가.
+                        sideways 구간에서 Sharpe=0이 다수일 때 거래 수가 더 많은
+                        파라미터를 선호하도록 유도 (supertrend_multi 0-trades 문제 완화).
         """
         if fold_decay < 0:
             raise ValueError(
@@ -229,6 +235,7 @@ class WalkForwardOptimizer:
         self.plateau_pct = plateau_pct
         self.fold_decay = fold_decay
         self.use_regime_weights = use_regime_weights
+        self.trades_regularization_scale = trades_regularization_scale
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -302,6 +309,7 @@ class WalkForwardOptimizer:
                 is_df, all_combinations,
                 stability_lambda=self.stability_lambda,
                 plateau_pct=self.plateau_pct,
+                trades_regularization_scale=self.trades_regularization_scale,
             )
 
             # OOS 검증
@@ -544,11 +552,13 @@ class WalkForwardOptimizer:
         self, is_df: pd.DataFrame, combinations: List[dict],
         stability_lambda: float = 0.5,
         plateau_pct: float = 0.9,
+        trades_regularization_scale: float = 0.0,
     ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색.
 
-        목적함수: Score = Sharpe - λ * CV (파라미터 내 변동성 패널티)
+        목적함수: Score = Sharpe - λ * CV [+ γ * min(1, trades/30)]
         λ=0이면 순수 Sharpe 최대화.
+        γ>0이면 IS 거래 수 기반 정규화 추가 (sideways 0-trades 타이브레이커).
 
         플래토 룰 (plateau_pct):
           1. 모든 파라미터의 IS Sharpe 계산
@@ -556,9 +566,12 @@ class WalkForwardOptimizer:
           3. 플래토 집합 내에서 각 파라미터의 중간값(median)에 가장 가까운 조합 선택
           → 극단적 파라미터 배제 → 과최적화 방지
         """
+        _TARGET_IS_TRADES = 30  # 정규화 기준 거래 수
+
         best_params = combinations[0]
         best_score = -999.0
         param_is_sharpes: Dict[str, float] = {}
+        param_is_trades: Dict[str, int] = {}  # 거래 수 기반 정규화용
         # 그리드 탐색 중 파라미터값 누적 (CV 계산용)
         param_value_lists: Dict[str, list] = {}
 
@@ -569,6 +582,7 @@ class WalkForwardOptimizer:
                 sharpe = result.sharpe_ratio
                 param_key = str(sorted(params.items()))
                 param_is_sharpes[param_key] = round(sharpe, 4)
+                param_is_trades[param_key] = result.total_trades
                 # 파라미터별 값 수집 (CV 계산용)
                 for k, v in params.items():
                     param_value_lists.setdefault(k, []).append(float(v))
@@ -585,7 +599,7 @@ class WalkForwardOptimizer:
             std_val = _statistics.stdev(vals)
             grid_cv[pname] = (std_val / mean_abs) if mean_abs > 1e-9 else 0.0
 
-        # Score = Sharpe - λ * avg_CV 로 최적 파라미터 선택 (플래토 룰 적용 전)
+        # Score = Sharpe - λ * avg_CV [+ γ * trades_norm] 로 최적 파라미터 선택
         avg_grid_cv = sum(grid_cv.values()) / len(grid_cv) if grid_cv else 0.0
 
         for params in combinations:
@@ -594,6 +608,11 @@ class WalkForwardOptimizer:
                 continue
             sharpe = param_is_sharpes[param_key]
             score = sharpe - stability_lambda * avg_grid_cv
+            # IS 거래 수 정규화: Sharpe 동점(특히 0.0 다수) 시 거래 더 많은 파라미터 선호
+            if trades_regularization_scale > 0.0:
+                trades = param_is_trades.get(param_key, 0)
+                trades_norm = min(1.0, trades / _TARGET_IS_TRADES)
+                score += trades_regularization_scale * trades_norm
             if score > best_score:
                 best_score = score
                 best_params = params
@@ -971,6 +990,7 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
         param_grid=DEFAULT_GRIDS["supertrend_multi"],
         n_windows=n_windows,
         plateau_pct=plateau_pct,
+        trades_regularization_scale=0.1,  # sideways 0-trades 타이브레이커 (Cycle 294 E)
     )
     return opt.run(df)
 
