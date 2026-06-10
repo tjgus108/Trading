@@ -28,6 +28,10 @@ _RSI_SELL_MIN = 32  # 약간의 과매도 허용
 class RelativeVolumeStrategy(BaseStrategy):
     name = "relative_volume"
 
+    def __init__(self, rvol_threshold: float = _RVOL_BUY_SELL, **kwargs):
+        # rvol_threshold: BUY/SELL 신호 발생 최소 RVOL (낮을수록 더 많은 신호)
+        self.rvol_threshold = rvol_threshold
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
             return self._hold_signal(0.0, "Insufficient data")
@@ -66,8 +70,8 @@ class RelativeVolumeStrategy(BaseStrategy):
             f"bb_upper={bb_upper:.2f} bb_lower={bb_lower:.2f} rsi={rsi:.1f}"
         )
 
-        # BUY: RVOL > 1.6 + 양봉 + close > VWAP + RSI < 68
-        if (rvol > _RVOL_BUY_SELL and bull_candle and 
+        # BUY: RVOL > rvol_threshold + 양봉 + close > VWAP + RSI < 68
+        if (rvol > self.rvol_threshold and bull_candle and
             close > vwap and rsi < _RSI_BUY_MAX):
             # HIGH CONF: RVOL > 2.3 AND (RSI < 45 OR RSI > 55) AND (close > BB upper)
             high_conf = (rvol > _RVOL_HIGH_CONF and 
@@ -84,8 +88,8 @@ class RelativeVolumeStrategy(BaseStrategy):
                 bear_case=info,
             )
 
-        # SELL: RVOL > 1.6 + 음봉 + close < VWAP + RSI > 32
-        if (rvol > _RVOL_BUY_SELL and bear_candle and 
+        # SELL: RVOL > rvol_threshold + 음봉 + close < VWAP + RSI > 32
+        if (rvol > self.rvol_threshold and bear_candle and
             close < vwap and rsi > _RSI_SELL_MIN):
             # HIGH CONF: RVOL > 2.3 AND (RSI < 45 OR RSI > 55) AND (close < BB lower)
             high_conf = (rvol > _RVOL_HIGH_CONF and 

@@ -18,6 +18,10 @@ MIN_ROWS = 50
 class HigherTimeframeEMAStrategy(BaseStrategy):
     name = "htf_ema"
 
+    def __init__(self, cross_pct: float = 0.5, **kwargs):
+        # cross_pct: cross 유효성 판단 시 HL-range 대비 거리 배율 (낮을수록 더 많은 신호)
+        self.cross_pct = cross_pct
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
             last_close: float = float(df["close"].iloc[-1])
@@ -98,12 +102,12 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
         cross_above = (prev_close_val <= prev_ema9) and (last_close_val > last_ema9)
         cross_below = (prev_close_val >= prev_ema9) and (last_close_val < last_ema9)
 
-        # 거리 필터 강화: 0.5배 변동성 이상 이동 필요
+        # cross_pct: HL-range 대비 cross 유효 거리 배율 (기본 0.5*0.5=0.25)
         cross_distance_threshold = last_hl_range * 0.5
         if cross_above:
-            cross_valid = (last_close_val - last_ema9) >= cross_distance_threshold * 0.5  # 강화됨
+            cross_valid = (last_close_val - last_ema9) >= cross_distance_threshold * self.cross_pct
         elif cross_below:
-            cross_valid = (last_ema9 - last_close_val) >= cross_distance_threshold * 0.5
+            cross_valid = (last_ema9 - last_close_val) >= cross_distance_threshold * self.cross_pct
         else:
             cross_valid = True
 
@@ -137,7 +141,7 @@ class HigherTimeframeEMAStrategy(BaseStrategy):
                 reasoning=(
                     f"HTF EMA uptrend ({htf_prev:.4f}→{htf_last:.4f}), "
                     f"close crossed above EMA9={last_ema9:.4f}, "
-                    f"distance={abs(last_close_val - last_ema9):.4f} (threshold={cross_distance_threshold * 0.5:.4f}), "
+                    f"distance={abs(last_close_val - last_ema9):.4f} (threshold={cross_distance_threshold * self.cross_pct:.4f}), "
                     f"RSI={last_rsi:.1f}"
                     + (f" [Vol spike {last_vol_ratio:.2f}x]" if vol_boost else "")
                     + (" [3-bar]" if htf_3up else "")

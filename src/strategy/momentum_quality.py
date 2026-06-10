@@ -19,6 +19,20 @@ _MIN_ROWS = 25
 class MomentumQualityStrategy(BaseStrategy):
     name = "momentum_quality"
 
+    def __init__(
+        self,
+        buy_threshold: float = 1.0,
+        sell_threshold: float = -0.5,
+        consistency_buy_min: float = 0.4,
+        consistency_sell_max: float = 0.6,
+        **kwargs,
+    ):
+        # sideways 구간에서 조건 완화 가능: buy_threshold=0.8, sell_threshold=-0.4
+        self.buy_threshold = buy_threshold
+        self.sell_threshold = sell_threshold
+        self.consistency_buy_min = consistency_buy_min
+        self.consistency_sell_max = consistency_sell_max
+
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < _MIN_ROWS:
             return self._hold(df, f"Insufficient data: {len(df)} < {_MIN_ROWS}")
@@ -54,8 +68,8 @@ class MomentumQualityStrategy(BaseStrategy):
             f"consistency={consistency_val:.2f} curr_close={curr_close:.4f}"
         )
 
-        if quality_score_val > 1.0 and mom20_val > 0 and consistency_val > 0.4:
-            conf = Confidence.HIGH if quality_score_val > 1.5 else Confidence.MEDIUM
+        if quality_score_val > self.buy_threshold and mom20_val > 0 and consistency_val > self.consistency_buy_min:
+            conf = Confidence.HIGH if quality_score_val > self.buy_threshold + 0.5 else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -67,8 +81,8 @@ class MomentumQualityStrategy(BaseStrategy):
                 bear_case="모멘텀 품질 하락 또는 일관성 감소 시 빠른 청산",
             )
 
-        if quality_score_val < -0.5 and mom20_val < 0 and consistency_val < 0.6:
-            conf = Confidence.HIGH if quality_score_val < -0.8 else Confidence.MEDIUM
+        if quality_score_val < self.sell_threshold and mom20_val < 0 and consistency_val < self.consistency_sell_max:
+            conf = Confidence.HIGH if quality_score_val < self.sell_threshold - 0.3 else Confidence.MEDIUM
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
