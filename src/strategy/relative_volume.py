@@ -28,8 +28,9 @@ _RSI_SELL_MIN = 32  # 약간의 과매도 허용
 class RelativeVolumeStrategy(BaseStrategy):
     name = "relative_volume"
 
-    def __init__(self, rvol_buy_sell: float = _RVOL_BUY_SELL, **kwargs):
+    def __init__(self, rvol_buy_sell: float = _RVOL_BUY_SELL, bull_only: bool = False, **kwargs):
         self.rvol_buy_sell = rvol_buy_sell
+        self.bull_only = bull_only  # True: BUY only when close > EMA50 (BULL regime)
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
@@ -69,9 +70,15 @@ class RelativeVolumeStrategy(BaseStrategy):
             f"bb_upper={bb_upper:.2f} bb_lower={bb_lower:.2f} rsi={rsi:.1f}"
         )
 
+        # bull_only: close > EMA50 일 때만 BUY 허용 (Cycle296 D: BULL 레짐 필터)
+        ema50_series = df["close"].ewm(span=50, adjust=False).mean()
+        ema50 = float(ema50_series.iloc[idx])
+        is_bull_regime = close > ema50
+
         # BUY: RVOL > threshold + 양봉 + close > VWAP + RSI < 68
         if (rvol > self.rvol_buy_sell and bull_candle and
-            close > vwap and rsi < _RSI_BUY_MAX):
+            close > vwap and rsi < _RSI_BUY_MAX and
+            (not self.bull_only or is_bull_regime)):
             # HIGH CONF: RVOL > 2.3 AND (RSI < 45 OR RSI > 55) AND (close > BB upper)
             high_conf = (rvol > _RVOL_HIGH_CONF and 
                         (rsi < 45 or rsi > 55) and close > bb_upper)

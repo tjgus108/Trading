@@ -60,11 +60,20 @@ def _find_cluster(
 class PriceClusterStrategy(BaseStrategy):
     name = "price_cluster"
 
-    def __init__(self, bounce_pct: float = _BOUNCE_PCT, **kwargs):
+    def __init__(
+        self,
+        bounce_pct: float = _BOUNCE_PCT,
+        close_window: int = _CLOSE_WINDOW,
+        n_bins: int = _N_BINS,
+        **kwargs,
+    ):
         self.bounce_pct = bounce_pct
+        self.close_window = close_window  # Cycle296 F: 빈도 개선용 (50→35 단축 가능)
+        self.n_bins = n_bins
 
     def generate(self, df: pd.DataFrame) -> Signal:
-        if len(df) < _MIN_ROWS:
+        min_rows = self.close_window + 5
+        if len(df) < min_rows:
             return self._hold(df, "Insufficient data")
 
         last = self._last(df)
@@ -77,10 +86,12 @@ class PriceClusterStrategy(BaseStrategy):
             return self._hold(df, "Not enough completed candles")
         prev_close = float(completed.iloc[-2]["close"])
 
-        # cluster 계산용 50봉 (신호봉 제외)
-        window_closes = completed["close"].iloc[-_CLOSE_WINDOW:]
+        # cluster 계산용 close_window봉 (신호봉 제외)
+        window_closes = completed["close"].iloc[-self.close_window:]
 
-        cluster_low, cluster_high, cluster_center, max_count, avg_count = _find_cluster(window_closes)
+        cluster_low, cluster_high, cluster_center, max_count, avg_count = _find_cluster(
+            window_closes, n_bins=self.n_bins
+        )
 
         context = (
             f"close={curr_close:.4f} prev={prev_close:.4f} "

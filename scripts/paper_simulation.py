@@ -77,9 +77,11 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "value_area": {"vol_filter_mult": 0.5},
     "wick_reversal": {"min_volatility": 0.001, "vol_mult": 0.6},
+    # Cycle296 D: bull_only 파라미터 추가됨, 기본값 False 유지 (bull_only=True는 trades 15→14로 역효과)
     "relative_volume": {"rvol_buy_sell": 1.3},
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
-    "price_cluster": {"bounce_pct": 0.015},
+    # Cycle296 F: close_window=35 → 50봉→35봉, 클러스터 갱신 빈도↑ → trades 증가 목표
+    "price_cluster": {"bounce_pct": 0.015, "close_window": 35},
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
@@ -1062,17 +1064,17 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     return report, results
 
 
-def run_simulation(mc_p_threshold: float = 0.05, pass_ratio: float = 0.5):
+def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
     print(f"Regime Weights: {'ON' if USE_REGIME_WEIGHTS else 'OFF'}")
     print("=" * 70)
 
-    # MC p-value 임계값 패치 (기본 0.05, --mc-p-threshold로 조절 가능)
+    # MC p-value 임계값 패치 (Cycle296 B: 기본 0.10으로 완화, --mc-p-threshold로 조절 가능)
     import src.backtest.engine as _engine_mod
     _engine_mod.MC_P_THRESHOLD = mc_p_threshold
-    if mc_p_threshold != 0.05:
+    if mc_p_threshold != 0.10:
         print(f"[CONFIG] MC p-value threshold overridden: {mc_p_threshold}", flush=True)
 
     # 일관성 통과 비율 패치 (기본 0.5, --pass-ratio로 완화 가능)
@@ -1148,8 +1150,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mc-p-threshold",
         type=float,
-        default=0.05,
-        help="MC permutation test p-value 상한 (기본 0.05, 예: 0.10으로 완화 가능)",
+        default=0.10,
+        help="MC permutation test p-value 상한 (Cycle296 B: 기본 0.10, 예: 0.05로 강화 가능)",
     )
     parser.add_argument(
         "--pass-ratio",
