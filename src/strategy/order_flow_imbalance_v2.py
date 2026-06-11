@@ -21,6 +21,10 @@ _HIGH_CONF_THRESH = 0.4
 class OrderFlowImbalanceV2Strategy(BaseStrategy):
     name = "order_flow_imbalance_v2"
 
+    def __init__(self, buy_thresh: float = _BUY_THRESH, sell_thresh: float = _SELL_THRESH, **kwargs):
+        self.buy_thresh = buy_thresh
+        self.sell_thresh = sell_thresh
+
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
             reason = "Insufficient data for order flow imbalance v2"
@@ -76,26 +80,26 @@ class OrderFlowImbalanceV2Strategy(BaseStrategy):
         # 거래량 필터 확인
         vol_strong = vol_val > vol_sma
 
-        if imb > _BUY_THRESH and imb > imb_ma_val and close_val > ewm_val and vol_strong:
+        if imb > self.buy_thresh and imb > imb_ma_val and close_val > ewm_val and vol_strong:
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close_val,
-                reasoning=f"매수 압력 우세(v2): imbalance={imb:.3f} > {_BUY_THRESH} AND > ma={imb_ma_val:.3f} AND close > EWM AND vol_strong",
-                invalidation=f"Imbalance drops below {_BUY_THRESH} or close < EWM or vol weakens",
+                reasoning=f"매수 압력 우세(v2): imbalance={imb:.3f} > {self.buy_thresh} AND > ma={imb_ma_val:.3f} AND close > EWM AND vol_strong",
+                invalidation=f"Imbalance drops below {self.buy_thresh} or close < EWM or vol weakens",
                 bull_case=f"imbalance={imb:.3f} imb_ma={imb_ma_val:.3f} ewm={ewm_val:.3f} vol={vol_val:.0f}vs{vol_sma:.0f}",
                 bear_case=f"imbalance={imb:.3f}",
             )
 
-        if imb < _SELL_THRESH and imb < imb_ma_val and close_val < ewm_val and vol_strong:
+        if imb < self.sell_thresh and imb < imb_ma_val and close_val < ewm_val and vol_strong:
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close_val,
-                reasoning=f"매도 압력 우세(v2): imbalance={imb:.3f} < {_SELL_THRESH} AND < ma={imb_ma_val:.3f} AND close < EWM AND vol_strong",
-                invalidation=f"Imbalance rises above {_SELL_THRESH} or close > EWM or vol weakens",
+                reasoning=f"매도 압력 우세(v2): imbalance={imb:.3f} < {self.sell_thresh} AND < ma={imb_ma_val:.3f} AND close < EWM AND vol_strong",
+                invalidation=f"Imbalance rises above {self.sell_thresh} or close > EWM or vol weakens",
                 bull_case=f"imbalance={imb:.3f}",
                 bear_case=f"imbalance={imb:.3f} imb_ma={imb_ma_val:.3f} ewm={ewm_val:.3f} vol={vol_val:.0f}vs{vol_sma:.0f}",
             )
