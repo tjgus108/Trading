@@ -1,3 +1,39 @@
+## [2026-06-11] Cycle 297 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] apply_wfe 불일치 수정 + rvol_buy_sell 조정**
+1. `src/backtest/engine.py`: apply_wfe() IS<-1.0 + OOS>1.5 케이스 수정
+   - RollingOOSValidator.validate()와 WFE 로직 동기화 (Cycle277 이후 불일치 존재)
+   - IS<-1.0 + OOS>1.5 → wfe=0.5 부분 신뢰 (레짐 전환 마커)
+   - 기존: wfe=0.0으로 무조건 FAIL 유도 → 수정: OOS 강한 회복은 부분 신뢰
+2. `scripts/paper_simulation.py`: rvol_buy_sell 1.3→1.2
+   - relative_volume avg_trades 15→17, consistency 0/8→1/8 PASS 달성
+
+**[D(ML)] n_bins=3 실험 실패 — 기본값 복원**
+3. `src/strategy/price_cluster.py`: close_window, n_bins 파라미터 추가 (코드 유지)
+   - PAPER_SIM_STRATEGY_PARAMS: n_bins=3 역효과 (Sharpe -2.78, 노이즈↑) → 제거
+   - PAPER_SIM_STRATEGY_PARAMS: close_window=35 역효과 없음 → 제거
+   - bounce_pct=0.015만 유지 → price_cluster score=70.8, Sharpe=3.63 복구
+
+**[F(리서치)] bull_only=True 실험 실패 — 제거**
+4. `src/strategy/momentum_quality.py`: bull_only 파라미터 추가 (코드 유지)
+   - PAPER_SIM_STRATEGY_PARAMS: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
+   - momentum_quality Sharpe=1.82 복구
+
+**[F(리서치)] MC_P_THRESHOLD=0.10 적용 효과 확인**
+- order_flow_imbalance_v2: 3/8 PASS (Cycle 296 MC 버그 수정 효과 확인)
+- 이번 사이클 Paper Sim은 MC_P_THRESHOLD=0.10 올바르게 적용됨
+
+**[시뮬레이션 결과 Cycle 297]**
+- Paper Sim BTC 4h (8 windows): **0/22 PASS**
+  - rank1: price_cluster (score=70.8, Sharpe=3.63, PF=2.21, trades=11) ← 복구
+  - rank2: momentum_quality (score=62.9, Sharpe=1.82, trades=22)
+  - rank3: relative_volume (score=61.8, Sharpe=2.08, **trades=17**, consistency=1/8) ← 신규 PASS 윈도우
+  - rank6: order_flow_imbalance_v2 (consistency=3/8) ← MC=0.10 효과
+- Bundle OOS BTC 4h (5-fold): **2/5 PASS** (Cycle 296와 동일)
+  - cmf: PASS (avg=2.508, std=1.888, WFE=1.136)
+  - supertrend_multi: PASS (avg=3.674, std=1.860, WFE=2.116)
+- 테스트: **8392 passed** (회귀 없음)
+
 ## [2026-06-10] Cycle 296 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] MC 임계값 완화 — 통계 검증력 개선**
@@ -10956,6 +10992,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-10 20:15 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 00:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

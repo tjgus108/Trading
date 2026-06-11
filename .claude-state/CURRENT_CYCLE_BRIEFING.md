@@ -1,39 +1,36 @@
 # Current Cycle Briefing
 
-_Cycle 296 완료 — 2026-06-10_
+_Cycle 297 완료 — 2026-06-11_
 _카테고리: B(리스크) + D(ML) + F(리서치)_
 
 ## 이번 사이클 요약
 
 ### 완료한 작업
 
-1. **B(리스크)**: MC 임계값 완화 — 15 trades 수준 통계 검증력 개선
-   - `src/backtest/engine.py`: MC_P_THRESHOLD 0.05 → 0.10
-   - `scripts/paper_simulation.py`: run_simulation/argparse default 0.05→0.10 동기화
-   - **버그 수정**: paper_simulation의 run_simulation() 기본값이 engine.py 변경을 덮어쓰는 문제 발견·수정
+1. **B(리스크)**: apply_wfe() 불일치 수정 + rvol_buy_sell 조정
+   - `src/backtest/engine.py`: IS<-1.0+OOS>1.5 WFE=0.5 케이스 추가 (RollingOOSValidator 동기화)
+   - `paper_simulation.py`: rvol_buy_sell 1.3→1.2 → relative_volume trades 15→17, 1/8 PASS
 
-2. **D(ML)**: relative_volume bull_only 레짐 필터
-   - `src/strategy/relative_volume.py`: bull_only 파라미터 추가 (기본값=False)
-   - **실험**: PAPER_SIM에 bull_only=True → trades 15→14 (역효과) → PAPER_SIM에서 제거
-   - 코드 기능은 보존 (향후 실험 가능)
+2. **D(ML)**: n_bins=3 실험 → 역효과 확인 → 복원
+   - `src/strategy/price_cluster.py`에 n_bins 파라미터 추가됨 (코드 유지)
+   - n_bins=3: Sharpe -2.78 (실패) → PAPER_SIM에서 제거, bounce_pct=0.015만 유지
 
-3. **F(리서치)**: price_cluster 파라미터화
-   - `src/strategy/price_cluster.py`: close_window, n_bins 생성자 파라미터 추가
-   - PAPER_SIM 오버라이드: close_window=35 테스트 → trades 여전히 11 (효과 없음)
-   - 다음 사이클: n_bins=3 시도 검토
+3. **F(리서치)**: bull_only=True 실험 → 역효과 확인 → 복원
+   - `src/strategy/momentum_quality.py`에 bull_only 파라미터 추가됨 (코드 유지)
+   - bull_only=True: Sharpe 1.82→1.60 (실패) → PAPER_SIM에서 제거
 
-### 현재 성과 지표
+### 시뮬레이션 결과
 
-- **테스트**: 8392 passed (회귀 없음)
-- **Paper Sim**: 0/22 PASS (MC 임계값 버그로 구기준 적용됨 → Cycle 297에서 재확인)
-  - 최고 전략: momentum_quality (Sharpe=1.82, trades=22, score=73.3)
-  - relative_volume: trades=14 (bull_only 역효과)
-- **Bundle OOS**: 2/5 PASS (cmf + supertrend_multi, Cycle 295 동일)
+- Paper Sim BTC 4h: 0/22 PASS
+  - price_cluster score=70.8, Sharpe=3.63 (복구)
+  - relative_volume score=61.8, trades=17, **1/8 PASS** (첫 일관성 달성)
+  - order_flow_imbalance_v2 **3/8 PASS** (MC=0.10 효과)
+- Bundle OOS BTC 4h: **2/5 PASS** (cmf, supertrend_multi)
+- 테스트: **8392 passed**
 
-### 다음 사이클 우선순위
+### 다음 사이클 (298) 방향
 
-**Cycle 297 = B(리스크) + D(ML) + F(리서치)**
-
-1. **B**: 수정된 MC_P_THRESHOLD=0.10 기준으로 Paper Sim 재실행 → order_flow_imbalance_v2 통과 확인
-2. **D**: price_cluster n_bins=3 실험 (더 넓은 bin → trades 증가 가능성)
-3. **F**: momentum_quality bear 레짐 FAIL 분석 → bull_only 파라미터 추가 검토
+- 298 mod 5 = 3 → **C(데이터) + B(리스크) + F(리서치)**
+- C: price_cluster bounce_pct=0.02 시도 (trades 11→15 목표)
+- B: relative_volume 추가 조정 또는 volatility_cluster 파라미터 검토
+- F: order_flow_imbalance_v2 3/8→4/8 PASS 달성 전략 분석

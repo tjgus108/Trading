@@ -23,10 +23,12 @@ class MomentumQualityStrategy(BaseStrategy):
         self,
         quality_score_buy_threshold: float = 1.0,
         consistency_buy_threshold: float = 0.4,
+        bull_only: bool = False,
         **kwargs,
     ):
         self.quality_score_buy_threshold = quality_score_buy_threshold
         self.consistency_buy_threshold = consistency_buy_threshold
+        self.bull_only = bull_only  # Cycle297 F: True → close > EMA50 시에만 BUY
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < _MIN_ROWS:
@@ -58,12 +60,20 @@ class MomentumQualityStrategy(BaseStrategy):
 
         curr_close = float(close.iloc[idx])
 
+        # bull_only: EMA50 기준 상승 레짐 필터 (Cycle297 F)
+        if self.bull_only:
+            ema50 = close.ewm(span=50, adjust=False).mean()
+            ema50_val = float(ema50.iloc[idx])
+            is_bull_regime = curr_close > ema50_val
+        else:
+            is_bull_regime = True
+
         context = (
             f"quality_score={quality_score_val:.3f} mom20={mom20_val:.5f} "
             f"consistency={consistency_val:.2f} curr_close={curr_close:.4f}"
         )
 
-        if quality_score_val > self.quality_score_buy_threshold and mom20_val > 0 and consistency_val > self.consistency_buy_threshold:
+        if quality_score_val > self.quality_score_buy_threshold and mom20_val > 0 and consistency_val > self.consistency_buy_threshold and is_bull_regime:
             conf = Confidence.HIGH if quality_score_val > 1.5 else Confidence.MEDIUM
             return Signal(
                 action=Action.BUY,

@@ -77,11 +77,13 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "value_area": {"vol_filter_mult": 0.5},
     "wick_reversal": {"min_volatility": 0.001, "vol_mult": 0.6},
-    # Cycle296 D: bull_only 파라미터 추가됨, 기본값 False 유지 (bull_only=True는 trades 15→14로 역효과)
-    "relative_volume": {"rvol_buy_sell": 1.3},
+    # Cycle297 B: rvol_buy_sell 1.3→1.2 (trades 15 평균이지만 일부 윈도우 14/10으로 FAIL → 신호 빈도 ↑)
+    "relative_volume": {"rvol_buy_sell": 1.2},
+    # Cycle297 F: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
-    # Cycle296 F: close_window=35 → 50봉→35봉, 클러스터 갱신 빈도↑ → trades 증가 목표
-    "price_cluster": {"bounce_pct": 0.015, "close_window": 35},
+    # Cycle297 D: n_bins=3 역효과 (Sharpe -2.78, 큰 bin으로 노이즈↑) + close_window=35 효과 없음 → 기본값 복원
+    # bounce_pct=0.015는 Cycle 295에서 rank1 검증 (score=74.1, Sharpe=3.63)
+    "price_cluster": {"bounce_pct": 0.015},
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)

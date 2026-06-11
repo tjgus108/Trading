@@ -275,7 +275,11 @@ class BacktestEngine:
         elif result.sharpe_ratio > 0:
             # IS<0 + OOS>0: IS가 심각한 음수(-1.0 미만)이면 역방향 신호로 신뢰 불가
             if is_sharpe < -1.0:
-                wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
+                # Cycle297 B: RollingOOSValidator와 동기화 — OOS>1.5면 레짐 전환 마커로 부분 신뢰
+                if result.sharpe_ratio > 1.5:
+                    wfe = 0.5  # IS 역방향 레짐, OOS 강한 회복 → 부분 신뢰
+                else:
+                    wfe = 0.0  # 강한 역방향 — WFE 0으로 fold FAIL 유도
             else:
                 wfe = 1.0  # IS 소폭 음수, OOS 양수 → 과최적화 아님
         else:
