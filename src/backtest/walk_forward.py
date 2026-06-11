@@ -1265,10 +1265,15 @@ class RollingOOSValidator:
         _WFE_CAP = 3.0
         capped_wfes = [max(min(f.wfe, _WFE_CAP), -_WFE_CAP) for f in active_folds]
         avg_wfe = sum(capped_wfes) / len(capped_wfes)
-        avg_sharpe = sum(f.oos_sharpe for f in active_folds) / len(active_folds)
+        # OOS Sharpe 윈소라이즈: WFE와 동일 원칙 적용 (Cycle298 C데이터)
+        # 극단 fold (e.g. -12.3) 가 avg_sharpe / oos_std 를 왜곡하는 것 방지
+        # 개별 fold PASS/FAIL은 원본 oos_sharpe 그대로 유지, 집계(avg/std)만 클리핑
+        _SHARPE_FOLD_CAP = 10.0
+        capped_sharpes = [max(min(f.oos_sharpe, _SHARPE_FOLD_CAP), -_SHARPE_FOLD_CAP) for f in active_folds]
+        avg_sharpe = sum(capped_sharpes) / len(capped_sharpes)
         avg_pf = sum(f.oos_pf for f in active_folds) / len(active_folds)
         oos_sharpes = [f.oos_sharpe for f in active_folds]
-        oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
+        oos_std = _stats.stdev(capped_sharpes) if len(capped_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
 
         # DSR 계산: OOS Sharpe 평균과 거래 수를 기반으로 통계적 유의성 판정
