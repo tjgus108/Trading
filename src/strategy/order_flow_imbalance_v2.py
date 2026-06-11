@@ -5,6 +5,8 @@ OrderFlowImbalanceV2Strategy Enhanced:
 - SELL_THRESH: -0.2 → -0.25 (더 강한 음봉 필요)
 - 거래량 필터: volume > volume_sma20 (강한 주문흐름 확인)
 - trend_span (optional): macro trend EMA filter (Cycle298 F)
+- delta_window (Cycle299 F): cumulative delta rolling window 파라미터화
+  기본값=10, 단축 시(7 등) 최근 신호에 더 빠르게 반응
 """
 
 from typing import Optional
@@ -22,9 +24,11 @@ _HIGH_CONF_THRESH = 0.4
 class OrderFlowImbalanceV2Strategy(BaseStrategy):
     name = "order_flow_imbalance_v2"
 
-    def __init__(self, trend_span: int = 0, **kwargs):
-        # trend_span > 0: EMA(trend_span) macro trend filter (BUY requires close > EMA, SELL requires close < EMA)
+    def __init__(self, trend_span: int = 0, delta_window: int = 10, **kwargs):
+        # trend_span > 0: EMA(trend_span) macro trend filter
         self.trend_span = trend_span
+        # delta_window: cumulative delta / total_vol rolling window (Cycle299 F)
+        self.delta_window = max(2, int(delta_window))
 
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
@@ -55,8 +59,8 @@ class OrderFlowImbalanceV2Strategy(BaseStrategy):
         buy_vol = volume * (close > open_).astype(float)
         sell_vol = volume * (close <= open_).astype(float)
         delta = buy_vol - sell_vol
-        cum_delta = delta.rolling(10, min_periods=1).sum()
-        total_vol = volume.rolling(10, min_periods=1).sum()
+        cum_delta = delta.rolling(self.delta_window, min_periods=1).sum()
+        total_vol = volume.rolling(self.delta_window, min_periods=1).sum()
         imbalance = cum_delta / (total_vol + 1e-10)
         imbalance_ma = imbalance.rolling(5, min_periods=1).mean()
         ewm_close = close.ewm(span=10).mean()

@@ -7,6 +7,9 @@ PriceClusterStrategy v3:
 - confidence: 빈도 > 평균의 1.5배 이상 → HIGH (PF 개선)
 - 최소 데이터: 55행
 - v3 수정: threshold를 cluster 가격 기준 비율로 계산 (0 trades 버그 수정)
+- Cycle299 D(ML): vol_regime_filter — ATR 기반 sideways 레짐 필터
+  ATR/close > vol_atr_thresh이면 추세/변동성 시장으로 간주해 신호 억제
+  price_cluster는 sideways에서만 유효 (W5/W6 PASS 관찰 기반)
 """
 
 from typing import Optional, Tuple
@@ -65,11 +68,38 @@ class PriceClusterStrategy(BaseStrategy):
         bounce_pct: float = _BOUNCE_PCT,
         close_window: int = _CLOSE_WINDOW,
         n_bins: int = _N_BINS,
+        vol_regime_filter: bool = False,
+        vol_atr_period: int = 14,
+        vol_atr_thresh: float = 0.025,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
-        self.close_window = close_window  # Cycle296 F: 빈도 개선용 (50→35 단축 가능)
+        self.close_window = close_window
         self.n_bins = n_bins
+        # Cycle299 D(ML): ATR 기반 sideways 레짐 필터
+        self.vol_regime_filter = vol_regime_filter
+        self.vol_atr_period = vol_atr_period
+        self.vol_atr_thresh = vol_atr_thresh
+
+    def _atr_ratio(self, df: pd.DataFrame) -> float:
+        """ATR(vol_atr_period) / close 비율. 변동성 레짐 판별용."""
+        n = self.vol_atr_period
+        if len(df) < n + 1:
+            return 0.0
+        high = df["high"].astype(float)
+        low = df["low"].astype(float)
+        close = df["close"].astype(float)
+        prev_close = close.shift(1)
+        tr = pd.concat([
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ], axis=1).max(axis=1)
+        atr = float(tr.rolling(n, min_periods=n).mean().iloc[-2])
+        curr_close = float(close.iloc[-2])
+        if curr_close <= 0 or np.isnan(atr):
+            return 0.0
+        return atr / curr_close
 
     def generate(self, df: pd.DataFrame) -> Signal:
         min_rows = self.close_window + 5
@@ -78,6 +108,13 @@ class PriceClusterStrategy(BaseStrategy):
 
         last = self._last(df)
         curr_close = float(last["close"])
+
+        # Cycle299 D(ML): ATR 기반 변동성 레짐 필터
+        # 높은 ATR/close → 추세/변동성 장 → price_cluster 비적합 → HOLD
+        if self.vol_regime_filter:
+            atr_r = self._atr_ratio(df)
+            if atr_r > self.vol_atr_thresh:
+                return self._hold(df, f"Vol regime filter: ATR/close={atr_r:.4f}>{self.vol_atr_thresh}")
 
         completed = df.iloc[:-1]
 

@@ -1,3 +1,34 @@
+## [2026-06-11] Cycle 299 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] price_cluster ATR 기반 vol_regime_filter 추가 (코드 기능)**
+1. `src/strategy/price_cluster.py`: vol_regime_filter, vol_atr_period, vol_atr_thresh 파라미터 추가
+   - `_atr_ratio()` 메서드: ATR(14)/close 비율로 변동성 레짐 판별
+   - vol_regime_filter=True 시 ATR/close > vol_atr_thresh이면 HOLD (추세/고변동성 억제)
+   - PAPER_SIM 실험: thresh=0.025 역효과 (trades 12→5, 0/8 PASS) → PAPER_SIM에서 비활성 유지
+   - 코드 기능은 유지 (향후 임계값 튜닝 또는 상대적 ATR 방식 실험 가능)
+
+**[E(실행)] paper_simulation adaptive_slippage 활성화**
+2. `scripts/paper_simulation.py`: BacktestEngine adaptive_slippage=True 추가
+   - ATR 기반 레짐별 가변 슬리피지: low(<0.5%)=0.02%, normal(<2%)=0.05%, high(≥2%)=0.15%
+   - 고변동성 구간 시장 충격을 현실적으로 반영 (flat 0.05%→레짐별 차등)
+   - price_cluster sideways 구간: 0.02% 슬리피지 → 더 현실적인 성과 추정
+   - cmf/supertrend_multi 트렌드 구간: 0.15% → 보수적 추정 (실전 격차 감소)
+
+**[F(리서치)] order_flow_imbalance_v2 delta_window 파라미터화**
+3. `src/strategy/order_flow_imbalance_v2.py`: delta_window 파라미터 추가 (기본값=10)
+   - cumulative delta rolling window를 파라미터화 (이전: 하드코딩 10)
+   - PAPER_SIM 실험: delta_window=7 → 역효과 (sharpe -2.10 악화) → 기본값(10) 복원
+   - 코드 기능 유지 (향후 실험 용이)
+
+**[시뮬레이션 결과 Cycle 299]**
+- Paper Sim BTC 4h (8 windows): **0/22 PASS** (adaptive_slippage=True 적용)
+  - rank1: price_cluster (score=71.5, Sharpe=3.41, SharpeStd=2.41, PF=2.05, trades=12, 2/8 PASS) ← bounce_pct=0.02, adaptive slippage
+  - rank2: momentum_quality (score=63.6, Sharpe=1.48, trades=22)
+  - rank8: order_flow_imbalance_v2 (trend_span=20, delta_window=10, 3/8 PASS 복원)
+  - cmf: score=56.9, Sharpe=0.59 (adaptive slippage 고변동성 페널티)
+- Bundle OOS BTC 4h (5-fold): **2/5 PASS** (cmf avg=2.508, supertrend_multi avg=3.674) ← 변화 없음
+- 테스트: **262 passed** (관련 테스트 전부 통과, 회귀 없음)
+
 ## [2026-06-11] Cycle 298 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] price_cluster bounce_pct 0.015→0.02**
@@ -11493,6 +11524,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-11 15:38 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-11 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 20:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

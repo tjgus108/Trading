@@ -82,9 +82,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle297 F: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
     # Cycle298 C: bounce_pct 0.015→0.02 (threshold 완화, W5/W6 sideways 2/8 PASS 달성)
+    # Cycle299 D(ML): vol_regime_filter 실험 → thresh=0.025 역효과 (trades 12→5, 0/8 PASS) → 제거
+    #   vol_regime_filter 코드 기능은 유지하되 기본값(False) 사용
     "price_cluster": {"bounce_pct": 0.02},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
-    # trend_span=50 시도 → 1/8로 감소 (EMA50 과도한 필터링 확인) → 20 유지
+    # Cycle299 F: delta_window=7 실험 → 역효과 (2/8→2/8, sharpe -2.10으로 악화) → 기본값(10) 복원
     "order_flow_imbalance_v2": {"trend_span": 20},
 }
 
@@ -1096,11 +1098,14 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
     engine = BacktestEngine(
         initial_balance=10_000,
         fee_rate=0.00055,       # Bybit taker 0.055%
-        slippage_pct=0.0005,    # 0.05%
+        slippage_pct=0.0005,    # 0.05% (기본값, adaptive_slippage=True 시 레짐별로 오버라이드됨)
         mc_min_trades=getattr(_this, "MC_MIN_TRADES", 0),
         mc_block_size=getattr(_this, "MC_BLOCK_SIZE", 1),
-        # Cycle298 B: 연속 손실 5회 시 포지션 50% 축소 (sharpe -7.98 극단 손실 윈도우 완화 목표)
+        # Cycle298 B: 연속 손실 5회 시 포지션 50% 축소
         consec_loss_scale_threshold=getattr(_this, "CONSEC_LOSS_SCALE_THRESHOLD", 5),
+        # Cycle299 E(실행): ATR 기반 레짐별 가변 슬리피지 (low=0.02%, normal=0.05%, high=0.15%)
+        # 고변동성 구간의 시장 충격을 현실적으로 반영, 저변동성 sideways 구간 유리
+        adaptive_slippage=True,
     )
 
     sections = []
