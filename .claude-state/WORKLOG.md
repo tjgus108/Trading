@@ -1,3 +1,42 @@
+## [2026-06-11] Cycle 298 — C(데이터) + B(리스크) + F(리서치)
+
+**[C(데이터)] price_cluster bounce_pct 조정**
+1. `scripts/paper_simulation.py`: price_cluster bounce_pct 0.015→0.02
+   - avg_trades 11→12 (marginal improvement, still < 15), Sharpe 3.63→3.72 유지
+   - 품질 유지 확인 (PF 2.21→2.17), 신호 빈도 소폭 증가
+
+**[B(리스크)] relative_volume 일관성 개선**
+2. `scripts/paper_simulation.py`: rvol_buy_sell 1.2→1.1
+   - avg_trades 17→19 (개선), PF 1.57→1.63 (개선)
+   - mc_p_value 0.256→0.155 (개선, 0.10 임계값에 근접)
+   - fail pattern 변화: trades 11<15(x1) → trades 13<15(x1) (trades 증가 확인)
+
+**[B(리스크)] volatility_cluster vol_thresh 실험 → 역효과 확인 → 복원**
+3. `src/strategy/volatility_cluster.py`: vol_thresh 파라미터 추가 (코드 유지)
+   - vol_thresh=0.7 실험: trades 14→21 BUT PF 1.14→0.88, Sharpe -1.31→-2.17 역효과
+   - PAPER_SIM_STRATEGY_PARAMS에서 제거 (기본값 0.6 복원)
+   - 파라미터화 코드는 유지 (future 실험용)
+
+**[코드 개선 1] walk_forward.py — OOS Sharpe 윈소라이제이션**
+4. `src/backtest/walk_forward.py`: RollingOOSValidator.validate() OOS Sharpe 윈소라이즈
+   - `_SHARPE_FOLD_CAP = 10.0` 추가 (WFE _WFE_CAP=3.0과 동일 원칙)
+   - avg_sharpe, oos_std 모두 capped_sharpes로 계산 (극단 fold 왜곡 방지)
+   - 개별 fold PASS/FAIL은 원본 oos_sharpe 그대로 유지
+
+**[F(리서치)] order_flow_imbalance_v2 분석**
+- 3/8 PASS 유지 (변경 없음)
+- fail: mc_p_value 0.192(x1), sharpe -7.98(x1), PF 0.31(x1) → 극단 손실 윈도우 1개 문제
+- 다음 사이클에서 BUY_THRESH 조정 또는 ATR 기반 레짐 필터 검토 필요
+
+**[시뮬레이션 결과 Cycle 298]**
+- Paper Sim BTC 4h (8 windows): **0/22 PASS** (Cycle 297과 동일)
+  - rank1: price_cluster (score=71.5, Sharpe=3.72, PF=2.17, trades=12)
+  - rank2: momentum_quality (score=62.9, Sharpe=1.82, trades=22)
+  - rank3: relative_volume (score=61.0, Sharpe=1.84, PF=1.63, trades=19) ← 개선
+  - rank6: order_flow_imbalance_v2 (3/8 PASS, 변화 없음)
+- Bundle OOS BTC 4h (5-fold, --csv-dir data/historical): **2/5 PASS** (cmf, supertrend_multi) ← 유지
+- 테스트: **8392 passed** (회귀 없음)
+
 ## [2026-06-11] Cycle 297 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] apply_wfe 불일치 수정 + rvol_buy_sell 조정**
@@ -11086,6 +11125,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-11 00:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-11 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-11 10:09 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

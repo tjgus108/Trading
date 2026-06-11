@@ -31,6 +31,9 @@ _SMA_PERIOD = 10
 class VolatilityClusterStrategy(BaseStrategy):
     name = "volatility_cluster"
 
+    def __init__(self, vol_thresh: float = _LOW_VOL_THRESH, **kwargs):
+        self.vol_thresh = vol_thresh  # Cycle298 B: 파라미터화 (0.6→0.7 조정 가능)
+
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
             reason = (
@@ -88,7 +91,7 @@ class VolatilityClusterStrategy(BaseStrategy):
         )
 
         # 신호 생성 로직 단순화: 거짓 신호 필터링 감소
-        if vr < _LOW_VOL_THRESH:
+        if vr < self.vol_thresh:
             confidence = Confidence.MEDIUM
             
             if vr < _HIGH_CONF_THRESH:
