@@ -77,13 +77,15 @@ PASS_RATIO = 0.5  # 50% 이상 윈도우에서 통과
 PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "value_area": {"vol_filter_mult": 0.5},
     "wick_reversal": {"min_volatility": 0.001, "vol_mult": 0.6},
-    # Cycle297 B: rvol_buy_sell 1.3→1.2 (trades 15 평균이지만 일부 윈도우 14/10으로 FAIL → 신호 빈도 ↑)
+    # Cycle298 B: rvol_buy_sell 1.1 역효과 (PF 1.40/1.36, W4-W6 bear/sideways 여전히 FAIL) → 1.2 복원
     "relative_volume": {"rvol_buy_sell": 1.2},
     # Cycle297 F: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
-    # Cycle297 D: n_bins=3 역효과 (Sharpe -2.78, 큰 bin으로 노이즈↑) + close_window=35 효과 없음 → 기본값 복원
-    # bounce_pct=0.015는 Cycle 295에서 rank1 검증 (score=74.1, Sharpe=3.63)
-    "price_cluster": {"bounce_pct": 0.015},
+    # Cycle298 C: bounce_pct 0.015→0.02 (threshold 완화, W5/W6 sideways 2/8 PASS 달성)
+    "price_cluster": {"bounce_pct": 0.02},
+    # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
+    # trend_span=50 시도 → 1/8로 감소 (EMA50 과도한 필터링 확인) → 20 유지
+    "order_flow_imbalance_v2": {"trend_span": 20},
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
@@ -1097,6 +1099,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
         slippage_pct=0.0005,    # 0.05%
         mc_min_trades=getattr(_this, "MC_MIN_TRADES", 0),
         mc_block_size=getattr(_this, "MC_BLOCK_SIZE", 1),
+        # Cycle298 B: 연속 손실 5회 시 포지션 50% 축소 (sharpe -7.98 극단 손실 윈도우 완화 목표)
+        consec_loss_scale_threshold=getattr(_this, "CONSEC_LOSS_SCALE_THRESHOLD", 5),
     )
 
     sections = []

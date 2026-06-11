@@ -4,6 +4,7 @@ OrderFlowImbalanceV2Strategy Enhanced:
 - BUY_THRESH: 0.2 → 0.25 (더 강한 양봉 필요)
 - SELL_THRESH: -0.2 → -0.25 (더 강한 음봉 필요)
 - 거래량 필터: volume > volume_sma20 (강한 주문흐름 확인)
+- trend_span (optional): macro trend EMA filter (Cycle298 F)
 """
 
 from typing import Optional
@@ -20,6 +21,10 @@ _HIGH_CONF_THRESH = 0.4
 
 class OrderFlowImbalanceV2Strategy(BaseStrategy):
     name = "order_flow_imbalance_v2"
+
+    def __init__(self, trend_span: int = 0, **kwargs):
+        # trend_span > 0: EMA(trend_span) macro trend filter (BUY requires close > EMA, SELL requires close < EMA)
+        self.trend_span = trend_span
 
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
@@ -72,11 +77,21 @@ class OrderFlowImbalanceV2Strategy(BaseStrategy):
 
         imb_ma_val = float(imb_ma)
         confidence = Confidence.HIGH if abs(imb) > _HIGH_CONF_THRESH else Confidence.MEDIUM
-        
+
         # 거래량 필터 확인
         vol_strong = vol_val > vol_sma
 
-        if imb > _BUY_THRESH and imb > imb_ma_val and close_val > ewm_val and vol_strong:
+        # macro trend filter (Cycle298 F): trend_span > 0이면 EMA 기반 추세 확인
+        # 극단 손실 윈도우(bearish spike)에서 역방향 신호 억제
+        trend_ema_val = None
+        if self.trend_span > 0:
+            trend_ema = close.ewm(span=self.trend_span, adjust=False).mean()
+            trend_ema_val = float(trend_ema.iloc[idx])
+
+        bull_trend = (trend_ema_val is None) or (close_val > trend_ema_val)
+        bear_trend = (trend_ema_val is None) or (close_val < trend_ema_val)
+
+        if imb > _BUY_THRESH and imb > imb_ma_val and close_val > ewm_val and vol_strong and bull_trend:
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -88,7 +103,7 @@ class OrderFlowImbalanceV2Strategy(BaseStrategy):
                 bear_case=f"imbalance={imb:.3f}",
             )
 
-        if imb < _SELL_THRESH and imb < imb_ma_val and close_val < ewm_val and vol_strong:
+        if imb < _SELL_THRESH and imb < imb_ma_val and close_val < ewm_val and vol_strong and bear_trend:
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,

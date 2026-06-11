@@ -113,6 +113,7 @@ class BacktestEngine:
         adaptive_slippage: bool = False,  # True면 ATR 기반 레짐별 가변 슬리피지
         mc_min_trades: int = 0,  # MC 검정 최소 거래 수 (0=MIN_TRADES 사용)
         mc_block_size: int = 1,  # MC block sign randomization 크기 (1=독립 셔플)
+        consec_loss_scale_threshold: int = 0,  # Cycle298 B: 연속 손실 N회 시 포지션 50% 축소 (0=비활성)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -127,6 +128,9 @@ class BacktestEngine:
         self.funding_cost_per_candle = funding_cost_per_candle
         self.dsr_threshold = dsr_threshold
         self.adaptive_slippage = adaptive_slippage
+        # consec_loss_scale_threshold: 0이면 비활성. N>0이면 N번 연속 손실 후 포지션 사이즈 50% 축소
+        # DrawdownMonitor.get_size_multiplier()와 동일한 로직을 backtest 시뮬레이션에 반영
+        self.consec_loss_scale_threshold = max(0, int(consec_loss_scale_threshold))
         # mc_min_trades: 0이면 MIN_TRADES(모듈 상수) 그대로 사용
         self.mc_min_trades = int(mc_min_trades) if mc_min_trades > 0 else MIN_TRADES
         self.mc_block_size = max(1, int(mc_block_size))
@@ -143,6 +147,7 @@ class BacktestEngine:
         total_fees = 0.0
         total_slippage_cost = 0.0
         signals_skipped_atr0 = 0  # 신호 생성됐으나 atr=0으로 포지션 미진입 횟수
+        consec_losses = 0  # 연속 손실 카운터 (consec_loss_scale_threshold 기능용)
 
         position = None  # {"side": "BUY"/"SELL", "entry": float, "sl": float, "tp": float, "size": float, "hold_candles": int, "raw_entry": float}
 
@@ -175,6 +180,10 @@ class BacktestEngine:
                     total_slippage_cost += slip
                     peak_balance = max(peak_balance, balance)
                     position = None
+                    if pnl > 0:
+                        consec_losses = 0
+                    else:
+                        consec_losses += 1
                 else:
                     pnl, closed, fee, slip = self._check_exit(position, candle, exit_slip)
                     if closed:
@@ -184,6 +193,10 @@ class BacktestEngine:
                         total_slippage_cost += slip
                         peak_balance = max(peak_balance, balance)
                         position = None
+                        if pnl > 0:
+                            consec_losses = 0
+                        else:
+                            consec_losses += 1
 
             # 신호 생성 (포지션 없을 때만)
             if position is None:
@@ -202,7 +215,11 @@ class BacktestEngine:
                         # Cycle 258: HIGH 1.2→1.35 (ETH/SOL 혼합 결과 중간값)
                         conf_name = getattr(signal.confidence, 'name', str(signal.confidence)).upper()
                         conf_mult = {"HIGH": 1.35, "MEDIUM": 1.0, "LOW": 0.5}.get(conf_name, 1.0)
-                        risk_amt = balance * 0.01 * conf_mult
+                        # Cycle298 B: 연속 손실 N회 시 포지션 사이즈 50% 축소 (consec_loss_scale_threshold > 0)
+                        loss_scale = (0.5 if (self.consec_loss_scale_threshold > 0
+                                               and consec_losses >= self.consec_loss_scale_threshold)
+                                      else 1.0)
+                        risk_amt = balance * 0.01 * conf_mult * loss_scale
                         size = risk_amt / sl_dist
                         close = candle["close"]
 
