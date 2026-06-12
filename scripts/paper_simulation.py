@@ -80,12 +80,15 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle298 B: rvol_buy_sell 1.1 역효과 (PF 1.40/1.36, W4-W6 bear/sideways 여전히 FAIL) → 1.2 복원
     "relative_volume": {"rvol_buy_sell": 1.2},
     # Cycle297 F: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
+    # Cycle301 D(ML): quality_score_buy_threshold 0.85 실험 → 역효과 (PF 1.48→1.33) → 0.80 복원
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
     # Cycle298 C: bounce_pct 0.015→0.02 (threshold 완화, W5/W6 sideways 2/8 PASS 달성)
     # Cycle300 A+F: vol_regime_filter=True, 상대적 ATR (ATR/ATR_MA > 1.5 → 추세 → 신호 억제)
     #   이전 절대값 thresh=0.025 역효과 (trades 12→5) 해소 목적
     #   ATR_MA(20) 대비 비율로 시장 스케일 무관하게 레짐 판별
-    "price_cluster": {"bounce_pct": 0.02, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # Cycle301 B(리스크): bounce_pct 0.02→0.025 (Sharpe 3.41→3.76+10%, PF 2.05→2.28+11%)
+    # Cycle301 D(ML): vol_atr_trend_min 1.3 실험 → SharpeStd 2.41→2.52 소폭 악화 → 1.5 복원
+    "price_cluster": {"bounce_pct": 0.025, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원

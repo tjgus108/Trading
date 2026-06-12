@@ -13,6 +13,10 @@ PriceClusterStrategy v3:
 - Cycle300 A+F: vol_use_relative=True — 상대적 ATR 방식 (ATR/ATR_MA 비율)
   ATR(14)/ATR_MA(20) > vol_atr_trend_min(1.5) → 추세 → 신호 억제
   절대값 thresh(0.025) 역효과 해소: 시장 가격 스케일에 무관하게 레짐 판별
+- Cycle301 F(리서치): atr_bounce_factor — ATR 기반 동적 bounce_pct
+  atr_bounce_factor > 0 시: effective_bounce_pct = ATR(14)/close × factor
+  고변동성 시장에서 threshold를 자동으로 확대, 저변동성 시장에서 축소
+  기본값 0.0 (비활성) → 향후 실험 시 활성화
 """
 
 from typing import Optional, Tuple
@@ -77,6 +81,7 @@ class PriceClusterStrategy(BaseStrategy):
         vol_use_relative: bool = True,
         vol_atr_ma_period: int = 20,
         vol_atr_trend_min: float = 1.5,
+        atr_bounce_factor: float = 0.0,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -90,6 +95,8 @@ class PriceClusterStrategy(BaseStrategy):
         self.vol_use_relative = vol_use_relative
         self.vol_atr_ma_period = vol_atr_ma_period
         self.vol_atr_trend_min = vol_atr_trend_min
+        # Cycle301 F(리서치): ATR 기반 동적 bounce_pct (0 = 비활성)
+        self.atr_bounce_factor = atr_bounce_factor
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
         """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
@@ -185,7 +192,13 @@ class PriceClusterStrategy(BaseStrategy):
         confidence = Confidence.HIGH if is_high_confidence else Confidence.MEDIUM
 
         # Threshold 계산: cluster 경계 가격 기준 비율 (가격 스케일에 비례)
-        threshold = max(cluster_low * self.bounce_pct, 0.001)
+        # Cycle301 F(리서치): ATR 기반 동적 bounce_pct (atr_bounce_factor > 0 시 활성)
+        if self.atr_bounce_factor > 0:
+            atr_r = self._atr_ratio(df)
+            effective_bounce_pct = (atr_r * self.atr_bounce_factor) if atr_r > 0 else self.bounce_pct
+        else:
+            effective_bounce_pct = self.bounce_pct
+        threshold = max(cluster_low * effective_bounce_pct, 0.001)
 
         # BUY: 이전 봉이 cluster_low 아래 (threshold 내), 현재 봉이 cluster_low 이상
         if (prev_close < cluster_low and 

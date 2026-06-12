@@ -1,3 +1,44 @@
+## [2026-06-12] Cycle 301 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] price_cluster bounce_pct 0.02→0.025**
+1. `scripts/paper_simulation.py`: PAPER_SIM_STRATEGY_PARAMS price_cluster bounce_pct 0.02→0.025
+   - 목표: trades=12 → 15+ (MIN_TRADES 기준 충족)
+   - 결과: trades 변화 없음(12), 하지만 Sharpe 3.41→3.76 (+10%), PF 2.05→2.28 (+11%) 개선
+   - 트레이드오프: threshold 확대로 클러스터 주변 신호 품질 향상 (낮은 진입 장벽 = 더 깊은 bounce)
+   - 최종 결정: bounce_pct=0.025 유지 (PF/Sharpe 개선)
+
+**[D(ML)] 두 가지 실험: vol_atr_trend_min 1.5→1.3, quality_score_buy_threshold 0.8→0.85**
+2. `scripts/paper_simulation.py` (실험 후 복원):
+   - vol_atr_trend_min=1.3: SharpeStd 2.41→2.52 소폭 악화, score 74.8→72.1 → **1.5 복원**
+   - quality_score_buy_threshold=0.85: PF 1.48→1.33 역효과 → **0.80 복원**
+   - 두 D(ML) 실험 모두 역효과 → Cycle 300 설정 복원
+
+**[F(리서치)] price_cluster ATR 기반 동적 bounce_pct 구현**
+3. `src/strategy/price_cluster.py`: `atr_bounce_factor` 파라미터 추가
+   - `atr_bounce_factor > 0`: effective_bounce_pct = ATR(14)/close × factor (동적 설정)
+   - `atr_bounce_factor = 0` (기본값): 기존 고정 bounce_pct 사용 (하위호환 유지)
+   - 고변동성 시장에서 threshold 자동 확대, 저변동성 시장에서 축소
+   - 코드 기능 추가 (현재 비활성, 향후 실험: factor ~1.5~2.0 시도 예정)
+
+**[F(리서치)] narrow_range fold3 극단 손실 분석**
+- fold3(2023-12-27~2024-02-24) OOS=-10.79: BTC 급등 구간 (30k→52k)
+- 문제: 급등 직전 narrow range 압축 → 상향 돌파 → BUY 신호 정확
+  하지만 급등 후 되돌림 구간에서 반복적 NR 패턴 발생 → 고점 매수 반복
+- 현재 ATR_THRESHOLD=0.95 (ATR 수축 5% 이상)만으로는 급등 레짐 필터링 불충분
+- 제안: 상대적 ATR 필터 추가 (price_cluster와 동일 방식): ATR/ATR_MA > 1.4 시 억제
+- 구현은 다음 A(품질) 사이클에서 검토
+
+**[시뮬레이션 결과 Cycle 301]**
+- Paper Sim BTC 4h (8 windows, adaptive_slippage=True): **0/22 PASS**
+  - rank1: price_cluster (score=72.1, Sharpe=3.76→+10%, PF=2.28→+11%, SharpeStd=2.52, trades=12, **2/8 PASS**)
+    - bounce_pct=0.025 효과: Sharpe/PF 개선, trades 변화 없음
+    - vol_atr_trend_min=1.3 실험 → SharpeStd 2.41→2.52 소폭 악화 → 1.5 복원
+  - rank2: momentum_quality (score=61.3, Sharpe=1.48, PF=1.33→PF 역효과, trades=22) ← threshold=0.85 실험 역효과 → 0.80 복원
+  - rank3: cmf (score=54.9, Sharpe=0.59, trades=23)
+  - rank8: order_flow_imbalance_v2 (3/8 PASS 복원 확인, score=42.7)
+- Bundle OOS BTC 4h (5-fold): **2/5 PASS** (cmf avg=2.508, supertrend_multi avg=3.674) ← 동일 유지
+- 테스트: **8392 passed, 23 skipped** (회귀 없음)
+
 ## [2026-06-12] Cycle 300 — A(품질) + C(데이터) + F(리서치)
 
 **[A+F(품질+리서치)] price_cluster 상대적 ATR vol_regime_filter 구현**
@@ -11836,6 +11877,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-12 00:15 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 05:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
