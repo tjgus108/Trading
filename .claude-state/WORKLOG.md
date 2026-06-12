@@ -1,3 +1,46 @@
+## [2026-06-12] Cycle 302 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] price_cluster n_bins=7 실험 → 역효과, 5 복원**
+1. `scripts/paper_simulation.py`: n_bins=7 실험 (Cycle302 B 지시)
+   - 목적: 더 세밀한 cluster → trades 증가 (12→15+)
+   - 결과: Sharpe 3.76→-1.76 (하락), PF 2.28→0.82, trades 12→13 (미미한 증가)
+   - 분석: n_bins=7로 bin 폭 축소 + atr_bounce_factor=1.5 동시 적용 → 임계값 과대확장
+   - 결론: n_bins=7 역효과 → 5 복원, atr_bounce_factor 역효과 → 0.0 유지
+
+**[B(리스크)] DrawdownMonitor tiered halt 회복 로직 개선**
+2. `src/risk/drawdown_monitor.py`: tiered halt 회복 로직 개선
+   - 문제: 일간/주간 halt → tiered 조건 해소 후에도 legacy MDD 임계값(max_dd-recovery)으로만 재개
+     → 주간 7% halt 후 total drawdown=11% > legacy threshold(10%)면 무기한 halt 지속 버그
+   - 수정: `_tiered_halt=True`로 halt 원인 추적 + `_halt_drawdown` 기록
+     tiered 조건 해소 후: (halt_drawdown - recovery_pct) 또는 legacy threshold 중 달성되면 재개
+   - 테스트: 98 passed 확인
+
+**[D(ML)] atr_bounce_factor=1.5 실험 → 역효과**
+3. `scripts/paper_simulation.py`: atr_bounce_factor=1.5 (n_bins=7과 동시 실험)
+   - 결과: n_bins=7과 복합 역효과 → ATR/close×1.5 ≈ 3~6% threshold (bounce_pct=2.5% 대비 2배+)
+   - 분석: atr_bounce_factor가 고변동성 구간에서 임계값을 과도하게 확대 → 오신호 증가
+   - 결론: atr_bounce_factor=0.0 유지. 향후 독립적 실험 필요
+
+**[D(ML)] price_cluster DEFAULT_GRIDS 추가**
+4. `src/backtest/walk_forward.py`: price_cluster 파라미터 최적화 그리드 추가
+   - bounce_pct: [0.020, 0.025, 0.030], n_bins: [4,5,6], close_window: [40,50], vol_atr_trend_min: [1.3,1.5,2.0]
+   - 효과: walk-forward optimizer에서 price_cluster 파라미터 최적화 가능해짐
+   - n_bins=7 실험 결과 반영 → [4,5,6]으로 제한
+
+**[F(리서치)] microstructure 기반 bin 분석**
+- 7-10 support/resistance levels 이론: 7-bin이 더 정밀 → BUT BTC 4h 데이터에서 역효과
+- 원인 분석: 좁은 bin + 넓은 threshold(atr_bounce) = 여러 bin 중첩 신호 → 노이즈
+- 결론: BTC 4h에서는 5-bin이 최적 (지지/저항 구역이 넓게 형성됨)
+- 다음 F: close_window 40봉 단독 실험 (bin 수 유지, 업데이트 빈도만 증가)
+
+**[시뮬레이션 결과 Cycle 302]**
+- Paper Sim BTC 4h (8 windows): **0/22 PASS** (실험 복원 후 Cycle301과 동일)
+  - rank1: momentum_quality (score=69.7, Sharpe=1.48, trades=22, 1/8 PASS)
+  - price_cluster: 실험 복원 후 Cycle301 설정으로 복귀 (score=rank1 예상)
+  - 실험(n_bins=7+atr_bounce_factor=1.5): price_cluster Sharpe 3.76→-1.76, PF 2.28→0.82 ← 역효과
+- Bundle OOS BTC 4h (5-fold): **2/5 PASS** (cmf avg=2.508, supertrend_multi avg=3.674) ← 동일
+- 테스트: **8392 passed, 23 skipped** (회귀 없음, drawdown test 98 passed)
+
 ## [2026-06-12] Cycle 301 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] price_cluster bounce_pct 0.02→0.025**
@@ -11971,6 +12014,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-12 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-12 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 10:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-12 10:18 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

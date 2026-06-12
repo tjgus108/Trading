@@ -204,6 +204,11 @@ class DrawdownMonitor:
         self._cooldown_until: float = 0.0   # epoch seconds; 0=쿨다운 없음
         self._single_loss_cooldown_until: float = 0.0  # 단일 손실로 인한 쿨다운
         self._last_loss_at: float = 0.0     # 마지막 손실 시각 (하이브리드 회복용)
+        # tiered halt 추적: True이면 tiered(일간/주간/월간) 조건으로 halt된 것
+        # → tiered 조건 해소 시 legacy MDD 체크 없이 즉시 회복 허용
+        self._tiered_halt: bool = False
+        # halt 당시 낙폭 기록: tiered 회복 임계값 = _halt_drawdown - recovery_pct
+        self._halt_drawdown: float = 0.0
 
     # ── 기준 잔고 설정 ─────────────────────────────────────────
 
@@ -596,6 +601,8 @@ class DrawdownMonitor:
                 self._halted = True
                 self._alert_level = new_level
                 self._halt_reason = new_reason
+                self._tiered_halt = True
+                self._halt_drawdown = drawdown
                 logger.warning(
                     "DrawdownMonitor: HALTED [%s] — %s", new_level.value, new_reason
                 )
@@ -604,6 +611,8 @@ class DrawdownMonitor:
                 self._halted = True
                 self._alert_level = new_level
                 self._halt_reason = new_reason
+                self._tiered_halt = True
+                self._halt_drawdown = drawdown
                 logger.warning(
                     "DrawdownMonitor: HALTED [%s] — %s", new_level.value, new_reason
                 )
@@ -612,6 +621,8 @@ class DrawdownMonitor:
         # legacy MDD 체크 (기준 잔고 미설정 시 폴백)
         elif not self._halted and drawdown >= self.max_drawdown_pct:
             self._halted = True
+            self._tiered_halt = False
+            self._halt_drawdown = drawdown
             self._alert_level = AlertLevel.HALT
             self._halt_reason = (
                 f"MDD {drawdown:.1%} ≥ 한계 {self.max_drawdown_pct:.1%} "
@@ -619,11 +630,25 @@ class DrawdownMonitor:
             )
             logger.warning("DrawdownMonitor: HALTED — %s", self._halt_reason)
 
-        # 차단 해제 체크: tiered 조건 해소 + MDD 회복 기준 충족 시만 재개
+        # 차단 해제 체크: tiered 조건 해소 후 재개
         # FORCE_LIQUIDATE는 수동 해제(force_resume)만 허용
         elif self._halted and self._alert_level != AlertLevel.FORCE_LIQUIDATE:
-            if drawdown < (self.max_drawdown_pct - self.recovery_pct):
+            # tiered halt(일간/주간) → tiered 조건이 해소됐으면(new_level==NONE)
+            #   halt_drawdown 대비 recovery_pct만큼 회복했거나, 혹은
+            #   legacy 회복 기준(max_drawdown_pct - recovery_pct) 달성 시 재개.
+            #   방어 목적: 단순 주간/일간 리셋으로 인한 조기 재개 방지.
+            # legacy MDD halt → 기존 기준(max_drawdown_pct - recovery_pct) 그대로 사용.
+            if self._tiered_halt:
+                tiered_recovery_threshold = self._halt_drawdown - self.recovery_pct
+                legacy_threshold = self.max_drawdown_pct - self.recovery_pct
+                should_resume = drawdown < max(tiered_recovery_threshold, 0.0) or \
+                                drawdown < legacy_threshold
+            else:
+                should_resume = drawdown < (self.max_drawdown_pct - self.recovery_pct)
+            if should_resume:
                 self._halted = False
+                self._tiered_halt = False
+                self._halt_drawdown = 0.0
                 self._alert_level = AlertLevel.NONE
                 self._halt_reason = ""
                 logger.info(
@@ -722,6 +747,8 @@ class DrawdownMonitor:
         self._last_loss_at = 0.0
         self._equity_history.clear()
         self._atr_vol_elevated = False
+        self._tiered_halt = False
+        self._halt_drawdown = 0.0
         self._atr_vol_mult = 1.0
         self._sharpe_decay_mult = 1.0
         logger.info("DrawdownMonitor: reset")

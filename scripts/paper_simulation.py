@@ -88,6 +88,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   ATR_MA(20) 대비 비율로 시장 스케일 무관하게 레짐 판별
     # Cycle301 B(리스크): bounce_pct 0.02→0.025 (Sharpe 3.41→3.76+10%, PF 2.05→2.28+11%)
     # Cycle301 D(ML): vol_atr_trend_min 1.3 실험 → SharpeStd 2.41→2.52 소폭 악화 → 1.5 복원
+    # Cycle302 B(리스크): n_bins=7 실험 역효과 (Sharpe 3.76→-1.76, PF 2.28→0.82) → 5 복원
+    # Cycle302 D(ML): atr_bounce_factor=1.5 실험 역효과 (동일 시험에서 확인) → 0.0 유지
     "price_cluster": {"bounce_pct": 0.025, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
