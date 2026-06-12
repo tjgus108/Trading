@@ -24,13 +24,18 @@ class NarrowRangeStrategy(BaseStrategy):
     VOL_SPIKE_MULT = 1.0   # 완화: 1.2→1.0 (4h봉 거래 수 증가 목적, Cycle 206)
     ATR_THRESHOLD = 0.95   # 완화: 0.90→0.95 (Cycle 219: 저거래 해결)
     NR_SCAN_WINDOW = 3     # NR 발생 후 최대 3봉 내 돌파 허용 (Cycle 219)
+    # Cycle304 F(리서치): 고변동성 구간에서 NR 전략 억제
+    # ATR/ATR_MA(20) > trend_regime_max → 추세 장세 → NR false breakout 위험 → 신호 억제
+    # Bundle OOS fold2/3 고변동성 구간에서 narrow_range FAIL 분석 기반
+    TREND_REGIME_MAX: float = 1.4  # ATR/ATR_MA(20) > 1.4 → 고변동성 억제 (0 = 비활성)
 
-    def __init__(self, nr_lookback: int = 5, **kwargs):
+    def __init__(self, nr_lookback: int = 5, trend_regime_max: float = 0.0, **kwargs):
         """
         Args:
             nr_lookback: NR lookback 기간 (NR5=5, NR7=7). 4h봉 신호 부족 완화를 위해 기본 5.
         """
         self.nr_lookback = max(4, int(nr_lookback))  # 최소 4봉 (NR4 확인용)
+        self.trend_regime_max = float(trend_regime_max)  # 0 = 비활성
 
     def _is_nr(self, ranges: pd.Series, idx: int, n: int) -> bool:
         """idx번 봉이 최근 n봉 중 최소 range인지 확인."""
@@ -62,6 +67,19 @@ class NarrowRangeStrategy(BaseStrategy):
             return self._hold(df, f"NR{self.nr_lookback} 판단에 필요한 이전 봉 부족")
 
         ranges = df["high"] - df["low"]
+
+        # Cycle304 F(리서치): 고변동성 구간(trend regime) 억제
+        # ATR_MA(20) 대비 현재 ATR이 trend_regime_max 이상이면 NR 전략 신호 억제
+        _trm = self.trend_regime_max if self.trend_regime_max > 0 else self.TREND_REGIME_MAX
+        if _trm > 0 and "atr14" in df.columns:
+            _atr_series = df["atr14"].iloc[:curr_idx + 1]
+            _curr_atr = float(_atr_series.iloc[-1])
+            _atr_ma = float(_atr_series.rolling(self.ATR_LOOKBACK, min_periods=5).mean().iloc[-1])
+            if _atr_ma > 0 and (_curr_atr / _atr_ma) > _trm:
+                return self._hold(
+                    df,
+                    f"고변동성 억제: ATR/ATR_MA={_curr_atr/_atr_ma:.2f} > {_trm}",
+                )
 
         # 최근 NR_SCAN_WINDOW 봉 내에서 NR 봉 탐색 (지연 돌파 포착)
         nr_info = self._find_recent_nr(ranges, curr_idx)

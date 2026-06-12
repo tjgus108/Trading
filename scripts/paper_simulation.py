@@ -92,6 +92,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle302 D(ML): atr_bounce_factor=1.5 실험 역효과 (동일 시험에서 확인) → 0.0 유지
     # Cycle303 C(데이터): close_window=40 실험 역효과 (Sharpe 3.76→1.47, trades 12→12 불변) → 50 복원
     #   분석: 더 짧은 window가 cluster 업데이트 속도는 높이나 신호 품질 저하 (Sharpe -55%)
+    # Cycle304 D(ML): bounce_pct=0.030 실험 역효과 (Sharpe 3.76→0.53, trades 12→50)
+    #   진입 장벽 완화 시 false signal 증가로 품질 저하 → 0.025 확정
     "price_cluster": {"bounce_pct": 0.025, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
