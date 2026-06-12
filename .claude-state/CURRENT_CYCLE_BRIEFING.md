@@ -1,35 +1,33 @@
 # Current Cycle Briefing
 
-_Cycle 302 완료 — 2026-06-12_
+_Cycle 303 완료 — 2026-06-12_
 
 ## 완료된 작업
 
-### B(리스크): n_bins=7 실험 → 역효과, DrawdownMonitor 개선
-- `scripts/paper_simulation.py`: n_bins=7 실험 → Sharpe 3.76→-1.76 역효과 → 복원
-- `src/risk/drawdown_monitor.py`: tiered halt 회복 로직 개선
-  - `_tiered_halt` + `_halt_drawdown` 상태 추가
-  - 주간/일간 halt 후 tiered 조건 해소 시 더 빠른 재개 가능 (버그 수정)
+### C(데이터) — close_window=40 단독 실험
+- `scripts/paper_simulation.py`에 `close_window=40` 추가 → 실험 → 역효과 확인 → 복원
+- 결과: Sharpe 3.76→1.47 (-61%), PF 2.28→1.54, trades 12→12 (불변)
+- **결론**: close_window=50이 BTC 4h 최적. 40봉은 cluster 안정성 저하로 신호 품질 악화
 
-### D(ML): atr_bounce_factor=1.5 실험 → 역효과, price_cluster 그리드 추가
-- `scripts/paper_simulation.py`: atr_bounce_factor=1.5 (n_bins=7과 동시 실험) → 역효과 → 0.0 유지
-  - ATR/close×1.5 ≈ 3~6% threshold (bounce_pct=2.5% 대비 2배+) → 오신호 증가
-- `src/backtest/walk_forward.py`: price_cluster DEFAULT_GRIDS 추가
-  - bounce_pct: [0.020, 0.025, 0.030], n_bins: [4,5,6], close_window: [40,50], vol_atr_trend_min: [1.3,1.5,2.0]
+### B(리스크) — DrawdownMonitor tiered halt 테스트 추가
+- `tests/test_drawdown_monitor.py`에 2개 테스트 추가
+- `test_tiered_halt_recovery_faster_than_legacy`: tiered halt가 legacy보다 빠른 재개 허용 검증
+- `test_legacy_halt_recovery_unchanged`: legacy MDD halt 기존 기준 불변 검증
+- 전체 테스트: **8394 passed** (기존 8392 + 2)
 
-### F(리서치): microstructure bin 분석
-- 7-10 지지/저항 레벨 이론 검증: BTC 4h에서 n_bins=7 역효과
-- 원인: 좁은 bin + 넓은 ATR threshold = bin 경계 중첩 신호 → 노이즈
-- **단독 실험 원칙 확립**: 두 파라미터 동시 변경 금지
+### F(리서치) — close_window 실증 분석
+- walk_forward 그리드 [40, 50] 중 40 역효과 확인 → 다음 사이클 [50, 60] 탐색 권고
+- bounce_pct=0.030 단독 실험이 trades 증가를 위한 더 유망한 대안으로 부상
 
-## 시뮬레이션 요약
+## 시뮬레이션 결과
 
-| 구분 | 결과 |
+| 시뮬 | 결과 |
 |------|------|
-| Paper Sim PASS | 0/22 (실험 n_bins=7: price_cluster Sharpe -1.76, 복원 후 Cycle301과 동일) |
-| Bundle OOS PASS | 2/5 (cmf, supertrend_multi) ← 동일 유지 |
-| 테스트 스위트 | 8392 passed, 23 skipped |
+| Paper Sim BTC 4h | 0/22 PASS (rank1: momentum_quality score=69.7) |
+| price_cluster (close_window=40) | Sharpe=1.47, PF=1.54, trades=12 → 역효과 → 50 복원 |
+| Bundle OOS BTC 4h | 2/5 PASS (cmf avg=2.508, supertrend_multi avg=3.674) |
 
-## 다음 사이클 (303): C(데이터) + B(리스크) + F(리서치)
-- C: close_window 50→40 **단독** 실험 (n_bins=5 유지, trades 증가 목적)
-- B: DrawdownMonitor tiered halt 테스트 추가 (test_tiered_halt_recovery_faster_than_legacy)
-- F: n_bins 독립 실험 근거 강화 (n_bins=6 단독 시도)
+## 다음 사이클 (304): D(ML) + E(실행) + F(리서치)
+- bounce_pct=0.030 단독 실험 (price_cluster trades 증가 목적)
+- close_window 그리드 [40,50] → [50,60] 업데이트
+- adaptive_slippage 효과 재측정

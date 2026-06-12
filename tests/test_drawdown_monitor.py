@@ -974,3 +974,59 @@ class TestTransitionCushion:
         """confidence=0.70 (경계, 같음) → 1.0 (미만일 때만 적용)."""
         m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
         assert m.get_transition_cushion_multiplier(0.70) == 1.0
+
+
+# ── tiered halt 회복 로직 테스트 (Cycle302 수정 검증) ─────────────────────────
+
+
+def test_tiered_halt_recovery_faster_than_legacy():
+    """tiered(주간) halt가 total_dd > max_drawdown_pct에서 발생하면
+    tiered 회복 임계값(halt_drawdown - recovery_pct)이 legacy 임계값보다 낮아
+    더 빠른 재개가 가능함을 검증.
+
+    시나리오:
+      peak=10000, weekly_start=9500 (이전 주 고점 이후 회복 상태)
+      max_drawdown_pct=10%, recovery_pct=2%, weekly_limit=7%
+      equity=8835 → weekly_dd=7%, total_dd=11.65% → HALT
+      equity=9100 → weekly_dd=4.2%(tiered 해소), total_dd=9%
+        tiered: 9% < halt_dd(11.65%) - 2% = 9.65% → RESUME (빠른 재개)
+        legacy만: 9% < max_dd(10%) - 2% = 8% → False → 재개 불가
+    """
+    m = DrawdownMonitor(max_drawdown_pct=0.10, recovery_pct=0.02, weekly_limit=0.07)
+    m.update(10000)               # peak = 10000
+    m.set_weekly_start(9500)      # weekly_start을 peak 아래로 설정 (mid-week 상태)
+
+    # weekly halt: weekly_dd = (9500-8835)/9500 = 7%, total_dd ≈ 11.65%
+    m.update(8835)
+    assert m.is_halted() is True
+    assert m._tiered_halt is True
+    halt_dd = (10000 - 8835) / 10000  # ≈ 0.1165
+    assert m._halt_drawdown == pytest.approx(halt_dd, rel=1e-4)
+
+    # equity=9100: weekly_dd=4.2% (tiered 해소), total_dd=9%
+    # tiered_recovery_threshold = 11.65% - 2% = 9.65% > 9% → resume
+    # legacy 기준(10%-2%=8%) 단독으로는 9% < 8% = False → resume 불가
+    m.update(9100)
+    assert m.is_halted() is False, (
+        "tiered halt should resume when drawdown < halt_drawdown - recovery_pct"
+    )
+
+
+def test_legacy_halt_recovery_unchanged():
+    """legacy MDD halt(_tiered_halt=False)는 기존 (max_drawdown_pct - recovery_pct)
+    기준만 사용하며, tiered 회복 임계값의 영향을 받지 않음을 검증."""
+    m = DrawdownMonitor(max_drawdown_pct=0.10, recovery_pct=0.02)
+    m.update(10000)   # peak = 10000
+
+    # legacy MDD halt: daily/weekly/monthly 미설정, total_dd=11% > max_dd(10%)
+    m.update(8900)
+    assert m.is_halted() is True
+    assert m._tiered_halt is False
+
+    # equity=9185: drawdown=8.15%, legacy_threshold=8% → 8.15% > 8% → still halted
+    m.update(9185)
+    assert m.is_halted() is True, "drawdown 8.15% should still be halted (threshold=8%)"
+
+    # equity=9220: drawdown=7.8% < 8% → resume
+    m.update(9220)
+    assert m.is_halted() is False, "drawdown 7.8% < legacy threshold 8% → should resume"
