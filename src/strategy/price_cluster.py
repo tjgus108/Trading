@@ -10,6 +10,9 @@ PriceClusterStrategy v3:
 - Cycle299 D(ML): vol_regime_filter — ATR 기반 sideways 레짐 필터
   ATR/close > vol_atr_thresh이면 추세/변동성 시장으로 간주해 신호 억제
   price_cluster는 sideways에서만 유효 (W5/W6 PASS 관찰 기반)
+- Cycle300 A+F: vol_use_relative=True — 상대적 ATR 방식 (ATR/ATR_MA 비율)
+  ATR(14)/ATR_MA(20) > vol_atr_trend_min(1.5) → 추세 → 신호 억제
+  절대값 thresh(0.025) 역효과 해소: 시장 가격 스케일에 무관하게 레짐 판별
 """
 
 from typing import Optional, Tuple
@@ -71,6 +74,9 @@ class PriceClusterStrategy(BaseStrategy):
         vol_regime_filter: bool = False,
         vol_atr_period: int = 14,
         vol_atr_thresh: float = 0.025,
+        vol_use_relative: bool = True,
+        vol_atr_ma_period: int = 20,
+        vol_atr_trend_min: float = 1.5,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -80,9 +86,13 @@ class PriceClusterStrategy(BaseStrategy):
         self.vol_regime_filter = vol_regime_filter
         self.vol_atr_period = vol_atr_period
         self.vol_atr_thresh = vol_atr_thresh
+        # Cycle300 A+F: 상대적 ATR 방식
+        self.vol_use_relative = vol_use_relative
+        self.vol_atr_ma_period = vol_atr_ma_period
+        self.vol_atr_trend_min = vol_atr_trend_min
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
-        """ATR(vol_atr_period) / close 비율. 변동성 레짐 판별용."""
+        """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
         n = self.vol_atr_period
         if len(df) < n + 1:
             return 0.0
@@ -101,6 +111,34 @@ class PriceClusterStrategy(BaseStrategy):
             return 0.0
         return atr / curr_close
 
+    def _atr_ratio_relative(self, df: pd.DataFrame) -> float:
+        """ATR(vol_atr_period) / ATR_MA(vol_atr_ma_period) 비율. 상대적 변동성 레짐 판별용.
+
+        비율 > 1.5: ATR이 자신의 MA 대비 높음 → 추세/변동성 장 → 신호 억제
+        비율 < 1.0: ATR이 자신의 MA 대비 낮음 → sideways → 신호 허용
+        데이터 부족 시 1.0(중립) 반환하여 suppress하지 않음.
+        """
+        n = self.vol_atr_period
+        ma_n = self.vol_atr_ma_period
+        if len(df) < n + ma_n + 1:
+            return 1.0
+        high = df["high"].astype(float)
+        low = df["low"].astype(float)
+        close = df["close"].astype(float)
+        prev_close = close.shift(1)
+        tr = pd.concat([
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ], axis=1).max(axis=1)
+        atr = tr.rolling(n, min_periods=n).mean()
+        atr_ma = atr.rolling(ma_n, min_periods=ma_n).mean()
+        atr_val = float(atr.iloc[-2])
+        atr_ma_val = float(atr_ma.iloc[-2])
+        if atr_ma_val <= 0 or np.isnan(atr_val) or np.isnan(atr_ma_val):
+            return 1.0
+        return atr_val / atr_ma_val
+
     def generate(self, df: pd.DataFrame) -> Signal:
         min_rows = self.close_window + 5
         if len(df) < min_rows:
@@ -109,12 +147,18 @@ class PriceClusterStrategy(BaseStrategy):
         last = self._last(df)
         curr_close = float(last["close"])
 
-        # Cycle299 D(ML): ATR 기반 변동성 레짐 필터
-        # 높은 ATR/close → 추세/변동성 장 → price_cluster 비적합 → HOLD
+        # ATR 기반 변동성 레짐 필터
         if self.vol_regime_filter:
-            atr_r = self._atr_ratio(df)
-            if atr_r > self.vol_atr_thresh:
-                return self._hold(df, f"Vol regime filter: ATR/close={atr_r:.4f}>{self.vol_atr_thresh}")
+            if self.vol_use_relative:
+                # Cycle300 A+F: 상대적 ATR — ATR/ATR_MA > vol_atr_trend_min이면 추세 → 신호 억제
+                atr_r = self._atr_ratio_relative(df)
+                if atr_r > self.vol_atr_trend_min:
+                    return self._hold(df, f"Vol regime filter (relative): ATR/ATR_MA={atr_r:.3f}>{self.vol_atr_trend_min}")
+            else:
+                # Cycle299 D(ML): 절대적 ATR — ATR/close > vol_atr_thresh이면 고변동성 → 신호 억제
+                atr_r = self._atr_ratio(df)
+                if atr_r > self.vol_atr_thresh:
+                    return self._hold(df, f"Vol regime filter: ATR/close={atr_r:.4f}>{self.vol_atr_thresh}")
 
         completed = df.iloc[:-1]
 

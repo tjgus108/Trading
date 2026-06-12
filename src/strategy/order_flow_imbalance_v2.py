@@ -7,6 +7,8 @@ OrderFlowImbalanceV2Strategy Enhanced:
 - trend_span (optional): macro trend EMA filter (Cycle298 F)
 - delta_window (Cycle299 F): cumulative delta rolling window 파라미터화
   기본값=10, 단축 시(7 등) 최근 신호에 더 빠르게 반응
+- Cycle300 C: buy_thresh/sell_thresh 파라미터화 (기본값=0.25/-0.25)
+  0.30/-0.30으로 강화 시 노이즈 신호 억제 효과 실험 가능
 """
 
 from typing import Optional
@@ -24,11 +26,16 @@ _HIGH_CONF_THRESH = 0.4
 class OrderFlowImbalanceV2Strategy(BaseStrategy):
     name = "order_flow_imbalance_v2"
 
-    def __init__(self, trend_span: int = 0, delta_window: int = 10, **kwargs):
+    def __init__(self, trend_span: int = 0, delta_window: int = 10,
+                 buy_thresh: float = _BUY_THRESH, sell_thresh: float = _SELL_THRESH,
+                 **kwargs):
         # trend_span > 0: EMA(trend_span) macro trend filter
         self.trend_span = trend_span
         # delta_window: cumulative delta / total_vol rolling window (Cycle299 F)
         self.delta_window = max(2, int(delta_window))
+        # Cycle300 C: 파라미터화 (기본값=모듈 상수, 강화 시 0.30/-0.30)
+        self.buy_thresh = float(buy_thresh)
+        self.sell_thresh = float(sell_thresh)
 
     def generate(self, df: Optional[pd.DataFrame]) -> Signal:
         if df is None or len(df) < _MIN_ROWS:
@@ -95,26 +102,26 @@ class OrderFlowImbalanceV2Strategy(BaseStrategy):
         bull_trend = (trend_ema_val is None) or (close_val > trend_ema_val)
         bear_trend = (trend_ema_val is None) or (close_val < trend_ema_val)
 
-        if imb > _BUY_THRESH and imb > imb_ma_val and close_val > ewm_val and vol_strong and bull_trend:
+        if imb > self.buy_thresh and imb > imb_ma_val and close_val > ewm_val and vol_strong and bull_trend:
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close_val,
-                reasoning=f"매수 압력 우세(v2): imbalance={imb:.3f} > {_BUY_THRESH} AND > ma={imb_ma_val:.3f} AND close > EWM AND vol_strong",
-                invalidation=f"Imbalance drops below {_BUY_THRESH} or close < EWM or vol weakens",
+                reasoning=f"매수 압력 우세(v2): imbalance={imb:.3f} > {self.buy_thresh} AND > ma={imb_ma_val:.3f} AND close > EWM AND vol_strong",
+                invalidation=f"Imbalance drops below {self.buy_thresh} or close < EWM or vol weakens",
                 bull_case=f"imbalance={imb:.3f} imb_ma={imb_ma_val:.3f} ewm={ewm_val:.3f} vol={vol_val:.0f}vs{vol_sma:.0f}",
                 bear_case=f"imbalance={imb:.3f}",
             )
 
-        if imb < _SELL_THRESH and imb < imb_ma_val and close_val < ewm_val and vol_strong and bear_trend:
+        if imb < self.sell_thresh and imb < imb_ma_val and close_val < ewm_val and vol_strong and bear_trend:
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=close_val,
-                reasoning=f"매도 압력 우세(v2): imbalance={imb:.3f} < {_SELL_THRESH} AND < ma={imb_ma_val:.3f} AND close < EWM AND vol_strong",
-                invalidation=f"Imbalance rises above {_SELL_THRESH} or close > EWM or vol weakens",
+                reasoning=f"매도 압력 우세(v2): imbalance={imb:.3f} < {self.sell_thresh} AND < ma={imb_ma_val:.3f} AND close < EWM AND vol_strong",
+                invalidation=f"Imbalance rises above {self.sell_thresh} or close > EWM or vol weakens",
                 bull_case=f"imbalance={imb:.3f}",
                 bear_case=f"imbalance={imb:.3f} imb_ma={imb_ma_val:.3f} ewm={ewm_val:.3f} vol={vol_val:.0f}vs{vol_sma:.0f}",
             )
