@@ -51,8 +51,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # cmf_1h: 1h 타임프레임 전용 파라미터 그리드 (D(ML) Cycle 271)
     # 기본 period=20 (4h 80시간)에 해당하는 1h 등가: period≥60
     # Cycle 273: threshold 완화 (0.05/-0.05) — 1h 신호 빈도 부족 문제 개선
+    # Cycle306 F(리서치): period [60,75,90]→[75,90,105] 상향
+    #   근거: cmf 4h 5/5 PASS(Sharpe=2.508) vs 1h rank15(Sharpe=-1.44)
+    #   1h에서 CMF 신호 노이즈 비율 높음 → 더 긴 period(105h≈4.4일)로 안정화 탐색
     "cmf_1h": {
-        "period": [60, 75, 90],
+        "period": [75, 90, 105],
         "buy_thresh": [0.05, 0.06, 0.07],
         "sell_thresh": [-0.07, -0.06, -0.05],
     },

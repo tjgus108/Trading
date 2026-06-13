@@ -1,33 +1,37 @@
 # Current Cycle Briefing
 
-_Cycle 305 완료 — 2026-06-13_
+_Cycle 306 완료 — 2026-06-13_
 
 ## 완료된 작업
 
-### A(품질) — narrow_range walk_forward 그리드 확장
-- `src/backtest/walk_forward.py`: narrow_range DEFAULT_GRIDS에 2개 파라미터 추가
-  - `trend_regime_filter: [False, True]` — Cycle304 E에서 구현된 기능 WF 탐색에 포함
-  - `atr_trend_max: [1.3, 1.4, 1.5]` — ATR 임계값 민감도 탐색
-  - 총 유효 조합: 12개 (grid explosion 없음)
-- 목적: fold3 OOS=-10.794 (2024-01~02 BTC 급등) 극단 손실 억제
+### B(리스크) — DrawdownMonitor 재시작 복원 버그 수정
+- `src/risk/drawdown_monitor.py`: `_tiered_halt`, `_halt_drawdown` 직렬화 추가
+  - **버그**: 재시작 후 _tiered_halt=False로 초기화 → tiered recovery 로직이 legacy로 대체
+  - **수정**: `to_dict()`에 두 필드 추가, `from_dict()`에서 `.get()` 복원
+  - 기존 테스트 301개 PASS (backward compatible)
 
-### C(데이터) — price_cluster close_window=60 단독 실험
-- `scripts/paper_simulation.py`: close_window=50→60 변경
-  - Paper Sim BTC: rank1 score=75.7 (+1.9 vs Cycle304 73.8)
-  - SharpeStd=1.77 (안정성 향상)
-  - **결론**: close_window=60 소폭 개선 → 유지 확정 (reverting 불필요)
+### D(ML) — narrow_range trend_regime_filter 실험 결과 분석
+- `scripts/run_bundle_oos.py`: BUNDLE_STRATEGY_INIT_PARAMS에 narrow_range 추가
+  - `trend_regime_filter=True, atr_trend_max=1.4`
+  - **결과**: 효과 없음 — fold1=-3.828, fold3=-10.794 완전 동일
+  - **원인**: BTC 4h 점진적 추세에서 ATR/ATR_MA(20) ratio가 1.4 미만
+    - fold3 max=1.236 (0번 트리거), fold1 max=1.447 (2번만 트리거)
+  - **다음**: atr_trend_max=1.1 실험 (Cycle 307)
 
-### F(리서치) — cmf/supertrend_multi 타임프레임 의존성 분석
-- cmf: 4h에서만 강세 (5/5 PASS), 1h에서는 rank15 (노이즈 취약)
-- supertrend_multi: 4h OOS PASS(Sharpe=3.674), 1h에서도 rank2 — 다중 타임프레임 유효
-- narrow_range: fold3 극단 손실 원인 확인 → trend_regime_filter 그리드 추가로 대응
+### F(리서치) — cmf_1h period 상향
+- `src/backtest/walk_forward.py`: cmf_1h period [60,75,90]→[75,90,105]
+  - 4h CMF PASS (Sharpe=2.508) vs 1h CMF FAIL (Sharpe=-1.44) 원인 연구
+  - 1h 노이즈 억제를 위해 더 긴 기간 탐색
 
 ## 시뮬레이션 결과
-- 테스트: **8394 passed, 23 skipped** (회귀 없음)
-- Paper Sim BTC 1h: 0/22 PASS, price_cluster rank1 (score=75.7, +1.9 개선)
-- Bundle OOS: **2/5 PASS** (cmf, supertrend_multi) — 이전 사이클 동일
 
-## 다음 Cycle 306 (306 mod 5 = 1 → B+D+F)
-- B(리스크): close_window=60 효과를 Bundle OOS 4h에서 검증
-- D(ML): narrow_range trend_regime_filter + atr_trend_max walk-forward 실험
-- F: cmf 1h 성능 저하 원인 심층 분석 (period 보수화 검토)
+| 시뮬 | 결과 |
+|------|------|
+| Paper Sim BTC 1h | 0/22 PASS, rank1=price_cluster(75.7), rank2=supertrend_multi(68.3) |
+| Bundle OOS BTC 4h | 2/5 PASS — cmf(2.508), supertrend_multi(3.674) |
+| 테스트 | 8394 passed, 23 skipped |
+
+## 다음 사이클 (307, 307 mod 5 = 2 → B + D + F)
+1. B(리스크): DrawdownMonitor to_dict/from_dict tiered halt roundtrip 테스트 추가
+2. D(ML): narrow_range atr_trend_max=1.1 Bundle OOS 실험
+3. F(리서치): cmf_1h period=105 paper sim 결과 분석

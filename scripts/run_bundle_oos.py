@@ -71,6 +71,12 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
+    # Cycle306 D(ML): narrow_range trend_regime_filter=True 실험
+    #   - fold1(2023-08~10 OOS=-3.828), fold3(2023-12~2024-02 OOS=-10.794) 극단 손실 원인
+    #   - 고변동성 추세장(BTC 급등) 에서 NR breakout 오신호 억제 목적
+    #   - atr_trend_max=1.4: ATR/ATR_MA(20) > 1.4 시 신호 차단
+    #   - 단독 실험: nr_lookback=5 고정, trend_regime_filter만 False→True
+    "narrow_range": {"trend_regime_filter": True, "atr_trend_max": 1.4},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)

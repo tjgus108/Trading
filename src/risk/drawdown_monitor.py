@@ -920,6 +920,8 @@ class DrawdownMonitor:
             "_single_loss_cooldown_until": self._single_loss_cooldown_until,
             "_last_loss_at": self._last_loss_at,
             "_equity_history": list(self._equity_history),
+            "_tiered_halt": self._tiered_halt,
+            "_halt_drawdown": self._halt_drawdown,
         }
 
     @classmethod
@@ -955,6 +957,8 @@ class DrawdownMonitor:
         obj._cooldown_until = data.get("_cooldown_until", 0.0)
         obj._single_loss_cooldown_until = data.get("_single_loss_cooldown_until", 0.0)
         obj._last_loss_at = data.get("_last_loss_at", 0.0)
+        obj._tiered_halt = data.get("_tiered_halt", False)
+        obj._halt_drawdown = data.get("_halt_drawdown", 0.0)
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
         return obj
