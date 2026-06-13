@@ -1,37 +1,30 @@
 # Current Cycle Briefing
 
-_Cycle 306 완료 — 2026-06-13_
+_Updated: 2026-06-13 | Cycle 307 완료_
 
 ## 완료된 작업
 
-### B(리스크) — DrawdownMonitor 재시작 복원 버그 수정
-- `src/risk/drawdown_monitor.py`: `_tiered_halt`, `_halt_drawdown` 직렬화 추가
-  - **버그**: 재시작 후 _tiered_halt=False로 초기화 → tiered recovery 로직이 legacy로 대체
-  - **수정**: `to_dict()`에 두 필드 추가, `from_dict()`에서 `.get()` 복원
-  - 기존 테스트 301개 PASS (backward compatible)
+### 1. B(리스크) — DrawdownMonitor tiered halt 직렬화 테스트
+- `tests/test_drawdown_monitor.py`에 `test_tiered_halt_roundtrip_recovery` 추가
+- 시나리오: tiered halt → `to_dict()` → `from_dict()` → recovery 정확성 검증
+- `_tiered_halt`, `_halt_drawdown` 보존 확인
 
-### D(ML) — narrow_range trend_regime_filter 실험 결과 분석
-- `scripts/run_bundle_oos.py`: BUNDLE_STRATEGY_INIT_PARAMS에 narrow_range 추가
-  - `trend_regime_filter=True, atr_trend_max=1.4`
-  - **결과**: 효과 없음 — fold1=-3.828, fold3=-10.794 완전 동일
-  - **원인**: BTC 4h 점진적 추세에서 ATR/ATR_MA(20) ratio가 1.4 미만
-    - fold3 max=1.236 (0번 트리거), fold1 max=1.447 (2번만 트리거)
-  - **다음**: atr_trend_max=1.1 실험 (Cycle 307)
+### 2. D(ML) — narrow_range ATR 필터 실험 + 그리드 정리
+- `run_bundle_oos.py`: atr_trend_max 1.4→1.1 실험 → OOS 결과 동일 (효과 없음 확정)
+- `walk_forward.py`: narrow_range 그리드에서 trend_regime_filter/atr_trend_max 정리
+  - `trend_regime_filter=[False]` 고정 (BTC 4h에서 ATR 필터 무효 확정)
 
-### F(리서치) — cmf_1h period 상향
-- `src/backtest/walk_forward.py`: cmf_1h period [60,75,90]→[75,90,105]
-  - 4h CMF PASS (Sharpe=2.508) vs 1h CMF FAIL (Sharpe=-1.44) 원인 연구
-  - 1h 노이즈 억제를 위해 더 긴 기간 탐색
+### 3. F(리서치) — cmf_1h 임계값 강화
+- `walk_forward.py`: cmf_1h `buy_thresh=[0.07,0.08,0.10]`, `sell_thresh=[-0.10,-0.08,-0.07]`
+- 근거: rank15 score=48.8, Sharpe=-1.44, 75 trades/8윈도우 (과다 신호)
+- period=[90,105]으로 축소 (75 저성능 확인)
 
 ## 시뮬레이션 결과
+- 테스트: 8395 passed, 23 skipped
+- Paper Sim: 0/22 PASS (price_cluster rank1=75.7, supertrend rank2=68.3)
+- Bundle OOS: 2/5 PASS (cmf 5/5, supertrend 3/5)
 
-| 시뮬 | 결과 |
-|------|------|
-| Paper Sim BTC 1h | 0/22 PASS, rank1=price_cluster(75.7), rank2=supertrend_multi(68.3) |
-| Bundle OOS BTC 4h | 2/5 PASS — cmf(2.508), supertrend_multi(3.674) |
-| 테스트 | 8394 passed, 23 skipped |
-
-## 다음 사이클 (307, 307 mod 5 = 2 → B + D + F)
-1. B(리스크): DrawdownMonitor to_dict/from_dict tiered halt roundtrip 테스트 추가
-2. D(ML): narrow_range atr_trend_max=1.1 Bundle OOS 실험
-3. F(리서치): cmf_1h period=105 paper sim 결과 분석
+## 다음 사이클 (308 = 308 mod 5 = 3 → C+B+F)
+- C: cmf_1h 강화된 임계값 효과 확인 (paper sim 재실행)
+- B: Kelly Sizer 실효성 점검
+- F: narrow_range 대체 필터 연구 (EMA slope, ROC 등)

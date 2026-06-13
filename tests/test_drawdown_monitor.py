@@ -1030,3 +1030,39 @@ def test_legacy_halt_recovery_unchanged():
     # equity=9220: drawdown=7.8% < 8% → resume
     m.update(9220)
     assert m.is_halted() is False, "drawdown 7.8% < legacy threshold 8% → should resume"
+
+
+def test_tiered_halt_roundtrip_recovery():
+    """to_dict → from_dict 직렬화 후 tiered halt의 recovery 동작이 정확한지 검증.
+
+    시나리오:
+      1. tiered(주간) halt 유발
+      2. to_dict → from_dict로 재시작 시뮬레이션
+      3. 복원된 인스턴스에서 recovery 조건 확인
+         - halt_drawdown/tiered_halt 정확히 복원됐으면 동일하게 빠른 recovery 작동해야 함
+    """
+    m = DrawdownMonitor(max_drawdown_pct=0.10, recovery_pct=0.02, weekly_limit=0.07)
+    m.update(10000)
+    m.set_weekly_start(9500)
+
+    # weekly_dd=7% → tiered HALT
+    m.update(8835)
+    assert m.is_halted() is True
+    assert m._tiered_halt is True
+    halt_dd = m._halt_drawdown
+
+    # 직렬화 → 복원
+    state = m.to_dict()
+    m2 = DrawdownMonitor.from_dict(state)
+
+    # 복원 상태 검증
+    assert m2.is_halted() is True
+    assert m2._tiered_halt is True
+    assert m2._halt_drawdown == pytest.approx(halt_dd, rel=1e-6)
+
+    # 복원된 인스턴스에서 recovery: equity=9100 (weekly_dd=4.2% → tiered 해소, total_dd=9%)
+    # tiered_recovery_threshold = halt_dd - 0.02 ≈ 9.65% → 9% < 9.65% → RESUME
+    m2.update(9100)
+    assert m2.is_halted() is False, (
+        "from_dict 복원 후 tiered halt은 동일한 recovery 기준으로 resume되어야 함"
+    )

@@ -55,9 +55,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   근거: cmf 4h 5/5 PASS(Sharpe=2.508) vs 1h rank15(Sharpe=-1.44)
     #   1h에서 CMF 신호 노이즈 비율 높음 → 더 긴 period(105h≈4.4일)로 안정화 탐색
     "cmf_1h": {
-        "period": [75, 90, 105],
-        "buy_thresh": [0.05, 0.06, 0.07],
-        "sell_thresh": [-0.07, -0.06, -0.05],
+        "period": [90, 105],  # Cycle306: [75,90,105] → 306 결과에서 75 저성능 제외
+        # Cycle307 F(리서치): cmf_1h 75trades/8윈도우, Sharpe=-1.44 → 과다신호 차단 필요
+        # 임계값 강화: 약한 CMF 신호 필터링으로 거래수 줄이고 신호 품질 향상
+        "buy_thresh": [0.07, 0.08, 0.10],
+        "sell_thresh": [-0.10, -0.08, -0.07],
     },
     "wick_reversal": {
         "min_wick_ratio": [0.55, 0.60, 0.65],  # Cycle 275: 0.50-0.60→0.55-0.65 상향, 추세장 약한 wick 오신호 차단
@@ -85,8 +87,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     "narrow_range": {
         "nr_lookback": [5, 6, 7],  # NR5/NR6/NR7 — 4h봉 0거래 문제 완화
-        "trend_regime_filter": [False, True],  # Cycle305 A(품질): fold1/3 FAIL 원인 검증
-        "atr_trend_max": [1.3, 1.4, 1.5],     # Cycle305 A: fold3 OOS=-10.794 극단손실 대응 (추세장 임계값 탐색)
+        # Cycle307 D(ML): ATR/ATR_MA(20) ratio가 BTC 4h에서 ~1.0 유지 (1.1/1.4 모두 미트리거)
+        # trend_regime_filter=True + atr_trend_max 조합은 비효율적 확정
+        # → trend_regime_filter=False 고정, nr_lookback 탐색으로 전환
+        "trend_regime_filter": [False],
     },
     "frama": {
         "period": [14, 16, 18],
