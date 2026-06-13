@@ -91,7 +91,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle302 B(리스크): n_bins=7 실험 역효과 (Sharpe 3.76→-1.76, PF 2.28→0.82) → 5 복원
     # Cycle302 D(ML): atr_bounce_factor=1.5 실험 역효과 (동일 시험에서 확인) → 0.0 유지
     # Cycle303 C(데이터): close_window=40 실험 역효과 (Sharpe 3.76→1.47, trades 12→12 불변) → 50 복원
-    #   분석: 더 짧은 window가 cluster 업데이트 속도는 높이나 신호 품질 저하 (Sharpe -55%)
+    # Cycle304 D(ML): bounce_pct=0.030 실험 역효과 (PF 2.28→2.07, trades 12→13 미미) → 0.025 복원
+    #   분석: threshold 완화가 신호 품질 저하 (PF -9%). trades 증가 미미, PASS 기준 미충족 지속
+    #   다음 실험 후보: close_window=60 (Cycle305 D)
     "price_cluster": {"bounce_pct": 0.025, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
