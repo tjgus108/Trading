@@ -93,8 +93,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle303 C(데이터): close_window=40 실험 역효과 (Sharpe 3.76→1.47, trades 12→12 불변) → 50 복원
     # Cycle304 D(ML): bounce_pct=0.030 실험 역효과 (PF 2.28→2.07, trades 12→13 미미) → 0.025 복원
     #   분석: threshold 완화가 신호 품질 저하 (PF -9%). trades 증가 미미, PASS 기준 미충족 지속
-    #   다음 실험 후보: close_window=60 (Cycle305 D)
-    "price_cluster": {"bounce_pct": 0.025, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # Cycle305 C(데이터): close_window=60 실험 — 더 긴 price memory → S/R 품질 향상 → trades 안정화 기대
+    #   단독 실험 원칙 유지: bounce_pct=0.025, n_bins=5 고정, window만 50→60
+    "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원

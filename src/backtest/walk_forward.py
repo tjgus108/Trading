@@ -82,6 +82,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     },
     "narrow_range": {
         "nr_lookback": [5, 6, 7],  # NR5/NR6/NR7 — 4h봉 0거래 문제 완화
+        "trend_regime_filter": [False, True],  # Cycle305 A(품질): fold1/3 FAIL 원인 검증
+        "atr_trend_max": [1.3, 1.4, 1.5],     # Cycle305 A: fold3 OOS=-10.794 극단손실 대응 (추세장 임계값 탐색)
     },
     "frama": {
         "period": [14, 16, 18],

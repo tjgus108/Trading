@@ -1,33 +1,33 @@
 # Current Cycle Briefing
 
-_Cycle 304 완료 — 2026-06-13_
+_Cycle 305 완료 — 2026-06-13_
 
 ## 완료된 작업
 
-### D(ML) — bounce_pct=0.030 실험 + walk_forward 그리드 업데이트
-- `scripts/paper_simulation.py`: bounce_pct=0.030 실험 → 역효과 확인 → 0.025 복원
-  - 결과: Sharpe 3.76(동일), PF 2.28→**2.07** (-9%), trades 12→13 (미미)
-  - **결론**: bounce_pct=0.025가 최적. threshold 완화는 신호 품질 저하 (PF -9%)
-- `src/backtest/walk_forward.py`: price_cluster close_window [40,50]→[50,60]
-  - Cycle303에서 40 역효과 실증 → 40 제거, 60 추가 탐색
+### A(품질) — narrow_range walk_forward 그리드 확장
+- `src/backtest/walk_forward.py`: narrow_range DEFAULT_GRIDS에 2개 파라미터 추가
+  - `trend_regime_filter: [False, True]` — Cycle304 E에서 구현된 기능 WF 탐색에 포함
+  - `atr_trend_max: [1.3, 1.4, 1.5]` — ATR 임계값 민감도 탐색
+  - 총 유효 조합: 12개 (grid explosion 없음)
+- 목적: fold3 OOS=-10.794 (2024-01~02 BTC 급등) 극단 손실 억제
 
-### E(실행) — NarrowRange trend_regime_filter 추가
-- `src/strategy/narrow_range.py`: 새 파라미터 추가
-  - `trend_regime_filter=False` (기본 비활성)
-  - `atr_trend_max=1.4` (ATR/ATR_MA 임계값)
-  - Bundle OOS 분석: fold1(-3.828)/fold3(-10.794) 고변동성 bull 구간에서 극단적 FAIL
-  - 해결책: ATR/ATR_MA > 1.4 시 신호 억제 → 고변동성 추세장 오신호 방지
+### C(데이터) — price_cluster close_window=60 단독 실험
+- `scripts/paper_simulation.py`: close_window=50→60 변경
+  - Paper Sim BTC: rank1 score=75.7 (+1.9 vs Cycle304 73.8)
+  - SharpeStd=1.77 (안정성 향상)
+  - **결론**: close_window=60 소폭 개선 → 유지 확정 (reverting 불필요)
 
-### F(리서치) — Bundle OOS PASS 전략 분석
-- cmf: 5/5 PASS (Sharpe=2.508, PF=1.387) — 가장 일관된 성과
-- supertrend_multi: PASS (OOS Sharpe=3.674, PF=2.475) — 높은 기대수익, fold3/4 거래 부족
-- narrow_range: FAIL — 고변동성 bull 구간 취약성 확인, trend_regime_filter로 개선 시도
+### F(리서치) — cmf/supertrend_multi 타임프레임 의존성 분석
+- cmf: 4h에서만 강세 (5/5 PASS), 1h에서는 rank15 (노이즈 취약)
+- supertrend_multi: 4h OOS PASS(Sharpe=3.674), 1h에서도 rank2 — 다중 타임프레임 유효
+- narrow_range: fold3 극단 손실 원인 확인 → trend_regime_filter 그리드 추가로 대응
 
 ## 시뮬레이션 결과
-- Paper Sim BTC 4h: 0/22 PASS, price_cluster rank1 (score=73.8, Sharpe=3.76, PF=2.07→0.025 복원 후 2.28)
+- 테스트: **8394 passed, 23 skipped** (회귀 없음)
+- Paper Sim BTC 1h: 0/22 PASS, price_cluster rank1 (score=75.7, +1.9 개선)
 - Bundle OOS: **2/5 PASS** (cmf, supertrend_multi) — 이전 사이클 동일
 
-## 다음 Cycle 305 (305 mod 5 = 0 → A+C+F)
-- A(품질): NarrowRange trend_regime_filter 그리드 추가 → walk_forward 실험
-- C(데이터): price_cluster close_window=60 단독 실험 (50 유지하면서 60 비교)
-- F(리서치): cmf/supertrend_multi 안정성 분석
+## 다음 Cycle 306 (306 mod 5 = 1 → B+D+F)
+- B(리스크): close_window=60 효과를 Bundle OOS 4h에서 검증
+- D(ML): narrow_range trend_regime_filter + atr_trend_max walk-forward 실험
+- F: cmf 1h 성능 저하 원인 심층 분석 (period 보수화 검토)
