@@ -30,6 +30,8 @@ class NarrowRangeStrategy(BaseStrategy):
         nr_lookback: int = 5,
         trend_regime_filter: bool = False,
         atr_trend_max: float = 1.4,
+        ema_slope_min_buy: float = 0.0,
+        ema_slope_max_sell: float = 0.0,
         **kwargs,
     ):
         """
@@ -38,10 +40,14 @@ class NarrowRangeStrategy(BaseStrategy):
             trend_regime_filter: True면 ATR/ATR_MA > atr_trend_max 시 신호 억제
                 (고변동성 추세장에서 NR breakout 오신호 감소).
             atr_trend_max: trend_regime_filter 활성 시 상한 임계값 (기본 1.4).
+            ema_slope_min_buy: BUY 진입 최소 EMA20 slope (0.0=필터 없음, 양수=상승추세 필수).
+            ema_slope_max_sell: SELL 진입 최대 EMA20 slope (0.0=필터 없음, 음수=하락추세 필수).
         """
         self.nr_lookback = max(4, int(nr_lookback))  # 최소 4봉 (NR4 확인용)
         self.trend_regime_filter = bool(trend_regime_filter)
         self.atr_trend_max = float(atr_trend_max)
+        self.ema_slope_min_buy = float(ema_slope_min_buy)
+        self.ema_slope_max_sell = float(ema_slope_max_sell)
 
     def _is_nr(self, ranges: pd.Series, idx: int, n: int) -> bool:
         """idx번 봉이 최근 n봉 중 최소 range인지 확인."""
@@ -136,8 +142,18 @@ class NarrowRangeStrategy(BaseStrategy):
             f"close={close_curr:.4f} < nr_low={low_nr:.4f}"
         )
 
+        # EMA slope 필터 (ema20_slope 컬럼 존재 시)
+        ema_slope = None
+        if "ema20_slope" in df.columns:
+            ema_slope = float(df["ema20_slope"].iloc[curr_idx])
+
         # 상향 돌파 (NR 봉의 high 기준)
         if close_curr > high_nr:
+            if ema_slope is not None and self.ema_slope_min_buy != 0.0 and ema_slope < self.ema_slope_min_buy:
+                return self._hold(
+                    df,
+                    f"ema_slope_min_buy 미충족: slope={ema_slope:.5f} < {self.ema_slope_min_buy}",
+                )
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -155,6 +171,11 @@ class NarrowRangeStrategy(BaseStrategy):
 
         # 하향 돌파 (NR 봉의 low 기준)
         if close_curr < low_nr:
+            if ema_slope is not None and self.ema_slope_max_sell != 0.0 and ema_slope > self.ema_slope_max_sell:
+                return self._hold(
+                    df,
+                    f"ema_slope_max_sell 미충족: slope={ema_slope:.5f} > {self.ema_slope_max_sell}",
+                )
             return Signal(
                 action=Action.SELL,
                 confidence=conf,

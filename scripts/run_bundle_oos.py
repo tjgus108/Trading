@@ -71,12 +71,12 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - 목표: fold1(2023-08~10 OOS=-4.606), fold2(2023-10~12 OOS=-2.046) 개선
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
-    # Cycle307 D(ML): narrow_range atr_trend_max=1.1 실험
-    #   - Cycle306 분석: atr_trend_max=1.4가 BTC 4h 점진적 추세에서 미트리거
-    #     fold1 max ratio=1.447(341봉 중 2번), fold3 max ratio=1.236(0번)
-    #   - Cycle307: threshold=1.1로 낮춰 ~50-70봉/fold 트리거 예상
-    #   - 위험: fold2 OOS=1.540 억제 가능성 (좋은 신호 필터 위험)
-    "narrow_range": {"trend_regime_filter": True, "atr_trend_max": 1.1},
+    # Cycle307 D(ML): atr_trend_max=1.1 실험 → fold3 OOS=-10.794 지속, 효과 없음 확정
+    # Cycle310 C(데이터): ema_slope 필터로 전환 (atr_trend_max 포기)
+    #   fold3 OOS=-10.794 (2023-12-27~2024-02-24 BTC 불마켓): EMA slope > 0 → SELL 차단이 핵심
+    #   fold1 OOS=-3.828 (2023-08-29~2023-10-27 베어마켓): EMA slope < 0 → BUY 차단 목적
+    #   단독 실험 원칙: ema_slope만 적용, nr_lookback은 기본값(5) 유지
+    "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.001, "ema_slope_max_sell": -0.001},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)

@@ -1,38 +1,36 @@
 # Current Cycle Briefing
 
-_Updated: 2026-06-14 | Cycle 309 완료_
+_Cycle 310 | 2026-06-14 | A(품질) + C(데이터) + F(리서치)_
 
 ## 완료된 작업
 
-### 1. D(ML) — cmf buy_thresh=0.10 paper_sim 실험
-- `scripts/paper_simulation.py`: `PAPER_SIM_STRATEGY_PARAMS["cmf"] = {"buy_thresh": 0.10}` 추가
-- **결과**: trades 75→72 (-4%), Sharpe -1.44→-1.21 (+0.23) — 기대 이하
-- **진단**: period=20(1h)이 근본 원인 → 4h 등가 period(80+) 실험 필요
+### A(품질): cmf 1h period=40 실험 → 역효과 확인
+- 가설: 1h CMF noise 취약성은 lookback이 짧아서 → period=40 실험
+- 결과: Sharpe -1.21 → -2.33, trades 72 → 59 (rank14 → rank19)
+- 결론: 1h CMF는 period 무관하게 구조적으로 약함. 4h bars가 intraday noise 필터링
+- 조치: paper_sim cmf params → `{"buy_thresh": 0.10}` (period=20 복원)
 
-### 2. E(실행) — BacktestEngine 슬리피지 레짐 추적
-- `src/backtest/engine.py`: `BacktestResult.slippage_regime_counts` 추가
-  - `Dict[str, int]` 필드, adaptive_slippage=True 시 low/normal/high 카운트
-  - `summary()` 출력 추가, `_compute_metrics()` 파라미터 추가
-  - backward-compatible (기본값 빈 dict)
+### C(데이터): NarrowRangeStrategy EMA slope 필터 구현
+- `src/data/feed.py`: `ema20_slope = ema20.diff() / ema20` 지표 추가
+- `src/strategy/narrow_range.py`: `ema_slope_min_buy`, `ema_slope_max_sell` 파라미터 추가
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["narrow_range"] 그리드 업데이트
+- `scripts/run_bundle_oos.py`: narrow_range init params 업데이트
+  - 기존: `trend_regime_filter=True, atr_trend_max=1.1` (효과 없음 확정)
+  - 신규: `trend_regime_filter=False, ema_slope_min_buy=0.001, ema_slope_max_sell=-0.001`
+  - 목표: fold3 OOS=-10.794 (BTC 불마켓 SELL 차단) 개선
 
-### 3. F(리서치) — narrow_range EMA slope 지원 가능성 조사
-- `ema_slope_min` 미지원 확인 → Cycle 310 C(데이터)에서 구현 예정
-- 구현 계획: feed.py `ema20_slope` 컬럼 추가 + narrow_range.py 파라미터 추가
+### F(리서치): 슬리피지 레짐 추적 분석
+- slippage_regime_counts 구현됨 (Cycle 309)이지만 리포트에 미반영
+- 다음 사이클 B(리스크) 태스크: paper_sim generate_report()에 slippage 레짐 컬럼 추가
 
-## 시뮬레이션 결과 요약
+## 시뮬레이션 결과
 
-| 구분 | 결과 |
+| 시뮬 | 결과 |
 |------|------|
-| 테스트 | 8400 passed, 23 skipped |
-| Paper Sim BTC 1h | 0/22 PASS |
-| Bundle OOS BTC 4h | 2/5 PASS (cmf, supertrend_multi) |
-| cmf rank (BTC 1h) | rank14 Sharpe=-1.21 (Cycle308: rank15 Sharpe=-1.44) |
-| Bundle cmf avg Sharpe | 2.508 (5/5 PASS, 동일) |
-| Bundle supertrend_multi | 3.674 (3/5 PASS, 동일) |
+| Paper Sim 1h | 0/22 PASS (동일), price_cluster rank1, cmf rank19(period=40 역효과) |
+| Bundle OOS 4h | 2/5 PASS (cmf, supertrend_multi), narrow_range fold3=-10.794 지속 |
 
-## 다음 사이클 (310) 핵심 작업
-
-- **310 mod 5 = 0** → A(품질) + C(데이터) + F(리서치)
-- A(품질): cmf 1h period=40 실험 (4h 등가 탐색 시작)
-- C(데이터): NarrowRangeStrategy에 ema_slope_min 지원 추가 (feed.py + narrow_range.py)
-- F(리서치): slippage_regime_counts 분석, value_area 대안 검토
+## 다음 사이클 (311): B(리스크) + D(ML) + F(리서치)
+1. B: paper_sim 리포트에 slippage_regime_counts 추가
+2. D: Cycle 311 Bundle OOS에서 narrow_range ema_slope 효과 확인
+3. F: 1h 전체 FAIL 근본 원인 탐구 (WF 윈도우 설정 검토)
