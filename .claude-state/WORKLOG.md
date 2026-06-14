@@ -1,3 +1,39 @@
+## [2026-06-14] Cycle 309 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] cmf buy_thresh=0.10 paper_sim 실험**
+1. `scripts/paper_simulation.py`: `PAPER_SIM_STRATEGY_PARAMS["cmf"] = {"buy_thresh": 0.10}` 추가
+   - **결과**: trades 75→72 (-4%), Sharpe -1.44→-1.21 (+0.23) — 기대한 25-30% 감소 미달
+   - **분석**: period=20(1h) 기반 CMF가 너무 많은 신호를 생성 → threshold 강화만으로 제한적
+   - **결론**: 4h CMF(period=21≈84h)와 등가를 위해 1h period를 40-50으로 높여야 함
+   - rank14→rank14(score 48.8→50.0), 미미한 개선
+
+**[E(실행)] BacktestEngine 슬리피지 레짐 추적 추가**
+2. `src/backtest/engine.py`: `BacktestResult.slippage_regime_counts` 필드 추가
+   - `slippage_regime_counts: Dict[str, int] = field(default_factory=dict)` (기본 빈 dict, backward-compatible)
+   - `engine.run()`: adaptive_slippage=True 시 신호 진입마다 low/normal/high 레짐 카운트
+   - `summary()`: 레짐 카운트 출력 추가 (adaptive_slippage 활성 시에만)
+   - **목적**: price_cluster MDD=12.2% 에서 고변동성 레짐 비율 진단 가능
+   - `_compute_metrics()` 시그니처: `slippage_regime_counts` 파라미터 추가
+
+**[F(리서치)] narrow_range EMA slope 필터 지원 여부 조사**
+3. NarrowRangeStrategy 분석:
+   - `ema_slope_min` 파라미터 **미지원** (narrow_range.py에 없음)
+   - `enrich_indicators()` / `_add_indicators()`에 `ema20_slope` 컬럼 **미생성**
+   - `ema_slope`는 impulse_system/trend_momentum_blend 등에만 존재 (수동 diff() 사용)
+   - **결론**: 구현하려면 (1) feed.py에 ema20_slope 추가, (2) NarrowRangeStrategy에 파라미터 추가 필요
+   - 이번 사이클은 연구만 → 다음 사이클 B+F에서 구현 계획
+
+**[시뮬레이션 결과 Cycle 309]**
+- 테스트: **8400 passed, 23 skipped** (회귀 없음, E(실행) 5개 신규 라인 추가)
+- Paper Sim BTC 1h (8 windows): **0/22 PASS** (동일)
+  - price_cluster: rank1 score=75.7 (안정, AvgSharpe=0.59, MDD=12.2%)
+  - supertrend_multi: rank2 score=68.3 (안정)
+  - cmf: rank14 score=50.0 Sharpe=-1.21 trades=72 (buy_thresh=0.10 효과 미미)
+- Bundle OOS BTC 4h (5-fold): **2/5 PASS** (cmf=2.508, supertrend_multi=3.674, 동일)
+  - narrow_range fold3 OOS=-10.794 (2023-12-27~2024-02-24 BTC 불마켓 구간) 지속
+
+---
+
 ## [2026-06-14] Cycle 308 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] CMFStrategy warmup 버그 수정**
@@ -13647,6 +13683,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-14 00:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-14 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-14 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-14 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-14 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-14 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-14 05:12 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -72,6 +72,8 @@ class BacktestResult:
     trades: List[float] = None  # 거래 PnL 리스트 (from_backtest_result 사용 시 설정)
     wfe: float = 0.0  # Walk-Forward Efficiency = OOS_Sharpe / IS_Sharpe (0이면 미계산)
     mc_p_value: float = -1.0  # Monte Carlo permutation p-value (-1=미계산)
+    # Cycle309 E(실행): adaptive_slippage 레짐별 진입 횟수 (adaptive_slippage=False면 빈 dict)
+    slippage_regime_counts: Dict[str, int] = field(default_factory=dict)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -94,6 +96,11 @@ class BacktestResult:
         ]
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
+        if self.slippage_regime_counts:
+            low = self.slippage_regime_counts.get("low", 0)
+            normal = self.slippage_regime_counts.get("normal", 0)
+            high = self.slippage_regime_counts.get("high", 0)
+            lines.append(f"  slippage_regimes: low={low} normal={normal} high={high}")
         return "\n".join(lines)
 
 
@@ -148,6 +155,8 @@ class BacktestEngine:
         total_slippage_cost = 0.0
         signals_skipped_atr0 = 0  # 신호 생성됐으나 atr=0으로 포지션 미진입 횟수
         consec_losses = 0  # 연속 손실 카운터 (consec_loss_scale_threshold 기능용)
+        # Cycle309 E(실행): adaptive_slippage 레짐별 진입 카운트
+        slip_regime_counts: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
 
         position = None  # {"side": "BUY"/"SELL", "entry": float, "sl": float, "tp": float, "size": float, "hold_candles": int, "raw_entry": float}
 
@@ -224,6 +233,14 @@ class BacktestEngine:
                         close = candle["close"]
 
                         cur_slip = self._get_slippage(candle)
+                        # adaptive_slippage 레짐 카운트 (Cycle309 E)
+                        if self.adaptive_slippage:
+                            if abs(cur_slip - SLIPPAGE_REGIME["low"]) < 1e-9:
+                                slip_regime_counts["low"] += 1
+                            elif abs(cur_slip - SLIPPAGE_REGIME["high"]) < 1e-9:
+                                slip_regime_counts["high"] += 1
+                            else:
+                                slip_regime_counts["normal"] += 1
                         if signal.action == Action.BUY:
                             entry = close * (1 + cur_slip)
                             sl = entry - sl_dist
@@ -264,7 +281,10 @@ class BacktestEngine:
             total_slippage_cost += slip
         equity_curve.append(balance)
 
-        result = self._compute_metrics(strategy.name, trades, equity_curve, total_fees, total_slippage_cost)
+        result = self._compute_metrics(
+            strategy.name, trades, equity_curve, total_fees, total_slippage_cost,
+            slippage_regime_counts=slip_regime_counts if self.adaptive_slippage else {},
+        )
         if not trades and signals_skipped_atr0 > 0:
             reason = f"atr=0 skipped {signals_skipped_atr0} signal(s) — 포지션 미진입"
             if reason not in result.fail_reasons:
@@ -380,7 +400,7 @@ class BacktestEngine:
             return (exit_price - entry) * size - commission_cost, commission_cost, slip_cost
         return (entry - exit_price) * size - commission_cost, commission_cost, slip_cost
 
-    def _compute_metrics(self, name: str, trades: list, equity: list, total_fees: float = 0.0, total_slippage_cost: float = 0.0, wfe: float = 0.0) -> BacktestResult:
+    def _compute_metrics(self, name: str, trades: list, equity: list, total_fees: float = 0.0, total_slippage_cost: float = 0.0, wfe: float = 0.0, slippage_regime_counts: Optional[Dict[str, int]] = None) -> BacktestResult:
         if not trades:
             return BacktestResult(
                 strategy=name, total_trades=0, win_rate=0, profit_factor=0,
@@ -484,6 +504,7 @@ class BacktestEngine:
             trades=trades,  # 거래 PnL 리스트 저장
             wfe=round(wfe, 4),
             mc_p_value=round(mc_p, 4),
+            slippage_regime_counts=slippage_regime_counts or {},
         )
 
     @staticmethod

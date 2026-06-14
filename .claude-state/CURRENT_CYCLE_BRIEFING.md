@@ -1,36 +1,38 @@
 # Current Cycle Briefing
 
-_Updated: 2026-06-14 | Cycle 308 완료_
+_Updated: 2026-06-14 | Cycle 309 완료_
 
 ## 완료된 작업
 
-### 1. C(데이터) — CMFStrategy warmup 버그 수정
-- `src/strategy/cmf.py`: `min_rows = max(_MIN_ROWS, self.period + 5)` 수정
-  - 기존: 고정 25봉, period=105에서 warmup 중 불완전한 CMF 계산 허용
-  - 수정: period 기반 동적 min_rows — period=105 → 110봉 요구
-- `tests/test_cmf.py`: warmup 방어 테스트 2개 추가
+### 1. D(ML) — cmf buy_thresh=0.10 paper_sim 실험
+- `scripts/paper_simulation.py`: `PAPER_SIM_STRATEGY_PARAMS["cmf"] = {"buy_thresh": 0.10}` 추가
+- **결과**: trades 75→72 (-4%), Sharpe -1.44→-1.21 (+0.23) — 기대 이하
+- **진단**: period=20(1h)이 근본 원인 → 4h 등가 period(80+) 실험 필요
 
-### 2. B(리스크) — DrawdownMonitor WARN 히스테리시스
-- `src/risk/drawdown_monitor.py`:
-  - `mdd_warn_hysteresis_pct=0.015` 파라미터 추가 (기본 1.5%)
-  - WARN→NORMAL 복귀 기준: `mdd_warn_pct - hysteresis = 3.5%`
-  - BTC MDD 5% 경계 oscillation으로 인한 size_multiplier 0.5/1.0 급등락 방지
-  - BLOCK_ENTRY 이상에서 복귀 시는 히스테리시스 미적용 (기존 동작 보존)
-  - `to_dict/from_dict` 직렬화에 `mdd_warn_hysteresis_pct`, `_in_warn_mode` 추가
-- `tests/test_drawdown_monitor.py`: 히스테리시스 테스트 3개 추가
+### 2. E(실행) — BacktestEngine 슬리피지 레짐 추적
+- `src/backtest/engine.py`: `BacktestResult.slippage_regime_counts` 추가
+  - `Dict[str, int]` 필드, adaptive_slippage=True 시 low/normal/high 카운트
+  - `summary()` 출력 추가, `_compute_metrics()` 파라미터 추가
+  - backward-compatible (기본값 빈 dict)
 
-### 3. F(리서치) — Bundle OOS 분석
-- cmf 5/5 PASS (avg OOS Sharpe=2.508, std=1.888) — 매우 안정적
-- supertrend_multi 3/5 PASS (avg OOS Sharpe=3.674)
-- narrow_range fold3 OOS=-10.794 지속 → EMA slope/ROC 필터 방향 연구
-- value_area OOS std=2.018 (2.0 임계값 극소 초과) FAIL 지속
+### 3. F(리서치) — narrow_range EMA slope 지원 가능성 조사
+- `ema_slope_min` 미지원 확인 → Cycle 310 C(데이터)에서 구현 예정
+- 구현 계획: feed.py `ema20_slope` 컬럼 추가 + narrow_range.py 파라미터 추가
 
-## 시뮬레이션 결과
-- 테스트: **8400 passed, 23 skipped** (+5 신규)
-- Paper Sim BTC 1h: 0/22 PASS (price_cluster rank1=75.7, supertrend rank2=68.3, cmf rank15=48.8)
-- Bundle OOS BTC 4h: **2/5 PASS** (cmf=2.508, supertrend_multi=3.674)
+## 시뮬레이션 결과 요약
 
-## 다음 사이클 (309 = 309 mod 5 = 4 → D+E+F)
-- D: cmf paper_sim 효과 검증 (PAPER_SIM_STRATEGY_PARAMS["cmf"]["buy_thresh"]=0.10 추가)
-- E: supertrend_multi 4h vs 1h 성능 격차 분석
-- F: narrow_range EMA slope 필터 실험 (walk_forward.py grids에 파라미터 추가)
+| 구분 | 결과 |
+|------|------|
+| 테스트 | 8400 passed, 23 skipped |
+| Paper Sim BTC 1h | 0/22 PASS |
+| Bundle OOS BTC 4h | 2/5 PASS (cmf, supertrend_multi) |
+| cmf rank (BTC 1h) | rank14 Sharpe=-1.21 (Cycle308: rank15 Sharpe=-1.44) |
+| Bundle cmf avg Sharpe | 2.508 (5/5 PASS, 동일) |
+| Bundle supertrend_multi | 3.674 (3/5 PASS, 동일) |
+
+## 다음 사이클 (310) 핵심 작업
+
+- **310 mod 5 = 0** → A(품질) + C(데이터) + F(리서치)
+- A(품질): cmf 1h period=40 실험 (4h 등가 탐색 시작)
+- C(데이터): NarrowRangeStrategy에 ema_slope_min 지원 추가 (feed.py + narrow_range.py)
+- F(리서치): slippage_regime_counts 분석, value_area 대안 검토

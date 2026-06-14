@@ -100,6 +100,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원
     "order_flow_imbalance_v2": {"trend_span": 20},
+    # Cycle309 D(ML): cmf buy_thresh=0.10 실험 — paper_sim은 walk_forward 그리드 미사용
+    # cmf rank15 Sharpe=-1.44 (75 trades/8w ≈ 9.4/w, 과다신호)
+    # 기대: 더 강한 threshold → trades ~75→50-60, Sharpe 개선
+    # 단독 실험 원칙: buy_thresh만 변경, period는 기본값(20) 유지
+    "cmf": {"buy_thresh": 0.10},
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
