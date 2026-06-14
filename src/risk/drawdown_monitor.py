@@ -130,6 +130,7 @@ class DrawdownMonitor:
         mdd_block_pct: float = 0.10,
         mdd_liquidate_pct: float = 0.15,
         mdd_halt_pct: float = 0.20,
+        mdd_warn_hysteresis_pct: float = 0.015,
         rolling_window: int = 50,
         kelly_reduce_at_mdd: float = 0.08,
         transition_cushion_enabled: bool = False,
@@ -155,6 +156,10 @@ class DrawdownMonitor:
             mdd_block_pct:     MDD 진입 차단 기준 (기본 10%). 신규 진입 차단.
             mdd_liquidate_pct: MDD 청산 권고 기준 (기본 15%). 모든 포지션 청산 권고.
             mdd_halt_pct:      MDD 완전 중단 기준 (기본 20%). 전체 거래 중단.
+            mdd_warn_hysteresis_pct: WARN→NORMAL 복귀 시 필요한 추가 회복폭 (기본 1.5%).
+                                     WARN 진입: MDD ≥ mdd_warn_pct (5%)
+                                     NORMAL 복귀: MDD < mdd_warn_pct - mdd_warn_hysteresis_pct (3.5%)
+                                     BTC처럼 MDD가 5% 경계를 반복 교차할 때 사이즈 배수 oscillation 방지.
             rolling_window:    rolling_mdd() 기본 윈도우 크기 (equity 업데이트 횟수, 기본 50).
             kelly_reduce_at_mdd: MDD가 이 값을 초과하면 Kelly fraction을 0.5x 축소 신호 반환
                                  (DrawdownStatus.kelly_fraction_multiplier = 0.5).
@@ -175,7 +180,10 @@ class DrawdownMonitor:
         self.mdd_block_pct = mdd_block_pct
         self.mdd_liquidate_pct = mdd_liquidate_pct
         self.mdd_halt_pct = mdd_halt_pct
+        self.mdd_warn_hysteresis_pct = float(mdd_warn_hysteresis_pct)
         self.kelly_reduce_at_mdd = float(kelly_reduce_at_mdd)
+        # WARN 히스테리시스 상태: True면 mdd_warn_pct를 넘어 WARN 진입한 상태
+        self._in_warn_mode: bool = False
         self.transition_cushion_enabled = transition_cushion_enabled
         self.transition_cushion_threshold = transition_cushion_threshold
         self._high_vol_daily_limit: float = 0.02   # HIGH_VOL 레짐 일일 DD 한도 (2%)
@@ -443,21 +451,37 @@ class DrawdownMonitor:
         """현재 peak 대비 전체 낙폭 기준 MDD 단계 반환.
 
         MDD 단계:
-          NORMAL      : MDD < mdd_warn_pct
+          NORMAL      : MDD < mdd_warn_pct (히스테리시스 적용 복귀 기준)
           WARN        : mdd_warn_pct ≤ MDD < mdd_block_pct
           BLOCK_ENTRY : mdd_block_pct ≤ MDD < mdd_liquidate_pct
           LIQUIDATE   : mdd_liquidate_pct ≤ MDD < mdd_halt_pct
           FULL_HALT   : MDD ≥ mdd_halt_pct
+
+        WARN 히스테리시스:
+          진입 조건: MDD ≥ mdd_warn_pct (5%)
+          복귀 조건: MDD < mdd_warn_pct - mdd_warn_hysteresis_pct (기본 3.5%)
+          → MDD가 5% 경계를 반복 교차할 때 size_multiplier oscillation 방지
         """
         dd = self.current_drawdown()
         if dd >= self.mdd_halt_pct:
+            self._in_warn_mode = False  # 상위 레벨 진입 → 히스테리시스 초기화
             return MddLevel.FULL_HALT
         if dd >= self.mdd_liquidate_pct:
+            self._in_warn_mode = False
             return MddLevel.LIQUIDATE
         if dd >= self.mdd_block_pct:
+            self._in_warn_mode = False
             return MddLevel.BLOCK_ENTRY
         if dd >= self.mdd_warn_pct:
+            self._in_warn_mode = True   # WARN 진입: 히스테리시스 활성화
             return MddLevel.WARN
+        # mdd_warn_pct 이하 — WARN 히스테리시스 확인
+        # BLOCK_ENTRY 이상에서 직접 내려올 때(_in_warn_mode=False)는 히스테리시스 없이 NORMAL
+        if self._in_warn_mode:
+            recovery_threshold = self.mdd_warn_pct - self.mdd_warn_hysteresis_pct
+            if dd > recovery_threshold:
+                return MddLevel.WARN  # 완전 회복 전까지 WARN 유지
+        self._in_warn_mode = False
         return MddLevel.NORMAL
 
     def get_mdd_size_multiplier(self) -> float:
@@ -905,8 +929,10 @@ class DrawdownMonitor:
             "mdd_block_pct": self.mdd_block_pct,
             "mdd_liquidate_pct": self.mdd_liquidate_pct,
             "mdd_halt_pct": self.mdd_halt_pct,
+            "mdd_warn_hysteresis_pct": self.mdd_warn_hysteresis_pct,
             "kelly_reduce_at_mdd": self.kelly_reduce_at_mdd,
             "rolling_window": self._rolling_window,
+            "_in_warn_mode": self._in_warn_mode,
             "_peak": self._peak,
             "_current": self._current,
             "_halted": self._halted,
@@ -942,9 +968,11 @@ class DrawdownMonitor:
             mdd_block_pct=data.get("mdd_block_pct", 0.10),
             mdd_liquidate_pct=data.get("mdd_liquidate_pct", 0.15),
             mdd_halt_pct=data.get("mdd_halt_pct", 0.20),
+            mdd_warn_hysteresis_pct=data.get("mdd_warn_hysteresis_pct", 0.015),
             rolling_window=data.get("rolling_window", 50),
             kelly_reduce_at_mdd=data.get("kelly_reduce_at_mdd", 0.08),
         )
+        obj._in_warn_mode = data.get("_in_warn_mode", False)
         obj._peak = data["_peak"]
         obj._current = data["_current"]
         obj._halted = data["_halted"]

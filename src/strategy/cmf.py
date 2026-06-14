@@ -30,7 +30,8 @@ class CMFStrategy(BaseStrategy):
         self.rsi_max_buy = rsi_max_buy
 
     def generate(self, df: pd.DataFrame) -> Signal:
-        if df is None or len(df) < _MIN_ROWS:
+        min_rows = max(_MIN_ROWS, self.period + 5)
+        if df is None or len(df) < min_rows:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.LOW,

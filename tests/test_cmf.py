@@ -231,3 +231,25 @@ def test_hold_neutral():
     sig = strategy.generate(df)
     # 중립 데이터에서 CMF=0 → HOLD
     assert sig.action == Action.HOLD
+
+
+# ── 17. [C(데이터) Cycle 308] 긴 period warmup 방어 ─────────────────────────
+def test_cmf_1h_period_warmup_insufficient_data():
+    """period=105일 때 데이터가 110봉 미만이면 HOLD (warmup 방어)."""
+    strat_105 = CMFStrategy(period=105)
+    df_short = _make_df(n=80, cmf_target="high_buy", close_above_ema=True, trend="bullish", rsi_val=60.0)
+    sig = strat_105.generate(df_short)
+    assert sig.action == Action.HOLD, "period=105에서 80봉은 warmup 미충족 → HOLD"
+    assert "부족" in sig.reasoning
+
+
+def test_cmf_1h_period_sufficient_data_can_signal():
+    """period=105일 때 데이터가 충분하면(115봉+) 정상 신호 생성 가능."""
+    strat_105 = CMFStrategy(period=105)
+    df_long = _make_df(n=115, cmf_target="high_buy", close_above_ema=True, trend="bullish", rsi_val=60.0)
+    sig = strat_105.generate(df_long)
+    # 신호 생성 여부 (HOLD가 아닌 경우 BUY가 정상)
+    assert sig.action in (Action.BUY, Action.HOLD), f"Unexpected action: {sig.action}"
+    # 단, 데이터 부족 이유로 HOLD이면 안 됨
+    if sig.action == Action.HOLD:
+        assert "부족" not in sig.reasoning, "115봉은 warmup 충족 → 데이터 부족 HOLD 아님"

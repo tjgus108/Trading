@@ -1066,3 +1066,54 @@ def test_tiered_halt_roundtrip_recovery():
     assert m2.is_halted() is False, (
         "from_dict 복원 후 tiered halt은 동일한 recovery 기준으로 resume되어야 함"
     )
+
+
+# ── [B] Cycle 308: WARN 히스테리시스 테스트 ─────────────────────────────────────
+
+def test_mdd_warn_hysteresis_prevents_oscillation():
+    """MDD가 5% 경계를 반복 교차할 때 WARN → NORMAL 즉각 전환 방지."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05, mdd_warn_hysteresis_pct=0.015)
+    m.update(10000)
+
+    # MDD 5.1% → WARN 진입
+    m.update(9490)  # dd = 5.1%
+    assert m.get_mdd_level() == MddLevel.WARN
+    assert m.get_mdd_size_multiplier() == 0.5
+
+    # MDD 4.9%로 소폭 회복 → 히스테리시스로 여전히 WARN 유지
+    m.update(9510)  # dd = 4.9% (< 5% 이지만 > 5% - 1.5% = 3.5%)
+    assert m.get_mdd_level() == MddLevel.WARN, "히스테리시스: 4.9%는 복귀 임계값(3.5%) 미달"
+    assert m.get_mdd_size_multiplier() == 0.5
+
+    # MDD 3.4%로 완전 회복 → NORMAL 복귀
+    m.update(9660)  # dd = 3.4% (< 3.5%)
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    assert m.get_mdd_size_multiplier() == 1.0
+
+
+def test_mdd_warn_hysteresis_no_hysteresis_without_warn_entry():
+    """WARN 진입 없이 5% 미만이면 히스테리시스 없이 즉시 NORMAL."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05, mdd_warn_hysteresis_pct=0.015)
+    m.update(10000)
+    m.update(9510)  # dd = 4.9% — WARN 진입 없음
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    assert m._in_warn_mode is False
+
+
+def test_mdd_warn_hysteresis_from_dict_preserves_state():
+    """to_dict/from_dict 후 _in_warn_mode 및 hysteresis 파라미터 보존."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05, mdd_warn_hysteresis_pct=0.02)
+    m.update(10000)
+    m.update(9490)  # dd=5.1% → WARN
+    assert m._in_warn_mode is True
+
+    d = m.to_dict()
+    assert d["mdd_warn_hysteresis_pct"] == pytest.approx(0.02)
+    assert d["_in_warn_mode"] is True
+
+    m2 = DrawdownMonitor.from_dict(d)
+    assert m2.mdd_warn_hysteresis_pct == pytest.approx(0.02)
+    assert m2._in_warn_mode is True
+    # 복원 후도 히스테리시스 동작: 4.5%는 NORMAL 복귀 임계값(5%-2%=3%) 미달
+    m2.update(9550)  # dd=4.5%
+    assert m2.get_mdd_level() == MddLevel.WARN
