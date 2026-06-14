@@ -1,36 +1,39 @@
 # Current Cycle Briefing
 
-_Cycle 310 | 2026-06-14 | A(품질) + C(데이터) + F(리서치)_
+_Cycle 311 | 2026-06-14 | B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### A(품질): cmf 1h period=40 실험 → 역효과 확인
-- 가설: 1h CMF noise 취약성은 lookback이 짧아서 → period=40 실험
-- 결과: Sharpe -1.21 → -2.33, trades 72 → 59 (rank14 → rank19)
-- 결론: 1h CMF는 period 무관하게 구조적으로 약함. 4h bars가 intraday noise 필터링
-- 조치: paper_sim cmf params → `{"buy_thresh": 0.10}` (period=20 복원)
+### B(리스크): Paper Simulation 슬리피지 레짐 리포트 추가
+- `scripts/paper_simulation.py` window_results에 `slippage_regime_counts` 추가
+- 결과 dict에 `slippage_regime_agg` 추가, generate_report()에 슬리피지 레짐 분포 섹션 추가
+- 결과: price_cluster MDD=12.2%의 high regime 비율이 낮음 (정상) → slippage가 MDD 원인 아님 확인
 
-### C(데이터): NarrowRangeStrategy EMA slope 필터 구현
-- `src/data/feed.py`: `ema20_slope = ema20.diff() / ema20` 지표 추가
-- `src/strategy/narrow_range.py`: `ema_slope_min_buy`, `ema_slope_max_sell` 파라미터 추가
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["narrow_range"] 그리드 업데이트
-- `scripts/run_bundle_oos.py`: narrow_range init params 업데이트
-  - 기존: `trend_regime_filter=True, atr_trend_max=1.1` (효과 없음 확정)
-  - 신규: `trend_regime_filter=False, ema_slope_min_buy=0.001, ema_slope_max_sell=-0.001`
-  - 목표: fold3 OOS=-10.794 (BTC 불마켓 SELL 차단) 개선
+### D(ML): narrow_range ema_slope 버그 수정 + 실험 결과 분석
+- **버그**: `run_bundle_oos.py` `enrich_indicators()`에 `ema20_slope` 컬럼 누락 → 필터 무효화
+- **수정**: `enrich_indicators()` 끝에 `df["ema20_slope"] = df["ema20"].diff() / df["ema20"]` 추가
+- **재실험 결과** (ema_slope_min_buy=0.001, ema_slope_max_sell=-0.001):
+  - 개선: fold3 -10.794→-8.828, fold1 -3.828→-2.852
+  - 악화: fold2 1.540→-1.763, 저거래 fold 60%로 증가
+  - 결론: threshold 너무 엄격 → `BUNDLE_STRATEGY_INIT_PARAMS["narrow_range"]` 기본값(0.0) 복원
 
-### F(리서치): 슬리피지 레짐 추적 분석
-- slippage_regime_counts 구현됨 (Cycle 309)이지만 리포트에 미반영
-- 다음 사이클 B(리스크) 태스크: paper_sim generate_report()에 slippage 레짐 컬럼 추가
+### F(리서치): 1h FAIL 근본 원인 + slippage regime 활용 분석
+- 1h paper_sim의 주요 실패 원인: **PF < 1.5** (profit_factor 관련 failures가 ~70%)
+- BTC 1h는 trend signal 대비 noise 비율이 높아 win/loss ratio 불리
+- 4h에서 cmf/supertrend PASS → 타임프레임 자체가 핵심 차별화 요인
+- Train window 축소 실험(TRAIN_HOURS=2016h) → 다음 사이클 C(데이터)에서 검토
 
-## 시뮬레이션 결과
+## 시뮬레이션 결과 요약
 
-| 시뮬 | 결과 |
+| 항목 | 결과 |
 |------|------|
-| Paper Sim 1h | 0/22 PASS (동일), price_cluster rank1, cmf rank19(period=40 역효과) |
-| Bundle OOS 4h | 2/5 PASS (cmf, supertrend_multi), narrow_range fold3=-10.794 지속 |
+| 테스트 | 8400 passed, 23 skipped |
+| Paper Sim 1h PASS | 0/22 |
+| Paper Sim rank1 | price_cluster (score=75.7, 3/8 consistent) |
+| Bundle OOS PASS | 2/5 (cmf=2.508, supertrend=3.674) |
+| narrow_range ema_slope | 부분 개선 but 저거래 악화 → 기본값 복원 |
 
-## 다음 사이클 (311): B(리스크) + D(ML) + F(리서치)
-1. B: paper_sim 리포트에 slippage_regime_counts 추가
-2. D: Cycle 311 Bundle OOS에서 narrow_range ema_slope 효과 확인
-3. F: 1h 전체 FAIL 근본 원인 탐구 (WF 윈도우 설정 검토)
+## 다음 사이클 (312) 방향
+- B(리스크): KellySizer kelly_reduce_at_mdd 파라미터 검토, CircuitBreaker 활용 검토
+- D(ML): narrow_range nr_lookback=3 실험 (저거래 문제 해결)
+- F(리서치): TRAIN_HOURS=2016h 실험 설계

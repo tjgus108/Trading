@@ -480,6 +480,7 @@ def evaluate_strategy_walk_forward(
                 "volatility": win_vol,
                 "market_return": round(mkt_ret, 4),
                 "market_state": mkt_state,
+                "slippage_regime_counts": dict(bt.slippage_regime_counts),
             })
         except Exception as e:
             window_vols.append(0.0)
@@ -543,6 +544,13 @@ def evaluate_strategy_walk_forward(
     # 빈도순 정렬된 리스트: [(reason, count), ...]
     top_fail_reasons = fail_counter.most_common()
 
+    # 슬리피지 레짐 집계 (adaptive_slippage=True 시 데이터 존재)
+    slip_agg: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
+    for wr in window_results:
+        for regime, cnt in wr.get("slippage_regime_counts", {}).items():
+            if regime in slip_agg:
+                slip_agg[regime] += cnt
+
     return {
         "name": name,
         "window_results": window_results,
@@ -560,6 +568,7 @@ def evaluate_strategy_walk_forward(
         "sharpe_std": sharpe_std,
         "top_fail_reasons": top_fail_reasons,
         "robustness_label": "",  # perturbation_check 결과 (빈 문자열 = 미실행)
+        "slippage_regime_agg": slip_agg,
     }
 
 
@@ -771,6 +780,23 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                         f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | {p} | {reasons} |"
                     )
                 lines.append("")
+
+    # 슬리피지 레짐 분포 (adaptive_slippage=True 시 표시)
+    slip_data = [(r["name"], r.get("slippage_regime_agg", {})) for r in results
+                 if sum(r.get("slippage_regime_agg", {}).values()) > 0]
+    if slip_data:
+        lines.append("## 슬리피지 레짐 분포 (상위 10)\n")
+        lines.append("_adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_\n")
+        lines.append("| Strategy | Low | Normal | High | High% |")
+        lines.append("|----------|-----|--------|------|-------|")
+        top_slip = sorted(slip_data, key=lambda x: x[1].get("high", 0) / max(sum(x[1].values()), 1), reverse=True)[:10]
+        for name, agg in top_slip:
+            total = sum(agg.values())
+            if total == 0:
+                continue
+            high_pct = agg.get("high", 0) / total
+            lines.append(f"| `{name}` | {agg.get('low',0)} | {agg.get('normal',0)} | {agg.get('high',0)} | {high_pct:.1%} |")
+        lines.append("")
 
     # 포트폴리오
     if results:

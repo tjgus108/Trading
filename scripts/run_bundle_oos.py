@@ -72,11 +72,12 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
 #   - sma_sell_threshold=1.01 → close < SMA20*1.01 조건 강화 → 추세장 SELL 오신호 차단
 BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle307 D(ML): atr_trend_max=1.1 실험 → fold3 OOS=-10.794 지속, 효과 없음 확정
-    # Cycle310 C(데이터): ema_slope 필터로 전환 (atr_trend_max 포기)
-    #   fold3 OOS=-10.794 (2023-12-27~2024-02-24 BTC 불마켓): EMA slope > 0 → SELL 차단이 핵심
-    #   fold1 OOS=-3.828 (2023-08-29~2023-10-27 베어마켓): EMA slope < 0 → BUY 차단 목적
-    #   단독 실험 원칙: ema_slope만 적용, nr_lookback은 기본값(5) 유지
-    "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.001, "ema_slope_max_sell": -0.001},
+    # Cycle310 C(데이터): ema_slope_min_buy=0.001, ema_slope_max_sell=-0.001 실험
+    # Cycle311 D(ML): ema_slope 실험 분석 — ema20_slope 미산정 버그 수정(run_bundle_oos.enrich_indicators) 후 재실행
+    #   fold3 -10.794→-8.828 개선, fold1 -3.828→-2.852 개선, 但 fold2 1.540→-1.763 악화
+    #   저거래 fold 비율 60%로 악화 (ema_slope=0.001 threshold 너무 엄격 → 정상 신호도 차단)
+    #   결론: threshold 완화 또는 기본값(0.0) 복원 — 저거래 문제가 핵심, ema_slope 단독으로는 FAIL
+    "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)
@@ -375,6 +376,9 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     )
     df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
     df["return_5"] = close.pct_change(5)
+
+    # EMA slope: NarrowRange ema_slope 필터용 (Cycle311 D: feed.py와 동기화)
+    df["ema20_slope"] = df["ema20"].diff() / df["ema20"]
 
     return df
 
