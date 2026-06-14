@@ -347,6 +347,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["ema20"] = close.ewm(span=20, adjust=False).mean()
     df["ema50"] = close.ewm(span=50, adjust=False).mean()
     df["ema200"] = close.ewm(span=200, adjust=False).mean()  # Cycle 280 C: EMA200 pre-compute (warm-up 문제 해결)
+    df["ema20_slope"] = df["ema20"].diff() / df["ema20"]  # Cycle310 C: NarrowRange ema_slope 필터용
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()
 

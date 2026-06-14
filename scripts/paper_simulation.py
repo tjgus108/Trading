@@ -100,11 +100,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원
     "order_flow_imbalance_v2": {"trend_span": 20},
-    # Cycle309 D(ML): cmf buy_thresh=0.10 실험 — paper_sim은 walk_forward 그리드 미사용
-    # cmf rank15 Sharpe=-1.44 (75 trades/8w ≈ 9.4/w, 과다신호)
-    # 기대: 더 강한 threshold → trades ~75→50-60, Sharpe 개선
-    # 단독 실험 원칙: buy_thresh만 변경, period는 기본값(20) 유지
-    "cmf": {"buy_thresh": 0.10},
+    # Cycle309 D(ML): cmf buy_thresh=0.10 실험 (rank15→14, 효과 미미)
+    # Cycle310 A(품질): 1h cmf period=40 실험 (4h period=10의 등가, 40h lookback)
+    #   가설: 1h cmf가 period=20(20h)로 노이즈 취약 → period=40(40h)로 lookback 연장
+    #   4h cmf: period=21=84h → 1h 등가 84h 기준 중간 단계부터 탐색
+    #   단독 실험 원칙: buy_thresh=0.10 고정, period만 20→40 변경
+    "cmf": {"period": 40, "buy_thresh": 0.10},
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
@@ -293,6 +294,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # EMA / SMA
     df["ema20"] = close.ewm(span=20, adjust=False).mean()
     df["ema50"] = close.ewm(span=50, adjust=False).mean()
+    df["ema20_slope"] = df["ema20"].diff() / df["ema20"]  # Cycle310 C: NarrowRange ema_slope 필터용
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()
 
@@ -481,6 +483,7 @@ def evaluate_strategy_walk_forward(
                 "volatility": win_vol,
                 "market_return": round(mkt_ret, 4),
                 "market_state": mkt_state,
+                "slippage_regime_counts": dict(bt.slippage_regime_counts),
             })
         except Exception as e:
             window_vols.append(0.0)
@@ -544,6 +547,13 @@ def evaluate_strategy_walk_forward(
     # 빈도순 정렬된 리스트: [(reason, count), ...]
     top_fail_reasons = fail_counter.most_common()
 
+    # Cycle310 F(리서치): slippage_regime_counts 전략 레벨 집계
+    total_slip: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
+    for wr in valid:
+        for k, v in wr.get("slippage_regime_counts", {}).items():
+            if k in total_slip:
+                total_slip[k] += v
+
     return {
         "name": name,
         "window_results": window_results,
@@ -561,6 +571,7 @@ def evaluate_strategy_walk_forward(
         "sharpe_std": sharpe_std,
         "top_fail_reasons": top_fail_reasons,
         "robustness_label": "",  # perturbation_check 결과 (빈 문자열 = 미실행)
+        "slippage_regime_totals": total_slip,
     }
 
 
@@ -772,6 +783,22 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                         f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | {p} | {reasons} |"
                     )
                 lines.append("")
+
+    # 슬리피지 레짐 분포 (상위 10 전략)
+    slip_data = [(r["name"], r.get("slippage_regime_totals", {})) for r in results[:10] if r.get("slippage_regime_totals")]
+    if slip_data:
+        lines.append("## 슬리피지 레짐 분포 (상위 10 전략)\n")
+        lines.append("_adaptive_slippage=True 시 진입 건별 레짐 (low=0.02%, normal=0.05%, high=0.15%)_\n")
+        lines.append("| Strategy | Low | Normal | High | High% |")
+        lines.append("|----------|-----|--------|------|-------|")
+        for sname, sc in slip_data:
+            lo = sc.get("low", 0)
+            nm = sc.get("normal", 0)
+            hi = sc.get("high", 0)
+            total_entries = lo + nm + hi
+            hi_pct = hi / total_entries if total_entries > 0 else 0.0
+            lines.append(f"| `{sname}` | {lo} | {nm} | {hi} | {hi_pct:.1%} |")
+        lines.append("")
 
     # 포트폴리오
     if results:

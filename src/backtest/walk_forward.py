@@ -91,6 +91,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # trend_regime_filter=True + atr_trend_max 조합은 비효율적 확정
         # → trend_regime_filter=False 고정, nr_lookback 탐색으로 전환
         "trend_regime_filter": [False],
+        # Cycle310 C(데이터): EMA slope 필터 — fold3 베어마켓 역추세 진입 차단
+        # BUY: EMA slope ≥ N (하락추세 차단), SELL: EMA slope ≤ N (상승추세 차단)
+        "ema_slope_min_buy": [0.0, 0.001, 0.002],
+        "ema_slope_max_sell": [0.0, -0.001, -0.002],
     },
     "frama": {
         "period": [14, 16, 18],
@@ -954,7 +958,12 @@ def optimize_narrow_range(df: pd.DataFrame, n_windows: int = 3,
     from src.strategy.narrow_range import NarrowRangeStrategy
 
     def factory(params: dict) -> BaseStrategy:
-        return NarrowRangeStrategy(nr_lookback=params.get("nr_lookback", 7))
+        return NarrowRangeStrategy(
+            nr_lookback=params.get("nr_lookback", 7),
+            trend_regime_filter=params.get("trend_regime_filter", False),
+            ema_slope_min_buy=params.get("ema_slope_min_buy", 0.0),
+            ema_slope_max_sell=params.get("ema_slope_max_sell", 0.0),
+        )
 
     opt = WalkForwardOptimizer(
         strategy_name="narrow_range",

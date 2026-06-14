@@ -1053,6 +1053,7 @@ class DataFeed:
         # EMA
         df["ema20"] = close.ewm(span=20, adjust=False).mean()
         df["ema50"] = close.ewm(span=50, adjust=False).mean()
+        df["ema20_slope"] = df["ema20"].diff() / df["ema20"]
 
         # ATR (Wilder)
         prev_close = close.shift(1)
