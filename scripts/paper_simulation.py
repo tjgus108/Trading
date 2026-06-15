@@ -60,6 +60,8 @@ _TF_CANDLE_RATIO: Dict[str, float] = {
 # fold당 30 trades 목표: 1h봉 60일(1440h) 테스트 윈도우가 유리
 # NOTE: 실제 캔들 수 = 아래 값 × _TF_CANDLE_RATIO[ACTIVE_TIMEFRAME]
 TRAIN_HOURS = 24 * 210   # 훈련: 7개월 (210일, 1h 기준 캔들 수)
+# Cycle312 F(리서치): 84일 실험 → 역효과 확인. price_cluster 3/8→1/12 consistency 폭락.
+# 결론: 84일 train은 파라미터 최적화에 부족. 210일 복원.
 TEST_HOURS = 24 * 60     # 테스트: 2개월 (60일, 1h 기준 캔들 수)
 STEP_HOURS = 24 * 30     # 롤링 간격: 1개월 (1h 기준 캔들 수)
 MIN_WINDOWS = 3          # 최소 테스트 윈도우 수

@@ -1621,3 +1621,42 @@ class TestKellySizerRolling:
         sizer.record_trade(float("inf"))
         sizer.record_trade(-float("inf"))
         assert len(sizer._trade_history) == 0
+
+
+# ── DrawdownMonitor.get_kelly_fraction_multiplier() 테스트 ────────────────────
+
+class TestKellyFractionMultiplier:
+    """DrawdownMonitor.get_kelly_fraction_multiplier() 경계값 테스트."""
+
+    def _monitor_at_mdd(self, mdd_pct: float, kelly_reduce_at_mdd: float = 0.08) -> "DrawdownMonitor":
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        m = DrawdownMonitor(kelly_reduce_at_mdd=kelly_reduce_at_mdd)
+        initial = 10_000.0
+        m.update(initial)
+        m.update(initial * (1.0 - mdd_pct))
+        return m
+
+    def test_normal_mdd_returns_1(self):
+        """MDD < kelly_reduce_at_mdd → kelly_fraction_multiplier = 1.0."""
+        m = self._monitor_at_mdd(mdd_pct=0.05, kelly_reduce_at_mdd=0.08)
+        assert m.get_kelly_fraction_multiplier() == 1.0
+
+    def test_above_threshold_returns_half(self):
+        """MDD > kelly_reduce_at_mdd(8%) → kelly_fraction_multiplier = 0.5."""
+        m = self._monitor_at_mdd(mdd_pct=0.10, kelly_reduce_at_mdd=0.08)
+        assert m.get_kelly_fraction_multiplier() == 0.5
+
+    def test_exactly_at_threshold_returns_1(self):
+        """MDD == kelly_reduce_at_mdd → 엄격한 > 조건이므로 1.0 반환 (경계는 미트리거)."""
+        m = self._monitor_at_mdd(mdd_pct=0.08, kelly_reduce_at_mdd=0.08)
+        assert m.get_kelly_fraction_multiplier() == 1.0
+
+    def test_drawdown_status_includes_kelly_multiplier(self):
+        """DrawdownStatus.kelly_fraction_multiplier가 올바르게 채워진다."""
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        m = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+        m.update(10_000.0)
+        status_normal = m.update(9_500.0)   # MDD=5% < 8%
+        assert status_normal.kelly_fraction_multiplier == 1.0
+        status_reduced = m.update(9_100.0)  # MDD≈9% > 8%
+        assert status_reduced.kelly_fraction_multiplier == 0.5
