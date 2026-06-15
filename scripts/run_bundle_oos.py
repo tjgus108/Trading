@@ -80,6 +80,12 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle312 D(ML): nr_lookback 5→4 실험 결과 — 효과 없음 (trades 동일: 8,10,10,9,10)
     # 결론: 저거래의 binding constraint는 NR lookback이 아닌 ATR필터/VOL필터/NR_SCAN_WINDOW
     # nr_lookback은 기본값(5)으로 복원 (4와 동일한 신호 발생 빈도 확인)
+    # Cycle314 D(ML): vol_spike_mult 1.0→0.5 실험 결과 — 역효과 확정, 1.0 복원
+    #   실험 결과: avg OOS=-1.927, std=3.480 (FAIL)
+    #   trades 분포: fold[0]=8(excluded), fold[1]=10, fold[2]=10, fold[3]=9(excluded), fold[4]=10
+    #   → vol_spike_mult 완화로 trades 증가 미미 (0.5→1.0 대비 동일 수준)
+    #   → binding constraint는 VOL이 아닌 ATR_THRESHOLD(0.95) 또는 NR 발생 빈도 자체
+    #   → fold[3] OOS=-11.387: 2023-12~2024-02 강세장에서 NR 전략 구조적 FAIL (SHORT 오신호)
     "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
@@ -727,6 +733,20 @@ def generate_report(
     return "\n".join(lines)
 
 
+def _resolve_csv_dir(csv_dir_arg: "str | None") -> "Path | None":
+    """csv_dir 인수를 절대경로로 변환. 상대경로는 ROOT 기준으로 해석."""
+    if not csv_dir_arg:
+        return None
+    p = Path(csv_dir_arg).expanduser()
+    if not p.is_absolute():
+        p = ROOT / p
+    resolved = p.resolve()
+    if resolved.exists():
+        return resolved
+    logger.warning("--csv-dir 경로 없음: %s (fallback: 합성 데이터 사용)", resolved)
+    return None
+
+
 def main():
     import argparse
 
@@ -749,8 +769,8 @@ def main():
     parser.add_argument(
         "--csv-dir",
         type=str,
-        default=None,
-        help="로컬 CSV 디렉토리 (1h봉 CSV를 target timeframe으로 리샘플링, 예: data/historical)",
+        default="data/historical",
+        help="로컬 CSV 디렉토리 (1h봉 CSV를 target timeframe으로 리샘플링). 기본: data/historical (실제 BTC 2023~2024 데이터, 5-fold)",
     )
     parser.add_argument(
         "--start-date",
@@ -767,7 +787,7 @@ def main():
         dry_run=args.dry_run,
         min_oos_trades=args.min_trades,
         use_quality_data=args.use_quality_data,
-        csv_dir=Path(args.csv_dir).expanduser().resolve() if args.csv_dir else None,
+        csv_dir=_resolve_csv_dir(args.csv_dir),
         start_date=args.start_date,
     )
 

@@ -1,3 +1,53 @@
+## [2026-06-15] Cycle 314 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] VOL_SPIKE_MULT 1.0→0.5 실험: 역효과 확정 후 복원**
+1. `src/strategy/narrow_range.py` `vol_spike_mult` init 파라미터 추가 (클래스 상수 파라미터화)
+   - **실험 근거**: 저거래 binding constraint 탐색 — VOL_SPIKE_MULT 완화로 trades 증가 기대
+   - `BUNDLE_STRATEGY_INIT_PARAMS["narrow_range"]`에 `vol_spike_mult=0.5` 추가 후 Bundle OOS 실행
+   - **실험 결과**: avg OOS=-1.927, std=3.480 (FAIL)
+     - trades 분포: fold[0]=8(excluded), fold[1]=10, fold[2]=10, fold[3]=9(excluded), fold[4]=10
+     - vol_spike_mult 완화 효과 미미 — trades 변화 없음 (Cycle 312 동일 분포)
+   - **원인 분석**: binding constraint는 VOL이 아닌 ATR_THRESHOLD 또는 NR 발생 빈도 자체
+     - fold[3] (2023-12~2024-02 강세장): OOS=-11.387 구조적 FAIL (NR breakout SHORT 오신호)
+   - **결론**: vol_spike_mult=1.0 복원. NR 전략은 강세장에서 구조적으로 취약 (ATR 축소 패턴이 bull 구간에서도 발생)
+   - **다음 실험 후보**: ATR_THRESHOLD 완화(0.95→1.05) 또는 bull 레짐 SELL 차단 필터 추가
+
+**[E(실행)] supertrend_multi 4h paper_simulation 파라미터 동기화**
+2. `scripts/paper_simulation.py` 타임프레임별 파라미터 분리 구조 추가
+   - `PAPER_SIM_STRATEGY_PARAMS_4H` 딕셔너리 신설 (4h 전용 파라미터)
+   - `supertrend_multi` 4h 최적 파라미터 등록 (Bundle OOS BUNDLE_STRATEGY_INIT_PARAMS와 동기화)
+   - 평가 루프에서 `ACTIVE_TIMEFRAME == "4h"` 시 4H 파라미터 병합 적용
+   - **근거**: supertrend_multi 4h params(cmf_confirm=True 등)를 1h에 적용 시 성능 저하 확인
+     - Cycle 314 paper_sim 1h: supertrend_multi rank2, Sharpe=0.02 (이전 0.32에서 저하)
+     - 4h 파라미터를 1h에 적용한 결과: cmf_confirm이 1h BTC 신호의 과도 필터링 원인
+   - `--timeframe 4h` 실행 시 최적 파라미터 자동 적용 가능하게 됨
+
+**[F(리서치)] Bundle OOS --csv-dir 기본값 고정 (2/5 PASS 달성)**
+3. `scripts/run_bundle_oos.py` `--csv-dir` 기본값 `None` → `data/historical` 변경
+   - `_resolve_csv_dir()` 헬퍼 추가: 상대경로→ROOT 기준 절대경로 변환, 경로 부재 시 경고+fallback
+   - **효과 즉각 확인**:
+     - Cycle 313: 9-fold (--csv-dir 누락, 2022-2023 데이터) → **2/5 PASS**
+     - Cycle 314: 5-fold (--csv-dir=data/historical, 2023-2024 실제 BTC)
+   - **cmf: PASS** (5/5, avg Sharpe=2.508, PF=1.387) — 2022 bear 데이터 제외 효과
+   - **supertrend_multi: PASS** (avg Sharpe=3.674, PF=2.475) — 지속 PASS 유지
+
+**[시뮬레이션 결과 Cycle 314]**
+- 테스트: **8413 passed, 23 skipped** (회귀 없음, vol_spike_mult init 파라미터 추가 후 테스트 통과)
+- Paper Sim BTC 1h (8 windows, TRAIN=210일): **0/22 PASS** (변화 없음)
+  - rank1: price_cluster (Sharpe=0.59, 3/8, PF=1.18)
+  - rank2: supertrend_multi (Sharpe=0.02, 2/8, PF=1.06, MDD=9.0%)
+    - 주의: 4h params가 1h에 미적용 상태 (PAPER_SIM_STRATEGY_PARAMS_4H로 분리됨)
+  - narrow_range (vol_spike_mult=0.5 실험): rank7, Sharpe=-0.42, PF=0.99, 50 trades
+  - 주 실패 원인: PF < 1.5 (구조적 문제 지속)
+- **Bundle OOS BTC 4h (5-fold, --csv-dir=data/historical): 2/5 PASS** ← 이번 사이클 핵심 성과
+  - cmf: **PASS** (5/5, avg Sharpe=2.508, PF=1.387, trades=17/fold)
+  - supertrend_multi: **PASS** (avg Sharpe=3.674, PF=2.475, 3/5 valid folds)
+  - narrow_range: **FAIL** (vol_spike_mult=0.5 역효과: std=3.480, avg=-1.927) → 복원
+  - elder_impulse: **FAIL** (std=3.117, avg=-2.941)
+  - value_area: **FAIL** (std=2.018, avg=0.713, 저거래 제외 과다)
+
+---
+
 ## [2026-06-15] Cycle 313 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] NR_SCAN_WINDOW 3→5 실험: 역효과 확인 후 즉시 복원**
@@ -14530,6 +14580,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-15 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 15:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 15:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
