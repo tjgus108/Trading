@@ -1,44 +1,39 @@
 # Current Cycle Briefing
 
-_Cycle 313 | 2026-06-15 | C(데이터) + B(리스크) + F(리서치)_
+_Cycle 314 | 2026-06-15 | D(ML) + E(실행) + F(리서치)_
 
 ## 완료된 작업
 
-### C(데이터) — NR_SCAN_WINDOW 실험
-- `src/strategy/narrow_range.py` NR_SCAN_WINDOW: 3→5 실험 후 **즉시 복원 (역효과 확정)**
-  - BTC 1h: rank15, Sharpe=-1.42, PF=0.90, return=-6.87% (기존 대비 악화)
-  - 4h OOS: std=5.447 (불안정 증가) — 오래된 NR 참조 → 오신호 증가
-  - 결론: NR_SCAN_WINDOW=3 유지. 다음 실험 후보: VOL_SPIKE_MULT 1.0→0.5
+### D(ML) — vol_spike_mult 실험 (효과 없음 확인)
+- `src/strategy/narrow_range.py` `vol_spike_mult` init 파라미터 추가 (클래스 상수 대신)
+- `BUNDLE_STRATEGY_INIT_PARAMS["narrow_range"]["vol_spike_mult"] = 0.5` 실험 후 복원
+- **결론**: vol_spike_mult는 confidence 결정에만 사용 (필터 아님) → trades 증가 불가
+- 실제 binding constraint는 ATR_THRESHOLD=0.95 → 다음 실험 후보
 
-### B(리스크) — should_kill_strategy 레짐별 테스트
-- `tests/test_risk_manager.py` `TestShouldKillStrategyRegime` 클래스 추가 (9개 테스트)
-  - BULL/BEAR/CRISIS/HIGH_VOL/RANGING/None 시나리오 완전 커버
-  - 총 **8413 passed, 23 skipped** (회귀 없음)
+### E(실행) — live_paper_trader.py --timeframe 4h 지원 추가
+- `LivePaperTrader.__init__()` 에 `timeframe` 파라미터 추가
+- `fetch_latest_candles()` 2개 호출점 + `_auto_retrain()` → `timeframe=self.timeframe` 전달
+- `main()` argparse에 `--timeframe` 추가
+- **효과**: `python3 scripts/live_paper_trader.py --timeframe 4h` 실행 가능 (supertrend_multi 4h 투입 준비)
 
-### F(리서치) — 1h PF 구조적 FAIL 분석
-- atr_multiplier_tp=3.5 (Cycle 256에서 이미 최적화됨, NEXT_STEPS의 3.0은 오류 수정)
-- 1h PF<1.5 구조적 문제: TP/SL 비율 개선 아닌 신호 승률 문제 → 4h OOS 집중 전략 채택
-- supertrend_multi 4h: 5/6 valid PASS (avg=4.880) — 실전 투입 후보 #1
+### F(리서치) — cmf 4h Bundle OOS PASS 확인
+- Bundle OOS 5-fold (--csv-dir data/historical) 실행 결과:
+  - **cmf: 5/5 PASS** (avg=2.508, PF=1.387) — relaxed WFE=0.4 기준
+  - **supertrend_multi: 3/5 PASS** (avg=3.674, PF=2.475) — 지속
+  - narrow_range: FAIL (avg=-1.927, vol_spike_mult 실험 효과 없음)
 
-## 시뮬레이션 결과
+## 시뮬레이션 요약
 
-| 항목 | BTC 1h | ETH 1h | SOL 1h |
-|------|--------|--------|--------|
-| PASS | 0/22 | 0/22 | 0/22 |
-| rank1 | price_cluster (0.59) | momentum_quality | elder_impulse |
-| narrow_range | Sharpe=-1.42, PF=0.90 | rank3, Sharpe=-1.17 | - |
-| 주 실패 원인 | PF<1.5 (압도적) | PF<1.5 | PF<1.5 |
+| 구분 | 결과 |
+|------|------|
+| 테스트 | 8413 passed, 23 skipped (회귀 없음) |
+| Paper Sim 1h PASS | 0/22 |
+| Bundle OOS 4h PASS | 2/5 (cmf, supertrend_multi) |
+| rank1 (1h) | price_cluster (Sharpe=0.59, PF=1.18, 3/8) |
+| rank2 (1h) | supertrend_multi (Sharpe=0.32, PF=1.14, 2/8) |
 
-Bundle OOS 4h (9-fold, --csv-dir 누락 주의):
-- supertrend_multi: 5/6 PASS, avg=4.880 ← 유망 전략 #1
-- narrow_range (NR=5): 3/8 PASS, std=5.447 ← 역효과 → 복원
+## 다음 사이클 (315) 핵심 포인트
 
-## 다음 사이클 (314: D+E+F)
-
-| 카테고리 | 작업 | 근거 |
-|---------|------|------|
-| D(ML) | VOL_SPIKE_MULT 1.0→0.5 실험 | narrow_range 거래 수 증가 마지막 후보 |
-| E(실행) | supertrend_multi 4h 파라미터 검토 | 5/6 valid PASS 유망 전략 |
-| F(리서치) | Bundle OOS --csv-dir 의존성 재확인 | Cycle 313 누락으로 9-fold 변경 |
-
-**⚠️ 주의**: 다음 Bundle OOS 실행 시 반드시 `--csv-dir data/historical` 포함
+- **A(품질)**: narrow_range `ATR_THRESHOLD` 파라미터화 + 0.95→1.05 실험
+- **C(데이터)**: cmf WFE 완화(0.4) 기준 재검토 — 표준(0.5) 강화 시 PASS/FAIL 재확인
+- **F(리서치)**: paper_simulation.py --timeframe 4h로 cmf/supertrend_multi 4h 결과 확인

@@ -78,8 +78,10 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   저거래 fold 비율 60%로 악화 (ema_slope=0.001 threshold 너무 엄격 → 정상 신호도 차단)
     #   결론: threshold 완화 또는 기본값(0.0) 복원 — 저거래 문제가 핵심, ema_slope 단독으로는 FAIL
     # Cycle312 D(ML): nr_lookback 5→4 실험 결과 — 효과 없음 (trades 동일: 8,10,10,9,10)
-    # 결론: 저거래의 binding constraint는 NR lookback이 아닌 ATR필터/VOL필터/NR_SCAN_WINDOW
-    # nr_lookback은 기본값(5)으로 복원 (4와 동일한 신호 발생 빈도 확인)
+    # Cycle314 D(ML): vol_spike_mult 1.0→0.5 실험 — 효과 없음 (trades 동일: 8,10,10,9,10)
+    #   원인 확인: vol_spike_mult는 필터가 아닌 confidence(HIGH/MEDIUM) 결정에만 사용 → 진입 차단 없음
+    #   결론: VOL_SPIKE_MULT는 binding constraint 아님, 기본값(1.0) 복원
+    #   다음 실험 후보: ATR_THRESHOLD 0.95→1.05 (ATR 축소 조건 완화 → fold0,3 저거래 해소 기대)
     "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단

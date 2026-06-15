@@ -32,6 +32,7 @@ class NarrowRangeStrategy(BaseStrategy):
         atr_trend_max: float = 1.4,
         ema_slope_min_buy: float = 0.0,
         ema_slope_max_sell: float = 0.0,
+        vol_spike_mult: float = 1.0,
         **kwargs,
     ):
         """
@@ -42,12 +43,14 @@ class NarrowRangeStrategy(BaseStrategy):
             atr_trend_max: trend_regime_filter 활성 시 상한 임계값 (기본 1.4).
             ema_slope_min_buy: BUY 진입 최소 EMA20 slope (0.0=필터 없음, 양수=상승추세 필수).
             ema_slope_max_sell: SELL 진입 최대 EMA20 slope (0.0=필터 없음, 음수=하락추세 필수).
+            vol_spike_mult: 거래량 스파이크 배수 임계값 (기본 1.0=평균 이상, 0.5=50%+ 완화).
         """
         self.nr_lookback = max(4, int(nr_lookback))  # 최소 4봉 (NR4 확인용)
         self.trend_regime_filter = bool(trend_regime_filter)
         self.atr_trend_max = float(atr_trend_max)
         self.ema_slope_min_buy = float(ema_slope_min_buy)
         self.ema_slope_max_sell = float(ema_slope_max_sell)
+        self.vol_spike_mult = max(0.0, float(vol_spike_mult))
 
     def _is_nr(self, ranges: pd.Series, idx: int, n: int) -> bool:
         """idx번 봉이 최근 n봉 중 최소 range인지 확인."""
@@ -121,7 +124,7 @@ class NarrowRangeStrategy(BaseStrategy):
         vol_current = float(df["volume"].iloc[curr_idx])
         avg_vol = float(df["volume"].iloc[curr_idx - self.VOL_LOOKBACK : curr_idx].mean())
 
-        vol_spike = vol_current >= avg_vol * self.VOL_SPIKE_MULT
+        vol_spike = vol_current >= avg_vol * self.vol_spike_mult
 
         close_curr = float(df["close"].iloc[curr_idx])
         high_nr = float(df["high"].iloc[nr_idx])
