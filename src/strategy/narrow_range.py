@@ -23,7 +23,7 @@ class NarrowRangeStrategy(BaseStrategy):
     VOL_LOOKBACK = 20
     VOL_SPIKE_MULT = 1.0   # 완화: 1.2→1.0 (4h봉 거래 수 증가 목적, Cycle 206)
     ATR_THRESHOLD = 0.95   # 완화: 0.90→0.95 (Cycle 219: 저거래 해결)
-    NR_SCAN_WINDOW = 3     # NR 발생 후 최대 3봉 내 돌파 허용 (Cycle 219)
+    NR_SCAN_WINDOW = 3     # NR 발생 후 최대 3봉 내 돌파 허용 (5→3 복원: Cycle 313 C 실험 역효과)
 
     def __init__(
         self,

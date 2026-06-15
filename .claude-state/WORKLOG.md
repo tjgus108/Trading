@@ -1,3 +1,52 @@
+## [2026-06-15] Cycle 313 — C(데이터) + B(리스크) + F(리서치)
+
+**[C(데이터)] NR_SCAN_WINDOW 3→5 실험: 역효과 확인 후 즉시 복원**
+1. `src/strategy/narrow_range.py` NR_SCAN_WINDOW: 3→5 실험 후 복원
+   - **실험 근거**: 신호 발생 윈도우 확장으로 거래 수 증가 기대 (Cycle 312 D 분석 결론)
+   - **실험 결과**:
+     - BTC 1h paper_sim: narrow_range rank15, Sharpe=-1.42, PF=0.90, return=-6.87%, 1/8 consistency
+       → PF=0.90 < 1.5 (기준 미달), Sharpe=-1.42 (이전보다 악화)
+     - Bundle OOS 4h (9-fold): narrow_range avg=-0.586, std=5.447 (불안정 증가)
+       → 윈도우 확장으로 "오래된 NR 참조" 문제 발생 → 오신호 증가
+   - **원인 분석**: NR_SCAN_WINDOW=5 → 5봉 이전 NR 참조 → NR 고점/저점이 현재 시장 S/R 아님 → 낮은 승률 → PF<1.0
+   - **결론**: NR_SCAN_WINDOW=3 복원 (5→3). narrow_range는 즉각적 돌파(1-3봉 이내)가 핵심
+   - **다음 실험 후보 재검토**: VOL_SPIKE_MULT 완화(1.0→0.5)가 다음 C 카테고리 우선 후보
+
+**[B(리스크)] should_kill_strategy() 레짐별 배수 테스트 추가 (9개)**
+2. `tests/test_risk_manager.py` 끝에 `TestShouldKillStrategyRegime` 클래스 추가:
+   - BULL regime: cap=1.5, effective=min(1.5, 1.5)=1.5 → threshold=backtest_mdd*1.5
+   - BEAR regime: cap=1.2, effective=1.2 → 더 타이트한 KILL 조건 (current_mdd>0.12 → KILL)
+   - CRISIS regime: cap=1.0, effective=1.0 → backtest_mdd 초과 즉시 KILL
+   - HIGH_VOL regime: cap=1.0, effective=1.0 → CRISIS와 동일
+   - Unknown regime: cap=multiplier(passthrough), effective=1.5
+   - regime=None: effective=1.5 (레짐 무관)
+   - get_kill_switch_status BEAR: effective_multiplier=1.2 반환 확인
+   - **결과**: 9개 신규 테스트 → 8413 passed, 23 skipped (이전 8404 + 9개 신규)
+
+**[F(리서치)] 1h paper_sim 구조적 FAIL 원인 재분석**
+3. 분석 완료:
+   - **핵심 원인**: profit_factor < 1.5 가 가장 빈번한 실패 (BTC 1h 22전략 모두 FAIL)
+   - `atr_multiplier_tp=3.5` (이미 Cycle 256에서 3.0→3.5 개선됨, NEXT_STEPS의 3.0은 오류)
+   - 추가 TP 상향(→4.0+)은 TP 달성률 저하 → 역효과 예상
+   - **근본 원인**: 1h BTC는 노이즈 비율이 높아 SL 빈번 터치 → PF 구조적 낮음
+   - **결론**: 4h Bundle OOS 집중 전략이 합리적 (supertrend_multi: 5/6 valid PASS, avg=4.880)
+   - **다음 방향**: 1h paper_sim은 모니터링 목적으로 유지하되, 실전 투입 후보는 4h OOS 결과 기반
+
+**[시뮬레이션 결과 Cycle 313]**
+- 테스트: **8413 passed, 23 skipped** (9개 B(리스크) 신규 추가, 회귀 없음)
+- Paper Sim BTC 1h (8 windows, TRAIN=210일): **0/22 PASS**
+  - rank1: price_cluster (Sharpe=0.59, 3/8 consistency, PF=1.18)
+  - rank2: supertrend_multi (Sharpe=0.32, 2/8 consistency, PF=1.14)
+  - narrow_range (NR_SCAN_WINDOW=5 실험): rank15, Sharpe=-1.42, PF=0.90 → 역효과 확정 → 즉시 복원
+  - 최다 FAIL 원인: profit_factor < 1.5 (압도적)
+- Bundle OOS BTC 4h (9-fold, --csv-dir 미지정→2022-2023 데이터): **0/5 PASS**
+  - ⚠️ 주의: --csv-dir data/historical 누락 → 9-fold (Cycle 312의 5-fold와 비교 불가)
+  - supertrend_multi: 5/6 valid PASS (avg=4.880, PF=2.321) — fold[0]만 FAIL
+  - narrow_range (NR_SCAN_WINDOW=5): 3/8 valid PASS, avg=-0.586, std=5.447 (불안정)
+  - cmf: 4/9 PASS, avg=-0.805 (2022 bear market 포함으로 성능 저하, 5-fold 비교 불가)
+
+---
+
 ## [2026-06-15] Cycle 312 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] get_kelly_fraction_multiplier() 테스트 커버리지 추가**
@@ -14387,6 +14436,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-15 00:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-15 05:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

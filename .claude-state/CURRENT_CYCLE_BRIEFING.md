@@ -1,43 +1,44 @@
 # Current Cycle Briefing
 
-_Cycle 312 | 2026-06-15 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 313 | 2026-06-15 | C(데이터) + B(리스크) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): kelly_fraction_multiplier 테스트 커버리지 추가
-- `tests/test_risk.py`에 `TestKellyFractionMultiplier` 클래스 신규 추가 (4개 테스트)
-- 확인 사항: kelly_reduce_at_mdd=0.08 기준 적절함 (mdd_warn < kelly_reduce < mdd_block)
-- 총 **8404 passed, 23 skipped**
+### C(데이터) — NR_SCAN_WINDOW 실험
+- `src/strategy/narrow_range.py` NR_SCAN_WINDOW: 3→5 실험 후 **즉시 복원 (역효과 확정)**
+  - BTC 1h: rank15, Sharpe=-1.42, PF=0.90, return=-6.87% (기존 대비 악화)
+  - 4h OOS: std=5.447 (불안정 증가) — 오래된 NR 참조 → 오신호 증가
+  - 결론: NR_SCAN_WINDOW=3 유지. 다음 실험 후보: VOL_SPIKE_MULT 1.0→0.5
 
-### D(ML): narrow_range nr_lookback 실험 (5→4)
-- 실험 결과: NR4 = NR5와 동일한 trade 빈도 (8, 10, 10, 9, 10)
-- 결론: binding constraint = ATR_THRESHOLD / VOL_SPIKE_MULT / NR_SCAN_WINDOW
-- BUNDLE_STRATEGY_INIT_PARAMS["narrow_range"] 복원: nr_lookback 명시 제거
+### B(리스크) — should_kill_strategy 레짐별 테스트
+- `tests/test_risk_manager.py` `TestShouldKillStrategyRegime` 클래스 추가 (9개 테스트)
+  - BULL/BEAR/CRISIS/HIGH_VOL/RANGING/None 시나리오 완전 커버
+  - 총 **8413 passed, 23 skipped** (회귀 없음)
 
-### F(리서치): TRAIN_HOURS 축소 실험 (210→84일)
-- 가설 A: 84일 train → 12 windows 생성 성공, 그러나 성능 악화
-- price_cluster consistency: 3/8→1/12 폭락 (파라미터 최적화 데이터 부족)
-- TRAIN_HOURS 210일 복원
+### F(리서치) — 1h PF 구조적 FAIL 분석
+- atr_multiplier_tp=3.5 (Cycle 256에서 이미 최적화됨, NEXT_STEPS의 3.0은 오류 수정)
+- 1h PF<1.5 구조적 문제: TP/SL 비율 개선 아닌 신호 승률 문제 → 4h OOS 집중 전략 채택
+- supertrend_multi 4h: 5/6 valid PASS (avg=4.880) — 실전 투입 후보 #1
 
 ## 시뮬레이션 결과
 
-**Paper Sim (84일 train, 12 windows)**:
-- 0/22 PASS
-- rank1: supertrend_multi (3/12, AvgSharpe=0.13, AvgPF=1.12)
-- rank2: price_cluster (1/12, AvgSharpe=0.19, AvgPF=1.10)
+| 항목 | BTC 1h | ETH 1h | SOL 1h |
+|------|--------|--------|--------|
+| PASS | 0/22 | 0/22 | 0/22 |
+| rank1 | price_cluster (0.59) | momentum_quality | elder_impulse |
+| narrow_range | Sharpe=-1.42, PF=0.90 | rank3, Sharpe=-1.17 | - |
+| 주 실패 원인 | PF<1.5 (압도적) | PF<1.5 | PF<1.5 |
 
-**Bundle OOS (5-fold, nr_lookback=4 실험)**:
-- 2/5 PASS (cmf, supertrend_multi)
-- narrow_range: avg_oos_sharpe=-0.194 (FAIL) — nr_lookback=5와 동일
+Bundle OOS 4h (9-fold, --csv-dir 누락 주의):
+- supertrend_multi: 5/6 PASS, avg=4.880 ← 유망 전략 #1
+- narrow_range (NR=5): 3/8 PASS, std=5.447 ← 역효과 → 복원
 
-## 현재 설정
+## 다음 사이클 (314: D+E+F)
 
-- `paper_simulation.py`: TRAIN_HOURS=24*210 (복원), TEST_HOURS=24*60
-- `run_bundle_oos.py`: narrow_range = `{trend_regime_filter: False, ema_slope: 0.0}`
-- 테스트: 8404 passed (이전 8400 + 4개 신규)
+| 카테고리 | 작업 | 근거 |
+|---------|------|------|
+| D(ML) | VOL_SPIKE_MULT 1.0→0.5 실험 | narrow_range 거래 수 증가 마지막 후보 |
+| E(실행) | supertrend_multi 4h 파라미터 검토 | 5/6 valid PASS 유망 전략 |
+| F(리서치) | Bundle OOS --csv-dir 의존성 재확인 | Cycle 313 누락으로 9-fold 변경 |
 
-## 다음 사이클 (313) 예정
-
-- C(데이터): NR_SCAN_WINDOW 3→5 실험 (binding constraint 완화)
-- B(리스크): check_strategy_health() 테스트 확인
-- F(리서치): 1h PF 개선 방향 분석
+**⚠️ 주의**: 다음 Bundle OOS 실행 시 반드시 `--csv-dir data/historical` 포함

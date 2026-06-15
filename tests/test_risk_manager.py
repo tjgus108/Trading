@@ -1429,3 +1429,61 @@ def test_regime_confidence_high_no_change():
 
     assert result_with.status == RiskStatus.APPROVED
     assert result_with.position_size == pytest.approx(result_without.position_size, rel=1e-4)
+
+
+# ── should_kill_strategy 레짐별 배수 테스트 (Cycle 313 B) ─────────────────
+
+class TestShouldKillStrategyRegime:
+    """DrawdownMonitor.should_kill_strategy() 레짐별 effective_multiplier 검증."""
+
+    def _dd(self):
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        return DrawdownMonitor()
+
+    def test_bull_regime_uses_full_multiplier(self):
+        """BULL: cap=1.5 → min(1.5, 1.5)=1.5, current_mdd(0.14) <= 0.10*1.5=0.15 → False."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="BULL") is False
+
+    def test_bull_regime_kill_above_threshold(self):
+        """BULL: threshold=0.10*1.5=0.15, current_mdd=0.16 → KILL."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.16, 0.10, multiplier=1.5, regime="BULL") is True
+
+    def test_bear_regime_tighter_threshold(self):
+        """BEAR: cap=1.2 → effective=1.2, current_mdd(0.13) > 0.10*1.2=0.12 → True."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="BEAR") is True
+
+    def test_bear_regime_no_kill_below_threshold(self):
+        """BEAR: threshold=0.10*1.2=0.12, current_mdd=0.11 → CONTINUE."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="BEAR") is False
+
+    def test_crisis_regime_kills_at_backtest_mdd(self):
+        """CRISIS: cap=1.0 → effective=1.0, current_mdd(0.11) > 0.10*1.0=0.10 → True."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="CRISIS") is True
+
+    def test_high_vol_regime_kills_at_backtest_mdd(self):
+        """HIGH_VOL: cap=1.0 → effective=1.0, same as CRISIS."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="HIGH_VOL") is True
+
+    def test_unknown_regime_uses_full_multiplier(self):
+        """Unknown regime: cap=multiplier(passthrough), effective=1.5."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="RANGING") is False
+
+    def test_none_regime_uses_full_multiplier(self):
+        """regime=None: effective=1.5 (레짐 무관)."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime=None) is False
+
+    def test_get_kill_switch_status_bear_effective_mult(self):
+        """get_kill_switch_status BEAR: effective_multiplier=1.2 반환."""
+        dd = self._dd()
+        status = dd.get_kill_switch_status(0.13, 0.10, multiplier=1.5, regime="BEAR")
+        assert status["effective_multiplier"] == pytest.approx(1.2)
+        assert status["threshold"] == pytest.approx(0.12)
+        assert status["should_kill"] is True
