@@ -25,7 +25,7 @@ _Cycle 314 | 2026-06-15 | D(ML) + E(실행) + F(리서치)_
   - cmf: PASS (5/5 folds, avg Sharpe=2.508)
   - supertrend_multi: PASS (avg Sharpe=3.674)
 
-## 시뮬레이션 결과
+## 시뮬레이션 요약
 
 | 지표 | Cycle 313 | Cycle 314 | 변화 |
 |------|-----------|-----------|------|

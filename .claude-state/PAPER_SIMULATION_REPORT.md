@@ -9,7 +9,7 @@ _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 _Generated: 2026-06-15T15:23:29.862183Z_
 _Symbol: BTC/USDT_
-_Data Source: CSV fallback BTC/USDT 1h (/home/user/Trading/data/historical)_
+_Data Source: CSV BTC/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
 _Walk-Forward: 8개 윈도우 (train=5040, test=1440 candles [1h])_
 _Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_

@@ -345,10 +345,11 @@ class LiveState:
 
 class LivePaperTrader:
     def __init__(self, days: int = DEFAULT_DAYS, interval: int = DEFAULT_INTERVAL,
-                 max_loss_pct: float = MAX_LOSS_PCT):
+                 max_loss_pct: float = MAX_LOSS_PCT, timeframe: str = DEFAULT_TIMEFRAME):
         self.days = days
         self.interval = interval
         self.max_loss_pct = max_loss_pct
+        self.timeframe = timeframe
         self._halted = False  # 최대 손실 한계 도달 시 True → 수동 재시작 필요
         self.state = LiveState.load()
         self.paper = PaperTrader(
@@ -588,7 +589,7 @@ class LivePaperTrader:
                 else:
                     logger.info("[%s] ML model not found (fallback to strategy-only)", symbol)
 
-            df = fetch_latest_candles(symbol=symbol, limit=WARMUP_CANDLES)
+            df = fetch_latest_candles(symbol=symbol, timeframe=self.timeframe, limit=WARMUP_CANDLES)
             if df is not None:
                 self._df_caches[symbol] = enrich_indicators(df)
                 logger.info("[%s] Data: %d candles", symbol, len(self._df_caches[symbol]))
@@ -705,7 +706,7 @@ class LivePaperTrader:
             logger.debug("[%s] Orders blocked — protection mode", symbol)
             return
 
-        new_df = fetch_latest_candles(symbol=symbol, limit=50)
+        new_df = fetch_latest_candles(symbol=symbol, timeframe=self.timeframe, limit=50)
         if new_df is None:
             self._fetch_fail_count[symbol] = self._fetch_fail_count.get(symbol, 0) + 1
             fails = self._fetch_fail_count[symbol]
@@ -1066,7 +1067,7 @@ class LivePaperTrader:
         for symbol in SYMBOLS:
             logger.info("Weekly retrain: %s ...", symbol)
             try:
-                result = _auto_retrain(symbol=symbol, timeframe=DEFAULT_TIMEFRAME)
+                result = _auto_retrain(symbol=symbol, timeframe=self.timeframe)
                 if result.passed:
                     # 재학습 성공 → 모델 캐시 갱신
                     new_model = load_ml_model(symbol)
@@ -1585,13 +1586,15 @@ def main():
     parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL, help="체크 간격 (초)")
     parser.add_argument("--reset", action="store_true", help="상태 초기화 후 시작")
     parser.add_argument("--ml-filter", action="store_true", help="ML 모델 시그널 필터 활성화")
+    parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME,
+                        help="데이터 타임프레임 (기본: 1h, 4h 가능 — supertrend_multi 4h 실전 투입용)")
     args = parser.parse_args()
 
     if args.reset and LIVE_STATE_PATH.exists():
         LIVE_STATE_PATH.unlink()
         logger.info("State reset.")
 
-    trader = LivePaperTrader(days=args.days, interval=args.interval)
+    trader = LivePaperTrader(days=args.days, interval=args.interval, timeframe=args.timeframe)
     trader.ml_filter_enabled = args.ml_filter
     sys.exit(trader.run())
 

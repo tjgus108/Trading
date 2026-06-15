@@ -2,9 +2,7 @@
   "metadata": {
     "generated": "2026-06-15T15:35:10.560461Z",
     "symbols": [
-      "BTC/USDT",
-      "ETH/USDT",
-      "SOL/USDT"
+      "BTC/USDT"
     ],
     "strategies_loaded": 22,
     "timeframe": "1h",
