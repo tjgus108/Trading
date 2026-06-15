@@ -108,6 +108,20 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "cmf": {"buy_thresh": 0.10},
 }
 
+# 타임프레임별 추가 파라미터 (ACTIVE_TIMEFRAME에 따라 PAPER_SIM_STRATEGY_PARAMS와 병합)
+# 4h 전용 파라미터는 1h 시뮬레이션에 적용하면 성능 저하 발생 (cmf_confirm 등 4h 특화 필터)
+PAPER_SIM_STRATEGY_PARAMS_4H: Dict[str, dict] = {
+    # Cycle314 E(실행): Bundle OOS 4h 최적 파라미터 동기화 (run_bundle_oos.BUNDLE_STRATEGY_INIT_PARAMS와 동일)
+    #   supertrend_multi: 5/6 valid PASS (avg=4.880, PF=2.321) — 실전 투입 후보 #1
+    #   1h에 적용 시 cmf_confirm=True가 과도 필터링 → Sharpe 0.32→0.02 역효과 확인 (Cycle 314)
+    "supertrend_multi": {
+        "atr_threshold": 0.5, "atr_threshold_max": 1.5,
+        "ema_filter": True, "confidence_filter": True,
+        "rsi_ob_filter": True, "rsi_ob_threshold": 80,
+        "trend_confirm_bars": 2, "cmf_confirm": True,
+    },
+}
+
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
 # 활성화 시 generate_report()에서 상위 5개 전략의 윈도우별 Sharpe/PF/Trades 출력
 VERBOSE_WINDOWS: bool = False
@@ -996,7 +1010,9 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
             load_failures += 1
             continue
         try:
-            s_params = PAPER_SIM_STRATEGY_PARAMS.get(mod_name, {})
+            s_params = dict(PAPER_SIM_STRATEGY_PARAMS.get(mod_name, {}))
+            if ACTIVE_TIMEFRAME == "4h":
+                s_params.update(PAPER_SIM_STRATEGY_PARAMS_4H.get(mod_name, {}))
             result = evaluate_strategy_walk_forward(cls, windows, engine, strategy_params=s_params or None)
             results.append(result)
             if (idx + 1) % 50 == 0:
