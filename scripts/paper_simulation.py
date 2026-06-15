@@ -356,18 +356,26 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 # ── 전략 로드 ──────────────────────────────────────────────
 
 def load_pass_strategies() -> List[Tuple[str, str]]:
-    """QUALITY_AUDIT.csv에서 PASS 전략만 로드."""
+    """QUALITY_AUDIT.csv에서 PASS 전략만 로드. STRATEGY_FILTER가 설정되면 해당 전략만 반환."""
     if CSV_PATH.exists():
         df = pd.read_csv(CSV_PATH)
         passed = df[df["passed"] == True]  # noqa: E712
         if len(passed) > 0:
-            return list(zip(passed["module"].tolist(), passed["class"].tolist()))
+            result = list(zip(passed["module"].tolist(), passed["class"].tolist()))
+            if STRATEGY_FILTER:
+                result = [(m, c) for m, c in result if m in STRATEGY_FILTER]
+                print(f"[STRATEGIES] Filter applied: {STRATEGY_FILTER} → {len(result)} strategies")
+            return result
         print("[WARN] QUALITY_AUDIT.csv에 PASS 전략 0개. 전체 전략 로드 (최대 50개)")
 
     from scripts.quality_audit import find_strategy_classes
     all_strats = find_strategy_classes()
     print(f"[INFO] 전체 전략 {len(all_strats)}개 중 상위 50개 로드")
-    return [(mod, cls_name) for mod, cls_name, _ in all_strats[:50]]
+    result = [(mod, cls_name) for mod, cls_name, _ in all_strats[:50]]
+    if STRATEGY_FILTER:
+        result = [(m, c) for m, c in result if m in STRATEGY_FILTER]
+        print(f"[STRATEGIES] Filter applied: {STRATEGY_FILTER} → {len(result)} strategies")
+    return result
 
 
 def load_strategy_class(module_name: str, class_name: str):
@@ -912,6 +920,10 @@ MC_BLOCK_SIZE: int = 1
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]  # 페이퍼 시뮬 대상 (live는 여전히 BTC만)
 
+# 전략 필터 (--strategies로 설정, None이면 전체 PASS 전략 실행)
+# Cycle314 E(실행): supertrend_multi 4h 단독 실행 지원
+STRATEGY_FILTER: Optional[List[str]] = None
+
 
 def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tuple[str, List[dict]]:
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
@@ -1268,6 +1280,12 @@ if __name__ == "__main__":
         default=False,
         help="윈도우별 상세 분석 출력: 상위 5 전략의 윈도우별 Sharpe/PF/Trades/Pass 테이블 추가",
     )
+    parser.add_argument(
+        "--strategies",
+        nargs="+",
+        default=None,
+        help="실행할 전략 모듈명 필터 (예: --strategies supertrend_multi narrow_range)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1301,4 +1319,7 @@ if __name__ == "__main__":
     if args.verbose_windows:
         _this.VERBOSE_WINDOWS = True
         print("[CONFIG] Verbose windows enabled: per-window detail for top 5 strategies", flush=True)
+    if args.strategies:
+        _this.STRATEGY_FILTER = args.strategies
+        print(f"[CONFIG] Strategy filter: {args.strategies}", flush=True)
     sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))

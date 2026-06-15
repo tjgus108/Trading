@@ -80,6 +80,10 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle312 D(ML): nr_lookback 5→4 실험 결과 — 효과 없음 (trades 동일: 8,10,10,9,10)
     # 결론: 저거래의 binding constraint는 NR lookback이 아닌 ATR필터/VOL필터/NR_SCAN_WINDOW
     # nr_lookback은 기본값(5)으로 복원 (4와 동일한 신호 발생 빈도 확인)
+    # Cycle314 D(ML): vol_spike_mult 1.0→0.5 실험 → 역효과 확인 후 복원
+    #   trades 동일 (8,10,10,9,10) → VOL_SPIKE_MULT는 binding constraint 아님
+    #   fold4: 1.71→-1.656 악화, fold1: -3.83→-5.534 악화 → 신호 품질 저하
+    #   결론: ATR_THRESHOLD(0.95)가 남은 마지막 후보 (다음 실험 방향)
     "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
