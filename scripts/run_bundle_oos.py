@@ -101,8 +101,10 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   OOS trade counts 동일 (fold0:8, fold1:8, fold2:12, fold3:9, fold4:7) — IS만 변화
     #   결론: vol_regime_filter는 OOS 신호 빈도의 binding constraint 아님
     #   실제 binding constraint: bounce_pct=0.025 (클러스터 가격 범위 너무 좁음) 또는 close_window=60
-    #   다음 후보: bounce_pct 축소 (0.025→0.015) 또는 price_cluster 전략 근본 구조 검토
-    "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # D(ML) Cycle 319: bounce_pct=0.025→0.015 단독 실험
+    #   4h 봉 기준 2.5% 클러스터 범위는 너무 좁음 → 1.5%로 완화하여 신호 빈도 증가 시도
+    #   기대: 저거래 비율 80%→40% 감소, PASS 가능성 확보
+    "price_cluster": {"bounce_pct": 0.015, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle317 D(ML): elder_impulse 교체 — order_flow_imbalance_v2 도입
     #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
     #   order_flow_imbalance_v2: 캔들 구조 기반 매수/매도 압력 측정 (cmf/supertrend 보완)
@@ -595,10 +597,12 @@ def run_bundle_oos(
     logger.info("Symbol: %s | Timeframe: %s | Candles: %d | min_oos_trades: %d", symbol, timeframe, limit, min_oos_trades)
 
     # 데이터 수집: csv_dir 지정 시 CSV 우선 사용
+    _using_real_data = False  # 실제 데이터(CSV or 거래소) 사용 여부 — 합성 fallback 시 False
     if csv_dir is not None:
         csv_df = load_csv_and_resample(csv_dir, symbol, timeframe)
         if not csv_df.empty:
             df = enrich_indicators(csv_df)
+            _using_real_data = True
             logger.info("CSV data used for Bundle OOS: %d candles", len(df))
         else:
             logger.warning("CSV 로드 실패, synthetic fallback")
@@ -611,6 +615,7 @@ def run_bundle_oos(
     else:
         try:
             df = enrich_indicators(fetch_bybit_data(symbol, timeframe, limit))
+            _using_real_data = True
         except (RuntimeError, ImportError) as e:
             logger.warning("실거래소 데이터 수집 실패 (%s), 합성 데이터로 fallback", e)
             if use_quality_data:
@@ -661,7 +666,7 @@ def run_bundle_oos(
             )
             results.append((module_name, fail_result))
 
-    return results
+    return results, _using_real_data
 
 
 def format_is_diagnosis(results: list[tuple[str, BundleOOSResult]]) -> str:
@@ -791,7 +796,7 @@ def main():
     )
     args = parser.parse_args()
 
-    results = run_bundle_oos(
+    results, using_real_data = run_bundle_oos(
         symbol=args.symbol,
         timeframe=args.timeframe,
         limit=args.limit,
@@ -824,10 +829,17 @@ def main():
     print(f"Overall: {passed_count}/5 PASS")
     print("=" * 70)
 
-    # 리포트 저장
+    # 리포트 저장: 합성 데이터 run은 실제 데이터 리포트를 덮어쓰지 않음
     report = generate_report(results, args.symbol, args.timeframe)
-    REPORT_PATH.write_text(report)
-    logger.info("Report saved to %s", REPORT_PATH)
+    if using_real_data:
+        REPORT_PATH.write_text(report)
+        logger.info("Report saved to %s", REPORT_PATH)
+    else:
+        logger.warning(
+            "합성 데이터 run — 리포트를 %s에 저장하지 않음 (실 데이터 리포트 보호). "
+            "실 데이터 리포트를 생성하려면 --csv-dir data/historical 를 사용하세요.",
+            REPORT_PATH,
+        )
     print(report)
 
 

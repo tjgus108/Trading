@@ -95,6 +95,21 @@ REGIME_SIZE_MULT: dict = {
     'HIGH_VOL':   0.3,   # 고변동성: 70% 대폭 축소
 }
 
+# Bundle OOS PASS 전략 우선순위 (Cycle 318 기준, 3/5 PASS 달성)
+# E(실행) Cycle 319: OFI v2(rank1) 40%, supertrend_multi(rank2) 35%, cmf(rank3) 25% 배분
+# fallback 선택 시 이 순서로 우선 로드 (rotation/state 복원 없을 때)
+BUNDLE_PASS_PRIORITY: list[str] = [
+    "order_flow_imbalance_v2",  # rank1: avg=4.345, std=0.907, PASS
+    "supertrend_multi",          # rank2: avg=3.892, std=1.239, PASS
+    "cmf",                       # rank3: avg=2.508, std=1.888, PASS
+]
+# 포지션 사이즈 가중치 (합산 1.0)
+BUNDLE_PASS_WEIGHTS: dict[str, float] = {
+    "order_flow_imbalance_v2": 0.40,
+    "supertrend_multi": 0.35,
+    "cmf": 0.25,
+}
+
 
 # ── 데이터 수집 ──────────────────────────────────────────
 
@@ -572,9 +587,15 @@ class LivePaperTrader:
                 logger.info("[%s] Restored %d strategies", symbol, len(sym_strats))
 
             if not sym_strats:
-                selected = list(all_strats.items())[:MAX_ACTIVE_STRATEGIES]
-                sym_strats = dict(selected)
-                logger.info("[%s] Fallback: %d strategies", symbol, len(sym_strats))
+                # Bundle PASS 우선순위 먼저 적용 (E(실행) Cycle319)
+                for name in BUNDLE_PASS_PRIORITY:
+                    if name in all_strats and len(sym_strats) < MAX_ACTIVE_STRATEGIES:
+                        sym_strats[name] = all_strats[name]
+                # 부족하면 나머지로 채움
+                for name, inst in all_strats.items():
+                    if name not in sym_strats and len(sym_strats) < MAX_ACTIVE_STRATEGIES:
+                        sym_strats[name] = inst
+                logger.info("[%s] Fallback (Bundle PASS priority): %s", symbol, list(sym_strats.keys()))
 
             self.symbol_strategies[symbol] = sym_strats
             self.state.active_strategies[symbol] = list(sym_strats.keys())
@@ -878,6 +899,16 @@ class LivePaperTrader:
                         symbol, name, regime.value, regime_mult, size, size * regime_mult,
                     )
                 size *= regime_mult
+
+                # Bundle PASS 가중치 적용 (E(실행) Cycle319)
+                # BUNDLE_PASS_WEIGHTS에 있는 전략은 해당 가중치×3으로 사이즈 조정
+                # (기본 균등 배분 대비: OFI v2 40%, supertrend_multi 35%, cmf 25%)
+                bundle_weight = BUNDLE_PASS_WEIGHTS.get(name)
+                if bundle_weight is not None:
+                    n_bundle = len(BUNDLE_PASS_WEIGHTS)
+                    uniform = 1.0 / n_bundle
+                    weight_mult = bundle_weight / uniform
+                    size *= weight_mult
 
                 if size * current_price < 10:
                     continue
