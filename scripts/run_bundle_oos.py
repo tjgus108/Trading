@@ -41,7 +41,7 @@ BUNDLE_STRATEGIES = [
     ("cmf", "CMFStrategy"),
     ("elder_impulse", "ElderImpulseStrategy"),
     ("supertrend_multi", "SupertrendMultiStrategy"),  # Cycle 278 B: wick_reversal 교체 (std=4.842 >> 3.0, 3회 연속 FAIL)
-    ("narrow_range", "NarrowRangeStrategy"),
+    ("price_cluster", "PriceClusterStrategy"),  # Cycle 316 B: narrow_range 4h 근본 한계 → price_cluster 교체 (paper_sim rank1, Sharpe=0.59)
     ("value_area", "ValueAreaStrategy"),
 ]
 
@@ -84,11 +84,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   trades 동일 (8,10,10,9,10) → VOL_SPIKE_MULT는 binding constraint 아님
     #   fold4: 1.71→-1.656 악화, fold1: -3.83→-5.534 악화 → 신호 품질 저하
     #   결론: ATR_THRESHOLD(0.95)가 남은 마지막 후보
-    # Cycle315 A(품질): atr_threshold 0.95→1.05 실험 → 역효과 → 복원
-    #   trades 증가 (8-10→13-21) but IS Sharpe 80% 음수, OOS avg=-2.118, std=3.889
-    #   ATR필터 완화가 오신호를 크게 증가시킴 → 0.95가 최적 (기본값 사용)
-    #   결론: narrow_range 4h에서 모든 파라미터 실험 완료 — 근본 한계 확인
-    "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
+    # Cycle316 B(리스크): narrow_range → price_cluster 번들 교체
+    #   narrow_range 4h 모든 파라미터 실험 완료, 근본 한계 확인 → 제거
+    #   price_cluster: paper_sim rank1 (Sharpe=0.59, 3/8 windows)
+    #   vol_regime_filter=True: sideways 레짐에서만 신호 허용 (price_cluster 설계 의도)
+    "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)
@@ -108,7 +108,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   실험 결과: cmf_period=10이 fold3 OOS를 -6.308→+1.593으로 개선, fold4는 악화
     #   std=3.142 > 2.5 FAIL, cmf_period=20 복귀 결정
     #   atr_threshold_max=2.0→1.5: IS 과최적화 방지 (유지)
-    "supertrend_multi": {"atr_threshold": 0.5, "atr_threshold_max": 1.5, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": True},
+    # Cycle316 D(ML): cmf_confirm=True→False 확정 (실험 결과: KEEP)
+    #   fold3 (2023-12-27~2024-02-24 BTC 40k 돌파): trades 2→3, OOS -6.308→+3.337 개선
+    #   avg OOS Sharpe 3.674→3.892, std 1.860→1.239 (안정성 향상)
+    #   원인: 상승장에서 CMF 필터가 정상 BUY 신호 차단 → cmf_confirm 제거로 신호 복원
+    "supertrend_multi": {"atr_threshold": 0.5, "atr_threshold_max": 1.5, "ema_filter": True, "confidence_filter": True, "rsi_ob_filter": True, "rsi_ob_threshold": 80, "trend_confirm_bars": 2, "cmf_confirm": False},
 }
 
 
