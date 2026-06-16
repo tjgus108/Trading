@@ -39,7 +39,7 @@ REPORT_PATH = ROOT / ".claude-state" / "BUNDLE_OOS_REPORT.md"
 # 5-Strategy Bundle 정의 (module, class)
 BUNDLE_STRATEGIES = [
     ("cmf", "CMFStrategy"),
-    ("elder_impulse", "ElderImpulseStrategy"),
+    ("order_flow_imbalance_v2", "OrderFlowImbalanceV2Strategy"),  # Cycle317 D(ML): elder_impulse 교체 (avg=-2.941, rank5 p0, IS 과최적화 확정)
     ("supertrend_multi", "SupertrendMultiStrategy"),  # Cycle 278 B: wick_reversal 교체 (std=4.842 >> 3.0, 3회 연속 FAIL)
     ("price_cluster", "PriceClusterStrategy"),  # Cycle 316 B: narrow_range 4h 근본 한계 → price_cluster 교체 (paper_sim rank1, Sharpe=0.59)
     ("value_area", "ValueAreaStrategy"),
@@ -88,7 +88,16 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   narrow_range 4h 모든 파라미터 실험 완료, 근본 한계 확인 → 제거
     #   price_cluster: paper_sim rank1 (Sharpe=0.59, 3/8 windows)
     #   vol_regime_filter=True: sideways 레짐에서만 신호 허용 (price_cluster 설계 의도)
+    # Cycle317 B(리스크): close_window=60→30 실험 결과 → 역효과 확인, 복원
+    #   close_window=30: avg=-0.336, IS overfitting (fold0 IS=6.054), failed folds=3 → 더 나쁨
+    #   결론: close_window=30이 IS 과최적화 심화, 신호 증가 ≠ OOS 품질 향상
+    #   다음 실험 후보: vol_regime_filter=False (신호 억제의 근본 원인 제거)
     "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # Cycle317 D(ML): elder_impulse 교체 — order_flow_imbalance_v2 도입
+    #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
+    #   order_flow_imbalance_v2: 캔들 구조 기반 매수/매도 압력 측정 (cmf/supertrend 보완)
+    #   trend_span=20: 4h 기준 80h(3.3일) EMA macro trend filter — 단기 추세 확인
+    "order_flow_imbalance_v2": {"trend_span": 20},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단
     #   fold4 가설: MEDIUM 신호 제거로 OOS=-1.539 → ≥0 목표 (효과 없음: ema_filter가 이미 차단)

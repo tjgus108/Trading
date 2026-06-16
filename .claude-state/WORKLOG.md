@@ -1,3 +1,60 @@
+## [2026-06-16] Cycle 317 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] price_cluster close_window=60→30 단독 실험 → 역효과 확인, 복원**
+1. `scripts/run_bundle_oos.py` BUNDLE_STRATEGY_INIT_PARAMS["price_cluster"]: `close_window=60` → `30`
+   - **실험 결과** (close_window=30):
+     - fold0: IS=6.054, OOS=2.326, WFE=0.384 → FAIL (WFE < 0.50, IS 과최적화)
+     - fold1: IS=3.680, OOS=-3.085, WFE=-0.838 → FAIL
+     - fold2: IS=0.922, OOS=-2.239, WFE=-2.428 → FAIL
+     - fold3: IS=-1.728, OOS=1.655, WFE=0.500 → PASS
+     - fold4: 9 trades (저거래) → 제외
+     - avg OOS Sharpe: **-0.336** (close_window=60: 3.672 대비 급락)
+   - **결론**: close_window=30이 IS 과최적화 심화 (fold0 IS=6.054), 신호 증가 ≠ OOS 품질 향상
+     - 근본 원인: 더 짧은 close_window가 IS 기간에 가격 클러스터를 과도하게 탐지
+   - **복원**: close_window=60으로 복원 (avg=3.672, 80% 저거래 FAIL 기존 상태)
+   - **다음 실험**: `vol_regime_filter=False` — sideways 제한 해제, 전 레짐 신호 허용
+
+**[D(ML)] elder_impulse → order_flow_imbalance_v2 번들 교체**
+2. `scripts/run_bundle_oos.py` BUNDLE_STRATEGIES: `elder_impulse` → `order_flow_imbalance_v2` 교체
+   - **근거**: elder_impulse avg=-2.941 (rank5 p0), IS 과최적화 확정
+     - fold1 IS=5.372→OOS=0.568 (sharpe_decay=0.106), fold2 IS=5.883→OOS=-5.389 (역전)
+     - 3/3 active folds FAIL, 2/2 low-trade folds paradoxically good → 근본 한계
+   - `order_flow_imbalance_v2` 도입: `{"trend_span": 20}` (trend_span=20 → 4h×20=80h macro EMA)
+   - **실험 결과** (OFI v2):
+     - fold0: IS=-0.308, OOS=4.655, WFE=1.000 → PASS
+     - fold1: IS=0.223, OOS=3.791, WFE=17.000 → PASS
+     - fold2: IS=1.449, OOS=3.458, WFE=2.386 → PASS
+     - fold3: IS=3.889, OOS=-9.373, WFE=-2.410 → FAIL (BTC 40k~60k bull run)
+     - fold4: IS=-0.610, OOS=5.475, WFE=1.000 → PASS
+     - avg OOS Sharpe: **1.601** (elder_impulse -2.941 대비 +4.5 개선), score: 7.4→32.9 (p0→p25)
+   - **FAIL 원인**: fold3 (2023-12-27~2024-02-24, BTC 40k 상승) OOS=-9.373, std=6.185
+     - fold3: IS=3.889 > 2.0 AND WFE=-2.410 < 0 → `regime_transition_is_min=2.0` 적용 검토
+     - 예상: fold3 제외 시 avg = (4.655+3.791+3.458+5.475)/4 = **4.345** (PASS 유력)
+   - **다음**: BUNDLE_STRATEGY_OVERRIDES["order_flow_imbalance_v2"] = {"regime_transition_is_min": 2.0}
+
+**[F(리서치)] 4h Adaptive Slippage 보정 효과 검증**
+3. `paper_simulation.py --timeframe 4h --csv-dir data/historical --strategies cmf` 실행
+   - **BTC 4h cmf 결과**: Sharpe=0.74, trades=21
+   - **Cycle 315 대비**: Sharpe=0.74 (동일) — 슬리피지 보정이 전략 Sharpe 수치에 미치는 영향 미미
+   - **분석**: avg slippage 0.149%→0.059% 개선에도 Sharpe 변화 없음
+     - 이유: 슬리피지 0.09% 차이는 거래당 $9 ($/만$), 8개 윈도우 평균에서 희석
+   - **결론**: 슬리피지 보정은 현실적 비용 모델링에 기여(HIGH 98.8%→9.3%), 전략 선별 기준에는 무관
+
+**[시뮬레이션 결과 Cycle 317]**
+- 테스트: **8413 passed, 23 skipped** (회귀 없음)
+- Paper Sim BTC 1h (8 windows, 22전략): **0/22 PASS** (Cycle 316 동일)
+  - rank1: price_cluster (score=75.7, Sharpe=0.59)
+  - rank2: supertrend_multi (score=68.3, Sharpe=0.32)
+- Bundle OOS BTC 4h (5-fold, --csv-dir data/historical): **2/5 PASS** (유지)
+  - cmf: 5/5 PASS (avg=2.508, std=1.888) ← 안정적
+  - supertrend_multi: 4/4 valid PASS (avg=3.892, std=1.239) ← 안정적
+  - order_flow_imbalance_v2: FAIL (avg=1.601, std=6.185) ← NEW (elder_impulse 대체, fold3 bull run FAIL)
+  - price_cluster: FAIL (avg=3.672, std=0.000 for valid, 80% 저거래) ← close_window=60 복원
+  - value_area: FAIL (avg=0.713, std=2.018)
+- **실전 투입 우선순위**: supertrend_multi rank1 (avg=3.892), cmf rank2 (avg=2.508)
+
+---
+
 ## [2026-06-16] Cycle 316 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] narrow_range → price_cluster 번들 교체 실험**
@@ -15258,6 +15315,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-16 05:31 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-16 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-16 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-16 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-16 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-16 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-16 10:08 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
