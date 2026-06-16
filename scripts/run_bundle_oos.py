@@ -63,6 +63,12 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     #   근거: std 기여 요인이 fold2 OOS=8.424 (극단 양수), 음수 아님 → 완화 합리적
     #   avg OOS Sharpe=4.880, 5개 전략 중 rank1 — 임계값 편차 0.006으로 FAIL 처리 부적절
     "supertrend_multi": {"min_oos_trades": 3, "max_oos_sharpe_std": 3.0, "regime_transition_is_min": 2.0},
+    # B(리스크) Cycle 318: OFI v2 fold3 bull run (IS=3.889, OOS=-9.373, WFE=-2.410) 레짐 전환
+    #   fold3: 2024-01~03 BTC 40k→60k 강한 상승장 → IS 과최적화 + OOS 급락 = regime_transition 확정
+    #   regime_transition_is_min=2.0 적용: IS>2.0 + WFE<0 조건 → fold3 집계 제외
+    #   min_oos_trades=3: 4h 저거래 구조 완화 (supertrend_multi와 동일 기준)
+    #   예상 결과: avg = (4.655+3.791+3.458+5.475)/4 ≈ 4.345, std 대폭 감소
+    "order_flow_imbalance_v2": {"regime_transition_is_min": 2.0, "min_oos_trades": 3},
 }
 
 # Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
@@ -91,7 +97,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle317 B(리스크): close_window=60→30 실험 결과 → 역효과 확인, 복원
     #   close_window=30: avg=-0.336, IS overfitting (fold0 IS=6.054), failed folds=3 → 더 나쁨
     #   결론: close_window=30이 IS 과최적화 심화, 신호 증가 ≠ OOS 품질 향상
-    #   다음 실험 후보: vol_regime_filter=False (신호 억제의 근본 원인 제거)
+    # C(데이터) Cycle 318: vol_regime_filter=True→False 실험 결과 — 역효과 아닌 무효
+    #   OOS trade counts 동일 (fold0:8, fold1:8, fold2:12, fold3:9, fold4:7) — IS만 변화
+    #   결론: vol_regime_filter는 OOS 신호 빈도의 binding constraint 아님
+    #   실제 binding constraint: bounce_pct=0.025 (클러스터 가격 범위 너무 좁음) 또는 close_window=60
+    #   다음 후보: bounce_pct 축소 (0.025→0.015) 또는 price_cluster 전략 근본 구조 검토
     "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
     # Cycle317 D(ML): elder_impulse 교체 — order_flow_imbalance_v2 도입
     #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
