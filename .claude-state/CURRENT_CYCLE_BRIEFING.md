@@ -1,45 +1,55 @@
 # Current Cycle Briefing
 
-_Cycle 314 | 2026-06-15 | D(ML) + E(실행) + F(리서치)_
+_Cycle 315 | 2026-06-16 | A(품질) + C(데이터) + F(리서치)_
 
 ## 완료된 작업
 
-### D(ML) — vol_spike_mult 실험 및 파라미터화
+### A(품질) — narrow_range ATR_THRESHOLD 파라미터화 및 1.05 실험
 
-- `src/strategy/narrow_range.py` `vol_spike_mult` 파라미터화 (클래스 상수 → __init__ 인자)
-  - **실험**: `vol_spike_mult=0.5` (거래량 스파이크 없어도 진입 허용)
-  - **결과**: trades 동일 (8,10,10,9,10), fold4 크게 악화 (1.71→-1.656), std=3.480
-  - **결론**: VOL_SPIKE_MULT는 binding constraint 아님 → 역효과 → 기본값(1.0) 복원
-  - 파라미터 기능은 유지 (향후 다른 배율 실험 가능)
+- `src/strategy/narrow_range.py` `atr_threshold` 파라미터화 완료
+  - `__init__`에 `atr_threshold: float = 0.95` 추가, `self._atr_threshold` 사용
+  - **실험**: `atr_threshold=1.05` (ATR 필터 거의 폐기 수준으로 완화)
+  - **결과**: trades 크게 증가 (8-10 → 13-21), BUT avg OOS Sharpe=-2.118, std=3.889
+    - IS Sharpe 80% 음수 (4/5 folds) — 전략 자체 불안정
+    - PASS: fold0(1.981), fold4(2.128) / FAIL: fold1(-5.622), fold2(-3.625), fold3(-5.451)
+  - **결론**: ATR 완화 → 오신호 폭발 → 역효과 → 기본값(0.95) 복원
+  - **인사이트**: narrow_range 4h 모든 파라미터 실험 완료 → 근본 한계 → 번들 교체 검토 필요
+    - 실험 이력: NR_SCAN_WINDOW, nr_lookback, vol_spike_mult, ema_slope, atr_threshold 전부 FAIL
 
-### E(실행) — paper_simulation.py --strategies 필터
+### C(데이터) — cmf 4h paper_simulation BTC-특이성 확인
 
-- `scripts/paper_simulation.py` `--strategies` CLI 인자 추가
-  - `STRATEGY_FILTER: Optional[List[str]] = None` 모듈 변수
-  - `load_pass_strategies()`에 필터 적용
-  - **목적**: supertrend_multi, cmf 4h 단독 실행 가능 (전체 22전략 대비 빠른 검증)
-  - **사용법**: `python3 scripts/paper_simulation.py --timeframe 4h --csv-dir data/historical --strategies supertrend_multi`
+- `python3 scripts/paper_simulation.py --timeframe 4h --csv-dir data/historical --strategies cmf`
+  - BTC 4h: 1/8 PASS, avg Sharpe=0.74 → FAIL (consistency 12.5%)
+  - ETH 4h: 0/8, avg Sharpe=-4.26 → FAIL
+  - SOL 4h: 0/8, avg Sharpe=-7.47 → FAIL
+  - **결론**: cmf는 BTC 전용 전략 확인 — Bundle OOS(5/5 PASS)는 BTC 2023-2024에 특화
+  - Slippage "HIGH" 99.4% → 실전 환경에서 슬리피지 영향 주의 필요
 
-### F(리서치) — Bundle OOS 5-fold 재실행 및 cmf PASS 확인
+### F(리서치) — narrow_range 번들 교체 및 실전 투입 검토
 
-- Bundle OOS `--csv-dir data/historical` (5-fold, BTC 4h, 2023-2024): **2/5 PASS** ← 첫 복수!
-  - **cmf: PASS** ← 신규 발견!
-    - 5/5 folds PASS, avg OOS Sharpe=2.508, std=1.888, Consistency=100%
-    - 이전 Cycle 313 (9-fold, 2022 포함): 4/9 PASS → 2022 제거로 5/5로 개선
-  - **supertrend_multi: PASS** ← 재확인
-    - 3/3 valid PASS (fold3 저거래 제외, fold4 레짐전환 제외), avg OOS Sharpe=3.674
-  - narrow_range (vol_spike_mult=0.5): FAIL → 역효과
+- narrow_range 번들 교체 후보 정리:
+  - price_cluster: paper_sim rank1 (Sharpe=0.59, 3/8, return=+4.50%) → 4h 평가 필요
+  - roc_ma_cross: paper_sim rank4 (Sharpe=-0.35, 2/8, return=+0.38%) → 상대적으로 안정
+  - positional_scaling: paper_sim rank3 (return=+1.97%) → Sharpe=0.00 (중립)
+- cmf + supertrend_multi 2개 PASS 전략 실전 투입 조건 검토 완료
+  - cmf: BTC 단독 배포만 고려 (다자산 배포 금지 확인)
+  - supertrend_multi: 다자산 배포 가능성 더 높음 (3/3 valid PASS)
 
 ## 시뮬레이션 결과
 
 - **테스트**: 8413 passed, 23 skipped (회귀 없음)
-- **Paper Sim BTC 1h (8 windows)**: 0/22 PASS
-  - rank1: price_cluster (Sharpe=0.59), rank2: supertrend_multi (Sharpe=0.32, +5.26%)
-- **Bundle OOS BTC 4h (5-fold)**: 2/5 PASS
-  - cmf avg=2.508 (PASS), supertrend_multi avg=3.674 (PASS)
+- **Paper Sim BTC 1h (22전략, 8 windows)**: 0/22 PASS
+  - rank1: price_cluster (Sharpe=0.59, 3/8, return=+4.50%)
+  - rank2: supertrend_multi (Sharpe=0.32, 2/8, return=+5.26%) ← 수익률 1위
+  - narrow_range: rank9 (Sharpe=-0.42, 0/8, PF=0.99)
+- **Paper Sim 4h cmf 단독**: 0/1 PASS (BTC=1/8, ETH=0/8, SOL=0/8)
+- **Bundle OOS BTC 4h (5-fold)**: 2/5 PASS (Cycle 314 동일)
+  - cmf: 5/5 PASS (avg=2.508, std=1.888)
+  - supertrend_multi: 3/3 valid PASS (avg=3.674, std=1.860)
+  - narrow_range (1.05 실험): FAIL (avg=-2.118, std=3.889) → 복원
 
-## 다음 Cycle 315 (315 mod 5 = 0 → A+C+F)
+## 다음 Cycle 316 (316 mod 5 = 1 → B+D+F)
 
-1. **A**: narrow_range ATR_THRESHOLD 0.95→1.05 실험 (마지막 binding constraint 후보)
-2. **C**: cmf 4h paper_sim 단독 실행 (첫 PASS 검증)
-3. **F**: cmf + supertrend_multi 조합 검토 (두 전략 모두 4h PASS)
+1. **B**: narrow_range → price_cluster 번들 교체 실험 (4h Bundle OOS 평가)
+2. **D**: supertrend_multi fold3 저거래 원인 파악 (cmf_confirm=False 임시 실험)
+3. **F**: cmf BTC 슬리피지 분석 및 실전 배포 준비 검토

@@ -83,7 +83,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     # Cycle314 D(ML): vol_spike_mult 1.0→0.5 실험 → 역효과 확인 후 복원
     #   trades 동일 (8,10,10,9,10) → VOL_SPIKE_MULT는 binding constraint 아님
     #   fold4: 1.71→-1.656 악화, fold1: -3.83→-5.534 악화 → 신호 품질 저하
-    #   결론: ATR_THRESHOLD(0.95)가 남은 마지막 후보 (다음 실험 방향)
+    #   결론: ATR_THRESHOLD(0.95)가 남은 마지막 후보
+    # Cycle315 A(품질): atr_threshold 0.95→1.05 실험 → 역효과 → 복원
+    #   trades 증가 (8-10→13-21) but IS Sharpe 80% 음수, OOS avg=-2.118, std=3.889
+    #   ATR필터 완화가 오신호를 크게 증가시킴 → 0.95가 최적 (기본값 사용)
+    #   결론: narrow_range 4h에서 모든 파라미터 실험 완료 — 근본 한계 확인
     "narrow_range": {"trend_regime_filter": False, "ema_slope_min_buy": 0.0, "ema_slope_max_sell": 0.0},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단

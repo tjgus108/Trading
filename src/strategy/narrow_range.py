@@ -33,6 +33,7 @@ class NarrowRangeStrategy(BaseStrategy):
         ema_slope_min_buy: float = 0.0,
         ema_slope_max_sell: float = 0.0,
         vol_spike_mult: float = 1.0,
+        atr_threshold: float = 0.95,
         **kwargs,
     ):
         """
@@ -44,6 +45,7 @@ class NarrowRangeStrategy(BaseStrategy):
             ema_slope_min_buy: BUY 진입 최소 EMA20 slope (0.0=필터 없음, 양수=상승추세 필수).
             ema_slope_max_sell: SELL 진입 최대 EMA20 slope (0.0=필터 없음, 음수=하락추세 필수).
             vol_spike_mult: 거래량 스파이크 배율 (기본 1.0=클래스 상수, 완화 시 0.5 등).
+            atr_threshold: ATR 축소 임계값 배율 (기본 0.95, 완화 시 1.05 등). Cycle 315 A 실험.
         """
         self.nr_lookback = max(4, int(nr_lookback))  # 최소 4봉 (NR4 확인용)
         self.trend_regime_filter = bool(trend_regime_filter)
@@ -51,6 +53,7 @@ class NarrowRangeStrategy(BaseStrategy):
         self.ema_slope_min_buy = float(ema_slope_min_buy)
         self.ema_slope_max_sell = float(ema_slope_max_sell)
         self._vol_spike_mult = float(vol_spike_mult)
+        self._atr_threshold = float(atr_threshold)
 
     def _is_nr(self, ranges: pd.Series, idx: int, n: int) -> bool:
         """idx번 봉이 최근 n봉 중 최소 range인지 확인."""
@@ -112,12 +115,12 @@ class NarrowRangeStrategy(BaseStrategy):
         nr_atr = float(atr_series.iloc[nr_idx])
         avg_atr = float(atr_series.iloc[nr_idx - self.ATR_LOOKBACK : nr_idx].mean())
 
-        atr_shrunk = nr_atr <= avg_atr * self.ATR_THRESHOLD
+        atr_shrunk = nr_atr <= avg_atr * self._atr_threshold
 
         if not atr_shrunk:
             return self._hold(
                 df,
-                f"ATR 축소 미충족: nr_atr={nr_atr:.4f} > avg*{self.ATR_THRESHOLD}={avg_atr*self.ATR_THRESHOLD:.4f}",
+                f"ATR 축소 미충족: nr_atr={nr_atr:.4f} > avg*{self._atr_threshold}={avg_atr*self._atr_threshold:.4f}",
             )
 
         # 거래량 확인 (현재 봉)
@@ -165,7 +168,7 @@ class NarrowRangeStrategy(BaseStrategy):
                 reasoning=(
                     f"{nr_label} 상향돌파(off={nr_info['offset']}): "
                     f"close({close_curr:.4f})>high({high_nr:.4f}), "
-                    f"ATR={nr_atr:.4f}<avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f})"
+                    f"ATR={nr_atr:.4f}<avg*{self._atr_threshold}({avg_atr*self._atr_threshold:.4f})"
                 ),
                 invalidation=f"close < nr_high({high_nr:.4f}) 복귀 시 무효",
                 bull_case=bull_case,
@@ -187,7 +190,7 @@ class NarrowRangeStrategy(BaseStrategy):
                 reasoning=(
                     f"{nr_label} 하향돌파(off={nr_info['offset']}): "
                     f"close({close_curr:.4f})<low({low_nr:.4f}), "
-                    f"ATR={nr_atr:.4f}<avg*{self.ATR_THRESHOLD}({avg_atr*self.ATR_THRESHOLD:.4f})"
+                    f"ATR={nr_atr:.4f}<avg*{self._atr_threshold}({avg_atr*self._atr_threshold:.4f})"
                 ),
                 invalidation=f"close > nr_low({low_nr:.4f}) 복귀 시 무효",
                 bull_case=bull_case,
