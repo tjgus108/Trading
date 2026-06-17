@@ -84,20 +84,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle297 F: bull_only=True 역효과 (Sharpe 1.82→1.60, trades 22→19) → 제거
     # Cycle301 D(ML): quality_score_buy_threshold 0.85 실험 → 역효과 (PF 1.48→1.33) → 0.80 복원
     "momentum_quality": {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3},
-    # Cycle298 C: bounce_pct 0.015→0.02 (threshold 완화, W5/W6 sideways 2/8 PASS 달성)
-    # Cycle300 A+F: vol_regime_filter=True, 상대적 ATR (ATR/ATR_MA > 1.5 → 추세 → 신호 억제)
-    #   이전 절대값 thresh=0.025 역효과 (trades 12→5) 해소 목적
-    #   ATR_MA(20) 대비 비율로 시장 스케일 무관하게 레짐 판별
-    # Cycle301 B(리스크): bounce_pct 0.02→0.025 (Sharpe 3.41→3.76+10%, PF 2.05→2.28+11%)
-    # Cycle301 D(ML): vol_atr_trend_min 1.3 실험 → SharpeStd 2.41→2.52 소폭 악화 → 1.5 복원
-    # Cycle302 B(리스크): n_bins=7 실험 역효과 (Sharpe 3.76→-1.76, PF 2.28→0.82) → 5 복원
-    # Cycle302 D(ML): atr_bounce_factor=1.5 실험 역효과 (동일 시험에서 확인) → 0.0 유지
-    # Cycle303 C(데이터): close_window=40 실험 역효과 (Sharpe 3.76→1.47, trades 12→12 불변) → 50 복원
-    # Cycle304 D(ML): bounce_pct=0.030 실험 역효과 (PF 2.28→2.07, trades 12→13 미미) → 0.025 복원
-    #   분석: threshold 완화가 신호 품질 저하 (PF -9%). trades 증가 미미, PASS 기준 미충족 지속
-    # Cycle305 C(데이터): close_window=60 실험 — 더 긴 price memory → S/R 품질 향상 → trades 안정화 기대
-    #   단독 실험 원칙 유지: bounce_pct=0.025, n_bins=5 고정, window만 50→60
-    "price_cluster": {"bounce_pct": 0.025, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # Cycle 321 B(리스크): price_cluster → vwap_cross 교체 (paper_sim에서도 반영)
+    #   price_cluster 1h paper_sim rank1이었으나 4h OOS 구조 한계로 번들 교체 확정
+    #   vwap_cross: 기본 파라미터로 1h paper_sim 시험 (VWAP20/50 크로스, 신호 빈도 비교)
+    # vwap_cross는 기본값으로 시험 (추가 파라미터 없음)
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원

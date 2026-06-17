@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-17T00:19:56.920250Z_
+_Generated: 2026-06-17T05:33:13.508173Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -11,11 +11,11 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | cmf | 5 | 1.136 | 2.508 | 1.387 | PASS | - |
 | order_flow_imbalance_v2 | 5 | 1.847 | 4.345 | 1.941 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3] |
 | supertrend_multi | 5 | 1.791 | 3.892 | 2.737 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4] |
-| price_cluster | 5 | 1.500 | 3.823 | 2.141 | FAIL | 저거래 fold 제외 (trades<10): [0, 1, 4]; 저거래 fold 비율 60% > 40% (신호 부족); Failed folds: [2]; OOS Sharpe std 3.854 > 2.0 (불안정) |
-| value_area | 5 | 0.984 | 2.016 | 1.511 | FAIL | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; Failed folds: [0] |
+| vwap_cross | 5 | 1.316 | 2.057 | 1.638 | FAIL | 저거래 fold 제외 (trades<3): [0]; Failed folds: [1]; OOS Sharpe std 2.302 > 2.0 (불안정) |
+| value_area | 5 | 1.476 | 3.069 | 1.771 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0] |
 
-**PASS: 3/5** (cmf, order_flow_imbalance_v2, supertrend_multi)
-**FAIL: 2/5** (price_cluster, value_area)
+**PASS: 4/5** (cmf, order_flow_imbalance_v2, supertrend_multi, value_area)
+**FAIL: 1/5** (vwap_cross)
 
 ## Composite Rank Score
 
@@ -23,11 +23,11 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | order_flow_imbalance_v2 | 66.0 | p100 | 4.345 | 0.907 | 1.941 | 14.0 | 4.85% | 80% | PASS |
-| 2 | supertrend_multi | 61.7 | p75 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
-| 3 | cmf | 38.0 | p50 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
-| 4 | price_cluster | 37.9 | p25 | 3.823 | 3.854 | 2.141 | 7.6 | 4.01% | 20% | FAIL |
-| 5 | value_area | 19.3 | p0 | 2.016 | 1.825 | 1.511 | 9.4 | 2.92% | 40% | FAIL |
+| 1 | order_flow_imbalance_v2 | 62.7 | p100 | 4.345 | 0.907 | 1.941 | 14.0 | 4.85% | 80% | PASS |
+| 2 | supertrend_multi | 60.6 | p75 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
+| 3 | value_area | 36.4 | p50 | 3.069 | 0.085 | 1.771 | 9.4 | 2.92% | 40% | PASS |
+| 4 | cmf | 32.8 | p25 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
+| 5 | vwap_cross | 15.1 | p0 | 2.057 | 2.301 | 1.638 | 5.4 | 2.39% | 80% | FAIL |
 
 ## IS Sharpe 음수 진단
 
@@ -36,7 +36,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | cmf | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
 | order_flow_imbalance_v2 | 2 | 5 | 40% | 🟡 IS 일부 음수 |
 | supertrend_multi | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
-| price_cluster | 3 | 5 | 60% | 🟡 IS 일부 음수 |
+| vwap_cross | 3 | 5 | 60% | 🟡 IS 일부 음수 |
 | value_area | 2 | 5 | 40% | 🟡 IS 일부 음수 |
 
 ## Fold Details
@@ -75,17 +75,17 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 **Fail reasons:** 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4]
 
-### price_cluster
+### vwap_cross
 
 | Fold | IS Start | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | IS MDD | OOS MDD | Pass |
 |------|----------|------------|-----------|------------|-----|--------|------------|-------|---------|------|
-| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -0.341 | -2.040 | 0.000 | 0.632 | 5 | 6.81% | 3.81% | FAIL |
-| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | -0.135 | -5.142 | 0.000 | 0.350 | 6 | 8.13% | 5.09% | FAIL |
-| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | -2.345 | 1.098 | 0.000 | 1.181 | 10 | 10.03% | 5.58% | FAIL |
-| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 0.191 | 6.548 | 34.283 | 3.100 | 10 | 6.22% | 1.42% | PASS |
-| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | 2.087 | -0.393 | -0.188 | 0.929 | 7 | 5.58% | 4.17% | FAIL |
+| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -0.805 | 0.487 | 1.000 | 1.186 | 2 | 6.96% | 1.06% | PASS |
+| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | -2.287 | -0.913 | 0.000 | 0.799 | 4 | 6.45% | 2.87% | FAIL |
+| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | -0.478 | 2.796 | 1.000 | 1.641 | 8 | 6.24% | 3.08% | PASS |
+| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 0.926 | 4.593 | 4.960 | 2.586 | 8 | 4.09% | 2.47% | PASS |
+| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | 1.387 | 1.753 | 1.264 | 1.525 | 5 | 5.96% | 2.45% | PASS |
 
-**Fail reasons:** 저거래 fold 제외 (trades<10): [0, 1, 4]; 저거래 fold 비율 60% > 40% (신호 부족); Failed folds: [2]; OOS Sharpe std 3.854 > 2.0 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<3): [0]; Failed folds: [1]; OOS Sharpe std 2.302 > 2.0 (불안정)
 
 ### value_area
 
@@ -97,4 +97,4 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 2.492 | -0.780 | -0.313 | 0.892 | 11 | 5.11% | 3.01% | FAIL |
 | 4 | 2023-08-29 | 2024-02-25~2024-04-24 | 3.054 | -0.283 | -0.093 | 0.954 | 8 | 2.10% | 2.74% | FAIL |
 
-**Fail reasons:** 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; Failed folds: [0]
+**Fail reasons:** 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0]

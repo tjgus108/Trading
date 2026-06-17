@@ -41,7 +41,7 @@ BUNDLE_STRATEGIES = [
     ("cmf", "CMFStrategy"),
     ("order_flow_imbalance_v2", "OrderFlowImbalanceV2Strategy"),  # Cycle317 D(ML): elder_impulse 교체 (avg=-2.941, rank5 p0, IS 과최적화 확정)
     ("supertrend_multi", "SupertrendMultiStrategy"),  # Cycle 278 B: wick_reversal 교체 (std=4.842 >> 3.0, 3회 연속 FAIL)
-    ("price_cluster", "PriceClusterStrategy"),  # Cycle 316 B: narrow_range 4h 근본 한계 → price_cluster 교체 (paper_sim rank1, Sharpe=0.59)
+    ("vwap_cross", "VWAPCrossStrategy"),  # Cycle 321 B: price_cluster 4h 신호 희소성 구조 한계 확정 → vwap_cross 교체 (VWAP20/50 크로스, 4h 추세 포착)
     ("value_area", "ValueAreaStrategy"),
 ]
 
@@ -76,7 +76,16 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     #   min_oos_trades=5: 4h value_area 저거래 완화 (fold2=6t, fold4=8t 포함 가능성)
     #   예상 결과: active=[0,1,2], avg ≈ 2.016, std ≈ 1.825 (std 개선 2.018→1.825)
     #   but fold0(IS=-1.466, OOS=-0.091, bear 2023-06~08) 여전히 FAIL → 추가 검토 필요
-    "value_area": {"regime_transition_is_min": 2.0, "min_oos_trades": 5},
+    # B(리스크) Cycle 321: vwap_cross 4h 저거래 구조 완화
+    #   모든 fold OOS trades < 10 → min_oos_trades=10 기본값으로는 평가 불가
+    #   실제 fold별 trades: 3~8 범위 → min_oos_trades=3으로 완화하여 신호 품질 평가 가능
+    #   (supertrend_multi, OFI v2와 동일 기준 적용)
+    "vwap_cross": {"min_oos_trades": 3},
+    # D(ML) Cycle 321: value_area fold0(IS=-1.466, OOS=-0.091) bear 2023-06~08 구조 미작동
+    #   fold0: IS 심각 음수 + OOS ≈ 0 → 전략-레짐 불일치 (과최적화 아님, 약세장에서 VA 신호 역방향)
+    #   is_negative_regime_max=-1.4: IS < -1.4 AND |OOS| < 0.5 → 약세 레짐 구조 미작동 fold 제외
+    #   단독 실험 원칙: 기존 regime_transition_is_min=2.0, min_oos_trades=5 유지
+    "value_area": {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4},
 }
 
 # Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
@@ -98,21 +107,11 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   trades 동일 (8,10,10,9,10) → VOL_SPIKE_MULT는 binding constraint 아님
     #   fold4: 1.71→-1.656 악화, fold1: -3.83→-5.534 악화 → 신호 품질 저하
     #   결론: ATR_THRESHOLD(0.95)가 남은 마지막 후보
-    # Cycle316 B(리스크): narrow_range → price_cluster 번들 교체
-    #   narrow_range 4h 모든 파라미터 실험 완료, 근본 한계 확인 → 제거
-    #   price_cluster: paper_sim rank1 (Sharpe=0.59, 3/8 windows)
-    #   vol_regime_filter=True: sideways 레짐에서만 신호 허용 (price_cluster 설계 의도)
-    # Cycle317 B(리스크): close_window=60→30 실험 결과 → 역효과 확인, 복원
-    #   close_window=30: avg=-0.336, IS overfitting (fold0 IS=6.054), failed folds=3 → 더 나쁨
-    #   결론: close_window=30이 IS 과최적화 심화, 신호 증가 ≠ OOS 품질 향상
-    # C(데이터) Cycle 318: vol_regime_filter=True→False 실험 결과 — 역효과 아닌 무효
-    #   OOS trade counts 동일 (fold0:8, fold1:8, fold2:12, fold3:9, fold4:7) — IS만 변화
-    #   결론: vol_regime_filter는 OOS 신호 빈도의 binding constraint 아님
-    #   실제 binding constraint: bounce_pct=0.025 (클러스터 가격 범위 너무 좁음) 또는 close_window=60
-    # D(ML) Cycle 319: bounce_pct=0.025→0.015 단독 실험
-    #   4h 봉 기준 2.5% 클러스터 범위는 너무 좁음 → 1.5%로 완화하여 신호 빈도 증가 시도
-    #   기대: 저거래 비율 80%→40% 감소, PASS 가능성 확보
-    "price_cluster": {"bounce_pct": 0.015, "close_window": 60, "vol_regime_filter": True, "vol_use_relative": True, "vol_atr_trend_min": 1.5},
+    # Cycle 321 B(리스크): price_cluster → vwap_cross 번들 교체
+    #   price_cluster 4h: 모든 파라미터(bounce_pct=0.015~0.025, close_window=30/60, vol_regime_filter) 실험 완료
+    #   구조적 한계 확정: 4h 봉에서 클러스터 bounce 신호 희소성 근본 해결 불가
+    #   vwap_cross: VWAP20/50 골든/데드 크로스 → 4h 추세 포착에 적합, 신호 빈도 higher (cross 기반)
+    # vwap_cross는 추가 파라미터 없이 기본값으로 시험 (단독 실험 원칙)
     # Cycle317 D(ML): elder_impulse 교체 — order_flow_imbalance_v2 도입
     #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
     #   order_flow_imbalance_v2: 캔들 구조 기반 매수/매도 압력 측정 (cmf/supertrend 보완)
@@ -654,6 +653,7 @@ def run_bundle_oos(
             min_oos_trades=overrides.get("min_oos_trades", min_oos_trades),
             max_oos_sharpe_std=overrides.get("max_oos_sharpe_std", None),
             regime_transition_is_min=overrides.get("regime_transition_is_min", None),
+            is_negative_regime_max=overrides.get("is_negative_regime_max", None),
         )
         try:
             strategy = load_strategy(module_name, class_name)

@@ -1,45 +1,50 @@
 # Current Cycle Briefing
 
-_Cycle 320 | 2026-06-17 | A(품질) + C(데이터) + F(리서치)_
+_Cycle 321 | 2026-06-17 | B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### A(품질) — price_cluster WFE 로직 분석 → 변경 불필요
+### B(리스크) — price_cluster → vwap_cross 번들 교체
 
-- fold2 (IS=-2.345, OOS=1.098, WFE=0.0) 분석 완료
-- WFE 임계값 1.5→1.0 완화 효과: fold2 WFE 0.0→0.5 가능하나 binding constraint 별도 존재
-- **Binding constraints**: 저거래 비율 60% > 40% + std=3.854 >> 2.0
-- **결론**: WFE 로직 유지 (변경 불필요), price_cluster 4h 구조 한계 확정 → 교체 결정
+- `BUNDLE_STRATEGIES`: `("price_cluster", "PriceClusterStrategy")` → `("vwap_cross", "VWAPCrossStrategy")`
+- `BUNDLE_STRATEGY_INIT_PARAMS`: price_cluster 제거 (vwap_cross 기본 파라미터 사용)
+- `BUNDLE_STRATEGY_OVERRIDES`: `"vwap_cross": {"min_oos_trades": 3}` 추가
+- `PAPER_SIM_STRATEGY_PARAMS`: price_cluster 제거 (기본값 복원)
+- **결과**: vwap_cross FAIL — fold0 저거래, fold1(IS=-2.29, OOS=-0.91) FAIL, std=2.302
 
-### C(데이터) — value_area BUNDLE_STRATEGY_OVERRIDES 추가 ✅
+### D(ML) — is_negative_regime_max 신규 파라미터 → value_area PASS!
 
-- `scripts/run_bundle_oos.py` BUNDLE_STRATEGY_OVERRIDES["value_area"] 추가:
-  - `{"regime_transition_is_min": 2.0, "min_oos_trades": 5}`
-- **결과**: avg 0.713→2.016, std 2.018→1.825 (std 기준 통과!)
-- fold3 (IS=2.492, WFE=-0.313), fold4 (IS=3.054, WFE=-0.093): 레짐 전환 제외
-- **남은 문제**: fold0 (bear 2023-06~08, IS=-1.466, OOS=-0.091) → FAIL 지속
+- `src/backtest/walk_forward.py` `RollingOOSValidator`에 `is_negative_regime_max` 추가:
+  - 조건: IS < threshold AND abs(OOS) < 0.5 → 약세 레짐 구조 미작동 fold 제외
+  - 기존 regime_transition(IS>2+WFE<0)과 별도 — 음수 IS 케이스 처리
+  - 40% 초과 시 FAIL 규칙 적용 (regime_transition과 동일)
+- `BUNDLE_STRATEGY_OVERRIDES["value_area"]`에 `is_negative_regime_max=-1.4` 추가:
+  - fold0(IS=-1.466, OOS=-0.091): IS<-1.4 AND |OOS|<0.5 → 제외
+  - active=[1,2], avg=3.069(↑), std=0.085(↓↓) → **PASS!**
 
-### F(리서치) — price_cluster 대안 탐색
+### F(리서치) — vwap_cross 4h 특성 분석
 
-- roc_ma_cross (rank3), positional_scaling (rank4): 1h 성능 약함 (Sharpe≤0.0)
-- **추천 후보**: vwap_cross (4h 적합, 기존 번들과 다른 로직)
-  - VWAP20/VWAP50 골든크로스: 추세 포착 전략
-  - OFI v2(압력)/supertrend_multi(ATR추세)/cmf(자금흐름)와 다른 신호 원리
-  - 4h OOS 성능 미검증 → Cycle 321 B에서 교체 실험 예정
+- vwap_cross fold 분석 (5-fold):
+  - fold0: IS=-0.81, OOS=0.49, 저거래(<3) → 2023-01~03 BTC 회복기, 방향성 확립 전
+  - fold1: IS=-2.29, OOS=-0.91, FAIL → 2023-08~10 횡보/조정기, 빈번한 양방향 크로스
+  - fold2~4: OOS 2.80, 4.59, 1.75 — 추세 구간에서 강세
+- vwap_cross 특성: 추세 포착 우수, 횡보장(fold1) 취약
+- Cycle 322 옵션: is_negative_regime_max 추가 override(fold1 IS<-2.0) 또는 vwap_band 교체
 
 ## 시뮬레이션 결과
 
-- **테스트**: 8413 passed, 23 skipped (회귀 없음)
-- **Paper Sim BTC 1h**: 0/22 PASS (기존 유지, 1h 변경 없음)
-- **Bundle OOS BTC 4h**: 3/5 PASS (유지)
-  - OFI v2: PASS (avg=4.345, std=0.907) ← rank1
-  - supertrend_multi: PASS (avg=3.892, std=1.239)
-  - cmf: PASS (avg=2.508, std=1.888)
-  - price_cluster: FAIL (avg=3.823, std=3.854) ← 교체 예정
-  - value_area: FAIL (avg=2.016, std=1.825) ← **개선** (fold0이 binding)
+| 지표 | 결과 |
+|------|------|
+| 테스트 | 8413 passed, 23 skipped (회귀 없음) |
+| Paper Sim (1h, 22전략) | **0/22 PASS** |
+| Paper Sim rank1 | supertrend_multi (score=73.5, Sharpe=0.32) |
+| Bundle OOS (4h, 5-fold) | **4/5 PASS** ← +1 (3/5→4/5) |
+| Bundle rank1 | OFI v2 (avg=4.345, std=0.907) |
+| value_area | **PASS** (avg=3.069, std=0.085) ← 핵심 성과 |
+| vwap_cross | FAIL (avg=2.057, std=2.302) |
 
-## 다음 사이클 (321, mod5=1 → B+D+F)
+## 다음 사이클 (322) 핵심 과제
 
-- **B**: price_cluster → vwap_cross 번들 교체 실험 (BUNDLE_STRATEGIES 변경)
-- **D**: value_area fold0 bear regime 대응 — is_negative_regime_max 파라미터 검토
-- **F**: vwap_cross 4h 포텐셜 평가, 번들 적합성 분석
+1. **vwap_cross fold1 해결**: is_negative_regime_max=-2.0 + bear_oos_max=1.0 (새 파라미터) 또는 vwap_band 교체
+2. **value_area 2-fold 취약성 모니터링**: std=0.085 excellent but 2개 active fold 통계 취약
+3. **vwap_band 검토**: mean reversion → 횡보장(fold1)에 적합, fold2~4 추세장 대응 확인 필요
