@@ -1386,6 +1386,18 @@ class RollingOOSValidator:
                     f"약세 레짐 fold 과다: {bear_regime_ratio:.0%} > 40%"
                 )
                 all_passed = False
+        # B Cycle 323: 합산 제외 비율 모니터링 — 카테고리별은 OK이지만 총합 ≥40% 시 WARNING
+        # vwap_cross: low_trade[0]+bear_regime[1]=40%, value_area: bear+regime_transition=60%
+        # PASS/FAIL 기준은 카테고리별 40% 유지 (현재 구조 동작 중); 합산은 정보 목적
+        _combined_excluded = set(low_trade_fold_ids) | set(regime_transition_fold_ids) | set(bear_regime_fold_ids)
+        _combined_ratio = len(_combined_excluded) / len(folds) if folds else 0.0
+        if _combined_ratio >= 0.4:
+            logger.warning(
+                "[%s] [WARN] combined_exclusion_ratio=%.0f%% (%d/%d folds excluded total: "
+                "low_trade=%s, regime_trans=%s, bear=%s). Sample size for OOS metrics is limited.",
+                strategy.name, _combined_ratio * 100, len(_combined_excluded), len(folds),
+                low_trade_fold_ids, regime_transition_fold_ids, bear_regime_fold_ids,
+            )
         if not all_passed:
             failed_ids = [f.fold_id for f in active_folds if not f.passed]
             if failed_ids:

@@ -95,19 +95,24 @@ REGIME_SIZE_MULT: dict = {
     'HIGH_VOL':   0.3,   # 고변동성: 70% 대폭 축소
 }
 
-# Bundle OOS PASS 전략 우선순위 (Cycle 318 기준, 3/5 PASS 달성)
-# E(실행) Cycle 319: OFI v2(rank1) 40%, supertrend_multi(rank2) 35%, cmf(rank3) 25% 배분
+# Bundle OOS PASS 전략 우선순위 (Cycle 323 기준, 5/5 PASS 달성)
+# F(리서치) Cycle 323: vwap_cross(rank4), value_area(rank3) 추가 (Cycle 321/322 Bundle PASS 달성)
+# 가중치: rank score 비례 배분 (OFI=30%, ST=28%, VA=16%, VWAP=14%, CMF=12%)
 # fallback 선택 시 이 순서로 우선 로드 (rotation/state 복원 없을 때)
 BUNDLE_PASS_PRIORITY: list[str] = [
-    "order_flow_imbalance_v2",  # rank1: avg=4.345, std=0.907, PASS
-    "supertrend_multi",          # rank2: avg=3.892, std=1.239, PASS
-    "cmf",                       # rank3: avg=2.508, std=1.888, PASS
+    "order_flow_imbalance_v2",  # rank1: avg=4.345, std=0.907, score=62.0
+    "supertrend_multi",          # rank2: avg=3.892, std=1.239, score=58.6
+    "value_area",                # rank3: avg=3.069, std=0.085, score=32.3 ← NEW Cycle 321
+    "vwap_cross",                # rank4: avg=3.047, std=1.437, score=28.9 ← NEW Cycle 322
+    "cmf",                       # rank5: avg=2.508, std=1.888, score=25.0
 ]
-# 포지션 사이즈 가중치 (합산 1.0)
+# 포지션 사이즈 가중치 (합산 1.0, rank score 비례)
 BUNDLE_PASS_WEIGHTS: dict[str, float] = {
-    "order_flow_imbalance_v2": 0.40,
-    "supertrend_multi": 0.35,
-    "cmf": 0.25,
+    "order_flow_imbalance_v2": 0.30,
+    "supertrend_multi": 0.28,
+    "value_area": 0.16,
+    "vwap_cross": 0.14,
+    "cmf": 0.12,
 }
 
 

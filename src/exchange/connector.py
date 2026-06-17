@@ -13,8 +13,10 @@ from typing import Optional, List
 
 try:
     import ccxt
+    _CcxtNotSupported: type = ccxt.NotSupported
 except ImportError:
     ccxt = None  # type: ignore[assignment]
+    _CcxtNotSupported = type("_CcxtNotSupported", (Exception,), {})
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +115,7 @@ class ExchangeConnector:
         """
         try:
             info = self.exchange.fetch_api_key_permissions()
-        except (ccxt.NotSupported, AttributeError):
+        except (_CcxtNotSupported, AttributeError):
             logger.warning(
                 "check_api_permissions: %s does not support fetchApiKeyPermissions — skipping",
                 self.exchange_name,
