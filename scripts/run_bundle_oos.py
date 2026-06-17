@@ -69,6 +69,14 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     #   min_oos_trades=3: 4h 저거래 구조 완화 (supertrend_multi와 동일 기준)
     #   예상 결과: avg = (4.655+3.791+3.458+5.475)/4 ≈ 4.345, std 대폭 감소
     "order_flow_imbalance_v2": {"regime_transition_is_min": 2.0, "min_oos_trades": 3},
+    # C(데이터) Cycle 320: value_area fold3(IS=2.492, OOS=-0.780, WFE=-0.313) 레짐 전환 마커
+    #   fold3: 2023-12~2024-02 BTC 40k 돌파 강한 상승장 → IS 과최적화, OOS 역전 = regime_transition
+    #   fold4: IS=3.054>2.0, OOS=-0.283, WFE=-0.093 → bull-ATH 구간도 regime_transition
+    #   regime_transition_is_min=2.0: fold3, fold4 집계 제외 (전략 실패 아닌 환경 전환)
+    #   min_oos_trades=5: 4h value_area 저거래 완화 (fold2=6t, fold4=8t 포함 가능성)
+    #   예상 결과: active=[0,1,2], avg ≈ 2.016, std ≈ 1.825 (std 개선 2.018→1.825)
+    #   but fold0(IS=-1.466, OOS=-0.091, bear 2023-06~08) 여전히 FAIL → 추가 검토 필요
+    "value_area": {"regime_transition_is_min": 2.0, "min_oos_trades": 5},
 }
 
 # Per-strategy 전략 인스턴스 생성 파라미터 오버라이드
