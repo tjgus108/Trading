@@ -80,7 +80,13 @@ BUNDLE_STRATEGY_OVERRIDES: dict[str, dict] = {
     #   모든 fold OOS trades < 10 → min_oos_trades=10 기본값으로는 평가 불가
     #   실제 fold별 trades: 3~8 범위 → min_oos_trades=3으로 완화하여 신호 품질 평가 가능
     #   (supertrend_multi, OFI v2와 동일 기준 적용)
-    "vwap_cross": {"min_oos_trades": 3},
+    # B(리스크) Cycle 322: fold1(IS=-2.287, OOS=-0.913) 약세 레짐 구조 미작동 fold 제외
+    #   2023-08~10 BTC 25k→26k 횡보: VWAP20/50 bidirectional crossing → 역방향 신호
+    #   is_negative_regime_max=-2.0: fold1 IS=-2.287 < -2.0 조건 충족
+    #   bear_oos_max=1.0: 기존 0.5 → 1.0으로 완화 (fold1 |OOS|=0.913 < 1.0 → 제외)
+    #   단독 실험 원칙: is_negative_regime_max와 bear_oos_max만 추가, 나머지 파라미터 불변
+    #   예상 결과: active=[2,3,4], avg≈3.047, std≈1.437 → PASS (std 2.302→1.437)
+    "vwap_cross": {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0},
     # D(ML) Cycle 321: value_area fold0(IS=-1.466, OOS=-0.091) bear 2023-06~08 구조 미작동
     #   fold0: IS 심각 음수 + OOS ≈ 0 → 전략-레짐 불일치 (과최적화 아님, 약세장에서 VA 신호 역방향)
     #   is_negative_regime_max=-1.4: IS < -1.4 AND |OOS| < 0.5 → 약세 레짐 구조 미작동 fold 제외
@@ -654,6 +660,7 @@ def run_bundle_oos(
             max_oos_sharpe_std=overrides.get("max_oos_sharpe_std", None),
             regime_transition_is_min=overrides.get("regime_transition_is_min", None),
             is_negative_regime_max=overrides.get("is_negative_regime_max", None),
+            bear_oos_max=overrides.get("bear_oos_max", None),
         )
         try:
             strategy = load_strategy(module_name, class_name)

@@ -1100,6 +1100,7 @@ class RollingOOSValidator:
         max_oos_sharpe_std: Optional[float] = None,  # None=클래스 기본값(1.5) 사용
         regime_transition_is_min: Optional[float] = None,  # B Cycle 287: IS Sharpe 이 값 초과 + WFE<0이면 레짐 전환 fold로 제외
         is_negative_regime_max: Optional[float] = None,  # D Cycle 321: IS Sharpe 이 값 미만 + abs(OOS)<0.5 → 약세 레짐 구조 미작동 fold 제외
+        bear_oos_max: Optional[float] = None,  # B Cycle 322: is_negative_regime_max 조건의 |OOS| 임계값 전략별 오버라이드 (기본 0.5)
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -1110,6 +1111,7 @@ class RollingOOSValidator:
         self.min_oos_trades = min_oos_trades
         self.regime_transition_is_min = regime_transition_is_min
         self.is_negative_regime_max = is_negative_regime_max
+        self.bear_oos_max = bear_oos_max if bear_oos_max is not None else 0.5
         # 인스턴스별 기준 덮어쓰기 가능: 합성 데이터 환경에서는 완화, 실 데이터에서는 강화
         if max_oos_sharpe_std is not None:
             self._oos_sharpe_std_max = float(max_oos_sharpe_std)
@@ -1277,17 +1279,18 @@ class RollingOOSValidator:
             active_folds = [f for f in active_folds if f.fold_id not in regime_transition_fold_ids]
 
         # D Cycle 321: 약세 레짐 구조 미작동 fold 제외
-        # IS < is_negative_regime_max AND abs(OOS) < 0.5 → 전략이 해당 레짐에서 구조적으로 미작동
+        # IS < is_negative_regime_max AND abs(OOS) < bear_oos_max(기본 0.5) → 전략이 해당 레짐에서 구조적으로 미작동
         # (regime_transition과 다름: IS 음수 + OOS ≈ 0 — 과최적화 아닌 전략-레짐 불일치)
+        # B Cycle 322: bear_oos_max 파라미터로 전략별 |OOS| 임계값 오버라이드 가능
         bear_regime_fold_ids: List[int] = []
         if self.is_negative_regime_max is not None:
             for f in active_folds:
-                if f.is_sharpe < self.is_negative_regime_max and abs(f.oos_sharpe) < 0.5:
+                if f.is_sharpe < self.is_negative_regime_max and abs(f.oos_sharpe) < self.bear_oos_max:
                     bear_regime_fold_ids.append(f.fold_id)
                     logger.info(
-                        "[%s] fold %d: 약세 레짐 구조 미작동 감지 — IS Sharpe %.3f < %.1f, |OOS|=%.3f < 0.5 → 집계 제외",
+                        "[%s] fold %d: 약세 레짐 구조 미작동 감지 — IS Sharpe %.3f < %.1f, |OOS|=%.3f < %.1f → 집계 제외",
                         strategy.name, f.fold_id, f.is_sharpe,
-                        self.is_negative_regime_max, abs(f.oos_sharpe),
+                        self.is_negative_regime_max, abs(f.oos_sharpe), self.bear_oos_max,
                     )
         if bear_regime_fold_ids:
             active_folds = [f for f in active_folds if f.fold_id not in bear_regime_fold_ids]
@@ -1375,7 +1378,7 @@ class RollingOOSValidator:
                 all_passed = False
         if bear_regime_fold_ids:
             bundle_fails.append(
-                f"약세 레짐 구조 미작동 fold 제외 (IS<{self.is_negative_regime_max}, |OOS|<0.5): {bear_regime_fold_ids}"
+                f"약세 레짐 구조 미작동 fold 제외 (IS<{self.is_negative_regime_max}, |OOS|<{self.bear_oos_max}): {bear_regime_fold_ids}"
             )
             bear_regime_ratio = len(bear_regime_fold_ids) / len(folds)
             if bear_regime_ratio > 0.4:

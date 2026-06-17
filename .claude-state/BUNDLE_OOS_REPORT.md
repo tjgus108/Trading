@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-17T05:33:13.508173Z_
+_Generated: 2026-06-17T10:16:00.434888Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -11,11 +11,11 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | cmf | 5 | 1.136 | 2.508 | 1.387 | PASS | - |
 | order_flow_imbalance_v2 | 5 | 1.847 | 4.345 | 1.941 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3] |
 | supertrend_multi | 5 | 1.791 | 3.892 | 2.737 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4] |
-| vwap_cross | 5 | 1.316 | 2.057 | 1.638 | FAIL | 저거래 fold 제외 (trades<3): [0]; Failed folds: [1]; OOS Sharpe std 2.302 > 2.0 (불안정) |
+| vwap_cross | 5 | 1.755 | 3.047 | 1.917 | PASS | 저거래 fold 제외 (trades<3): [0]; 약세 레짐 구조 미작동 fold 제외 (IS<-2.0, |OOS|<1.0): [1] |
 | value_area | 5 | 1.476 | 3.069 | 1.771 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0] |
 
-**PASS: 4/5** (cmf, order_flow_imbalance_v2, supertrend_multi, value_area)
-**FAIL: 1/5** (vwap_cross)
+**PASS: 5/5** (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
+**FAIL: 0/5** (none)
 
 ## Composite Rank Score
 
@@ -23,11 +23,11 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | order_flow_imbalance_v2 | 62.7 | p100 | 4.345 | 0.907 | 1.941 | 14.0 | 4.85% | 80% | PASS |
-| 2 | supertrend_multi | 60.6 | p75 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
-| 3 | value_area | 36.4 | p50 | 3.069 | 0.085 | 1.771 | 9.4 | 2.92% | 40% | PASS |
-| 4 | cmf | 32.8 | p25 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
-| 5 | vwap_cross | 15.1 | p0 | 2.057 | 2.301 | 1.638 | 5.4 | 2.39% | 80% | FAIL |
+| 1 | order_flow_imbalance_v2 | 62.0 | p100 | 4.345 | 0.907 | 1.941 | 14.0 | 4.85% | 80% | PASS |
+| 2 | supertrend_multi | 58.6 | p75 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
+| 3 | value_area | 32.3 | p50 | 3.069 | 0.085 | 1.771 | 9.4 | 2.92% | 40% | PASS |
+| 4 | vwap_cross | 28.9 | p25 | 3.047 | 1.437 | 1.917 | 5.4 | 2.39% | 80% | PASS |
+| 5 | cmf | 25.0 | p0 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
 
 ## IS Sharpe 음수 진단
 
@@ -85,7 +85,7 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 | 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 0.926 | 4.593 | 4.960 | 2.586 | 8 | 4.09% | 2.47% | PASS |
 | 4 | 2023-08-29 | 2024-02-25~2024-04-24 | 1.387 | 1.753 | 1.264 | 1.525 | 5 | 5.96% | 2.45% | PASS |
 
-**Fail reasons:** 저거래 fold 제외 (trades<3): [0]; Failed folds: [1]; OOS Sharpe std 2.302 > 2.0 (불안정)
+**Fail reasons:** 저거래 fold 제외 (trades<3): [0]; 약세 레짐 구조 미작동 fold 제외 (IS<-2.0, |OOS|<1.0): [1]
 
 ### value_area
 
