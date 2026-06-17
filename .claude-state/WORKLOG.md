@@ -1,3 +1,43 @@
+## [2026-06-17] Cycle 324 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] supertrend_multi 1h cmf_confirm 실험 → 역효과 확인**
+1. `scripts/paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS에 supertrend_multi 파라미터 추가 실험:
+   - cmf_confirm=True, atr_threshold=0.4로 1h 노이즈 차단 시도
+   - 결과: Sharpe 0.32→0.02, trades 48→35, PF 1.14→1.06 — 역효과 확정
+   - 롤백 완료: 1h CMF는 4h 전용 전략과 동일하게 1h에서도 부적합 재확인
+2. 진단: 1h 고빈도 노이즈 환경에서 CMF>0 필터가 양/음 시그널 모두 차단
+   - 차기 D(ML) 방향: atr_threshold 그리드 탐색(0.3~0.5) 또는 레짐(TREND_UP) 한정 BUY
+
+**[E(실행)] live_paper_trader.py 4h 타임프레임 지원 추가**
+3. `scripts/live_paper_trader.py` `--timeframe` CLI 옵션 추가:
+   - `LivePaperTrader.__init__`에 `timeframe: str = DEFAULT_TIMEFRAME` 파라미터 추가
+   - `self.timeframe` 저장 → fetch_latest_candles(초기화, tick, retrain) 3개소 전파
+   - `--timeframe {1m,5m,15m,1h,4h,1d}` argparse 추가, interval 자동 설정 로직 포함
+   - 4h 선택 시: interval 자동 14400s, WARMUP_CANDLES=200 × 4h = 33일 데이터
+   - Bundle 전략(4h OOS PASS 5개)을 4h 모드로 live_paper_trader 실행 가능해짐
+
+**[F(리서치)] 레짐 기반 전략 스위칭 로드맵 분석**
+4. MarketRegimeDetector 기반 전략 스위칭 프레임워크 현황 확인:
+   - TREND_UP: OFI v2 + supertrend_multi 추세 추종 (4h 5/5 PASS)
+   - TREND_DOWN: vwap_cross + value_area mean reversion (4h PASS)
+   - HIGH_VOL: cmf volume filter (4h avg Sharpe=2.508)
+   - RANGING: 포지션 최소화 원칙 유지
+   - 현재 live_paper_trader BUNDLE_PASS_PRIORITY 가중치 유지 (OFI=0.30, ST=0.28...)
+
+**[시뮬레이션 결과 Cycle 324]**
+- 테스트: **51 passed** (관련 모듈, 회귀 없음)
+- Paper Sim BTC 1h (8 windows, 22전략): **0/22 PASS** (유지)
+  - rank1: supertrend_multi (return=+4.23%, Sharpe=0.02 [cmf_confirm=True 실험값, 롤백])
+  - 롤백 후 rank1: supertrend_multi (return=+5.26%, Sharpe=0.32 — Cycle 323 수치 복원)
+- Bundle OOS BTC 4h (5-fold, --csv-dir data/historical): **5/5 PASS** (유지)
+  - order_flow_imbalance_v2: PASS (avg=4.345, rank1)
+  - supertrend_multi: PASS (avg=3.892, rank2)
+  - value_area: PASS (avg=3.069, rank3)
+  - vwap_cross: PASS (avg=3.047, rank4)
+  - cmf: PASS (avg=2.508, rank5)
+
+---
+
 ## [2026-06-17] Cycle 323 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] Bundle OOS 5/5 PASS 안정성 검증**

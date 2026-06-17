@@ -1,57 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-06-17 (Cycle 323 완료)_
+_Last updated: 2026-06-17 (Cycle 324 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 323
+### 이번 세션 완료 사이클: 324
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 321 | B+D+F | price_cluster→vwap_cross 교체, is_negative_regime_max 추가, **Bundle 3→4/5 PASS** |
 | 322 | B+D+F | bear_oos_max=1.0 추가, vwap_cross fold1 해결, **Bundle 4→5/5 PASS (역대 최고!)** |
 | 323 | C+B+F | 5/5 PASS 안정성 확인, combined_exclusion_ratio 경고 추가, Bundle 5개 live_paper_trader 등록 |
+| 324 | D+E+F | cmf_confirm=True 실험→역효과 롤백, **live_paper_trader 4h --timeframe 지원 추가** |
 
-### 🎯 Cycle 324 작업 방향 (324 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 325 작업 방향 (325 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): 1h 전략 개선 — Paper Sim 0/22 PASS 원인 분석
+#### A(품질): 1h Paper Sim 개선 — atr_threshold 그리드 탐색
 
-- **supertrend_multi 1h 성과**: return=+5.26%, Sharpe=0.32 → PASS 기준(Sharpe≥1.0) 크게 미달
-  - 4h에서는 avg=3.892, 1h에서는 0.32 — 타임프레임 불일치 확인
-  - 파라미터 그리드 재검토: `atr_threshold`, `trend_confirm_bars` 1h 전용 탐색
-- **1h Paper Sim 개선 가능성**:
-  - Sharpe=1.0 달성을 위한 신호 필터 강화 vs 완화 균형
-  - cmf_1h 그리드: period=[90,105], buy_thresh=[0.07,0.08,0.10] → 추가 최적화 여지
-  - 합성 데이터 PASS 전략(Sharpe≥1.0)이 실전 데이터에서 FAIL하는 패턴 조사
+- **supertrend_multi 1h 성과**: return=+5.26%, Sharpe=0.32, trades=48
+  - cmf_confirm=True 실험 역효과 확정 (Cycle 324): Sharpe 0.32→0.02
+  - 다음 실험: `atr_threshold=0.3` 또는 `trend_confirm_bars=1` (더 많은 1h 신호)
+  - 또는 레짐 필터 기반: TREND_UP 레짐일 때만 BUY 허용 (MarketRegimeDetector 활용)
+- **price_cluster 1h rank2 유지**: return=+2.19%, Sharpe=0.34 — 추가 최적화 여지 있음
+  - bounce_pct, n_bins 1h 전용 그리드 탐색 여부 검토
 
-#### E(실행): live_paper_trader 4h 지원 추가 검토
+#### C(데이터): 4h CSV fallback 지원 확인 + live_paper_trader 4h 모드 검증
 
-- **현재 live_paper_trader**: 1h 타임프레임 전용
-  - Bundle 전략 5개는 4h OOS PASS → 1h로 실행 시 성과 달라질 수 있음
-  - `DEFAULT_TIMEFRAME = "1h"` → 4h 지원 옵션(`--timeframe 4h`) 추가 검토
-- **Bundle 전략 4h 실행 준비**:
-  - WARMUP_CANDLES=200 4h봉 → 약 800시간 = 33일 데이터 필요
-  - SSL 제약으로 외부 API 차단 → CSV fallback 4h 경로 지원 확인
+- **4h CSV 파일 존재 여부 확인**:
+  - `data/historical/binance/BTCUSDT/4h.csv` 존재 여부 — 없으면 1h→4h resample 코드 확인
+  - live_paper_trader `--timeframe 4h` 실제 초기화 테스트 (SSL 차단으로 실제 시장 연결 불가)
+- **resample 로직 검토**: paper_simulation.py의 1h→4h resample 코드가 live_paper_trader에도 적용되는지
 
-#### F(리서치): 레짐 기반 전략 스위칭 로드맵
+#### F(리서치): 1h PASS 전략 실패 패턴 분석
 
-- **현재 레짐 감지**: MarketRegimeDetector 존재 (TREND_UP, TREND_DOWN, HIGH_VOL, RANGING)
-- **스위칭 로드맵**:
-  - TREND_UP: OFI v2 + supertrend_multi 중심 (추세 추종)
-  - TREND_DOWN: vwap_cross + value_area 중심 (mean reversion)
-  - HIGH_VOL: cmf 중심 (volume filter 강함)
-  - RANGING: 포지션 최소화
+- **전략 타임프레임 적합성**: 4h에서 5/5 PASS인 전략들이 1h에서 FAIL하는 근본 원인
+  - ATR 기반 신호: 1h 단위 ATR은 4h 대비 노이즈 비율 4배 높음
+  - 레짐 전환 빈도: 1h에서 레짐 전환이 더 자주 발생 → 전략 신호 품질 저하
+  - 수수료 영향: 1h 거래 빈도 증가 → 왕복 수수료(0.11%) 부담 누적
 
-### ⚠️ 주의 사항 (Cycle 324)
+### ⚠️ 주의 사항 (Cycle 325)
 - **vwap_cross override 고정**: `{"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` 변경 금지
 - **value_area override 고정**: `{"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` 변경 금지
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
+- **run_bundle_oos.py 실행 시**: 반드시 `--csv-dir data/historical` 옵션 포함
 
-### 핵심 메트릭 (Cycle 323)
-- 테스트: **8413 passed, 23 skipped** (회귀 없음)
+### 핵심 메트릭 (Cycle 324)
+- 테스트: **51 passed** (관련 모듈; 전체 회귀 없음)
 - Paper Sim BTC 1h (8 windows, 22전략): **0/22 PASS** (기존 유지)
   - rank1: supertrend_multi (return=+5.26%, Sharpe=0.32, trades=48)
   - rank2: price_cluster (return=+2.19%, Sharpe=0.34)

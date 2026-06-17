@@ -96,6 +96,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
+    # Cycle324 D(ML): supertrend_multi 1h cmf_confirm=True 실험 → 역효과 확인 후 롤백
+    # 실험 결과: Sharpe 0.32→0.02, trades 48→35, PF 1.14→1.06 — 1h CMF 노이즈로 양/음 시그널 모두 차단
+    # 결론: 1h에서 CMF 필터는 부적합 (cmf 4h 전용 전략과 동일한 패턴 재확인)
+    # 차기 개선 방향: atr_threshold 그리드 탐색(0.3~0.5) 또는 레짐 기반 필터 (TREND_UP 한정 BUY)
 }
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
