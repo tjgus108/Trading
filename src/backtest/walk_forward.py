@@ -126,6 +126,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "close_window": [50, 60],
         "vol_atr_trend_min": [1.3, 1.5, 2.0],
     },
+    # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
+    # 현재 상태: rank2(2/8 consistency), Sharpe=-0.35, PF=1.12 — 파라미터 탐색 필요
+    # roc_period: ROC 계산 lookback (현재 12 고정) → 1h 노이즈 감안 짧게 [10,12,15]
+    # ma_period: ROC 스무딩 MA 윈도우 (현재 3 고정) → 1h에서 3봉=3h 너무 짧음 [3,5,7]
+    "roc_ma_cross": {
+        "roc_period": [10, 12, 15],
+        "ma_period": [3, 5, 7],
+    },
 }
 
 # 과최적화 판단 기준
@@ -1035,6 +1043,27 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
         n_windows=n_windows,
         plateau_pct=plateau_pct,
         trades_regularization_scale=0.1,  # sideways 0-trades 타이브레이커 (Cycle 294 E)
+    )
+    return opt.run(df)
+
+
+def optimize_roc_ma_cross(df: pd.DataFrame, n_windows: int = 3,
+                          plateau_pct: float = 0.9) -> WalkForwardResult:
+    """ROCMACross 전략 파라미터 최적화 (Cycle 326 D(ML): 1h WFO 그리드)."""
+    from src.strategy.roc_ma_cross import ROCMACrossStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return ROCMACrossStrategy(
+            roc_period=params.get("roc_period", 12),
+            ma_period=params.get("ma_period", 3),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="roc_ma_cross",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["roc_ma_cross"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 

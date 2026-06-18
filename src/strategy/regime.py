@@ -28,7 +28,9 @@ class MarketRegime(str, Enum):
 class MarketRegimeDetector:
     """시장 regime 감지기. DataFrame을 받아 현재 regime을 반환."""
 
-    def __init__(self, adx_threshold: float = 25.0, vol_multiplier: float = 1.5):
+    def __init__(self, adx_threshold: float = 25.0, vol_multiplier: float = 2.0):
+        # vol_multiplier=2.0: BTC ATR% 정상 범위(2-4%)에서 1.5x 기본값이 HIGH_VOL 과다 판정
+        # → 2.0x 기준으로 강화 (현재 ATR이 20-bar 평균의 2배 초과 시에만 HIGH_VOL)
         self.adx_threshold = adx_threshold
         self.vol_multiplier = vol_multiplier
 

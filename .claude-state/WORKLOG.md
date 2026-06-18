@@ -1,3 +1,34 @@
+## [2026-06-18] Cycle 326 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] MarketRegimeDetector HIGH_VOL 임계값 재보정**
+1. `src/strategy/regime.py` `vol_multiplier` 1.5→2.0:
+   - 기존 1.5x: BTC 정상 ATR% 구간에서도 HIGH_VOL 과다 판정
+   - 2.0x: 현재 ATR이 20-bar 평균의 2배 초과 시에만 HIGH_VOL
+   - 효과: TREND_UP/DOWN 판정 빈도 증가, 레짐 기반 전략 매핑 개선
+   - 테스트: test_market_regime.py 32개 통과
+
+**[D(ML)] roc_ma_cross 1h WFO 그리드 추가**
+2. `src/strategy/roc_ma_cross.py`: `roc_period=12`, `ma_period=3` 생성자 파라미터화
+   - 기존 모듈 상수 고정 → 인스턴스 파라미터로 전환 (기본값 동일)
+   - `_min_rows = max(roc_period + ma_period, 20)` 동적 계산
+3. `src/backtest/walk_forward.py`:
+   - `DEFAULT_GRIDS["roc_ma_cross"]` 추가: `roc_period=[10,12,15]`, `ma_period=[3,5,7]`
+   - `optimize_roc_ma_cross()` 함수 추가
+   - 테스트: test_roc_ma_cross.py + test_walk_forward.py 전체 통과
+
+**[F(리서치)] HMM vs EMA slope 레짐 감지 비교**
+4. SSRN 2023-2024 논문 기반 HMM 적용 가능성 평가:
+   - 2-state/3-state HMM: BTC에 잘 피팅되나 EM 수렴 불안정, forward-looking 위험
+   - 결론: 실시간 감지에는 EMA slope + ADX 방식이 우월
+   - vol_multiplier 2.0 강화 + adx_threshold 완화(차기)가 최선 경로
+
+**시뮬레이션 결과:**
+- 테스트: **8413 passed, 23 skipped** (회귀 없음)
+- Paper Sim: 0/20 PASS (rank1=price_cluster +2.19%, rank2=roc_ma_cross 2/8)
+- Bundle OOS BTC 4h: **5/5 PASS** (6사이클 연속)
+
+---
+
 ## [2026-06-18] Cycle 325 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] 1h 제외 전략 확정 + supertrend_multi 1h WFO 분석**
@@ -17354,6 +17385,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-18 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 10:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

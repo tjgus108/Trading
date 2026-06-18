@@ -18,19 +18,21 @@ import pandas as pd
 
 from .base import Action, BaseStrategy, Confidence, Signal
 
-_MIN_ROWS = 20
-_ROC_PERIOD = 12
-_MA_PERIOD = 3
 _STD_PERIOD = 20
 _STD_MULT = 2.0
-_ROC_MIN_ABS = 0.3  # IMPROVED:: ROC 절대값 최소값 (0.5%)
+_ROC_MIN_ABS = 0.3
 
 
 class ROCMACrossStrategy(BaseStrategy):
     name = "roc_ma_cross"
 
+    def __init__(self, roc_period: int = 12, ma_period: int = 3):
+        self.roc_period = roc_period
+        self.ma_period = ma_period
+        self._min_rows = max(roc_period + ma_period, 20)
+
     def generate(self, df: pd.DataFrame) -> Signal:
-        if df is None or len(df) < _MIN_ROWS:
+        if df is None or len(df) < self._min_rows:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.LOW,
@@ -44,8 +46,8 @@ class ROCMACrossStrategy(BaseStrategy):
 
         idx = len(df) - 2
 
-        roc = (df["close"] / df["close"].shift(_ROC_PERIOD) - 1) * 100
-        roc_ma = roc.rolling(_MA_PERIOD).mean()
+        roc = (df["close"] / df["close"].shift(self.roc_period) - 1) * 100
+        roc_ma = roc.rolling(self.ma_period).mean()
         roc_std = roc.rolling(_STD_PERIOD).std()
 
         roc_ma_now = float(roc_ma.iloc[idx])
