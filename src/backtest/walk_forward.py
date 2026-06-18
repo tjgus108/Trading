@@ -77,6 +77,22 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "trend_confirm_bars": [2, 3],  # Cycle 283 B(리스크): 연속 확인 봉 수 — 3은 post-ATH whipsaw 억제
         "cmf_confirm": [True, False],  # Cycle 284 D(ML): CMF>0 시에만 BUY — ATH 이후 자금이탈 선행 감지
     },
+    # Cycle 324 D(ML): supertrend_multi 1h 전용 그리드
+    # 문제: 4h avg=3.892 vs 1h Sharpe=0.32 — 타임프레임 불일치 원인 분석
+    # 1h 특성: 4h보다 ATR 절대값 작음 → atr_threshold 하향, trend_confirm_bars 연장
+    # - atr_threshold: [0.3, 0.4, 0.5] (4h [0.5-0.7] 대비 1h 노이즈 보상)
+    # - trend_confirm_bars: [4, 6, 8] (4h 2-3봉=8-12h → 1h 4-8봉=4-8h 등가 확인 기간)
+    # - cmf_confirm=True 고정 (1h 노이즈 필터 강화)
+    "supertrend_multi_1h": {
+        "atr_threshold": [0.3, 0.4, 0.5],
+        "atr_threshold_max": [1.0, 1.5, 2.0],
+        "ema_filter": [True],
+        "confidence_filter": [True],
+        "rsi_ob_filter": [True],
+        "rsi_ob_threshold": [75, 80],
+        "trend_confirm_bars": [4, 6, 8],
+        "cmf_confirm": [True],
+    },
     "elder_impulse": {
         "ema_span": [10, 13, 15],
         "min_volatility": [0.001, 0.002, 0.003],

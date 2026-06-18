@@ -145,9 +145,11 @@ class StrategyRotationManager:
         """
         Regime에 맞는 전략 추천.
 
-        TREND_UP/DOWN → 모멘텀/추세 전략 우선
-        RANGING → 평균 회귀 전략 우선
-        HIGH_VOL → 보수적 전략만 (낮은 MDD)
+        Bundle PASS 전략 우선순위 (Cycle 324 F(리서치) — 레짐 스위칭 로드맵):
+          TREND_UP:   order_flow_imbalance_v2 + supertrend_multi (추세 추종)
+          TREND_DOWN: vwap_cross + value_area (mean reversion, 숏 친화)
+          HIGH_VOL:   cmf 중심 + 낮은 MDD 전략 (볼륨 필터 강함)
+          RANGING:    포지션 최소화 (상위 2개만 활성화)
         """
         active = self.get_active_strategies(symbol)
         if not active:
@@ -155,33 +157,45 @@ class StrategyRotationManager:
 
         strategies = self._state[symbol]["strategies"]
 
-        if regime == "HIGH_VOL":
-            return sorted(
-                active,
-                key=lambda n: strategies[n].get("avg_mdd", 1.0),
-            )[:3]
+        # Bundle PASS 전략별 레짐 친화도 매핑
+        BUNDLE_REGIME_MAP: dict[str, list[str]] = {
+            "TREND_UP": ["order_flow_imbalance_v2", "supertrend_multi"],
+            "TREND_DOWN": ["vwap_cross", "value_area"],
+            "HIGH_VOL": ["cmf"],
+        }
 
-        if regime in ("TREND_UP", "TREND_DOWN"):
+        if regime == "HIGH_VOL":
+            # Bundle PASS 중 cmf 우선, 나머지는 MDD 기준 보수 정렬
+            bundle_preferred = [n for n in BUNDLE_REGIME_MAP["HIGH_VOL"] if n in active]
+            remainder = [n for n in active if n not in bundle_preferred]
+            remainder_sorted = sorted(remainder, key=lambda n: strategies[n].get("avg_mdd", 1.0))
+            return (bundle_preferred + remainder_sorted)[:3]
+
+        if regime == "TREND_UP":
+            bundle_preferred = [n for n in BUNDLE_REGIME_MAP["TREND_UP"] if n in active]
             trend_keywords = [
                 "momentum", "trend", "breakout", "supertrend",
                 "ema", "macd", "impulse", "force",
             ]
-            trend_strats = [
-                n for n in active
-                if any(k in n.lower() for k in trend_keywords)
-            ]
-            return trend_strats if trend_strats else active
+            fallback = [n for n in active if n not in bundle_preferred
+                        and any(k in n.lower() for k in trend_keywords)]
+            combined = bundle_preferred + fallback
+            return combined if combined else active
 
-        if regime == "RANGING":
+        if regime == "TREND_DOWN":
+            bundle_preferred = [n for n in BUNDLE_REGIME_MAP["TREND_DOWN"] if n in active]
             mr_keywords = [
                 "reversion", "mean_rev", "band", "rsi", "range",
-                "value", "cluster", "channel",
+                "value", "cluster", "channel", "vwap",
             ]
-            mr_strats = [
-                n for n in active
-                if any(k in n.lower() for k in mr_keywords)
-            ]
-            return mr_strats if mr_strats else active
+            fallback = [n for n in active if n not in bundle_preferred
+                        and any(k in n.lower() for k in mr_keywords)]
+            combined = bundle_preferred + fallback
+            return combined if combined else active
+
+        if regime == "RANGING":
+            # 횡보장: 전략 최소화 — MDD 낮은 상위 2개만 활성화
+            return sorted(active, key=lambda n: strategies[n].get("avg_mdd", 1.0))[:2]
 
         return active
 
