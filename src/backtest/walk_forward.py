@@ -25,9 +25,45 @@ from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 import pandas as pd
 
 from src.backtest.engine import BacktestEngine, BacktestResult, MIN_WFE
-from src.strategy.base import BaseStrategy
+from src.strategy.base import Action, BaseStrategy, Confidence, Signal
+from src.strategy.regime import MarketRegime, MarketRegimeDetector
 
 logger = logging.getLogger(__name__)
+
+
+class _RegimeFilterStrategy(BaseStrategy):
+    """레짐 필터 래퍼: TREND_UP이 아닌 봉의 BUY 신호를 HOLD로 변환.
+
+    walk_forward.py의 regime_filter=True 옵션 전용 내부 클래스.
+    df에 _regime_trend_up(bool) 컬럼이 있으면 해당 값으로 BUY 신호를 필터링.
+    컬럼 없으면 필터 미적용(원본 신호 그대로 통과).
+    """
+
+    def __init__(self, inner: BaseStrategy):
+        self._inner = inner
+        self.name = inner.name
+
+    def generate(self, df) -> Signal:
+        signal = self._inner.generate(df)
+        if signal.action != Action.BUY:
+            return signal
+        if "_regime_trend_up" not in df.columns:
+            return signal
+        idx = len(df) - 2
+        if idx < 0:
+            return signal
+        if not bool(df["_regime_trend_up"].iloc[idx]):
+            return Signal(
+                action=Action.HOLD,
+                confidence=signal.confidence,
+                strategy=signal.strategy,
+                entry_price=signal.entry_price,
+                reasoning="레짐 필터: TREND_UP 아님 → BUY 차단",
+                invalidation="",
+                bull_case="",
+                bear_case="",
+            )
+        return signal
 
 # 기본 최적화 파라미터 그리드
 DEFAULT_GRIDS: Dict[str, dict] = {
@@ -247,6 +283,7 @@ class WalkForwardOptimizer:
         fold_decay: float = 0.0,  # time-decay: 0=동일가중, 양수=최근fold에 지수적 가중치
         use_regime_weights: bool = False,  # HIGH_VOL fold 다운웨이팅
         trades_regularization_scale: float = 0.0,  # IS 거래 수 기반 정규화 계수
+        regime_filter: bool = False,  # TREND_UP 레짐에서만 BUY 허용 (B리스크 Cycle 328)
     ):
         """
         Args:
@@ -263,6 +300,8 @@ class WalkForwardOptimizer:
             fold_decay: time-decay 계수. 0이면 동일 가중치(기존 동작).
                         양수면 w_i = exp(fold_decay * i) (i가 클수록 최근 fold).
                         weighted_oos_sharpe 계산에만 사용; PASS/FAIL은 avg_oos_sharpe 기준.
+            regime_filter: True이면 MarketRegimeDetector로 각 윈도우에 _regime_trend_up 컬럼 추가
+                           후 TREND_UP이 아닌 봉의 BUY 신호를 자동 차단 (_RegimeFilterStrategy 래퍼 적용).
             trades_regularization_scale: IS 거래 수 기반 정규화 계수.
                         0.0(기본)이면 기존 동작 유지.
                         양수면 Score += scale * min(1.0, is_trades/30) 추가.
@@ -283,6 +322,8 @@ class WalkForwardOptimizer:
         self.fold_decay = fold_decay
         self.use_regime_weights = use_regime_weights
         self.trades_regularization_scale = trades_regularization_scale
+        self.regime_filter = regime_filter
+        self._regime_detector = MarketRegimeDetector() if regime_filter else None
         self._param_grid = param_grid or DEFAULT_GRIDS.get(strategy_name, {})
         self._engine = BacktestEngine()
 
@@ -351,16 +392,23 @@ class WalkForwardOptimizer:
         oos_vols: List[float] = []
 
         for i, (is_df, oos_df) in enumerate(windows):
+            # regime_filter: TREND_UP 레짐 외 BUY 차단 (_regime_trend_up 컬럼 추가)
+            if self.regime_filter and self._regime_detector is not None:
+                is_df = self._annotate_regime(is_df)
+                oos_df = self._annotate_regime(oos_df)
+
             # IS 최적화 (Sharpe - λ*CV 목적함수 + 플래토 룰 적용)
             best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(
                 is_df, all_combinations,
                 stability_lambda=self.stability_lambda,
                 plateau_pct=self.plateau_pct,
                 trades_regularization_scale=self.trades_regularization_scale,
+                regime_filter=self.regime_filter,
             )
 
             # OOS 검증
-            oos_strategy = self.strategy_factory(best_params)
+            inner_strategy = self.strategy_factory(best_params)
+            oos_strategy = _RegimeFilterStrategy(inner_strategy) if self.regime_filter else inner_strategy
             oos_result = self._engine.run(oos_strategy, oos_df)
 
             # OOS ATR (변동성) 계산 — regime 가중치에 사용
@@ -595,11 +643,19 @@ class WalkForwardOptimizer:
 
         return windows
 
+    def _annotate_regime(self, df: pd.DataFrame) -> pd.DataFrame:
+        """df에 _regime_trend_up(bool) 컬럼 추가 후 반환 (복사본)."""
+        df = df.copy()
+        regime_series = self._regime_detector.detect_series(df)
+        df["_regime_trend_up"] = (regime_series == MarketRegime.TREND_UP)
+        return df
+
     def _optimize_in_sample(
         self, is_df: pd.DataFrame, combinations: List[dict],
         stability_lambda: float = 0.5,
         plateau_pct: float = 0.9,
         trades_regularization_scale: float = 0.0,
+        regime_filter: bool = False,
     ) -> Tuple[dict, float]:
         """그리드 서치로 IS 최적 파라미터 탐색.
 
@@ -624,7 +680,8 @@ class WalkForwardOptimizer:
 
         for params in combinations:
             try:
-                strategy = self.strategy_factory(params)
+                inner = self.strategy_factory(params)
+                strategy = _RegimeFilterStrategy(inner) if regime_filter else inner
                 result = self._engine.run(strategy, is_df)
                 sharpe = result.sharpe_ratio
                 param_key = str(sorted(params.items()))

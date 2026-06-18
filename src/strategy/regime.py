@@ -118,6 +118,66 @@ class MarketRegimeDetector:
         avg = float(mean20.iloc[-2]) if not pd.isna(mean20.iloc[-2]) else float("inf")
         return cur > avg * self.vol_multiplier if avg > 0 else False
 
+    def detect_series(self, df: pd.DataFrame) -> pd.Series:
+        """전체 DataFrame에 대해 벡터화된 레짐 시리즈 반환.
+
+        각 인덱스 i의 레짐은 df.iloc[:i+1]에 대한 detect()와 동일하게
+        iloc[-2] 기준으로 계산 (미래 데이터 사용 방지).
+        최소 60행 이전 구간은 MarketRegime.RANGING 반환.
+
+        Returns:
+            pd.Series(MarketRegime) — df와 동일한 인덱스.
+        """
+        if df is None or len(df) < 60:
+            return pd.Series([MarketRegime.RANGING] * len(df), index=df.index if df is not None else None)
+
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
+
+        adx, plus_di, minus_di = self._adx(high, low, close, period=14)
+        ema20 = close.ewm(span=20, adjust=False).mean()
+        ema50 = close.ewm(span=50, adjust=False).mean()
+
+        # ATR HIGH_VOL 시리즈
+        tr = pd.concat([
+            high - low,
+            (high - close.shift(1)).abs(),
+            (low - close.shift(1)).abs(),
+        ], axis=1).max(axis=1)
+        atr14 = tr.rolling(14).mean()
+        atr_ratio = atr14 / close.replace(0, np.nan)
+        mean20_atr = atr_ratio.rolling(20).mean()
+
+        regimes = []
+        n = len(df)
+        for i in range(n):
+            if i < 60:
+                regimes.append(MarketRegime.RANGING)
+                continue
+            # 레짐은 iloc[-2] 기준 (현재 봉은 미완성이므로 1봉 전 사용)
+            ref = i - 1
+            cur_atr = float(atr_ratio.iloc[ref]) if not pd.isna(atr_ratio.iloc[ref]) else 0.0
+            avg_atr = float(mean20_atr.iloc[ref]) if not pd.isna(mean20_atr.iloc[ref]) else float("inf")
+            if avg_atr > 0 and cur_atr > avg_atr * self.vol_multiplier:
+                regimes.append(MarketRegime.HIGH_VOL)
+                continue
+            cur_adx = float(adx.iloc[ref]) if not pd.isna(adx.iloc[ref]) else 0.0
+            cur_plus = float(plus_di.iloc[ref]) if not pd.isna(plus_di.iloc[ref]) else 0.0
+            cur_minus = float(minus_di.iloc[ref]) if not pd.isna(minus_di.iloc[ref]) else 0.0
+            cur_ema20 = float(ema20.iloc[ref])
+            cur_ema50 = float(ema50.iloc[ref])
+            if cur_adx > self.adx_threshold:
+                if cur_plus > cur_minus and cur_ema20 > cur_ema50:
+                    regimes.append(MarketRegime.TREND_UP)
+                    continue
+                elif cur_minus > cur_plus and cur_ema20 < cur_ema50:
+                    regimes.append(MarketRegime.TREND_DOWN)
+                    continue
+            regimes.append(MarketRegime.RANGING)
+
+        return pd.Series(regimes, index=df.index)
+
     def _atr_regime_series(self, high, low, close) -> list:
         """전체 시리즈에 대해 HIGH_VOL 여부 반환."""
         tr = pd.concat([
