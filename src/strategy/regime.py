@@ -5,8 +5,8 @@ regime_filter.py와 달리 전략이 아니라 감지기(detector)로,
 다른 전략/로테이션 매니저에서 현재 regime을 질의할 수 있다.
 
 Regimes:
-  TREND_UP   — ADX > 25, +DI > -DI, EMA20 > EMA50
-  TREND_DOWN — ADX > 25, -DI > +DI, EMA20 < EMA50
+  TREND_UP   — ADX > 22, +DI > -DI, EMA20 > EMA50
+  TREND_DOWN — ADX > 22, -DI > +DI, EMA20 < EMA50
   RANGING    — ADX <= 25, BB bandwidth < median
   HIGH_VOL   — ATR ratio > 1.5x 20-period mean
 """
@@ -28,7 +28,8 @@ class MarketRegime(str, Enum):
 class MarketRegimeDetector:
     """시장 regime 감지기. DataFrame을 받아 현재 regime을 반환."""
 
-    def __init__(self, adx_threshold: float = 25.0, vol_multiplier: float = 2.0):
+    def __init__(self, adx_threshold: float = 22.0, vol_multiplier: float = 2.0):
+        # adx_threshold=22.0: Wilder 기준(25)보다 완화 → TREND 감지 빈도 향상 (Cycle 327 B)
         # vol_multiplier=2.0: BTC ATR% 정상 범위(2-4%)에서 1.5x 기본값이 HIGH_VOL 과다 판정
         # → 2.0x 기준으로 강화 (현재 ATR이 20-bar 평균의 2배 초과 시에만 HIGH_VOL)
         self.adx_threshold = adx_threshold

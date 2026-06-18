@@ -1,3 +1,33 @@
+## [2026-06-18] Cycle 327 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] adx_threshold 25.0→22.0 완화**
+1. `src/strategy/regime.py` `MarketRegimeDetector.__init__` adx_threshold 25.0→22.0:
+   - Wilder 기준(25) 완화 → TREND 감지 민감도 향상
+   - ADX>22 + DI 조건 + EMA 필터로 TREND_UP/DOWN 판정 빈도 증가
+   - 테스트: test_market_regime.py + test_walk_forward.py 85개 통과
+
+**[D(ML)] roc_ma_cross WFO 실행 + 파라미터 탐색**
+2. BTC 1h CSV 5-fold WFO 결과:
+   - best params: roc_period=12, ma_period=7 (avg OOS Sharpe +0.072 개선: -0.35→+0.07)
+   - W2 OOS=2.339 (roc_period=12, ma_period=7), W3 OOS=2.113 (roc_period=12, ma_period=3)
+   - **주요 문제**: avg 33 trades/8 windows → 4.1 trades/window (통계적 신뢰도 부족)
+   - paper_simulation ma_period=7 적용 → rank6 (이전 rank2 대비 악화) → 즉시 **되돌림**
+   - **결론**: EMA+RSI 필터 이중 조건이 1h 신호를 과도 차단 → Cycle 328 필터 완화 필요
+
+**[F(리서치)] positional_scaling 1/8 PASS 분석**
+3. positional_scaling 전략 분석 (rank2, +1.97%, Sharpe=0.00, 1/8):
+   - 조건: EMA20>EMA50>EMA100 bullish alignment + close±ATR*0.3 내 + 양봉
+   - 1/8 PASS 원인: 레짐 필터 없음 → 횡보/하락 구간에서도 BUY 진입
+   - PASS 윈도우: 2023 Q4 불마켓(Oct-Dec)에서만 EMA alignment 지속 유효
+   - **개선 제안**: `MarketRegimeDetector(adx_threshold=22.0)` TREND_UP 필터 추가
+
+**시뮬레이션 결과:**
+- 테스트: **8409 passed, 17 skipped** (회귀 없음)
+- Paper Sim: 0/20 PASS (rank1=price_cluster +2.19%, rank2=positional_scaling +1.97%)
+- Bundle OOS BTC 4h: **5/5 PASS** (7사이클 연속)
+
+---
+
 ## [2026-06-18] Cycle 326 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] MarketRegimeDetector HIGH_VOL 임계값 재보정**
@@ -17479,6 +17509,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-18 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-18 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 15:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-18 15:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
