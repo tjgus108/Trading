@@ -1,49 +1,38 @@
 # Current Cycle Briefing
 
-_Cycle 324 | 2026-06-18 | D(ML) + E(실행) + F(리서치)_
+_Cycle 325 | 2026-06-18 | A(품질) + C(데이터) + F(리서치)_
 
 ## 완료된 작업
 
-### D(ML): supertrend_multi 1h 분석 + walk_forward 그리드 추가
-- 1h Paper Sim (0/22 PASS) 원인 분석:
-  - rank1 supertrend_multi: Sharpe=0.32, PF=1.14 (4h avg=3.892 대비 크게 낮음)
-  - FAIL 원인: 4h 최적화 파라미터(trend_confirm_bars=2-3, atr_threshold=0.5-0.7) 가 1h 노이즈에 취약
-- `src/backtest/walk_forward.py` `DEFAULT_GRIDS`에 `supertrend_multi_1h` 추가:
-  - atr_threshold: [0.3, 0.4, 0.5] (1h ATR 값 특성 반영)
-  - trend_confirm_bars: [4, 6, 8] (1h에서 4-8시간 확인 기간)
-  - cmf_confirm=True 고정 (노이즈 필터 강화)
+### A(품질): 1h 제외 전략 확정
 
-### E(실행): live_paper_trader 4h 타임프레임 지원
-- `scripts/live_paper_trader.py` 변경:
-  - `--timeframe {1h, 4h, 1d}` 인수 추가 (기본: 1h)
-  - 4h 선택 시 interval 자동 14400s (4시간) 설정
-  - fetch_latest_candles() + _auto_retrain()에 self.timeframe 전달
-  - Bundle 전략(4h OOS PASS)을 4h로 실행하는 경로 완성
+- `scripts/paper_simulation.py`에 `STRATEGIES_TIMEFRAME_EXCLUDE` 추가
+  - `"1h": {"value_area", "supertrend_multi"}` — 4h 전용 전략 1h paper_sim 제외
+- supertrend_multi 1h WFO 실행 (reduced grid 9조합, 4 windows):
+  - avg OOS Sharpe=-2.858, WFE=-2.71 → 4h 전용 완전 확정
+- Paper Sim: 22→20전략, 0/20 PASS, rank1=price_cluster(+2.19%, 1/8)
 
-### F(리서치): 레짐 기반 전략 스위칭 코드화
-- `src/strategy/rotation.py` `recommend_for_regime()` 개선:
-  - Bundle PASS 전략 레짐 친화도 매핑 (하드코드→런타임 적용):
-    - TREND_UP: OFI v2 + supertrend_multi 우선
-    - TREND_DOWN: vwap_cross + value_area 우선
-    - HIGH_VOL: cmf 우선 (볼륨 필터 강함)
-    - RANGING: 상위 2개만 (포지션 최소화)
-  - 기존 키워드 폴백 로직 유지
+### C(데이터): live_paper_trader 4h CSV fallback
 
-## 시뮬레이션 결과
+- `fetch_latest_candles()` exchange 실패 시 `data/historical/` CSV 자동 fallback
+- 4h 요청: 1h CSV → `resample_ohlcv('4h')` (volume=sum 검증 완료)
+- synthetic보다 실거래소 우선 정렬 추가
 
-| 구분 | 결과 |
-|------|------|
-| 테스트 | **8413 passed, 23 skipped** |
-| Paper Sim 1h (BTC, 22전략) | **0/22 PASS** (유지) |
-| Paper Sim rank1 | supertrend_multi (+5.26%, Sharpe=0.32) |
-| Bundle OOS 4h (5-fold) | **5/5 PASS** (유지) |
-| Bundle rank1 | OFI v2 (avg=4.345, std=0.907) |
+### F(리서치): 레짐 스위칭 실효성 분석
 
-## 다음 사이클 (325)
+- BTC 5-fold ATR% 분석: 전 구간 2.5-3.3% → 전부 HIGH_VOL 판정
+- **발견**: MarketRegimeDetector HIGH_VOL 임계값(2.5%)이 BTC 정상 변동성 수준보다 낮음
+- OFI+supertrend의 TREND_UP 우세 패턴 확인 → 레짐 매핑 방향은 옳으나 감지기 재보정 필요
 
-**325 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)**
+## 현재 시스템 상태
 
-우선순위:
-1. A(품질): supertrend_multi 1h PASS 경계값 분석 — 추가된 `supertrend_multi_1h` 그리드 활용
-2. C(데이터): Bundle 4h 리샘플링 데이터 품질 검증
-3. F(리서치): 레짐별 전략 성과 사후 분석 (fold별 레짐 추정 + 전략 성과 매칭)
+- 테스트: 8413 passed, 23 skipped
+- Paper Sim: 0/20 PASS (1h, 8 windows) — rank1 price_cluster
+- Bundle OOS: **5/5 PASS** (5 사이클 연속 유지)
+- 코드 변경: paper_simulation.py + live_paper_trader.py (회귀 없음)
+
+## 다음 사이클 (326) 핵심 작업
+
+- **B(리스크)**: MarketRegimeDetector HIGH_VOL 임계값 crypto 재보정
+- **D(ML)**: roc_ma_cross 1h 파라미터 탐색 (2/8 consistency 개선 가능성)
+- **F**: Bundle fold4 ATH 구간 OFI>supertrend 패턴 → 레짐 스위칭 근거 강화

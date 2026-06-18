@@ -123,7 +123,7 @@ def fetch_latest_candles(
     timeframe: str = DEFAULT_TIMEFRAME,
     limit: int = 500,
 ) -> Optional[pd.DataFrame]:
-    """Bybit에서 최근 캔들 데이터 수집."""
+    """Bybit에서 최근 캔들 데이터 수집. 실패 시 data/historical CSV fallback."""
     try:
         import ccxt
         ex = ccxt.bybit()
@@ -134,8 +134,43 @@ def fetch_latest_candles(
         df = df.set_index("timestamp").sort_index()
         return df
     except Exception as e:
-        logger.error("Data fetch failed: %s: %s", type(e).__name__, str(e)[:120])
-        return None
+        logger.warning("Exchange fetch failed (%s) — trying CSV fallback", str(e)[:80])
+
+    # CSV fallback: data/historical/{exchange}/{pair}/{timeframe}.csv
+    # Cycle 325 C(데이터): 4h 지원 — 1h CSV를 4h로 리샘플링. synthetic보다 실거래소 우선.
+    csv_base = ROOT / "data" / "historical"
+    pair_clean = symbol.replace("/", "").replace(":", "")
+    candidates: list[tuple[bool, Path, str]] = []  # (is_synthetic, csv_path, base_tf)
+    for exc_dir in (csv_base.iterdir() if csv_base.exists() else []):
+        if not exc_dir.is_dir():
+            continue
+        for pair_dir in exc_dir.iterdir():
+            if not pair_dir.is_dir() or pair_dir.name.upper() != pair_clean:
+                continue
+            csv_path = pair_dir / f"{timeframe}.csv"
+            base_tf = timeframe
+            if not csv_path.exists():
+                csv_path = pair_dir / "1h.csv"
+                base_tf = "1h"
+            if csv_path.exists():
+                is_synth = "synthetic" in str(exc_dir).lower()
+                candidates.append((is_synth, csv_path, base_tf))
+    # synthetic=False(실거래소) 우선
+    candidates.sort(key=lambda x: x[0])
+    for is_synth, csv_path, base_tf in candidates:
+        try:
+            from src.data.data_utils import load_csv_ohlcv, resample_ohlcv
+            df = load_csv_ohlcv(csv_path, validate=False)
+            if df is None or df.empty:
+                continue
+            if base_tf != timeframe:
+                df = resample_ohlcv(df, timeframe)
+            logger.info("CSV fallback loaded: %s (%s, %d candles)", csv_path.name, timeframe, len(df))
+            return df.iloc[-limit:]
+        except Exception as csv_e:
+            logger.warning("CSV fallback failed: %s", str(csv_e)[:80])
+    logger.error("All data sources failed for %s %s", symbol, timeframe)
+    return None
 
 
 def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
