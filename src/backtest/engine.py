@@ -74,6 +74,8 @@ class BacktestResult:
     mc_p_value: float = -1.0  # Monte Carlo permutation p-value (-1=미계산)
     # Cycle309 E(실행): adaptive_slippage 레짐별 진입 횟수 (adaptive_slippage=False면 빈 dict)
     slippage_regime_counts: Dict[str, int] = field(default_factory=dict)
+    # Cycle333 B(리스크): min_hold_bars cooldown으로 억제된 신호 수 (min_hold_bars>0일 때만 유효)
+    cooldown_suppressed: int = 0
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -158,6 +160,7 @@ class BacktestEngine:
         signals_skipped_atr0 = 0  # 신호 생성됐으나 atr=0으로 포지션 미진입 횟수
         consec_losses = 0  # 연속 손실 카운터 (consec_loss_scale_threshold 기능용)
         cooldown_remaining = 0  # Cycle331 B: 청산 후 재진입 대기 봉수 카운터
+        cooldown_suppressed = 0  # Cycle333 B: cooldown 중 신호 억제 횟수
         # Cycle309 E(실행): adaptive_slippage 레짐별 진입 카운트
         slip_regime_counts: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
 
@@ -211,6 +214,10 @@ class BacktestEngine:
                             consec_losses = 0
                         else:
                             consec_losses += 1
+
+            # cooldown 중 신호 억제 카운트
+            if position is None and cooldown_remaining > 0:
+                cooldown_suppressed += 1
 
             # 신호 생성 (포지션 없고 cooldown 만료 시)
             if position is None and cooldown_remaining == 0:
@@ -293,6 +300,12 @@ class BacktestEngine:
             strategy.name, trades, equity_curve, total_fees, total_slippage_cost,
             slippage_regime_counts=slip_regime_counts if self.adaptive_slippage else {},
         )
+        result.cooldown_suppressed = cooldown_suppressed
+        if self.min_hold_bars > 0 and cooldown_suppressed > 0:
+            logger.debug(
+                "Cooldown suppressed %d signal(s) (min_hold_bars=%d)",
+                cooldown_suppressed, self.min_hold_bars,
+            )
         if not trades and signals_skipped_atr0 > 0:
             reason = f"atr=0 skipped {signals_skipped_atr0} signal(s) — 포지션 미진입"
             if reason not in result.fail_reasons:

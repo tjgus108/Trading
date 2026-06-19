@@ -523,3 +523,87 @@ class TestCsvLoader:
 
         df_4h = resample_ohlcv(df, '4h', drop_incomplete=True)
         assert len(df_4h) == 4  # 16 / 4 = 4 완전한 버킷
+
+    def test_load_csv_file_not_found(self):
+        """존재하지 않는 파일 → FileNotFoundError."""
+        from src.data.data_utils import load_csv_ohlcv
+        with pytest.raises(FileNotFoundError):
+            load_csv_ohlcv("/nonexistent/path/data.csv")
+
+    def test_load_csv_missing_required_column(self):
+        """필수 컬럼 누락 → ValueError."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("timestamp,open,high,low,close\n")  # volume 컬럼 없음
+            f.write("2024-01-01 00:00:00,50000,50100,49900,50050\n")
+            csv_path = f.name
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            with pytest.raises(ValueError, match="Missing required column"):
+                load_csv_ohlcv(csv_path, validate=False)
+        finally:
+            os.unlink(csv_path)
+
+    def test_load_csv_time_column_variant(self):
+        """'time' 컬럼 헤더도 timestamp로 인식."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("time,open,high,low,close,volume\n")
+            f.write("2024-01-01 00:00:00,50000,50100,49900,50050,1000\n")
+            f.write("2024-01-01 01:00:00,50050,50150,49950,50100,1100\n")
+            csv_path = f.name
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            df = load_csv_ohlcv(csv_path, validate=False)
+            assert isinstance(df.index, pd.DatetimeIndex)
+            assert len(df) == 2
+        finally:
+            os.unlink(csv_path)
+
+    def test_load_csv_date_column_variant(self):
+        """'date' 컬럼 헤더도 timestamp로 인식."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("date,open,high,low,close,volume\n")
+            f.write("2024-01-01 00:00:00,50000,50100,49900,50050,1000\n")
+            f.write("2024-01-01 04:00:00,50050,50150,49950,50100,1100\n")
+            csv_path = f.name
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            df = load_csv_ohlcv(csv_path, validate=False)
+            assert isinstance(df.index, pd.DatetimeIndex)
+            assert str(df.index.tz) == 'UTC'
+        finally:
+            os.unlink(csv_path)
+
+    def test_load_csv_tz_aware_timestamps_converted_to_utc(self):
+        """타임존이 있는 timestamp는 UTC로 변환됨."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            # UTC+9 타임존 명시
+            f.write("timestamp,open,high,low,close,volume\n")
+            f.write("2024-01-01 09:00:00+09:00,50000,50100,49900,50050,1000\n")
+            f.write("2024-01-01 10:00:00+09:00,50050,50150,49950,50100,1100\n")
+            csv_path = f.name
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            df = load_csv_ohlcv(csv_path, validate=False)
+            assert str(df.index.tz) == 'UTC'
+            # 09:00+09:00 → 00:00 UTC
+            assert df.index[0] == pd.Timestamp('2024-01-01 00:00:00', tz='UTC')
+        finally:
+            os.unlink(csv_path)
+
+    def test_load_csv_no_timestamp_column_raises(self):
+        """timestamp/time/date 컬럼 없으면 ValueError."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write("idx,open,high,low,close,volume\n")
+            f.write("0,50000,50100,49900,50050,1000\n")
+            csv_path = f.name
+        try:
+            from src.data.data_utils import load_csv_ohlcv
+            with pytest.raises(ValueError, match="No timestamp column"):
+                load_csv_ohlcv(csv_path, validate=False)
+        finally:
+            os.unlink(csv_path)

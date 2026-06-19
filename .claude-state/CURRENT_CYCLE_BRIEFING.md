@@ -1,51 +1,49 @@
 # Current Cycle Briefing
 
-_Cycle 332 | 2026-06-19 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 333 | 2026-06-19 | C(데이터) + B(리스크) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): paper_simulation.py --min-hold-bars CLI 인자 추가
+### C(데이터): load_csv_ohlcv() 엣지케이스 테스트 6건 추가
 
-- `scripts/paper_simulation.py`:
-  - `--min-hold-bars INT` argparse 인자 추가 (기본 0=비활성)
-  - `run_simulation(min_hold_bars: int = 0)` 파라미터 추가
-  - `BacktestEngine(min_hold_bars=min_hold_bars)` 전달
-  - args.min_hold_bars > 0 시 "[CONFIG] min_hold_bars overridden: N" 출력
-- 검증: `python3 scripts/paper_simulation.py --help` 에서 `--min-hold-bars` 노출 확인
+- `tests/test_data_utils.py` 누락 경로 보완:
+  - FileNotFoundError, missing column, 'time'/'date' 헤더 변형, TZ-aware → UTC 변환, no timestamp column
+  - 총 34 tests (이전 28 → +6)
+- 합성 vs 실거래소 CSV 우선순위 로직 확인: `_candidate_key` 정상 작동 (synthetic=False 우선)
+- Empty DataFrame 엣지케이스: `resample_ohlcv()` 빈 DF 입력 시 빈 DF 반환 확인
 
-### D(ML): order_flow_imbalance_v2 그리드 탐색 — trend_span=15, delta_window=7 실험
+### B(리스크): BacktestEngine cooldown_suppressed 진단 카운터 + min_hold_bars=4 실험
 
-- `scripts/run_bundle_oos.py` + `scripts/paper_simulation.py`:
-  - `{"trend_span": 20}` → `{"trend_span": 15, "delta_window": 7}` 실험
-  - Bundle OOS 결과: avg=4.036 (4.345→-0.309 악화), std=2.771 (0.907→+1.864 악화) → FAIL
-  - Paper Sim: OFI rank11 (avg_sharpe=-1.03)
-  - 원인: fold0 OOS=6.724 극단값 + fold4 OOS=1.189 → std 폭발
-  - **즉시 복원**: `{"trend_span": 20}` (원상복구)
-  - **결론**: trend_span=15 단기 추세 필터 → 노이즈 증가, 신호 불안정화
+- `src/backtest/engine.py`:
+  - `BacktestResult.cooldown_suppressed: int = 0` 필드 추가
+  - cooldown 활성 시마다 카운터 증가, DEBUG 로그 출력
+- min_hold_bars=4 실험 (paper_sim --min-hold-bars 4):
+  - roc_ma_cross: -0.41 → +0.16 (개선), price_cluster: +0.34 → -0.53 (악화)
+  - 결론: 전략별 차별 효과 → 범용 min_hold_bars 기본값 유지 (0), 필요시 CLI 옵션 활용
 
-### F(리서치): 1h 12연속 FAIL 정책 확정
+### F(리서치): OFI v2 trend_span=25 실험 완료
 
-- Paper Sim BTC 1h 12사이클 연속 0/20 PASS
-- 1h 전략 파라미터 실험 무기한 중단 결정
-- 4h OFI 탐색 계속: trend_span=25 다음 차례 (15 역효과 확인)
+- `scripts/run_bundle_oos.py`:
+  - trend_span=25 실험: avg=3.929, std=1.081, 5/5 PASS
+  - trend_span=20 (avg=4.345, std=0.907) vs trend_span=25 (avg=3.929, std=1.081)
+  - 결론: trend_span=20이 최적. **즉시 복원 완료**
+  - 그리드 탐색 완료: 15(FAIL) < 25(PASS) < 20(PASS, best)
 
-## 시뮬레이션 결과 (OFI 실험 파라미터 적용)
+## 시뮬레이션 결과 (Cycle 333)
 
-- **테스트**: 8419 passed, 23 skipped (회귀 없음)
-- **Paper Sim BTC 1h**: 0/20 PASS (12사이클 연속)
-  - rank1: price_cluster (Sharpe=0.34, 1/8)
-  - rank2: roc_ma_cross (Sharpe=-0.41, 2/8)
-  - rank3: positional_scaling (Sharpe=0.00, 1/8)
-- **Bundle OOS BTC 4h (실험 중)**: 4/5 PASS (OFI 파라미터 실험 FAIL)
-  - order_flow_imbalance_v2: FAIL (avg=4.036, std=2.771) ← trend_span=15 실험
-  - supertrend_multi: PASS (avg=3.892, std=1.239)
-  - value_area: PASS (avg=3.069)
-  - vwap_cross: PASS (avg=3.047)
-  - cmf: PASS (avg=2.508)
-  - ⚠️ OFI 파라미터 복원 완료 (trend_span=20) → 다음 사이클 5/5 복구 예정
+- **테스트**: 8425 passed, 23 skipped (회귀 없음, +6 신규)
+- **Paper Sim BTC 1h (min_hold_bars=4 실험)**: 0/20 PASS (13사이클 연속)
+  - rank1: roc_ma_cross (Sharpe=0.16, Return=+2.34%, 2/8) — min_hold_bars=4로 개선
+  - rank2: positional_scaling (Sharpe=-0.40, 1/8)
+  - rank6: price_cluster (Sharpe=-0.53, 1/8) — min_hold_bars=4로 악화
+- **Bundle OOS BTC 4h (trend_span=25 실험)**: **5/5 PASS** (4/5 → 5/5 복원!)
+  - order_flow_imbalance_v2: PASS (avg=3.929, std=1.081, trend_span=25 실험)
+  - supertrend_multi: PASS (avg=3.892), vwap_cross: PASS (avg=3.047)
+  - value_area: PASS (avg=3.069), cmf: PASS (avg=2.508)
+  - ⚠️ 파라미터 복원 완료 (trend_span=20) — 다음 사이클 OFI avg=4.345 복구 예정
 
-## 다음 사이클 (333 mod 5 = 3): C(데이터) + B(리스크) + F(리서치)
+## 다음 사이클 (334 mod 5 = 4): D(ML) + E(실행) + F(리서치)
 
-- **C(데이터)**: src/data/ 모듈 엣지케이스 테스트 점검 (CSV 로딩 안정성)
-- **B(리스크)**: --min-hold-bars 4 실제 효과 측정 (price_cluster Sharpe 변화)
-- **F(리서치)**: OFI v2 trend_span=25 실험 (목표: avg>5.0, std<0.8)
+- **D(ML)**: ML 모델 재학습 권고 (ADWIN drift=YES), 또는 OFI v2 delta_window 실험
+- **E(실행)**: Paper Trading 모드 점검, TWAP 실행기 검증
+- **F(리서치)**: OFI v2 delta_window 탐색 (trend_span=20 확정, 다음: delta_window=5 또는 7)
