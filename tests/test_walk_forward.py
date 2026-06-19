@@ -1658,3 +1658,134 @@ def test_rolling_oos_extreme_is_overfit_marker():
                 f"과최적화 마커 없음: {fold.fail_reasons}"
             )
             break
+
+
+# ---------------------------------------------------------------------------
+# Cycle 330 C(데이터): detect_series() + regime_filter=True 검증 테스트
+# ---------------------------------------------------------------------------
+
+def _make_trend_up_df(n: int = 500) -> pd.DataFrame:
+    """TREND_UP regime이 30%+ 발생하도록 강한 상승 추세 데이터 생성."""
+    np.random.seed(7)
+    closes = 100.0 * np.cumprod(1 + 0.003 + np.random.randn(n) * 0.005)
+    highs = closes * 1.008
+    lows = closes * 0.992
+    return pd.DataFrame({
+        "close": closes,
+        "high": highs,
+        "low": lows,
+        "atr14": np.full(n, 1.5),
+        "rsi14": np.full(n, 55.0),
+        "volume": np.full(n, 1000.0),
+        "ema50": closes * 0.97,
+        "ema20": closes * 0.99,
+        "ema9": closes * 0.995,
+        "ema21": closes * 0.985,
+        "vwap": closes * 0.99,
+        "donchian_high": highs,
+        "donchian_low": lows,
+    })
+
+
+def test_detect_series_returns_trend_up_on_uptrend():
+    """강한 상승 추세 데이터에서 detect_series()가 30%+ TREND_UP을 반환하는지 검증.
+
+    Cycle 329 detect_series() 버그 수정(dtype=object) 이후 실제로 TREND_UP이
+    올바르게 감지되는지 확인.
+    """
+    from src.strategy.regime import MarketRegime, MarketRegimeDetector
+
+    df = _make_trend_up_df(500)
+    detector = MarketRegimeDetector()
+    regime_series = detector.detect_series(df)
+
+    assert regime_series.dtype == object, (
+        f"detect_series() dtype이 object가 아님: {regime_series.dtype}"
+    )
+
+    trend_up_count = (regime_series == MarketRegime.TREND_UP).sum()
+    trend_up_pct = trend_up_count / len(regime_series)
+
+    assert trend_up_pct >= 0.30, (
+        f"TREND_UP 비율 {trend_up_pct:.1%} < 30% — detect_series() 버그 재발 의심"
+    )
+
+
+def test_annotate_regime_adds_column():
+    """WalkForwardOptimizer._annotate_regime()이 _regime_trend_up 컬럼을 올바르게 추가하는지."""
+    from src.backtest.walk_forward import WalkForwardOptimizer
+    from src.strategy.ema_cross import EmaCrossStrategy
+
+    def factory(params):
+        return EmaCrossStrategy(
+            fast_span=params.get("fast_span", 20),
+            slow_span=params.get("slow_span", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="ema_cross",
+        strategy_factory=factory,
+        param_grid={"fast_span": [10, 20], "slow_span": [40, 50]},
+        n_windows=2,
+        regime_filter=True,
+    )
+
+    df = _make_trend_up_df(500)
+    annotated = opt._annotate_regime(df)
+
+    assert "_regime_trend_up" in annotated.columns, "_regime_trend_up 컬럼 없음"
+    assert annotated["_regime_trend_up"].dtype == bool or annotated["_regime_trend_up"].isin([True, False]).all(), (
+        "_regime_trend_up 컬럼이 bool 타입이 아님"
+    )
+    # 원본 df 불변 확인
+    assert "_regime_trend_up" not in df.columns, "_annotate_regime()이 원본 df를 수정함"
+
+    # 상승 추세 데이터에서 True 비율이 30%+ 여야 함
+    true_ratio = annotated["_regime_trend_up"].mean()
+    assert true_ratio >= 0.30, (
+        f"_regime_trend_up True 비율 {true_ratio:.1%} < 30% — regime 감지 오류"
+    )
+
+
+def test_regime_filter_true_blocks_buy_on_ranging():
+    """regime_filter=True이면 RANGING 구간에서 BUY 신호가 HOLD로 변환되는지 검증."""
+    from src.backtest.walk_forward import _RegimeFilterStrategy
+    from src.strategy.base import Action, BaseStrategy, Confidence, Signal
+
+    class AlwaysBuyInner(BaseStrategy):
+        name = "always_buy_inner"
+        def generate(self, df):
+            last = df.iloc[-1]
+            return Signal(
+                action=Action.BUY, confidence=Confidence.HIGH,
+                strategy=self.name, entry_price=float(last["close"]),
+                reasoning="test", invalidation="none",
+            )
+
+    wrapped = _RegimeFilterStrategy(AlwaysBuyInner())
+
+    # _regime_trend_up=False → BUY 차단
+    n = 10
+    df_ranging = pd.DataFrame({
+        "close": np.full(n, 100.0),
+        "high": np.full(n, 101.0),
+        "low": np.full(n, 99.0),
+        "_regime_trend_up": np.array([True] * (n - 2) + [False, False]),
+    })
+    sig = wrapped.generate(df_ranging)
+    assert sig.action == Action.HOLD, (
+        f"RANGING 구간에서 BUY가 차단되지 않음: {sig.action}"
+    )
+    assert "레짐 필터" in sig.reasoning
+
+    # _regime_trend_up=True → BUY 통과
+    df_trend = pd.DataFrame({
+        "close": np.full(n, 100.0),
+        "high": np.full(n, 101.0),
+        "low": np.full(n, 99.0),
+        "_regime_trend_up": np.array([True] * n),
+    })
+    sig_trend = wrapped.generate(df_trend)
+    assert sig_trend.action == Action.BUY, (
+        f"TREND_UP 구간에서 BUY가 차단됨: {sig_trend.action}"
+    )

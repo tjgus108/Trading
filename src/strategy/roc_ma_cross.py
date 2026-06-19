@@ -1,10 +1,10 @@
 """
-ROCMACrossStrategy v4 (Cycle 329):
+ROCMACrossStrategy v5 (Cycle 330):
 
 변경:
-- RSI 필터 제거: BUY시 RSI<70, SELL시 RSI>30 조건 제거
-  (Cycle 328 분석: RSI<70 차단 0건 — 완전 무의미, 신호 빈도 개선 목적)
-- ROC 절대값 필터: abs(ROC) > 0.3% 유지 (EMA50/200 주요 차단 요인)
+- ROC 절대값 필터: abs(ROC) > 0.3% 유지 (Cycle 330: 0.1% 실험 → Sharpe -0.41→-0.74 악화 → 즉시 되돌림)
+  배경: _ROC_MIN_ABS=0.1 오신호 증가 확인, EMA50이 주 차단 요인
+  결론: ROC 필터는 오신호 방어선 — 완화 효과 없음
 
 원리:
 - ROC = (close / close.shift(12) - 1) * 100

@@ -1,3 +1,52 @@
+## [2026-06-19] Cycle 330 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] roc_ma_cross ROC_MIN_ABS 0.3%→0.1% 실험 및 되돌림**
+1. `src/strategy/roc_ma_cross.py` `_ROC_MIN_ABS = 0.3 → 0.1` 실험:
+   - Paper Sim 결과: roc_ma_cross Sharpe: -0.41 → -0.74 (악화)
+   - 오신호 증가 확인: ROC 필터가 오신호 방어선 역할 수행 중
+   - **즉시 되돌림**: `_ROC_MIN_ABS = 0.3` 복원 (실패 판단 기준 충족)
+   - v5 docstring: 실험 결과 및 결론 기록
+   - **결론**: ROC_MIN_ABS 완화는 역효과. EMA50이 주 차단요인이나 ROC 필터도 필요
+
+**[C(데이터)] detect_series() dtype=object 버그 수정 검증 테스트 추가**
+2. `tests/test_walk_forward.py` regime_filter=True 전용 테스트 3개 추가:
+   - `test_detect_series_returns_trend_up_on_uptrend()`: 강한 상승 추세 데이터에서 TREND_UP 30%+ 확인
+     - dtype=object 보장 검증 (pandas 3.x StringDtype 추론 방지)
+     - Cycle 329 버그 수정(dtype=object) 회귀 방지
+   - `test_annotate_regime_adds_column()`: `_regime_trend_up` 컬럼 추가 및 bool 타입 검증
+     - 원본 df 불변 확인 (복사본 반환 보장)
+     - 상승 추세 데이터에서 True 비율 30%+ 확인
+   - `test_regime_filter_true_blocks_buy_on_ranging()`: RANGING 구간 BUY 차단 + TREND_UP 구간 BUY 통과
+3. 테스트 결과: **8416 passed, 23 skipped** (+3 신규 테스트, 회귀 없음)
+
+**[F(리서치)] Paper Sim 0/20 PASS 10사이클 연속 — 수수료 효과 정량화**
+4. 수수료 impact 분석 (기존 데이터 활용):
+   - fee_rate=0.055%/leg + slippage=0.05%/leg = 왕복 0.21% 실거래 비용
+   - price_cluster (45 trades): 수수료 9.45% → 수수료 전 gross return ≈ +11.64%
+   - positional_scaling (36 trades): 수수료 7.56% → gross ≈ +9.53%
+   - roc_ma_cross (42 trades): 수수료 8.82% → gross ≈ +7.96%
+   - volume_breakout (78 trades): 수수료 16.38% → gross ≈ +14.33%
+   - **핵심 결론**: 대부분 전략이 수수료 없으면 양수 alpha — **수수료가 0/20 PASS 주범**
+   - **가설 A 기각**: BTC 2023 데이터 불리 → 부분적, 주원인 아님
+   - **가설 B 확인**: 수수료 0.21% 왕복 × 40+회 = 8%+ 비용 ≫ alpha
+   - Bundle OOS 4h가 PASS이유: 거래수 5-17/fold → 낮은 수수료 부담 + 높은 per-trade alpha
+   - **Cycle 331 방향**: 1h 신호를 더 선택적으로 (거래수 절반 목표: 20→10/window)
+
+**시뮬레이션 결과:**
+- 테스트: **8416 passed, 23 skipped** (+3 신규, 회귀 없음)
+- Paper Sim BTC 1h (8 windows, 20전략): **0/20 PASS** (10사이클 연속)
+  - rank1: price_cluster (return=+2.19%, Sharpe=0.34, 1/8) ← 변화 없음
+  - rank2: positional_scaling (return=+1.97%, Sharpe=0.00, 1/8)
+  - rank4: roc_ma_cross (return=-1.02%, Sharpe=-0.74, 2/8) ← _ROC_MIN_ABS=0.1 실험 실패, 0.3 복원
+- Bundle OOS BTC 4h (5-fold, real CSV): **5/5 PASS** (10사이클 연속!)
+  - order_flow_imbalance_v2: PASS (avg=4.345, std=0.907, rank1)
+  - supertrend_multi: PASS (avg=3.892, std=1.239, rank2)
+  - value_area: PASS (avg=3.069, std=0.085, rank3)
+  - vwap_cross: PASS (avg=3.047, std=1.437, rank4)
+  - cmf: PASS (avg=2.508, std=1.888, rank5)
+
+---
+
 ## [2026-06-19] Cycle 329 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] roc_ma_cross RSI 필터 제거**
@@ -17984,6 +18033,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-19 00:30 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-19 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-19 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-19 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-19 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-19 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-19 05:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
