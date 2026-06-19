@@ -1,17 +1,16 @@
 """
-ROCMACrossStrategy v3 (Cycle 122):
+ROCMACrossStrategy v4 (Cycle 329):
 
-개선 사항:
-- RSI 필터 추가: BUY시 RSI<70, SELL시 RSI>30 (과매수/과매도 회피)
-- ROC 절대값 필터 강화: abs(ROC) > 0.3% 요구 (더 민감하게) (신호 신뢰도 향상)
-- EMA50/200 이중 필터: 중장기 추세 확인
-- 목표: PF 1.577 → 1.75+, Win Rate 50% → 55%+
+변경:
+- RSI 필터 제거: BUY시 RSI<70, SELL시 RSI>30 조건 제거
+  (Cycle 328 분석: RSI<70 차단 0건 — 완전 무의미, 신호 빈도 개선 목적)
+- ROC 절대값 필터: abs(ROC) > 0.3% 유지 (EMA50/200 주요 차단 요인)
 
 원리:
 - ROC = (close / close.shift(12) - 1) * 100
 - ROC_MA = ROC.rolling(3).mean() (스무딩)
-- BUY: ROC_MA 0 상향 + ROC>0.5% + RSI<70 + close > EMA50/200
-- SELL: ROC_MA 0 하향 + ROC<-0.3% + RSI>30 + close < EMA50/200
+- BUY: ROC_MA 0 상향 + ROC>0.3% + close > EMA50/200
+- SELL: ROC_MA 0 하향 + ROC<-0.3% + close < EMA50/200
 """
 
 import pandas as pd
@@ -95,48 +94,48 @@ class ROCMACrossStrategy(BaseStrategy):
 
         conf = Confidence.HIGH if conf_high else Confidence.MEDIUM
 
-        # BUY: ROC_MA 상향 + ROC>0.5% + RSI<70 + close > EMA50 + (EMA200 확인 or 없음)
-        if (cross_above and 
+        # BUY: ROC_MA 상향 + ROC>0.3% + close > EMA50 + (EMA200 확인 or 없음)
+        # Cycle 329: RSI 필터 제거 (Cycle 328 분석: BTC 1h에서 RSI<70 차단 0건)
+        if (cross_above and
             abs(roc_now) > _ROC_MIN_ABS and roc_now > 0 and
-            rsi_val < 70 and
             close > ema50 and
             (ema200 is None or close > ema200)):
-            
+
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 상향 크로스 (ROC>{_ROC_MIN_ABS}%, RSI<70): "
+                    f"ROC_MA 0 상향 크로스 (ROC>{_ROC_MIN_ABS}%): "
                     f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
-                    f"ROC={roc_now:.2f}%, RSI={rsi_val:.1f}, close={close:.4f} > EMA50={ema50:.4f}"
+                    f"ROC={roc_now:.2f}%, close={close:.4f} > EMA50={ema50:.4f}"
                 ),
-                invalidation="ROC_MA 0 아래 재하락 또는 close < EMA50 또는 RSI>=70",
-                bull_case=f"ROC_MA 양전 전환, 상승 모멘텀 확인. ROC={roc_now:.2f}%, RSI={rsi_val:.1f}",
+                invalidation="ROC_MA 0 아래 재하락 또는 close < EMA50",
+                bull_case=f"ROC_MA 양전 전환, 상승 모멘텀 확인. ROC={roc_now:.2f}%",
                 bear_case="단순 조정 후 재하락 가능",
             )
 
-        # SELL: ROC_MA 하향 + ROC<-0.3% + RSI>30 + close < EMA50 + (EMA200 확인 or 없음)
-        if (cross_below and 
+        # SELL: ROC_MA 하향 + ROC<-0.3% + close < EMA50 + (EMA200 확인 or 없음)
+        # Cycle 329: RSI 필터 제거 (대칭적으로)
+        if (cross_below and
             abs(roc_now) > _ROC_MIN_ABS and roc_now < 0 and
-            rsi_val > 30 and
             close < ema50 and
             (ema200 is None or close < ema200)):
-            
+
             return Signal(
                 action=Action.SELL,
                 confidence=conf,
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 하향 크로스 (ROC<-{_ROC_MIN_ABS}%, RSI>30): "
+                    f"ROC_MA 0 하향 크로스 (ROC<-{_ROC_MIN_ABS}%): "
                     f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
-                    f"ROC={roc_now:.2f}%, RSI={rsi_val:.1f}, close={close:.4f} < EMA50={ema50:.4f}"
+                    f"ROC={roc_now:.2f}%, close={close:.4f} < EMA50={ema50:.4f}"
                 ),
-                invalidation="ROC_MA 0 위로 재상승 또는 close > EMA50 또는 RSI<=30",
+                invalidation="ROC_MA 0 위로 재상승 또는 close > EMA50",
                 bull_case="단순 조정일 수 있음",
-                bear_case=f"ROC_MA 음전 전환, 하락 모멘텀 확인. ROC={roc_now:.2f}%, RSI={rsi_val:.1f}",
+                bear_case=f"ROC_MA 음전 전환, 하락 모멘텀 확인. ROC={roc_now:.2f}%",
             )
 
         return Signal(
@@ -147,7 +146,7 @@ class ROCMACrossStrategy(BaseStrategy):
             reasoning=(
                 f"ROC_MA 크로스 없음 또는 조건 미충족: "
                 f"ROC_MA={roc_ma_now:.2f}, ROC={roc_now:.2f}% (need >{_ROC_MIN_ABS}%), "
-                f"RSI={rsi_val:.1f}, close={close:.4f}, EMA50={ema50:.4f}"
+                f"close={close:.4f}, EMA50={ema50:.4f}"
             ),
             invalidation="",
             bull_case="",

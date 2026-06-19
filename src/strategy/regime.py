@@ -176,7 +176,8 @@ class MarketRegimeDetector:
                     continue
             regimes.append(MarketRegime.RANGING)
 
-        return pd.Series(regimes, index=df.index)
+        # dtype=object: pandas 3.x StringDtype 추론 방지 — 벡터화 enum == 비교 정확도 보장
+        return pd.Series(regimes, index=df.index, dtype=object)
 
     def _atr_regime_series(self, high, low, close) -> list:
         """전체 시리즈에 대해 HIGH_VOL 여부 반환."""
