@@ -122,6 +122,14 @@ BUNDLE_STRATEGY_INIT_PARAMS: dict[str, dict] = {
     #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
     #   order_flow_imbalance_v2: 캔들 구조 기반 매수/매도 압력 측정 (cmf/supertrend 보완)
     #   trend_span=20: 4h 기준 80h(3.3일) EMA macro trend filter — 단기 추세 확인
+    # Cycle317 D(ML): elder_impulse 교체 — order_flow_imbalance_v2 도입
+    #   elder_impulse: avg OOS=-2.941, fold1(IS=5.372→OOS=0.568), fold2(IS=5.883→OOS=-5.389) IS 과최적화 확정
+    #   order_flow_imbalance_v2: 캔들 구조 기반 매수/매도 압력 측정 (cmf/supertrend 보완)
+    #   trend_span=20: 4h 기준 80h(3.3일) EMA macro trend filter — 단기 추세 확인
+    # Cycle332 D(ML): 그리드 탐색 결과 — trend_span=15, delta_window=7 역효과 확인
+    #   avg=4.036 (4.345→-0.309), std=2.771 (0.907→+1.864 악화) → FAIL
+    #   원인: fold0 OOS=6.724 극단값 + fold4 OOS=1.189 → std 폭발
+    #   결론: trend_span=20 복원 (다음 탐색: trend_span=25 또는 delta_window=5)
     "order_flow_imbalance_v2": {"trend_span": 20},
     # Cycle 280 A(품질): ema_filter=True 추가 — close > EMA200 시 SELL 차단
     # Cycle 281 B(리스크): confidence_filter=True 추가 — fold4 ATH 구간 MEDIUM SELL 오신호 차단

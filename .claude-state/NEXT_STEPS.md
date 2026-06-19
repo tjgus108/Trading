@@ -1,50 +1,47 @@
 # Next Steps
 
-_Last updated: 2026-06-19 (Cycle 331 완료)_
+_Last updated: 2026-06-19 (Cycle 332 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 331
+### 이번 세션 완료 사이클: 332
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 329 | D+E+F | roc_ma_cross RSI 필터 제거, detect_series() enum 버그 수정 |
 | 330 | A+C+F | ROC_MIN_ABS 0.1% 실험→즉시 되돌림(Sharpe악화), regime_filter 테스트 3개 추가 |
 | 331 | B+D+F | min_hold_bars 추가, price_cluster 그리드 업데이트, fee=0 gross alpha 실험 |
+| 332 | B+D+F | paper_sim --min-hold-bars CLI 추가, OFI v2 trend_span=15 실험→역효과 확인 복원 |
 
-### 🎯 Cycle 332 작업 방향 (332 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 333 작업 방향 (333 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): min_hold_bars 실험 — 1h 전략 재진입 대기로 거래수 감소
+#### C(데이터): WebSocket / DataFeed 안정성 점검
 
-- **배경**: Cycle 331 gross alpha 실험 결론 — 1h 전략 gross Sharpe ≈ 0.82 최대 (기준 1.0 미달)
-  - 수수료 제거 후에도 0/20 PASS → 수수료만의 문제가 아닌 gross alpha 부족
-  - **실질 전략**: 1h 개선보다 4h 강화가 현실적
-- **실험**: paper_simulation에 `--min-hold-bars 4` 옵션 추가 및 WFO 실험
-  - BacktestEngine에 `min_hold_bars` 파라미터 이미 추가됨 (Cycle 331)
-  - `paper_simulation.py`에 `--min-hold-bars` CLI 인자 추가
-  - BTC 1h 시뮬: min_hold_bars=0 vs 4 vs 8 비교 → 거래수 및 Sharpe 변화 측정
+- **배경**: SSL 차단 환경에서 CSV fallback이 핵심 — WebSocket/DataFeed 코드 유효성 확인
+- **작업**: `src/data/` 모듈 점검
+  - `data_utils.py` load_csv_ohlcv() / resample_ohlcv() 엣지케이스 테스트 확인
+  - `tests/test_data_utils.py` 커버리지 확인 (누락 경로 보완)
+  - ETH/USDT 합성 CSV vs BTC 실데이터 구분 로직 확인 (paper_sim load_ohlcv_from_csv_dir)
 
-#### D(ML): 4h 전략 강화 — order_flow_imbalance_v2 그리드 탐색
+#### B(리스크): min_hold_bars 실제 효과 측정 — --min-hold-bars 4 실험
 
-- **배경**: Cycle 331 Bundle OOS rank1 order_flow_imbalance_v2 (avg_sharpe=4.345, std=0.907)
-  - 이미 5/5 PASS + 최고 안정성 → 파라미터 최적화로 추가 개선 여지
-  - `trend_span=20` 고정 → `[15, 20, 25]` 탐색
-  - `delta_window` (현재 기본값) → `[5, 7, 10]` 탐색
-- **목표**: avg_sharpe > 5.0, std < 0.8 (현재 4.345/0.907)
+- **배경**: Cycle 332 --min-hold-bars CLI 추가 완료 (BacktestEngine 연결 검증됨)
+  - 다음 단계: 실제 효과 측정 (min_hold_bars=4 vs 0 Sharpe 비교)
+- **실험**: `python3 scripts/paper_simulation.py --csv-dir data/historical --symbols BTC/USDT --min-hold-bars 4`
+  - 거래수 변화 및 Sharpe/PF 변화 측정
+  - price_cluster rank1이 4봉 대기로 개선되는지 확인
 
-#### F(리서치): 4h 전략 전환 검토 — 1h 10연속 FAIL 결론 문서화
+#### F(리서치): OFI v2 그리드 탐색 — trend_span=25 실험
 
-- **배경**: 1h gross alpha 실험 (Cycle 331) 결론:
-  - fee=0에서도 0/20 PASS (gross Sharpe 최대 0.82 < 1.0 기준)
-  - 4h는 11사이클 연속 5/5 PASS 유지
-- **작업**: 1h 전략 개선 일시 중단 판단 문서화
-  - `paper_simulation.py` 심볼에서 ETH/SOL 제거 옵션 검토 (BTC만 집중)
-  - 4h 심볼 확장: ETH/USDT 4h CSV 존재 여부 확인
-  - 결론을 NEXT_STEPS에 정책으로 기록
+- **배경**: Cycle 332 결과 — trend_span=15 역효과 확인 (avg=4.036, std=2.771 → FAIL)
+  - trend_span=20 복원 완료. 다음 탐색: trend_span=25 (더 긴 추세 필터)
+- **작업**: `run_bundle_oos.py` BUNDLE_STRATEGY_INIT_PARAMS 변경
+  - `{"trend_span": 25}` 실험 (80h→100h EMA)
+  - 목표: avg_sharpe > 5.0, std < 0.8 (현재 4.345/0.907)
+  - 역효과면 즉시 복원 (trend_span=20 유지 정책)
 
-### ⚠️ 주의 사항 (Cycle 332)
+### ⚠️ 주의 사항 (Cycle 333)
 - **roc_ma_cross 현재 상태**: v5 (RSI 필터 제거, ROC_MIN_ABS=0.3% 복원)
   - ROC_MIN_ABS 추가 하향 실험 금지 — 이미 0.1% 역효과 확인
 - **vwap_cross override 고정**: `{"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}`
@@ -52,7 +49,9 @@ _Last updated: 2026-06-19 (Cycle 331 완료)_
 - **STRATEGIES_TIMEFRAME_EXCLUDE 유지**: `"1h": {"value_area", "supertrend_multi"}`
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
-- **min_hold_bars**: BacktestEngine에 추가 완료 (Cycle 331). paper_simulation --min-hold-bars CLI도 추가 필요
+- **order_flow_imbalance_v2 현재 상태**: `{"trend_span": 20}` (Cycle 332 실험 후 복원)
+  - trend_span=15 역효과 확인 → trend_span=25 다음 탐색
+- **min_hold_bars**: BacktestEngine + paper_simulation CLI 완료 (Cycle 332). 실제 효과 측정 필요
 
 ### ⚠️ 주의 사항 (Cycle 331, 유지)
 - **vwap_cross override 고정**: `{"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` 변경 금지
@@ -62,7 +61,20 @@ _Last updated: 2026-06-19 (Cycle 331 완료)_
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 - **roc_ma_cross 현재 상태**: v5 (RSI 필터 제거, ROC_MIN_ABS=0.3%)
 
-### 핵심 메트릭 (Cycle 331)
+### 핵심 메트릭 (Cycle 332)
+- 테스트: **8419 passed, 23 skipped** (회귀 없음)
+- Paper Sim BTC 1h (8 windows, **20전략**): **0/20 PASS** (12사이클 연속)
+  - rank1: price_cluster (Sharpe=0.34, 1/8)
+  - rank2: roc_ma_cross (Sharpe=-0.41, 2/8)
+  - rank3: positional_scaling (Sharpe=0.00, 1/8)
+  - OFI (trend_span=15) rank11 (Sharpe=-1.03) — 실험 중 임시 악화, 복원 완료
+- Bundle OOS BTC 4h (5-fold, OFI 실험 파라미터): **4/5 PASS** (OFI v2 실험 FAIL)
+  - order_flow_imbalance_v2: **FAIL** (avg=4.036, std=2.771, trend_span=15 실험)
+  - supertrend_multi: PASS (avg=3.892, std=1.239, rank1)
+  - value_area: PASS (avg=3.069, std=0.085, rank3)
+  - ⚠️ 파라미터 복원 완료 (trend_span=20) → 다음 사이클 5/5 복구 예정
+
+### 핵심 메트릭 (Cycle 331, 이전)
 - 테스트: **8419 passed, 23 skipped** (+3 신규 min_hold_bars, 회귀 없음)
 - Paper Sim BTC 1h (8 windows, **20전략**): **0/20 PASS** (11사이클 연속)
   - rank1: price_cluster (Sharpe=0.34, 1/8)

@@ -1,57 +1,51 @@
 # Current Cycle Briefing
 
-_Cycle 331 | 2026-06-19 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 332 | 2026-06-19 | B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): BacktestEngine min_hold_bars 파라미터 추가
-
-- `src/backtest/engine.py`:
-  - `min_hold_bars: int = 0` 파라미터 추가
-  - 청산 후 N봉 재진입 대기 (post-trade cooldown)
-  - 구현: cooldown_remaining 카운터, 청산 시 min_hold_bars로 리셋, 매 봉 끝 감소
-  - 신호 생성: `position is None and cooldown_remaining == 0` 조건
-  - `_build_engine()` valid_keys에 추가
-- `tests/test_backtest_engine.py` 3개 테스트 추가:
-  - `test_min_hold_bars_default_zero_no_effect()`: 기본값 동작 보존 확인
-  - `test_min_hold_bars_reduces_trade_count()`: cooldown=8봉 거래수 감소 확인
-  - `test_min_hold_bars_stored_in_engine()`: 파라미터 저장 확인
-
-### D(ML): price_cluster 그리드 vol_atr_trend_min 업데이트
-
-- `src/backtest/walk_forward.py` DEFAULT_GRIDS["price_cluster"]:
-  - `vol_atr_trend_min: [1.3, 1.5, 2.0]` → `[1.5, 2.0, 2.5]`
-  - 1.3 제거 (Cycle301 역효과 확인), 2.5 추가 (강한 추세 억제 탐색)
-
-### F(리서치): --fee-rate/--slippage 인자 + gross alpha 실험
+### B(리스크): paper_simulation.py --min-hold-bars CLI 인자 추가
 
 - `scripts/paper_simulation.py`:
-  - `--fee-rate` / `--slippage` CLI 인자 추가
-  - `run_simulation(fee_rate_override, slippage_override)` 파라미터 추가
-  - metadata JSON에 실제 적용된 fee_rate/slippage 기록
-- BTC/USDT 1h fee=0.0 slippage=0.0 시뮬레이션:
-  - **결과: 0/20 PASS** (수수료=0에서도 전멸!)
-  - best gross Sharpe: price_cluster=0.82, positional_scaling=0.40
-  - **핵심 발견**: 수수료 제거 후에도 FAIL → 1h gross alpha 부족이 근본 원인
-  - Cycle330 가설 수정: 수수료만의 문제가 아님 — gross Sharpe 최대 0.82 < 기준 1.0
+  - `--min-hold-bars INT` argparse 인자 추가 (기본 0=비활성)
+  - `run_simulation(min_hold_bars: int = 0)` 파라미터 추가
+  - `BacktestEngine(min_hold_bars=min_hold_bars)` 전달
+  - args.min_hold_bars > 0 시 "[CONFIG] min_hold_bars overridden: N" 출력
+- 검증: `python3 scripts/paper_simulation.py --help` 에서 `--min-hold-bars` 노출 확인
 
-## 시뮬레이션 결과
+### D(ML): order_flow_imbalance_v2 그리드 탐색 — trend_span=15, delta_window=7 실험
 
-- **테스트**: 8419 passed, 23 skipped (+3 신규 min_hold_bars, 회귀 없음)
-- **Paper Sim BTC 1h**: 0/20 PASS (11사이클 연속 전멸)
+- `scripts/run_bundle_oos.py` + `scripts/paper_simulation.py`:
+  - `{"trend_span": 20}` → `{"trend_span": 15, "delta_window": 7}` 실험
+  - Bundle OOS 결과: avg=4.036 (4.345→-0.309 악화), std=2.771 (0.907→+1.864 악화) → FAIL
+  - Paper Sim: OFI rank11 (avg_sharpe=-1.03)
+  - 원인: fold0 OOS=6.724 극단값 + fold4 OOS=1.189 → std 폭발
+  - **즉시 복원**: `{"trend_span": 20}` (원상복구)
+  - **결론**: trend_span=15 단기 추세 필터 → 노이즈 증가, 신호 불안정화
+
+### F(리서치): 1h 12연속 FAIL 정책 확정
+
+- Paper Sim BTC 1h 12사이클 연속 0/20 PASS
+- 1h 전략 파라미터 실험 무기한 중단 결정
+- 4h OFI 탐색 계속: trend_span=25 다음 차례 (15 역효과 확인)
+
+## 시뮬레이션 결과 (OFI 실험 파라미터 적용)
+
+- **테스트**: 8419 passed, 23 skipped (회귀 없음)
+- **Paper Sim BTC 1h**: 0/20 PASS (12사이클 연속)
   - rank1: price_cluster (Sharpe=0.34, 1/8)
-  - rank2: roc_ma_cross (Sharpe=-0.41, 0/8)
+  - rank2: roc_ma_cross (Sharpe=-0.41, 2/8)
   - rank3: positional_scaling (Sharpe=0.00, 1/8)
-  - fee=0: price_cluster gross=0.82, positional_scaling gross=0.40
-- **Bundle OOS BTC 4h**: 5/5 PASS (11사이클 연속!)
-  - rank1: order_flow_imbalance_v2 (avg OOS Sharpe=4.345, std=0.907)
-  - rank2: supertrend_multi (avg=3.892, std=1.239)
-  - rank3: value_area (avg=3.069, std=0.085) ← std 최저 안정
-  - rank4: vwap_cross (avg=3.047, std=1.437)
-  - rank5: cmf (avg=2.508, std=1.888)
+- **Bundle OOS BTC 4h (실험 중)**: 4/5 PASS (OFI 파라미터 실험 FAIL)
+  - order_flow_imbalance_v2: FAIL (avg=4.036, std=2.771) ← trend_span=15 실험
+  - supertrend_multi: PASS (avg=3.892, std=1.239)
+  - value_area: PASS (avg=3.069)
+  - vwap_cross: PASS (avg=3.047)
+  - cmf: PASS (avg=2.508)
+  - ⚠️ OFI 파라미터 복원 완료 (trend_span=20) → 다음 사이클 5/5 복구 예정
 
-## 다음 사이클 (332 mod 5 = 2): B(리스크) + D(ML) + F(리서치)
+## 다음 사이클 (333 mod 5 = 3): C(데이터) + B(리스크) + F(리서치)
 
-- **B(리스크)**: paper_simulation에 --min-hold-bars CLI 인자 추가 후 min_hold_bars=4/8 효과 측정
-- **D(ML)**: order_flow_imbalance_v2 4h WFO 그리드 탐색 (trend_span, delta_window)
-- **F(리서치)**: 1h 전략 개선 일시 중단 판단 문서화 + 4h 심볼 확장 검토
+- **C(데이터)**: src/data/ 모듈 엣지케이스 테스트 점검 (CSV 로딩 안정성)
+- **B(리스크)**: --min-hold-bars 4 실제 효과 측정 (price_cluster Sharpe 변화)
+- **F(리서치)**: OFI v2 trend_span=25 실험 (목표: avg>5.0, std<0.8)

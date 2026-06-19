@@ -91,6 +91,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle298 F: trend_span=20 적용 (EMA20 macro trend filter, sharpe -7.98 완화)
     # Cycle299 F: delta_window=7 실험 → 역효과 → 기본값(10) 복원
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원
+    # Cycle332 D(ML): trend_span=15, delta_window=7 실험 → 역효과 확인 후 복원
+    #   avg=4.036 (4.345→-0.309 악화), std=2.771 (0.907→+1.864 악화) → Bundle OOS FAIL
     "order_flow_imbalance_v2": {"trend_span": 20},
     # Cycle309 D(ML): buy_thresh=0.10 효과 미미 (rank14, Sharpe -1.21, trades=72)
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
@@ -1129,7 +1131,8 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
 
 def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
                    fee_rate_override: Optional[float] = None,
-                   slippage_override: Optional[float] = None):
+                   slippage_override: Optional[float] = None,
+                   min_hold_bars: int = 0):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
@@ -1172,6 +1175,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         # Cycle299 E(실행): ATR 기반 레짐별 가변 슬리피지 (low=0.02%, normal=0.05%, high=0.15%)
         # 고변동성 구간의 시장 충격을 현실적으로 반영, 저변동성 sideways 구간 유리
         adaptive_slippage=True,
+        # Cycle332 B(리스크): 청산 후 재진입 대기 봉수 (0=비활성)
+        min_hold_bars=min_hold_bars,
     )
 
     sections = []
@@ -1308,6 +1313,12 @@ if __name__ == "__main__":
         default=None,
         help="슬리피지 오버라이드 (기본 0.0005=0.05%%, 0.0으로 gross alpha 측정)",
     )
+    parser.add_argument(
+        "--min-hold-bars",
+        type=int,
+        default=0,
+        help="Cycle332 B: 청산 후 재진입 대기 봉수 (기본 0=비활성, 예: 4=4봉 대기)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1344,9 +1355,12 @@ if __name__ == "__main__":
     if args.strategies:
         _this.STRATEGY_FILTER = args.strategies
         print(f"[CONFIG] Strategy filter: {args.strategies}", flush=True)
+    if args.min_hold_bars > 0:
+        print(f"[CONFIG] min_hold_bars overridden: {args.min_hold_bars}", flush=True)
     sys.exit(run_simulation(
         mc_p_threshold=args.mc_p_threshold,
         pass_ratio=args.pass_ratio,
         fee_rate_override=args.fee_rate,
         slippage_override=args.slippage,
+        min_hold_bars=args.min_hold_bars,
     ))
