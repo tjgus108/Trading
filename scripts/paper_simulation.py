@@ -1127,7 +1127,9 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
     return report, results
 
 
-def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
+def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
+                   fee_rate_override: Optional[float] = None,
+                   slippage_override: Optional[float] = None):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
@@ -1152,10 +1154,17 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
         return 1
     print(f"[STRATEGIES] Loaded {len(pass_list)} strategies")
 
+    _fee_rate = fee_rate_override if fee_rate_override is not None else 0.00055
+    _slippage = slippage_override if slippage_override is not None else 0.0005
+    if fee_rate_override is not None:
+        print(f"[CONFIG] fee_rate overridden: {_fee_rate} (gross alpha mode)", flush=True)
+    if slippage_override is not None:
+        print(f"[CONFIG] slippage overridden: {_slippage}", flush=True)
+
     engine = BacktestEngine(
         initial_balance=10_000,
-        fee_rate=0.00055,       # Bybit taker 0.055%
-        slippage_pct=0.0005,    # 0.05% (기본값, adaptive_slippage=True 시 레짐별로 오버라이드됨)
+        fee_rate=_fee_rate,
+        slippage_pct=_slippage,
         mc_min_trades=getattr(_this, "MC_MIN_TRADES", 0),
         mc_block_size=getattr(_this, "MC_BLOCK_SIZE", 1),
         # Cycle298 B: 연속 손실 5회 시 포지션 50% 축소
@@ -1199,8 +1208,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5):
             "step_hours": STEP_HOURS,
             "pass_ratio": PASS_RATIO,
             "initial_balance": 10_000,
-            "fee_rate": 0.00055,
-            "slippage_pct": 0.0005,
+            "fee_rate": _fee_rate,
+            "slippage_pct": _slippage,
             "synthetic_data_mode": "BlockBootstrap" if USE_BLOCK_BOOTSTRAP else "GBM",
             "block_bootstrap_block_size": BLOCK_BOOTSTRAP_BLOCK_SIZE if USE_BLOCK_BOOTSTRAP else None,
             "regime_weights": USE_REGIME_WEIGHTS,
@@ -1287,6 +1296,18 @@ if __name__ == "__main__":
         default=None,
         help="실행할 전략 모듈명 필터 (예: --strategies supertrend_multi narrow_range)",
     )
+    parser.add_argument(
+        "--fee-rate",
+        type=float,
+        default=None,
+        help="수수료율 오버라이드 (기본 0.00055=0.055%%, 0.0으로 gross alpha 측정)",
+    )
+    parser.add_argument(
+        "--slippage",
+        type=float,
+        default=None,
+        help="슬리피지 오버라이드 (기본 0.0005=0.05%%, 0.0으로 gross alpha 측정)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1323,4 +1344,9 @@ if __name__ == "__main__":
     if args.strategies:
         _this.STRATEGY_FILTER = args.strategies
         print(f"[CONFIG] Strategy filter: {args.strategies}", flush=True)
-    sys.exit(run_simulation(mc_p_threshold=args.mc_p_threshold, pass_ratio=args.pass_ratio))
+    sys.exit(run_simulation(
+        mc_p_threshold=args.mc_p_threshold,
+        pass_ratio=args.pass_ratio,
+        fee_rate_override=args.fee_rate,
+        slippage_override=args.slippage,
+    ))

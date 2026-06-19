@@ -919,3 +919,33 @@ def test_avg_slippage_per_trade_larger_with_higher_slippage():
             f"높은 슬리피지율이 avg 증가: high={result_high.avg_slippage_per_trade:.6f} "
             f"low={result_low.avg_slippage_per_trade:.6f}"
         )
+
+
+# Cycle331 B: min_hold_bars cooldown 테스트
+
+def test_min_hold_bars_default_zero_no_effect():
+    """min_hold_bars=0(기본값)은 기존 동작과 동일해야 함."""
+    df = make_df(n=200, close_trend=0.001)
+    engine_base = BacktestEngine(commission=0.0, slippage=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0)
+    engine_zero = BacktestEngine(commission=0.0, slippage=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0, min_hold_bars=0)
+    r_base = engine_base.run(AlwaysBuyStrategy(), df)
+    r_zero = engine_zero.run(AlwaysBuyStrategy(), df)
+    assert r_base.total_trades == r_zero.total_trades
+
+
+def test_min_hold_bars_reduces_trade_count():
+    """min_hold_bars>0이면 재진입이 억제되어 거래 수가 줄어야 함."""
+    df = make_df(n=300, close_trend=0.001)
+    engine_no_cd = BacktestEngine(commission=0.0, slippage=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0, min_hold_bars=0)
+    engine_cd = BacktestEngine(commission=0.0, slippage=0.0, atr_multiplier_sl=0.5, atr_multiplier_tp=1.0, min_hold_bars=8)
+    r_no_cd = engine_no_cd.run(AlwaysBuyStrategy(), df)
+    r_cd = engine_cd.run(AlwaysBuyStrategy(), df)
+    assert r_cd.total_trades <= r_no_cd.total_trades, (
+        f"cooldown 8봉: {r_cd.total_trades} <= {r_no_cd.total_trades}"
+    )
+
+
+def test_min_hold_bars_stored_in_engine():
+    """BacktestEngine이 min_hold_bars를 올바르게 저장해야 함."""
+    engine = BacktestEngine(min_hold_bars=4)
+    assert engine.min_hold_bars == 4

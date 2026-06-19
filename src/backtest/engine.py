@@ -121,6 +121,7 @@ class BacktestEngine:
         mc_min_trades: int = 0,  # MC 검정 최소 거래 수 (0=MIN_TRADES 사용)
         mc_block_size: int = 1,  # MC block sign randomization 크기 (1=독립 셔플)
         consec_loss_scale_threshold: int = 0,  # Cycle298 B: 연속 손실 N회 시 포지션 50% 축소 (0=비활성)
+        min_hold_bars: int = 0,  # Cycle331 B: 청산 후 재진입 대기 봉수 (0=비활성, 1h에서 4봉=4h 최소 대기)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -138,6 +139,7 @@ class BacktestEngine:
         # consec_loss_scale_threshold: 0이면 비활성. N>0이면 N번 연속 손실 후 포지션 사이즈 50% 축소
         # DrawdownMonitor.get_size_multiplier()와 동일한 로직을 backtest 시뮬레이션에 반영
         self.consec_loss_scale_threshold = max(0, int(consec_loss_scale_threshold))
+        self.min_hold_bars = max(0, int(min_hold_bars))
         # mc_min_trades: 0이면 MIN_TRADES(모듈 상수) 그대로 사용
         self.mc_min_trades = int(mc_min_trades) if mc_min_trades > 0 else MIN_TRADES
         self.mc_block_size = max(1, int(mc_block_size))
@@ -155,6 +157,7 @@ class BacktestEngine:
         total_slippage_cost = 0.0
         signals_skipped_atr0 = 0  # 신호 생성됐으나 atr=0으로 포지션 미진입 횟수
         consec_losses = 0  # 연속 손실 카운터 (consec_loss_scale_threshold 기능용)
+        cooldown_remaining = 0  # Cycle331 B: 청산 후 재진입 대기 봉수 카운터
         # Cycle309 E(실행): adaptive_slippage 레짐별 진입 카운트
         slip_regime_counts: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
 
@@ -189,6 +192,7 @@ class BacktestEngine:
                     total_slippage_cost += slip
                     peak_balance = max(peak_balance, balance)
                     position = None
+                    cooldown_remaining = self.min_hold_bars
                     if pnl > 0:
                         consec_losses = 0
                     else:
@@ -202,13 +206,14 @@ class BacktestEngine:
                         total_slippage_cost += slip
                         peak_balance = max(peak_balance, balance)
                         position = None
+                        cooldown_remaining = self.min_hold_bars
                         if pnl > 0:
                             consec_losses = 0
                         else:
                             consec_losses += 1
 
-            # 신호 생성 (포지션 없을 때만)
-            if position is None:
+            # 신호 생성 (포지션 없고 cooldown 만료 시)
+            if position is None and cooldown_remaining == 0:
                 signal = strategy.generate(window)
                 if signal.action != Action.HOLD:
                     atr = candle["atr14"]
@@ -268,6 +273,9 @@ class BacktestEngine:
                             "hold_candles": 0,
                         }
 
+            # cooldown 감소 (매 봉 끝)
+            if cooldown_remaining > 0:
+                cooldown_remaining -= 1
             equity_curve.append(balance)
 
         # 미청산 포지션 시장가 청산
@@ -672,7 +680,7 @@ class BacktestEngine:
             "atr_multiplier_sl", "atr_multiplier_tp",
             "slippage", "slippage_pct", "timeframe",
             "funding_cost_per_candle", "dsr_threshold",
-            "adaptive_slippage",
+            "adaptive_slippage", "min_hold_bars",
         }
         filtered = {k: v for k, v in params.items() if k in valid_keys}
         return BacktestEngine(**filtered)
