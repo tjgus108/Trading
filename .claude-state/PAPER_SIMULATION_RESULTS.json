@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated": "2026-06-19T10:34:04.710999Z",
+    "generated": "2026-06-19T15:14:56.137704Z",
     "symbols": [
       "BTC/USDT"
     ],
@@ -597,7 +597,7 @@
         "avg_win_rate": 0.376,
         "avg_final_balance": 10008.5,
         "sharpe_std": 2.8326,
-        "rank_score": 64.7,
+        "rank_score": 64.8,
         "percentile": "p94",
         "robustness_label": "",
         "top_fail_reasons": [
@@ -2657,7 +2657,7 @@
         "avg_win_rate": 0.356,
         "avg_final_balance": 9626.75,
         "sharpe_std": 3.0338,
-        "rank_score": 59.6,
+        "rank_score": 59.7,
         "percentile": "p78",
         "robustness_label": "",
         "top_fail_reasons": [
@@ -2951,7 +2951,7 @@
         "avg_win_rate": 0.3355,
         "avg_final_balance": 9552.62,
         "sharpe_std": 3.5235,
-        "rank_score": 52.1,
+        "rank_score": 52.2,
         "percentile": "p42",
         "robustness_label": "",
         "top_fail_reasons": [
@@ -3233,307 +3233,6 @@
               "low": 0,
               "normal": 67,
               "high": 7
-            }
-          }
-        ]
-      },
-      {
-        "name": "order_flow_imbalance_v2",
-        "overall_passed": false,
-        "consistency_score": 0.0,
-        "passed_windows": 0,
-        "total_windows": 8,
-        "avg_sharpe": -0.8285,
-        "avg_return": -0.0488,
-        "avg_max_dd": 0.158,
-        "avg_profit_factor": 0.9544,
-        "avg_trades": 73.4,
-        "avg_win_rate": 0.361,
-        "avg_final_balance": 9512.0,
-        "sharpe_std": 2.1297,
-        "rank_score": 56.7,
-        "percentile": "p52",
-        "robustness_label": "",
-        "top_fail_reasons": [
-          [
-            "profit_factor 0.94 < 1.5",
-            2
-          ],
-          [
-            "profit_factor 1.25 < 1.5",
-            1
-          ],
-          [
-            "mc_p_value 0.234 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -0.63 < 1.0",
-            1
-          ],
-          [
-            "mc_p_value 0.603 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -1.44 < 1.0",
-            1
-          ],
-          [
-            "profit_factor 0.84 < 1.5",
-            1
-          ],
-          [
-            "mc_p_value 0.743 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -3.91 < 1.0",
-            1
-          ],
-          [
-            "max_drawdown 27.0% > 20%",
-            1
-          ],
-          [
-            "profit_factor 0.63 < 1.5",
-            1
-          ],
-          [
-            "mc_p_value 0.946 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -3.73 < 1.0",
-            1
-          ],
-          [
-            "max_drawdown 22.6% > 20%",
-            1
-          ],
-          [
-            "profit_factor 0.62 < 1.5",
-            1
-          ],
-          [
-            "mc_p_value 0.963 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -0.65 < 1.0",
-            1
-          ],
-          [
-            "mc_p_value 0.592 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "sharpe -0.49 < 1.0",
-            1
-          ],
-          [
-            "profit_factor 0.96 < 1.5",
-            1
-          ],
-          [
-            "mc_p_value 0.549 > 0.1 (우연 가능성)",
-            1
-          ],
-          [
-            "profit_factor 1.45 < 1.5",
-            1
-          ]
-        ],
-        "window_results": [
-          {
-            "window": 1,
-            "sharpe": 1.6,
-            "total_return": 0.1172,
-            "max_dd": 0.1132,
-            "profit_factor": 1.249,
-            "trades": 69,
-            "win_rate": 0.4058,
-            "passed": false,
-            "fail_reasons": [
-              "profit_factor 1.25 < 1.5",
-              "mc_p_value 0.234 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 11172.0,
-            "volatility": 0.013094603671579916,
-            "market_return": 1.4292,
-            "market_state": "bull",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 69,
-              "high": 0
-            }
-          },
-          {
-            "window": 2,
-            "sharpe": -0.626,
-            "total_return": -0.0575,
-            "max_dd": 0.1682,
-            "profit_factor": 0.94,
-            "trades": 78,
-            "win_rate": 0.3462,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -0.63 < 1.0",
-              "profit_factor 0.94 < 1.5",
-              "mc_p_value 0.603 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 9425.0,
-            "volatility": 0.015622104069582875,
-            "market_return": 1.2676,
-            "market_state": "bull",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 67,
-              "high": 11
-            }
-          },
-          {
-            "window": 3,
-            "sharpe": -1.441,
-            "total_return": -0.107,
-            "max_dd": 0.1256,
-            "profit_factor": 0.842,
-            "trades": 73,
-            "win_rate": 0.3288,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -1.44 < 1.0",
-              "profit_factor 0.84 < 1.5",
-              "mc_p_value 0.743 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 8930.0,
-            "volatility": 0.018072748211802974,
-            "market_return": -0.0624,
-            "market_state": "bear",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 52,
-              "high": 21
-            }
-          },
-          {
-            "window": 4,
-            "sharpe": -3.912,
-            "total_return": -0.2306,
-            "max_dd": 0.2699,
-            "profit_factor": 0.631,
-            "trades": 70,
-            "win_rate": 0.2714,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -3.91 < 1.0",
-              "max_drawdown 27.0% > 20%",
-              "profit_factor 0.63 < 1.5",
-              "mc_p_value 0.946 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 7694.0,
-            "volatility": 0.015865500647897907,
-            "market_return": -0.2711,
-            "market_state": "bear",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 57,
-              "high": 13
-            }
-          },
-          {
-            "window": 5,
-            "sharpe": -3.729,
-            "total_return": -0.2201,
-            "max_dd": 0.2258,
-            "profit_factor": 0.618,
-            "trades": 74,
-            "win_rate": 0.3108,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -3.73 < 1.0",
-              "max_drawdown 22.6% > 20%",
-              "profit_factor 0.62 < 1.5",
-              "mc_p_value 0.963 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 7799.0,
-            "volatility": 0.013860749794991405,
-            "market_return": -0.0095,
-            "market_state": "sideways",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 71,
-              "high": 3
-            }
-          },
-          {
-            "window": 6,
-            "sharpe": -0.648,
-            "total_return": -0.0527,
-            "max_dd": 0.1491,
-            "profit_factor": 0.943,
-            "trades": 74,
-            "win_rate": 0.3919,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -0.65 < 1.0",
-              "profit_factor 0.94 < 1.5",
-              "mc_p_value 0.592 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 9473.0,
-            "volatility": 0.014763504835485256,
-            "market_return": -0.0352,
-            "market_state": "sideways",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 70,
-              "high": 4
-            }
-          },
-          {
-            "window": 7,
-            "sharpe": -0.494,
-            "total_return": -0.0432,
-            "max_dd": 0.1083,
-            "profit_factor": 0.959,
-            "trades": 75,
-            "win_rate": 0.3733,
-            "passed": false,
-            "fail_reasons": [
-              "sharpe -0.49 < 1.0",
-              "profit_factor 0.96 < 1.5",
-              "mc_p_value 0.549 > 0.1 (우연 가능성)"
-            ],
-            "final_balance": 9568.0,
-            "volatility": 0.01570541552722104,
-            "market_return": 0.2022,
-            "market_state": "bull",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 65,
-              "high": 10
-            }
-          },
-          {
-            "window": 8,
-            "sharpe": 2.622,
-            "total_return": 0.2035,
-            "max_dd": 0.1039,
-            "profit_factor": 1.453,
-            "trades": 74,
-            "win_rate": 0.4595,
-            "passed": false,
-            "fail_reasons": [
-              "profit_factor 1.45 < 1.5"
-            ],
-            "final_balance": 12035.0,
-            "volatility": 0.01376050134807865,
-            "market_return": 0.3239,
-            "market_state": "bull",
-            "slippage_regime_counts": {
-              "low": 0,
-              "normal": 68,
-              "high": 6
             }
           }
         ]
@@ -3844,8 +3543,8 @@
         "avg_win_rate": 0.3578,
         "avg_final_balance": 9283.25,
         "sharpe_std": 1.9115,
-        "rank_score": 56.3,
-        "percentile": "p47",
+        "rank_score": 56.4,
+        "percentile": "p52",
         "robustness_label": "",
         "top_fail_reasons": [
           [
@@ -4141,6 +3840,326 @@
             "slippage_regime_counts": {
               "low": 0,
               "normal": 86,
+              "high": 7
+            }
+          }
+        ]
+      },
+      {
+        "name": "order_flow_imbalance_v2",
+        "overall_passed": false,
+        "consistency_score": 0.0,
+        "passed_windows": 0,
+        "total_windows": 8,
+        "avg_sharpe": -1.0269,
+        "avg_return": -0.0736,
+        "avg_max_dd": 0.198112,
+        "avg_profit_factor": 0.9331,
+        "avg_trades": 82.5,
+        "avg_win_rate": 0.3508,
+        "avg_final_balance": 9264.0,
+        "sharpe_std": 2.1279,
+        "rank_score": 54.1,
+        "percentile": "p47",
+        "robustness_label": "",
+        "top_fail_reasons": [
+          [
+            "sharpe -0.52 < 1.0",
+            1
+          ],
+          [
+            "profit_factor 0.96 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.572 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "sharpe -2.57 < 1.0",
+            1
+          ],
+          [
+            "max_drawdown 30.1% > 20%",
+            1
+          ],
+          [
+            "profit_factor 0.76 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.877 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "sharpe -3.92 < 1.0",
+            1
+          ],
+          [
+            "max_drawdown 31.7% > 20%",
+            1
+          ],
+          [
+            "profit_factor 0.63 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.968 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "sharpe -3.67 < 1.0",
+            1
+          ],
+          [
+            "max_drawdown 28.8% > 20%",
+            1
+          ],
+          [
+            "profit_factor 0.66 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.946 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "sharpe -1.55 < 1.0",
+            1
+          ],
+          [
+            "max_drawdown 22.8% > 20%",
+            1
+          ],
+          [
+            "profit_factor 0.82 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.757 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "profit_factor 1.26 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.192 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "sharpe 0.44 < 1.0",
+            1
+          ],
+          [
+            "profit_factor 1.08 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.398 > 0.1 (우연 가능성)",
+            1
+          ],
+          [
+            "profit_factor 1.29 < 1.5",
+            1
+          ],
+          [
+            "mc_p_value 0.164 > 0.1 (우연 가능성)",
+            1
+          ]
+        ],
+        "window_results": [
+          {
+            "window": 1,
+            "sharpe": -0.516,
+            "total_return": -0.0565,
+            "max_dd": 0.1753,
+            "profit_factor": 0.963,
+            "trades": 84,
+            "win_rate": 0.3571,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe -0.52 < 1.0",
+              "profit_factor 0.96 < 1.5",
+              "mc_p_value 0.572 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 9435.0,
+            "volatility": 0.013094603671579916,
+            "market_return": 1.4292,
+            "market_state": "bull",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 84,
+              "high": 0
+            }
+          },
+          {
+            "window": 2,
+            "sharpe": -2.568,
+            "total_return": -0.1987,
+            "max_dd": 0.3013,
+            "profit_factor": 0.762,
+            "trades": 94,
+            "win_rate": 0.2979,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe -2.57 < 1.0",
+              "max_drawdown 30.1% > 20%",
+              "profit_factor 0.76 < 1.5",
+              "mc_p_value 0.877 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 8013.0,
+            "volatility": 0.015622104069582875,
+            "market_return": 1.2676,
+            "market_state": "bull",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 75,
+              "high": 19
+            }
+          },
+          {
+            "window": 3,
+            "sharpe": -3.917,
+            "total_return": -0.2705,
+            "max_dd": 0.317,
+            "profit_factor": 0.633,
+            "trades": 97,
+            "win_rate": 0.2784,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe -3.92 < 1.0",
+              "max_drawdown 31.7% > 20%",
+              "profit_factor 0.63 < 1.5",
+              "mc_p_value 0.968 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 7295.0,
+            "volatility": 0.018072748211802974,
+            "market_return": -0.0624,
+            "market_state": "bear",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 61,
+              "high": 36
+            }
+          },
+          {
+            "window": 4,
+            "sharpe": -3.673,
+            "total_return": -0.2441,
+            "max_dd": 0.2882,
+            "profit_factor": 0.661,
+            "trades": 83,
+            "win_rate": 0.2892,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe -3.67 < 1.0",
+              "max_drawdown 28.8% > 20%",
+              "profit_factor 0.66 < 1.5",
+              "mc_p_value 0.946 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 7559.0,
+            "volatility": 0.015865500647897907,
+            "market_return": -0.2711,
+            "market_state": "bear",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 63,
+              "high": 20
+            }
+          },
+          {
+            "window": 5,
+            "sharpe": -1.548,
+            "total_return": -0.1124,
+            "max_dd": 0.2277,
+            "profit_factor": 0.817,
+            "trades": 72,
+            "win_rate": 0.3333,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe -1.55 < 1.0",
+              "max_drawdown 22.8% > 20%",
+              "profit_factor 0.82 < 1.5",
+              "mc_p_value 0.757 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 8876.0,
+            "volatility": 0.013860749794991405,
+            "market_return": -0.0095,
+            "market_state": "sideways",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 69,
+              "high": 3
+            }
+          },
+          {
+            "window": 6,
+            "sharpe": 1.678,
+            "total_return": 0.1213,
+            "max_dd": 0.1026,
+            "profit_factor": 1.264,
+            "trades": 72,
+            "win_rate": 0.4167,
+            "passed": false,
+            "fail_reasons": [
+              "profit_factor 1.26 < 1.5",
+              "mc_p_value 0.192 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 11213.0,
+            "volatility": 0.014763504835485256,
+            "market_return": -0.0352,
+            "market_state": "sideways",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 66,
+              "high": 6
+            }
+          },
+          {
+            "window": 7,
+            "sharpe": 0.443,
+            "total_return": 0.0222,
+            "max_dd": 0.0958,
+            "profit_factor": 1.078,
+            "trades": 76,
+            "win_rate": 0.3947,
+            "passed": false,
+            "fail_reasons": [
+              "sharpe 0.44 < 1.0",
+              "profit_factor 1.08 < 1.5",
+              "mc_p_value 0.398 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 10222.0,
+            "volatility": 0.01570541552722104,
+            "market_return": 0.2022,
+            "market_state": "bull",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 63,
+              "high": 13
+            }
+          },
+          {
+            "window": 8,
+            "sharpe": 1.886,
+            "total_return": 0.1499,
+            "max_dd": 0.077,
+            "profit_factor": 1.287,
+            "trades": 82,
+            "win_rate": 0.439,
+            "passed": false,
+            "fail_reasons": [
+              "profit_factor 1.29 < 1.5",
+              "mc_p_value 0.164 > 0.1 (우연 가능성)"
+            ],
+            "final_balance": 11499.0,
+            "volatility": 0.01376050134807865,
+            "market_return": 0.3239,
+            "market_state": "bull",
+            "slippage_regime_counts": {
+              "low": 0,
+              "normal": 75,
               "high": 7
             }
           }
@@ -4787,7 +4806,7 @@
         "avg_win_rate": 0.3449,
         "avg_final_balance": 9233.0,
         "sharpe_std": 1.6773,
-        "rank_score": 51.3,
+        "rank_score": 51.4,
         "percentile": "p36",
         "robustness_label": "",
         "top_fail_reasons": [
@@ -5418,7 +5437,7 @@
         "avg_win_rate": 0.3143,
         "avg_final_balance": 8970.5,
         "sharpe_std": 1.1865,
-        "rank_score": 35.3,
+        "rank_score": 35.4,
         "percentile": "p15",
         "robustness_label": "",
         "top_fail_reasons": [
