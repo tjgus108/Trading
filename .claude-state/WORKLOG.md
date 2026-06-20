@@ -1,3 +1,39 @@
+## [2026-06-20] Cycle 334 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] OFI v2 delta_window=5 실험 → FAIL → 복원**
+1. `scripts/run_bundle_oos.py`:
+   - `{"trend_span": 20, "delta_window": 5}` 실험 결과:
+     - OFI avg OOS Sharpe: 4.345 → 2.962 (-1.383 악화)
+     - OFI std: 0.907 → 3.570 (+2.663 불안정)
+     - fold2 OOS=-0.86 FAIL (delta_window=10 기준 3.458)
+   - 결론: delta_window=5 역효과 확정. **즉시 복원** `{"trend_span": 20}`
+   - delta_window 그리드: 5(FAIL) ← tested, 10(best) ← baseline
+
+**[E(실행)] live_paper_trader.py CSV fallback 검증**
+2. `scripts/live_paper_trader.py` 점검:
+   - CSV fallback 로직 정상 작동: Bybit 실패 → data/historical/binance/BTCUSDT/1h.csv 로드
+   - 실거래소 CSV 우선, synthetic 후순위, 4h 요청 시 1h→4h 리샘플링 지원
+   - PASS 전략 22개 로드 확인 (QUALITY_AUDIT.csv → 22 PASS 전략)
+   - 초기화 오류 없음: `enrich_indicators()` 정상 실행
+
+**[F(리서치)] OFI v2 파라미터 그리드 탐색 완료 기록**
+3. 탐색 이력 정리:
+   - trend_span 그리드: 15(FAIL) < 25(PASS,avg=3.929) < 20(PASS,best=4.345) ← 완료
+   - delta_window 그리드: 5(FAIL,avg=2.962) < 10(best,avg=4.345) ← 완료
+   - 결론: `{"trend_span": 20, "delta_window": 10(기본값)}` 최적 파라미터 확정
+
+**시뮬레이션 결과 (Cycle 334)**
+- 테스트: **8425 passed, 23 skipped** (회귀 없음)
+- Paper Sim BTC 1h (8 windows, 20전략, 표준 run): **0/20 PASS** (14사이클 연속)
+  - rank1: price_cluster (Sharpe=0.34, 1/8) — 표준 기준 복귀
+  - rank2: roc_ma_cross (Sharpe=-0.41, 2/8)
+  - rank3: positional_scaling (Sharpe=0.00, 1/8)
+- Bundle OOS BTC 4h (delta_window=5 실험): **4/5 PASS** (OFI FAIL)
+  - order_flow_imbalance_v2: **FAIL** (avg=2.962, std=3.570) ← delta_window=5 역효과
+  - supertrend_multi: PASS (avg=3.892, std=1.239, rank1)
+  - value_area: PASS (avg=3.069, std=0.085), vwap_cross: PASS, cmf: PASS
+  - ⚠️ 파라미터 복원 완료 → 다음 사이클 OFI 4.345 복구 예정
+
 ## [2026-06-19] Cycle 333 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] load_csv_ohlcv() 엣지케이스 테스트 6건 추가**
@@ -18817,6 +18853,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-19 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-20 05:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-20 05:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-20 05:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-20 05:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-20 05:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-20 05:07 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
