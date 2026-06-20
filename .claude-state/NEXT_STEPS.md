@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-06-20 (Cycle 335 완료)_
+_Last updated: 2026-06-20 (Cycle 336 D(ML) 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -103,5 +103,5 @@ _Last updated: 2026-06-20 (Cycle 335 완료)_
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}`
 - `relative_volume: {"rvol_buy_sell": 1.2}`
 - `momentum_quality: {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3}`
-- `order_flow_imbalance_v2: {"trend_span": 20}`
+- `order_flow_imbalance_v2: {"trend_span": 20, "buy_thresh": 0.30, "sell_thresh": -0.30}` ← Cycle 336 D(ML) 변경
 - `cmf: {"buy_thresh": 0.10}`
