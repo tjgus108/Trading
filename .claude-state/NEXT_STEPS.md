@@ -1,54 +1,58 @@
 # Next Steps
 
-_Last updated: 2026-06-20 (Cycle 336 B(리스크) 완료)_
+_Last updated: 2026-06-20 (Cycle 336 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 335
+### 이번 세션 완료 사이클: 336
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 333 | C+B+F | data_utils 테스트+6, cooldown_suppressed 진단 필드, trend_span=25 실험→복원 |
 | 334 | D+E+F | delta_window=5 실험→FAIL(avg=2.962,std=3.570), live_paper_trader CSV fallback 검증 |
 | 335 | A+C+F | 청산이유 추적(sl/tp/max_hold), BTC CSV 갭 없음 확인, OFI imbalance_threshold 탐색 완료 |
+| 336 | B+D+F | MAX_HOLD=48 실험(Sharpe 전 전략 개선), OFI buy_thresh=0.30(BTC개선/ETH악화), 0/20 PASS 16연속 |
 
-### 🎯 Cycle 336 작업 방향 (336 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 337 작업 방향 (337 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): MAX_HOLD_CANDLES 진단 기반 개선 탐색
+#### B(리스크): MAX_HOLD_CANDLES=48 실제 적용
 
-- **배경**: Cycle 335 발견 — price_cluster 스모크테스트에서 14거래 중 max_hold=7 (50%)
-  - SL=5, TP=2, MAX_HOLD=7 → TP 도달 전 강제청산이 PF 저하의 핵심 원인
-  - 현재 MAX_HOLD_CANDLES=24 (1h 기준 24시간=1일)
-- **작업**: BacktestEngine에서 1h 실데이터 기반 close_reason 분포 측정
-  - price_cluster, roc_ma_cross, positional_scaling 대상으로 sl/tp/max_hold 비율 확인
-  - MAX_HOLD_CANDLES=48 (2일) 실험: max_hold 강제청산 감소 → PF 개선 가능성 검토
-  - **주의**: MAX_HOLD 증가 시 MDD 악화 위험 — 전략별 영향 측정 필수
-- **금지**: price_cluster 전략 파일 수정 금지
+- **배경**: Cycle 336 실험 확인 — MAX_HOLD=48 시 전 전략 Sharpe/PF 개선
+  - price_cluster: max_hold% 12%→3%, Sharpe +0.498, PF +0.100
+  - roc_ma_cross: max_hold% 18%→5%, Sharpe +0.665, MDD -6.4%p
+  - 설정 위치: `src/backtest/engine.py` line 27 `MAX_HOLD_CANDLES = 24`
+- **작업**: `engine.py` `MAX_HOLD_CANDLES = 24` → `48` 변경 후 Paper Sim 전체 재실행
+  - Paper Sim 재실행으로 전체 전략에서 PASS 수 변화 확인
+  - MDD 악화 여부 감시 (≤20% 기준 유지 필수)
+  - 테스트 실행 (`pytest tests/ -x -q`)으로 회귀 없음 확인
+- **기대**: 0/20 PASS → 1~3 PASS 가능성 (PF 개선 흐름 전략 대상)
+- **금지**: 전략 파일 수정 금지, MDD > 20% 초과 시 즉시 복원
 
-#### D(ML): OFI v2 buy_thresh 1h 탐색
+#### D(ML): OFI v2 buy_thresh=0.30 결과 평가 및 결정
 
-- **배경**: 1h Paper Sim에서 OFI rank10 (Sharpe=-0.83, PF=0.95)
-  - 4h Bundle OOS에서는 rank1 (avg=4.345) — 타임프레임별 적합성 차이
-  - buy_thresh=0.25는 1h에서 너무 많은 노이즈 신호 허용 가능성
-- **작업**: PAPER_SIM_STRATEGY_PARAMS에 `order_flow_imbalance_v2: {"trend_span": 20, "buy_thresh": 0.30, "sell_thresh": -0.30}` 실험
-  - Paper Sim 1h에서 OFI 신호 빈도 측정 (현재 73거래/8윈도우 = 과다)
-  - 0.30으로 강화 시 거래 감소 + PF 개선 가능성
-  - **주의**: Bundle OOS 4h `BUNDLE_STRATEGY_INIT_PARAMS`는 변경 금지 (4h에서 이미 최적)
+- **배경**: Cycle 336 결과 — BTC 개선(Sharpe -0.83→-0.64), ETH 악화(rank15, Sharpe=-2.40)
+  - 복합 결과로 단순 유지/복원 결정 어려움
+  - 주의: Cycle 300에서도 buy_thresh=0.30 시도 → 역효과 후 복원 전례 있음
+- **작업**: 유지 여부 결정을 위한 추가 분석
+  - ETH 악화 원인 분석 (`order_flow_imbalance_v2.py` ETH 신호 패턴 확인)
+  - BTC-only 기준에서는 유지, ETH/SOL 포함 멀티심볼 기준에서는 복원 고려
+  - 결론이 복원이면: `{"trend_span": 20}`으로 되돌리기
+- **주의**: Bundle OOS `BUNDLE_STRATEGY_INIT_PARAMS` 변경 금지 (4h 최적 유지)
 
-#### F(리서치): MAX_HOLD_CANDLES 영향 분석 + 논문 리서치
+#### F(리서치): 1h PASS 불가 구조적 원인 분석
 
-- **배경**: close_reason 추적 기능 추가로 진단 가능
-- **작업**: BTC 1h 실데이터로 전략별 close_reason 분포 측정
-  - 분포 측정 코드: engine.run() 후 result.sl_hits, tp_hits, max_hold_closes 로깅
-  - MAX_HOLD_CANDLES 값 변화에 따른 PF/Sharpe 민감도 분석
-- **리서치**: "Optimal holding period for crypto mean-reversion strategies" 관련 퀀트 논문
+- **배경**: 16사이클 연속 0/20 PASS — 단순 파라미터 조정의 한계 도달
+- **작업**: SL/TP 비율 재검토
+  - 현재: SL=5%, TP=2% → 2.5:1 손절 우세 → 높은 WR 필요 (현재 37-40% WR로 부족)
+  - 대안 탐색: SL=2%, TP=4% (1:2 리스크리워드) or SL=3%, TP=6% (1:2)
+  - `src/backtest/engine.py`에서 SL_PCT, TP_PCT 파라미터 위치 확인
+  - **주의**: 실험 전 전략별 평균 승률 확인 필수 (현재 37~40%)
 
-### ⚠️ 주의 사항 (Cycle 336)
-- **order_flow_imbalance_v2 현재 상태**: `{"trend_span": 20}` (delta_window=10 기본값)
+### ⚠️ 주의 사항 (Cycle 337)
+- **order_flow_imbalance_v2 현재 상태**: `{"trend_span": 20, "buy_thresh": 0.30, "sell_thresh": -0.30}` ← Cycle 336 변경
   - **Bundle OOS 파라미터 변경 금지**: 5/5 PASS 유지
-  - 1h paper_sim 실험만 허용 (PAPER_SIM_STRATEGY_PARAMS)
+  - ETH 악화 분석 후 복원 여부 결정
 - **vwap_cross override 고정**: `{"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` 변경 금지
 - **value_area override 고정**: `{"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` 변경 금지
 - **STRATEGIES_TIMEFRAME_EXCLUDE 유지**: `"1h": {"value_area", "supertrend_multi"}` 변경 금지
@@ -84,15 +88,15 @@ _Last updated: 2026-06-20 (Cycle 336 B(리스크) 완료)_
   - MAX_HOLD=48 권장 — Cycle 337에서 engine.py 상수 변경 가능
 - **미변경**: engine.py MAX_HOLD_CANDLES 아직 24 유지 (추가 검토 후 Cycle 337 B에서 결정)
 
-### 핵심 메트릭 (Cycle 335)
+### 핵심 메트릭 (Cycle 336)
 - 테스트: **8425 passed, 23 skipped** (회귀 없음)
-- Paper Sim BTC 1h (8 windows, **20전략**, 표준): **0/20 PASS** (15사이클 연속)
+- Paper Sim BTC 1h (8 windows, **20전략**, buy_thresh=0.30): **0/20 PASS** (16사이클 연속)
   - rank1: price_cluster (Sharpe=0.34, Return=+2.19%, PF=1.11, 1/8)
   - rank2: roc_ma_cross (Sharpe=-0.41, PF=1.10, 2/8)
   - rank3: positional_scaling (Sharpe=0.00, PF=1.18, 1/8)
-  - 주요 FAIL 원인: profit_factor < 1.5 (전체)
-  - **NEW 진단**: max_hold_closes가 전체 거래의 ~50% 차지 → PF 저하 원인
-- Bundle OOS BTC 4h (OFI 복원): **5/5 PASS** ← 이전 사이클 파라미터 복원 확인
+  - OFI rank5: Sharpe=-0.64, PF=1.04, 70 trades (이전 rank10, Sharpe=-0.83 대비 개선)
+  - 주요 FAIL 원인: profit_factor < 1.5 (전체), MAX_HOLD 강제청산 구조적 원인
+- Bundle OOS BTC 4h: **5/5 PASS** ← 유지
   - rank1: order_flow_imbalance_v2 (avg=4.345, std=0.907)
   - rank2: supertrend_multi (avg=3.892, std=1.239)
   - rank3: value_area (avg=3.069, std=0.085)
@@ -106,7 +110,7 @@ _Last updated: 2026-06-20 (Cycle 336 B(리스크) 완료)_
 - Bundle OOS: `--csv-dir data/historical` 필수 (합성 데이터 run은 리포트 덮어쓰기 방지됨)
 - Paper simulation 1h: **20 전략** × 8 windows → 약 13분 소요
 
-### BUNDLE_STRATEGY_INIT_PARAMS 현재 설정 (Cycle 335 변경 없음)
+### BUNDLE_STRATEGY_INIT_PARAMS 현재 설정 (Cycle 336 변경 없음)
 - `vwap_cross: {}` ← 기본 파라미터
 - `supertrend_multi: {atr_threshold=0.5, atr_threshold_max=1.5, ema_filter=True, confidence_filter=True, rsi_ob_filter=True, rsi_ob_threshold=80, trend_confirm_bars=2, cmf_confirm=False}` ← 고정
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← 최적 확정 (delta_window=10 기본값)
@@ -118,7 +122,7 @@ _Last updated: 2026-06-20 (Cycle 336 B(리스크) 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 335 변경 없음)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 336 변경)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}`
 - `relative_volume: {"rvol_buy_sell": 1.2}`
