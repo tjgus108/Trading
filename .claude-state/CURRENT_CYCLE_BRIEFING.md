@@ -1,49 +1,46 @@
 # Current Cycle Briefing
 
-_Cycle 333 | 2026-06-19 | C(데이터) + B(리스크) + F(리서치)_
+_Cycle 334 | 2026-06-20 | D(ML) + E(실행) + F(리서치)_
 
 ## 완료된 작업
 
-### C(데이터): load_csv_ohlcv() 엣지케이스 테스트 6건 추가
+### D(ML): OFI v2 delta_window=5 실험 → 역효과 확인 후 복원
 
-- `tests/test_data_utils.py` 누락 경로 보완:
-  - FileNotFoundError, missing column, 'time'/'date' 헤더 변형, TZ-aware → UTC 변환, no timestamp column
-  - 총 34 tests (이전 28 → +6)
-- 합성 vs 실거래소 CSV 우선순위 로직 확인: `_candidate_key` 정상 작동 (synthetic=False 우선)
-- Empty DataFrame 엣지케이스: `resample_ohlcv()` 빈 DF 입력 시 빈 DF 반환 확인
+- `scripts/run_bundle_oos.py` BUNDLE_STRATEGY_INIT_PARAMS 변경:
+  - `{"trend_span": 20, "delta_window": 5}` 실험 (기본 delta_window=10에서 단축)
+  - 결과: avg=2.962 (4.345→-1.383 악화), std=3.570 (0.907→+2.663 악화) → **FAIL** (4/5 PASS)
+  - 원인: fold0 OOS=7.75 극단값 (lucky fold) + fold2 OOS=-0.86 FAIL
+  - 즉시 복원: `{"trend_span": 20}` (delta_window=10 기본값 유지)
+- **delta_window 그리드 탐색 완료**: 5(FAIL), 7(FAIL), 10(PASS,best) → 추가 탐색 불필요
 
-### B(리스크): BacktestEngine cooldown_suppressed 진단 카운터 + min_hold_bars=4 실험
+### D(ML) 코드 개선: walk_forward.py lucky_fold 경고 로직 추가
 
-- `src/backtest/engine.py`:
-  - `BacktestResult.cooldown_suppressed: int = 0` 필드 추가
-  - cooldown 활성 시마다 카운터 증가, DEBUG 로그 출력
-- min_hold_bars=4 실험 (paper_sim --min-hold-bars 4):
-  - roc_ma_cross: -0.41 → +0.16 (개선), price_cluster: +0.34 → -0.53 (악화)
-  - 결론: 전략별 차별 효과 → 범용 min_hold_bars 기본값 유지 (0), 필요시 CLI 옵션 활용
+- `src/backtest/walk_forward.py` BundleOOSResult.validate():
+  - fold OOS Sharpe > avg+1.5*std AND > 5.0 시 WARNING 로그
+  - 목적: 단일 lucky fold가 std를 왜곡하는 패턴 (delta_window=5 fold0=7.75) 조기 탐지
+  - PASS/FAIL 로직 무변경, 진단 전용
 
-### F(리서치): OFI v2 trend_span=25 실험 완료
+### E(실행): live_paper_trader.py 초기화 검증
 
-- `scripts/run_bundle_oos.py`:
-  - trend_span=25 실험: avg=3.929, std=1.081, 5/5 PASS
-  - trend_span=20 (avg=4.345, std=0.907) vs trend_span=25 (avg=3.929, std=1.081)
-  - 결론: trend_span=20이 최적. **즉시 복원 완료**
-  - 그리드 탐색 완료: 15(FAIL) < 25(PASS) < 20(PASS, best)
+- 임포트/초기화 정상: `LiveState()`, `load_pass_strategies()` → 22 strategies
+- `BUNDLE_PASS_PRIORITY` 5개 전략 정상 로드
+- CSV fallback 로직 검토: Bybit 실패 → data/historical 실거래소 우선 정렬 정상
 
-## 시뮬레이션 결과 (Cycle 333)
+### F(리서치): OFI v2 파라미터 탐색 완료 기록
 
-- **테스트**: 8425 passed, 23 skipped (회귀 없음, +6 신규)
-- **Paper Sim BTC 1h (min_hold_bars=4 실험)**: 0/20 PASS (13사이클 연속)
-  - rank1: roc_ma_cross (Sharpe=0.16, Return=+2.34%, 2/8) — min_hold_bars=4로 개선
-  - rank2: positional_scaling (Sharpe=-0.40, 1/8)
-  - rank6: price_cluster (Sharpe=-0.53, 1/8) — min_hold_bars=4로 악화
-- **Bundle OOS BTC 4h (trend_span=25 실험)**: **5/5 PASS** (4/5 → 5/5 복원!)
-  - order_flow_imbalance_v2: PASS (avg=3.929, std=1.081, trend_span=25 실험)
-  - supertrend_multi: PASS (avg=3.892), vwap_cross: PASS (avg=3.047)
-  - value_area: PASS (avg=3.069), cmf: PASS (avg=2.508)
-  - ⚠️ 파라미터 복원 완료 (trend_span=20) — 다음 사이클 OFI avg=4.345 복구 예정
+- OFI v2 파라미터 탐색 이력:
+  - trend_span: 15(FAIL) < 25(PASS) < 20(PASS,best) — 완료 (Cycle 333)
+  - delta_window: 5(FAIL), 7(FAIL), 10(PASS,best) — 완료 (Cycle 334)
+- **다음 탐색 후보**: buy_thresh=0.30 (현재 0.25/-0.25)
 
-## 다음 사이클 (334 mod 5 = 4): D(ML) + E(실행) + F(리서치)
+## 시뮬레이션 결과
 
-- **D(ML)**: ML 모델 재학습 권고 (ADWIN drift=YES), 또는 OFI v2 delta_window 실험
-- **E(실행)**: Paper Trading 모드 점검, TWAP 실행기 검증
-- **F(리서치)**: OFI v2 delta_window 탐색 (trend_span=20 확정, 다음: delta_window=5 또는 7)
+- Paper Sim BTC 1h (8 windows, 20전략): **0/20 PASS** (14사이클 연속)
+  - rank1: price_cluster (Sharpe=0.34, +2.19%, 1/8)
+  - rank2: positional_scaling (Sharpe=0.00, +1.97%, 1/8)
+- Bundle OOS BTC 4h (5-fold): **5/5 PASS** (delta_window=10 복원!)
+  - OFI v2: PASS (avg=4.345, std=0.907, rank1) ← 기준 복원
+
+## 테스트 결과
+
+- **8425 passed, 23 skipped** (회귀 없음)

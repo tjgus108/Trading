@@ -1424,6 +1424,20 @@ class RollingOOSValidator:
         oos_std = _stats.stdev(oos_sharpes) if len(oos_sharpes) > 1 else 0.0
         all_passed = all(f.passed for f in active_folds)
 
+        # Cycle334 D(ML): 극단 양수 outlier fold 진단 (std 왜곡 원인 조기 탐지)
+        # 단일 fold OOS Sharpe가 avg + 1.5*std 초과 시 WARNING — "lucky fold" 패턴 식별
+        if oos_std > 0 and len(oos_sharpes) > 1:
+            outlier_folds = [
+                (f.fold_id, f.oos_sharpe) for f in active_folds
+                if f.oos_sharpe > avg_sharpe + 1.5 * oos_std and f.oos_sharpe > 5.0
+            ]
+            if outlier_folds:
+                logger.warning(
+                    "[%s] lucky_fold 의심: fold(s) OOS Sharpe 극단 양수 %s — "
+                    "std=%.3f 왜곡 원인. 파라미터 단축 실험 시 발생 패턴.",
+                    strategy.name, outlier_folds, oos_std,
+                )
+
         # DSR 계산: OOS Sharpe 평균과 거래 수를 기반으로 통계적 유의성 판정
         dsr_pvalue = None
         is_sig = None
