@@ -124,7 +124,7 @@ class BacktestEngine:
         commission: float = DEFAULT_FEE_RATE,  # Bybit taker 0.055% (deprecated alias: use fee_rate)
         fee_rate: Optional[float] = None,  # 진입/청산 각 taker fee, 왕복 0.11%
         atr_multiplier_sl: float = 1.5,
-        atr_multiplier_tp: float = 3.5,  # Cycle 256: 3.0→3.5 (R:R=2.33:1, PF 임계값 낮춤)
+        atr_multiplier_tp: float = 3.5,  # Cycle 256: 3.0→3.5 (R:R=2.33:1, PF 임계값 낮춤); Cycle 339: 4.0 실험 → bundle OOS 1/5 FAIL → revert
         slippage: float = DEFAULT_SLIPPAGE,
         slippage_pct: Optional[float] = None,  # 기본 0.05% (보통 레짐)
         timeframe: str = "1h",

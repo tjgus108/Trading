@@ -1,3 +1,41 @@
+## [2026-06-20] Cycle 339 — D(ML) + F(리서치)
+
+**[F(리서치)] atr_multiplier_tp=3.5→4.0 실험 → FAIL → 즉시 revert**
+1. `engine.py` `atr_multiplier_tp: float = 3.5 → 4.0` 변경
+   - 이론: R:R=2.67, 이론 PF = (0.38×2.67)/0.62 = 1.63 → PASS 가능성 기대
+   - Bundle OOS 4h 실행 결과: **1/5 PASS (catastrophic regression)**
+     - cmf: FAIL (OOS Sharpe std 2.858 > 2.0, fold2 FAIL)
+     - order_flow_imbalance_v2: FAIL (fold2 FAIL, std 2.680 > 2.0)
+     - vwap_cross: FAIL (fold1 FAIL, std 2.929 > 2.0)
+     - value_area: FAIL (fold3,4 FAIL)
+     - supertrend_multi: PASS (레짐전환 fold4 제외)
+   - **즉시 revert**: `atr_multiplier_tp: float = 4.0 → 3.5`
+   - Bundle OOS 재실행 확인: **5/5 PASS 복원** ✅
+   - **결론**: tp=4.0은 번들 OOS 전략들이 민감 반응, tp=3.5 유지 필수
+   - **분석**: TP 원거리화로 WR 감소 + 전략별 청산 타이밍 구조 변화 → 4h 전략 성능 훼손
+
+**[D(ML)] ML 모델 재훈련 시도 + ADWIN drift 검토**
+2. Cycle 338 paper sim의 ADWIN drift 신호 분석:
+   - 3개 심볼 모두 "Drift Detected=YES, Retrain Count=3" — 최근 200봉 데이터에서 레짐 변화 감지
+   - Feature Drift=0/3 — 특정 피처 자체보다는 분포 변화 (ADWIN 윈도우 적응 후 안정화)
+3. ML 모델 재훈련 시도 (binary RF, --demo, limit=1500):
+   - BTC: train_acc=0.755, val=0.500, test=0.512 → **FAIL** (< 0.55 임계값)
+   - ETH: train_acc=0.778, val=0.413, test=0.447 → **FAIL**
+   - SOL: train_acc=0.756, val=0.448, test=0.461 → **FAIL**
+   - **결론**: 모든 심볼에서 심각한 과적합 (train 0.75+ vs test 0.45-0.51)
+   - 기존 모델 유지 (새 모델 저장 실패) — rf_btcusdt_2026-06-20.pkl 등
+   - **향후 과제**: 피처 엔지니어링 개선 또는 앙상블 다양화 필요
+
+**시뮬레이션 결과 (Cycle 339)**
+- Paper Sim (atr_tp=4.0 실험): **무효** — `--symbols BTC ETH SOL` 형식 오류로 synthetic data 강제 사용
+  - 올바른 형식: `--symbols "BTC/USDT" "ETH/USDT" "SOL/USDT"` (CSV dir 매칭용 필수)
+  - 결과 신뢰 불가 → 실제 Cycle 339 paper sim은 tp=3.5 복원 후 올바른 형식으로 재실행
+- Bundle OOS BTC 4h (atr_tp=4.0): **1/5 PASS** → 즉시 revert (valid 실험 결과)
+- Bundle OOS BTC 4h (atr_tp=3.5, revert 후): **5/5 PASS** ✅ 복원
+- Paper Sim BTC 1h (atr_tp=3.5, 올바른 형식 재실행): 결과 기록 예정
+
+---
+
 ## [2026-06-20] Cycle 338 — C(데이터) + B(리스크) + F(리서치)
 
 **[B(리스크)] TF별 MAX_HOLD 구현 + 중요 버그 수정**
