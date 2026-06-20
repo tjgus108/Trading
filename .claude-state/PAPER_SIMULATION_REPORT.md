@@ -327,3 +327,166 @@ _adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
 
 - **전체 20개 균등배분**: -5.37% -> $9,463
 - **Top 5 균등배분**: +0.40% -> $10,040
+
+
+---
+
+# Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
+
+_Generated: 2026-06-20T05:32:14.369815Z_
+_Symbol: SOL/USDT_
+_Data Source: CSV fallback SOL/USDT 1h (/home/user/Trading/data/historical)_
+_Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
+_Walk-Forward: 8개 윈도우 (train=5040, test=1440 candles [1h])_
+_Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_
+_통과 기준: 윈도우 50% 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_
+
+## ML 모델 건강 상태 (ADWIN)
+
+| 항목 | 값 |
+|------|-----|
+| EWMA Accuracy | 1.0000 |
+| EWMA Trend | N/A (unknown) |
+| EWMA Samples | 0 |
+| Drift Detected | YES |
+| Output Drift | NO |
+| Retrain Recommended (EWMA) | NO |
+| Retrain Recommended (ADWIN) | YES |
+| Retrain Count | 3 |
+| Feature Drift | 0/3 features drifted |
+
+## 요약
+
+| 항목 | 값 |
+|------|-----|
+| 테스트 전략 | 20개 |
+| PASS (일관성 50%+) | 0개 |
+| FAIL | 20개 |
+| 평균 수익률 | -4.29% |
+| 최고 수익률 | 1.42% (elder_impulse) |
+| 최저 수익률 | -13.10% (lob_maker) |
+
+## TOP 10 전략 (평균 수익률 기준)
+
+| # | Name | AvgReturn | AvgSharpe | AvgWR | AvgPF | AvgTrades | AvgMDD | Consistency | Pass |
+|---|------|-----------|-----------|-------|-------|-----------|--------|-------------|------|
+| 1 | `elder_impulse` | +1.42% | 0.34 | 39.6% | 1.07 | 47 | 8.6% | 0/8 | FAIL |
+| 2 | `order_flow_imbalance_v2` | +1.39% | 0.10 | 37.7% | 1.04 | 72 | 11.5% | 0/8 | FAIL |
+| 3 | `htf_ema` | +1.12% | 0.27 | 38.8% | 1.08 | 35 | 7.9% | 0/8 | FAIL |
+| 4 | `momentum_quality` | +0.10% | -0.14 | 40.8% | 1.03 | 74 | 13.3% | 0/8 | FAIL |
+| 5 | `wick_reversal` | +0.00% | 0.00 | 0.0% | 0.00 | 0 | 0.0% | 0/8 | FAIL |
+| 6 | `price_action_momentum` | -0.35% | -0.36 | 39.9% | 1.05 | 48 | 9.3% | 1/8 | FAIL |
+| 7 | `acceleration_band` | -0.46% | -0.44 | 33.6% | 1.22 | 7 | 3.8% | 0/8 | FAIL |
+| 8 | `volatility_cluster` | -0.74% | -0.17 | 39.0% | 1.01 | 49 | 9.4% | 0/8 | FAIL |
+| 9 | `roc_ma_cross` | -1.98% | -0.78 | 38.5% | 0.91 | 34 | 8.0% | 0/8 | FAIL |
+| 10 | `price_cluster` | -2.63% | -0.85 | 37.8% | 0.84 | 24 | 7.9% | 0/8 | FAIL |
+
+## 상대 순위 (Composite Rank Score)
+
+_점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consistency(10%) + Sharpe안정성(10%)_
+_0/N PASS 상황에서도 전략 간 상대 우위를 파악할 수 있는 보조 지표_
+
+| Rank | Name | Score | Pctl | AvgSharpe | SharpeStd | AvgPF | AvgTrades | AvgMDD | Consist | Pass |
+|------|------|-------|------|-----------|-----------|-------|-----------|--------|---------|------|
+| 1 | `order_flow_imbalance_v2` | 68.4 | p100 | 0.10 | 1.82 | 1.04 | 72 | 11.5% | 0/8 | FAIL |
+| 2 | `price_action_momentum` | 66.7 | p94 | -0.36 | 2.50 | 1.05 | 48 | 9.3% | 1/8 | FAIL |
+| 3 | `elder_impulse` | 66.5 | p89 | 0.34 | 0.86 | 1.07 | 47 | 8.6% | 0/8 | FAIL |
+| 4 | `momentum_quality` | 63.7 | p84 | -0.14 | 2.35 | 1.03 | 74 | 13.3% | 0/8 | FAIL |
+| 5 | `htf_ema` | 61.2 | p78 | 0.27 | 1.09 | 1.08 | 35 | 7.9% | 0/8 | FAIL |
+| 6 | `volatility_cluster` | 60.4 | p73 | -0.17 | 1.57 | 1.01 | 49 | 9.4% | 0/8 | FAIL |
+| 7 | `frama` | 48.6 | p68 | -1.41 | 1.26 | 0.81 | 60 | 14.8% | 0/8 | FAIL |
+| 8 | `roc_ma_cross` | 48.1 | p63 | -0.78 | 2.05 | 0.91 | 34 | 8.0% | 0/8 | FAIL |
+| 9 | `acceleration_band` | 46.6 | p57 | -0.44 | 1.91 | 1.22 | 7 | 3.8% | 0/8 | FAIL |
+| 10 | `relative_volume` | 45.7 | p52 | -2.06 | 1.19 | 0.76 | 73 | 16.5% | 0/8 | FAIL |
+| 11 | `volume_breakout` | 44.9 | p47 | -1.41 | 2.47 | 0.86 | 58 | 15.2% | 0/8 | FAIL |
+| 12 | `price_cluster` | 43.7 | p42 | -0.85 | 1.40 | 0.84 | 24 | 7.9% | 0/8 | FAIL |
+| 13 | `narrow_range` | 40.6 | p36 | -1.77 | 2.33 | 0.80 | 48 | 12.1% | 0/8 | FAIL |
+| 14 | `cmf` | 39.6 | p31 | -1.98 | 1.74 | 0.75 | 52 | 14.2% | 0/8 | FAIL |
+| 15 | `lob_maker` | 39.5 | p26 | -2.20 | 1.57 | 0.75 | 67 | 19.1% | 0/8 | FAIL |
+
+## 전체 결과
+
+| Name | AvgReturn | AvgSharpe | AvgPF | AvgTrades | Consistency | Pass |
+|------|-----------|-----------|-------|-----------|-------------|------|
+| `elder_impulse` | +1.42% | 0.34 | 1.07 | 47 | 0/8 | FAIL |
+| `order_flow_imbalance_v2` | +1.39% | 0.10 | 1.04 | 72 | 0/8 | FAIL |
+| `htf_ema` | +1.12% | 0.27 | 1.08 | 35 | 0/8 | FAIL |
+| `momentum_quality` | +0.10% | -0.14 | 1.03 | 74 | 0/8 | FAIL |
+| `wick_reversal` | +0.00% | 0.00 | 0.00 | 0 | 0/8 | FAIL |
+| `price_action_momentum` | -0.35% | -0.36 | 1.05 | 48 | 1/8 | FAIL |
+| `acceleration_band` | -0.46% | -0.44 | 1.22 | 7 | 0/8 | FAIL |
+| `volatility_cluster` | -0.74% | -0.17 | 1.01 | 49 | 0/8 | FAIL |
+| `roc_ma_cross` | -1.98% | -0.78 | 0.91 | 34 | 0/8 | FAIL |
+| `price_cluster` | -2.63% | -0.85 | 0.84 | 24 | 0/8 | FAIL |
+| `dema_cross` | -4.42% | -1.69 | 0.66 | 26 | 0/8 | FAIL |
+| `linear_channel_rev` | -5.77% | -1.89 | 0.68 | 28 | 0/8 | FAIL |
+| `volume_breakout` | -5.98% | -1.41 | 0.86 | 58 | 0/8 | FAIL |
+| `narrow_range` | -6.22% | -1.77 | 0.80 | 48 | 0/8 | FAIL |
+| `frama` | -8.13% | -1.41 | 0.81 | 60 | 0/8 | FAIL |
+| `cmf` | -8.62% | -1.98 | 0.75 | 52 | 0/8 | FAIL |
+| `engulfing_zone` | -9.43% | -3.45 | 0.57 | 26 | 1/8 | FAIL |
+| `relative_volume` | -10.36% | -2.06 | 0.76 | 73 | 0/8 | FAIL |
+| `positional_scaling` | -11.71% | -3.40 | 0.55 | 41 | 0/8 | FAIL |
+| `lob_maker` | -13.10% | -2.20 | 0.75 | 67 | 0/8 | FAIL |
+
+## FAIL 원인 분석
+
+| Strategy | Top Fail Reasons (reason x count) |
+|----------|-----------------------------------|
+| `elder_impulse` | sharpe -1.33 < 1.0 (x1), profit_factor 0.80 < 1.5 (x1), mc_p_value 0.733 > 0.1 (우연 가능성) (x1) |
+| `order_flow_imbalance_v2` | sharpe -3.46 < 1.0 (x1), profit_factor 0.62 < 1.5 (x1), mc_p_value 0.952 > 0.1 (우연 가능성) (x1) |
+| `htf_ema` | sharpe -1.07 < 1.0 (x1), profit_factor 0.81 < 1.5 (x1), mc_p_value 0.699 > 0.1 (우연 가능성) (x1) |
+| `momentum_quality` | profit_factor 1.33 < 1.5 (x2), sharpe -1.16 < 1.0 (x1), profit_factor 0.86 < 1.5 (x1) |
+| `wick_reversal` | no trades generated (x8) |
+| `price_action_momentum` | sharpe -2.53 < 1.0 (x1), profit_factor 0.67 < 1.5 (x1), mc_p_value 0.900 > 0.1 (우연 가능성) (x1) |
+| `acceleration_band` | trades 7 < 15 (x4), trades 8 < 15 (x2), trades 6 < 15 (x2) |
+| `volatility_cluster` | sharpe -3.53 < 1.0 (x1), profit_factor 0.56 < 1.5 (x1), mc_p_value 0.966 > 0.1 (우연 가능성) (x1) |
+| `roc_ma_cross` | sharpe -2.43 < 1.0 (x1), profit_factor 0.59 < 1.5 (x1), mc_p_value 0.874 > 0.1 (우연 가능성) (x1) |
+| `price_cluster` | profit_factor 0.45 < 1.5 (x2), sharpe -0.17 < 1.0 (x1), profit_factor 0.97 < 1.5 (x1) |
+| `dema_cross` | sharpe -1.67 < 1.0 (x1), profit_factor 0.65 < 1.5 (x1), mc_p_value 0.771 > 0.1 (우연 가능성) (x1) |
+| `linear_channel_rev` | profit_factor 0.72 < 1.5 (x2), sharpe -3.16 < 1.0 (x1), profit_factor 0.50 < 1.5 (x1) |
+| `volume_breakout` | sharpe -5.85 < 1.0 (x1), max_drawdown 25.7% > 20% (x1), profit_factor 0.44 < 1.5 (x1) |
+| `narrow_range` | sharpe -4.26 < 1.0 (x1), max_drawdown 20.3% > 20% (x1), profit_factor 0.51 < 1.5 (x1) |
+| `frama` | sharpe -2.57 < 1.0 (x1), max_drawdown 22.3% > 20% (x1), profit_factor 0.65 < 1.5 (x1) |
+| `cmf` | sharpe -5.89 < 1.0 (x1), max_drawdown 22.0% > 20% (x1), profit_factor 0.40 < 1.5 (x1) |
+| `engulfing_zone` | mc_p_value 0.997 > 0.1 (우연 가능성) (x2), sharpe -4.37 < 1.0 (x1), profit_factor 0.30 < 1.5 (x1) |
+| `relative_volume` | mc_p_value 0.891 > 0.1 (우연 가능성) (x2), sharpe -3.01 < 1.0 (x1), profit_factor 0.66 < 1.5 (x1) |
+| `positional_scaling` | sharpe -3.64 < 1.0 (x1), profit_factor 0.51 < 1.5 (x1), mc_p_value 0.959 > 0.1 (우연 가능성) (x1) |
+| `lob_maker` | sharpe -5.45 < 1.0 (x1), max_drawdown 28.8% > 20% (x1), profit_factor 0.48 < 1.5 (x1) |
+
+### 전체 FAIL 원인 빈도 (상위 10)
+
+| Fail Reason | Total Count |
+|-------------|-------------|
+| no trades generated | 8 |
+| profit_factor 0.86 < 1.5 | 4 |
+| profit_factor 1.01 < 1.5 | 4 |
+| trades 7 < 15 | 4 |
+| profit_factor 0.66 < 1.5 | 4 |
+| profit_factor 0.71 < 1.5 | 4 |
+| profit_factor 1.23 < 1.5 | 3 |
+| profit_factor 0.97 < 1.5 | 3 |
+| profit_factor 0.57 < 1.5 | 3 |
+| profit_factor 0.58 < 1.5 | 3 |
+
+## 슬리피지 레짐 분포 (상위 10)
+
+_adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
+
+| Strategy | Low | Normal | High | High% |
+|----------|-----|--------|------|-------|
+| `acceleration_band` | 0 | 0 | 56 | 100.0% |
+| `dema_cross` | 0 | 0 | 205 | 100.0% |
+| `engulfing_zone` | 0 | 0 | 212 | 100.0% |
+| `lob_maker` | 0 | 0 | 539 | 100.0% |
+| `momentum_quality` | 0 | 1 | 590 | 99.8% |
+| `relative_volume` | 0 | 1 | 580 | 99.8% |
+| `volatility_cluster` | 0 | 1 | 394 | 99.7% |
+| `frama` | 0 | 2 | 477 | 99.6% |
+| `linear_channel_rev` | 0 | 1 | 224 | 99.6% |
+| `cmf` | 0 | 2 | 418 | 99.5% |
+
+## 포트폴리오 가상 배분
+
+- **전체 20개 균등배분**: -4.29% -> $9,571
+- **Top 5 균등배분**: +0.80% -> $10,080
