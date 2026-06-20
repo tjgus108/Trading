@@ -1,6 +1,6 @@
 # Next Steps
 
-_Last updated: 2026-06-20 (Cycle 336 D(ML) 완료)_
+_Last updated: 2026-06-20 (Cycle 336 B(리스크) 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
@@ -63,6 +63,26 @@ _Last updated: 2026-06-20 (Cycle 336 D(ML) 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 - **roc_ma_cross 현재 상태**: v5 (RSI 필터 제거, ROC_MIN_ABS=0.3%)
+
+### 핵심 메트릭 (Cycle 336 B: MAX_HOLD 실험)
+- MAX_HOLD=24 vs 48 close_reason 분포 (BTC 1h 실데이터):
+
+| 전략 | MAX_HOLD | trades | sl% | tp% | max_hold% | Sharpe | PF | MDD |
+|------|----------|--------|-----|-----|-----------|--------|-----|-----|
+| price_cluster | 24 | 368 | 61% | 27% | 12% | 0.239 | 1.061 | 30.7% |
+| price_cluster | 48 | 336 | 63% | 34% | 3% | 0.737 | 1.161 | 31.2% |
+| roc_ma_cross | 24 | 309 | 59% | 23% | 18% | -0.168 | 0.995 | 23.1% |
+| roc_ma_cross | 48 | 284 | 64% | 31% | 5% | 0.497 | 1.115 | 16.7% |
+| positional_scaling | 24 | 314 | 62% | 21% | 17% | -0.688 | 0.895 | 36.0% |
+| positional_scaling | 48 | 288 | 68% | 28% | 4% | -0.393 | 0.946 | 31.5% |
+
+- **결론**: MAX_HOLD=48이 전 전략에서 Sharpe/PF 개선 (max_hold% 급감: 12-18% → 3-5%)
+  - price_cluster: Sharpe +0.498, PF +0.100, MDD +0.5%p (허용 범위)
+  - roc_ma_cross: Sharpe +0.665, PF +0.120, MDD -6.4%p (개선)
+  - positional_scaling: Sharpe +0.295, PF +0.051, MDD -4.5%p (개선)
+  - **주의**: 세 전략 모두 여전히 FAIL (PF<1.5, Sharpe 부족, MDD>20%)
+  - MAX_HOLD=48 권장 — Cycle 337에서 engine.py 상수 변경 가능
+- **미변경**: engine.py MAX_HOLD_CANDLES 아직 24 유지 (추가 검토 후 Cycle 337 B에서 결정)
 
 ### 핵심 메트릭 (Cycle 335)
 - 테스트: **8425 passed, 23 skipped** (회귀 없음)
