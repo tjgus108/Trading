@@ -32,7 +32,11 @@
   - 결과 신뢰 불가 → 실제 Cycle 339 paper sim은 tp=3.5 복원 후 올바른 형식으로 재실행
 - Bundle OOS BTC 4h (atr_tp=4.0): **1/5 PASS** → 즉시 revert (valid 실험 결과)
 - Bundle OOS BTC 4h (atr_tp=3.5, revert 후): **5/5 PASS** ✅ 복원
-- Paper Sim BTC 1h (atr_tp=3.5, 올바른 형식 재실행): 결과 기록 예정
+- Paper Sim 1h (atr_tp=3.5, 올바른 형식 `"BTC/USDT" "ETH/USDT" "SOL/USDT"`, --csv-dir data/historical):
+  - BTC: **0/20 PASS** (실제 데이터, 8 windows, 499일) rank1=price_cluster(Sharpe=0.90, PF=1.21)
+  - ETH: **0/20 PASS** (synthetic — ETH binance CSV 없음) → 유효하지 않음
+  - SOL: **0/20 PASS** (synthetic — SOL binance CSV 없음) → 유효하지 않음
+  - **주의**: ETH/SOL은 data/historical/synthetic/ 폴더에만 CSV 존재. 실전 데이터 없음.
 
 ---
 
