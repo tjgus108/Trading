@@ -1,6 +1,6 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-20T05:17:07.030858Z_
+_Generated: 2026-06-20T10:31:03.882444Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
@@ -9,13 +9,13 @@ _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 | Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | All Pass | Fail Reasons |
 |----------|-------|---------|----------------|------------|----------|--------------|
 | cmf | 5 | 1.136 | 2.508 | 1.387 | PASS | - |
-| order_flow_imbalance_v2 | 5 | 0.500 | 2.962 | 1.677 | FAIL | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3]; Failed folds: [2]; OOS Sharpe std 3.570 > 2.0 (불안정) |
+| order_flow_imbalance_v2 | 5 | 1.847 | 4.345 | 1.941 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3] |
 | supertrend_multi | 5 | 1.791 | 3.892 | 2.737 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4] |
 | vwap_cross | 5 | 1.755 | 3.047 | 1.917 | PASS | 저거래 fold 제외 (trades<3): [0]; 약세 레짐 구조 미작동 fold 제외 (IS<-2.0, |OOS|<1.0): [1] |
 | value_area | 5 | 1.476 | 3.069 | 1.771 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0] |
 
-**PASS: 4/5** (cmf, supertrend_multi, vwap_cross, value_area)
-**FAIL: 1/5** (order_flow_imbalance_v2)
+**PASS: 5/5** (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
+**FAIL: 0/5** (none)
 
 ## Composite Rank Score
 
@@ -23,18 +23,18 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Rank | Strategy | Score | Pctl | OOS Sharpe | SharpeStd | OOS PF | Avg Trades | Avg MDD | Consist | Pass |
 |------|----------|-------|------|------------|-----------|-------|------------|---------|---------|------|
-| 1 | supertrend_multi | 67.7 | p100 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
-| 2 | value_area | 35.6 | p75 | 3.069 | 0.085 | 1.771 | 9.4 | 2.92% | 40% | PASS |
-| 3 | vwap_cross | 32.9 | p50 | 3.047 | 1.437 | 1.917 | 5.4 | 2.39% | 80% | PASS |
-| 4 | cmf | 32.6 | p25 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
-| 5 | order_flow_imbalance_v2 | 30.4 | p0 | 2.962 | 3.570 | 1.677 | 15.4 | 5.83% | 60% | FAIL |
+| 1 | order_flow_imbalance_v2 | 62.0 | p100 | 4.345 | 0.907 | 1.941 | 14.0 | 4.85% | 80% | PASS |
+| 2 | supertrend_multi | 58.6 | p75 | 3.892 | 1.239 | 2.737 | 7.6 | 3.14% | 80% | PASS |
+| 3 | value_area | 32.3 | p50 | 3.069 | 0.085 | 1.771 | 9.4 | 2.92% | 40% | PASS |
+| 4 | vwap_cross | 28.9 | p25 | 3.047 | 1.437 | 1.917 | 5.4 | 2.39% | 80% | PASS |
+| 5 | cmf | 25.0 | p0 | 2.508 | 1.888 | 1.387 | 17.0 | 5.19% | 100% | PASS |
 
 ## IS Sharpe 음수 진단
 
 | Strategy | 음수 IS fold | 전체 fold | 음수 비율 | 진단 |
 |----------|-------------|-----------|----------|------|
 | cmf | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
-| order_flow_imbalance_v2 | 4 | 5 | 80% | 🔴 IS 대부분 음수 (불안정) |
+| order_flow_imbalance_v2 | 2 | 5 | 40% | 🟡 IS 일부 음수 |
 | supertrend_multi | 1 | 5 | 20% | 🟢 IS 대체로 양수 |
 | vwap_cross | 3 | 5 | 60% | 🟡 IS 일부 음수 |
 | value_area | 2 | 5 | 40% | 🟡 IS 일부 음수 |
@@ -55,13 +55,13 @@ _점수 구성: Sharpe(30%) + PF(20%) + Trades(15%) + MDD역수(15%) + Consisten
 
 | Fold | IS Start | OOS Period | IS Sharpe | OOS Sharpe | WFE | OOS PF | OOS Trades | IS MDD | OOS MDD | Pass |
 |------|----------|------------|-----------|------------|-----|--------|------------|-------|---------|------|
-| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -3.625 | 7.755 | 0.500 | 3.034 | 14 | 18.54% | 2.77% | PASS |
-| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | -1.118 | 2.760 | 0.500 | 1.449 | 14 | 19.91% | 3.76% | PASS |
-| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | -0.109 | -0.863 | 0.000 | 0.898 | 16 | 17.28% | 11.07% | FAIL |
-| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 2.737 | -2.308 | -0.843 | 0.750 | 16 | 11.07% | 7.36% | FAIL |
-| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | -0.065 | 2.197 | 1.000 | 1.327 | 17 | 17.78% | 4.20% | PASS |
+| 0 | 2023-01-01 | 2023-06-30~2023-08-28 | -0.308 | 4.655 | 1.000 | 2.005 | 13 | 7.72% | 3.10% | PASS |
+| 1 | 2023-03-02 | 2023-08-29~2023-10-27 | 0.223 | 3.791 | 17.000 | 1.679 | 14 | 11.25% | 2.66% | PASS |
+| 2 | 2023-05-01 | 2023-10-28~2023-12-26 | 1.449 | 3.458 | 2.386 | 1.690 | 12 | 11.25% | 4.62% | PASS |
+| 3 | 2023-06-30 | 2023-12-27~2024-02-24 | 3.889 | -9.373 | -2.410 | 0.313 | 17 | 4.62% | 10.85% | FAIL |
+| 4 | 2023-08-29 | 2024-02-25~2024-04-24 | -0.610 | 5.475 | 1.000 | 2.391 | 14 | 15.51% | 3.04% | PASS |
 
-**Fail reasons:** 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3]; Failed folds: [2]; OOS Sharpe std 3.570 > 2.0 (불안정)
+**Fail reasons:** 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3]
 
 ### supertrend_multi
 

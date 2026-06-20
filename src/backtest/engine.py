@@ -76,6 +76,10 @@ class BacktestResult:
     slippage_regime_counts: Dict[str, int] = field(default_factory=dict)
     # Cycle333 B(리스크): min_hold_bars cooldown으로 억제된 신호 수 (min_hold_bars>0일 때만 유효)
     cooldown_suppressed: int = 0
+    # Cycle335 A(품질): 청산 이유별 거래 수 (SL/TP/MAX_HOLD 원인 분석용)
+    sl_hits: int = 0
+    tp_hits: int = 0
+    max_hold_closes: int = 0
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -98,6 +102,8 @@ class BacktestResult:
         ]
         if self.fail_reasons:
             lines.append(f"  fail_reasons: {self.fail_reasons}")
+        if self.sl_hits or self.tp_hits or self.max_hold_closes:
+            lines.append(f"  close_reasons: sl={self.sl_hits} tp={self.tp_hits} max_hold={self.max_hold_closes}")
         if self.slippage_regime_counts:
             low = self.slippage_regime_counts.get("low", 0)
             normal = self.slippage_regime_counts.get("normal", 0)
@@ -161,6 +167,10 @@ class BacktestEngine:
         consec_losses = 0  # 연속 손실 카운터 (consec_loss_scale_threshold 기능용)
         cooldown_remaining = 0  # Cycle331 B: 청산 후 재진입 대기 봉수 카운터
         cooldown_suppressed = 0  # Cycle333 B: cooldown 중 신호 억제 횟수
+        # Cycle335 A(품질): 청산 이유 카운터
+        sl_hits = 0
+        tp_hits = 0
+        max_hold_closes = 0
         # Cycle309 E(실행): adaptive_slippage 레짐별 진입 카운트
         slip_regime_counts: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
 
@@ -194,6 +204,7 @@ class BacktestEngine:
                     total_fees += fee
                     total_slippage_cost += slip
                     peak_balance = max(peak_balance, balance)
+                    max_hold_closes += 1
                     position = None
                     cooldown_remaining = self.min_hold_bars
                     if pnl > 0:
@@ -201,13 +212,17 @@ class BacktestEngine:
                     else:
                         consec_losses += 1
                 else:
-                    pnl, closed, fee, slip = self._check_exit(position, candle, exit_slip)
+                    pnl, closed, fee, slip, close_reason = self._check_exit(position, candle, exit_slip)
                     if closed:
                         balance += pnl
                         trades.append(pnl)
                         total_fees += fee
                         total_slippage_cost += slip
                         peak_balance = max(peak_balance, balance)
+                        if close_reason == "sl":
+                            sl_hits += 1
+                        else:
+                            tp_hits += 1
                         position = None
                         cooldown_remaining = self.min_hold_bars
                         if pnl > 0:
@@ -294,6 +309,7 @@ class BacktestEngine:
             trades.append(pnl)
             total_fees += fee
             total_slippage_cost += slip
+            max_hold_closes += 1
         equity_curve.append(balance)
 
         result = self._compute_metrics(
@@ -301,6 +317,9 @@ class BacktestEngine:
             slippage_regime_counts=slip_regime_counts if self.adaptive_slippage else {},
         )
         result.cooldown_suppressed = cooldown_suppressed
+        result.sl_hits = sl_hits
+        result.tp_hits = tp_hits
+        result.max_hold_closes = max_hold_closes
         if self.min_hold_bars > 0 and cooldown_suppressed > 0:
             logger.debug(
                 "Cooldown suppressed %d signal(s) (min_hold_bars=%d)",
@@ -385,8 +404,10 @@ class BacktestEngine:
         else:
             return SLIPPAGE_REGIME["high"]
 
-    def _check_exit(self, position: dict, candle: pd.Series, slippage: Optional[float] = None) -> Tuple[float, bool, float, float]:
-        """반환: (pnl, closed, fee, slippage_cost)"""
+    def _check_exit(self, position: dict, candle: pd.Series, slippage: Optional[float] = None) -> Tuple[float, bool, float, float, str]:
+        """반환: (pnl, closed, fee, slippage_cost, close_reason)
+        close_reason: 'sl' | 'tp' | '' (미청산)
+        """
         slip = slippage if slippage is not None else self.slippage
         side = position["side"]
         sl, tp, size, entry = position["sl"], position["tp"], position["size"], position["entry"]
@@ -396,24 +417,24 @@ class BacktestEngine:
                 exit_price = sl * (1 - slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(sl - exit_price)
-                return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost
+                return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost, "sl"
             if candle["high"] >= tp:
                 exit_price = tp * (1 - slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(tp - exit_price)
-                return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost
+                return (exit_price - entry) * size - commission_cost, True, commission_cost, slip_cost, "tp"
         else:
             if candle["high"] >= sl:
                 exit_price = sl * (1 + slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(exit_price - sl)
-                return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost
+                return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost, "sl"
             if candle["low"] <= tp:
                 exit_price = tp * (1 + slip)
                 commission_cost = size * exit_price * self.commission
                 slip_cost = size * abs(exit_price - tp)
-                return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost
-        return 0.0, False, 0.0, 0.0
+                return (entry - exit_price) * size - commission_cost, True, commission_cost, slip_cost, "tp"
+        return 0.0, False, 0.0, 0.0, ""
 
     def _market_close(self, position: dict, close_price: float, slippage: Optional[float] = None) -> Tuple[float, float, float]:
         """반환: (pnl, fee, slippage_cost)"""

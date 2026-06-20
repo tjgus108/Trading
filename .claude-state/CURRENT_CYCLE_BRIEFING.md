@@ -1,52 +1,62 @@
 # Current Cycle Briefing
 
-_Cycle 334 | 2026-06-20 | D(ML) + E(실행) + F(리서치)_
+_Cycle 335 | 2026-06-20 | A(품질) + C(데이터) + F(리서치)_
 
 ## 완료된 작업
 
-### D(ML): OFI v2 delta_window=5 실험 → FAIL → 복원
+### A(품질): BacktestEngine 청산 이유 추적 기능 추가
 
-- `scripts/run_bundle_oos.py`:
-  - `{"trend_span": 20, "delta_window": 5}` 실험 (기본값 10 → 5)
-  - 결과: OFI avg OOS Sharpe 4.345 → 2.962, std 0.907 → 3.570 — **FAIL**
-  - fold2 OOS=-0.86 (delta_window=10 시 +3.458), std 3.570 > 2.0 임계 초과
-  - 원인: 5봉 단기 window → 노이즈에 민감, 불안정한 신호 생성
-  - **즉시 복원**: `{"trend_span": 20}` (delta_window=10 기본값 유지)
-  - delta_window 그리드 확정: 5(FAIL) < 10(PASS,best)
+- `src/backtest/engine.py` 개선:
+  - `BacktestResult` 필드 추가: `sl_hits: int = 0`, `tp_hits: int = 0`, `max_hold_closes: int = 0`
+  - `_check_exit()` 반환값을 4-tuple → 5-tuple로 확장 (`close_reason: 'sl'|'tp'|''`)
+  - `run()` 루프에서 SL/TP/MAX_HOLD 각각 카운트 추적
+  - `summary()` 에 `close_reasons: sl=N tp=N max_hold=N` 출력 추가
+  - 미청산 포지션 최종청산(end-of-data)도 max_hold_closes에 포함
 
-### E(실행): live_paper_trader.py CSV fallback 검증
+- **핵심 발견**: price_cluster 스모크테스트(500봉 합성데이터)에서:
+  - 14거래 중 sl=5, tp=2, max_hold=7 → MAX_HOLD 강제청산 50%
+  - TP 도달 전 MAX_HOLD_CANDLES=24 (24h) 강제청산이 PF < 1.5의 주요 원인
+  - win/loss ratio가 기대 R:R=2.33보다 낮은 1.71 수준인 이유 설명됨
 
-- `scripts/live_paper_trader.py` 코드 검토 완료:
-  - `fetch_latest_candles()`: Bybit 실패 → data/historical/ CSV 자동 로드
-  - 실거래소 CSV 우선(synthetic=False 정렬), 4h 요청 시 1h→resample 지원
-  - 초기화 정상: BTC 200 candles 로드, `enrich_indicators()` 실행 완료
-  - PASS 전략 22개 정상 로드 (QUALITY_AUDIT.csv 기반)
-  - 코드 변경 없음 — 기존 구현이 안정적
+### C(데이터): 데이터 품질 전수 검증
 
-### F(리서치): OFI v2 파라미터 탐색 결론 정리
+- BTC 1h CSV (real data):
+  - 12000 rows, 2023-01-01~2024-05-14, **갭 0개** (완전 연속)
+  - 데이터 연장 불가 (SSL 차단 환경에서 거래소 API 접근 불가)
 
-- trend_span 그리드 탐색 완료 (이전 사이클 포함):
-  - 15(FAIL,std=2.771) < 25(PASS,avg=3.929,std=1.081) < 20(PASS,best=4.345,std=0.907)
-- delta_window 그리드 탐색 완료 (이번 사이클):
-  - 5(FAIL,avg=2.962,std=3.570) < 10(PASS,best=4.345,std=0.907)
-- 최적 파라미터 확정: `{"trend_span": 20}` (delta_window=10 기본값)
-- 다음 탐색 후보: `imbalance_threshold` 파라미터 (전략 소스 확인 필요)
+- ETH/SOL synthetic CSV:
+  - ETH: 12000 rows, NaN=0, bad OHLC=0, extreme return=0, zero volume=0
+  - SOL: 12000 rows, NaN=0, bad OHLC=0, extreme return=0, zero volume=0
+  - 품질 문제 없음 (단, SOL synthetic이 1h 슬리피지 HIGH 100% → 현실 데이터와 괴리)
 
-## 시뮬레이션 결과 (Cycle 334)
+### F(리서치): OFI v2 imbalance_threshold 탐색 완료
+
+- `order_flow_imbalance_v2.py` 분석:
+  - `buy_thresh=0.25`, `sell_thresh=-0.25`가 이미 파라미터화된 imbalance_threshold
+  - `imbalance = cum_delta / total_vol` 비율의 임계값
+  - 4h Bundle OOS: 기본값으로 avg=4.345 (rank1) — 변경 불필요
+  - 1h Paper Sim: OFI rank10 (Sharpe=-0.83) — 4h 대비 1h 성능 열세
+- 결론: buy_thresh 파라미터화 완료, 다음 실험 = 1h 특화 0.30/-0.30 탐색
+
+## 시뮬레이션 결과 (Cycle 335)
 
 - **테스트**: 8425 passed, 23 skipped (회귀 없음)
-- **Paper Sim BTC 1h (표준)**: **0/20 PASS** (14사이클 연속)
-  - rank1: price_cluster (Sharpe=0.34, Return=+2.19%, 1/8) — 표준 기준
-  - rank2: roc_ma_cross (Sharpe=-0.41, 2/8)
-  - 주요 FAIL 원인: profit_factor 1.5 미달 (전략 전반)
-- **Bundle OOS BTC 4h (delta_window=5 실험)**: **4/5 PASS**
-  - order_flow_imbalance_v2: FAIL (avg=2.962, std=3.570) ← 실험 결과, 파라미터 복원됨
-  - supertrend_multi: PASS (avg=3.892), value_area: PASS (avg=3.069)
-  - vwap_cross: PASS (avg=3.047), cmf: PASS (avg=2.508)
-  - ⚠️ 파라미터 복원 → 다음 실행 시 5/5 PASS 복구 예정
 
-## 다음 사이클 (335 mod 5 = 0): A(품질) + C(데이터) + F(리서치)
+- **Paper Sim BTC 1h (20전략, 8 windows)**: **0/20 PASS** (15사이클 연속)
+  - rank1: price_cluster (Sharpe=0.34, Return=+2.19%, PF=1.11, 1/8)
+  - rank2: roc_ma_cross (Sharpe=-0.41, PF=1.10, 2/8)
+  - rank3: positional_scaling (Sharpe=0.00, PF=1.18, 1/8)
+  - 주요 FAIL 원인: profit_factor < 1.5 전체
 
-- **A(품질)**: profit_factor FAIL 원인 분석 + price_cluster/positional_scaling 개선 탐색
-- **C(데이터)**: SOL/ETH synthetic 데이터 품질 점검, BTC CSV 커버리지 확인
-- **F(리서치)**: OFI imbalance_threshold 파라미터 존재 여부 확인 후 탐색 결정
+- **Bundle OOS BTC 4h**: **5/5 PASS** ← OFI 파라미터 복원 확인
+  - rank1: order_flow_imbalance_v2 (avg=4.345, std=0.907) ← delta_window=10 복원
+  - rank2: supertrend_multi (avg=3.892, std=1.239)
+  - rank3: value_area (avg=3.069, std=0.085)
+  - rank4: vwap_cross (avg=3.047, std=1.437)
+  - rank5: cmf (avg=2.508, std=1.888)
+
+## 다음 사이클 (336 mod 5 = 1): B(리스크) + D(ML) + F(리서치)
+
+- **B(리스크)**: MAX_HOLD_CANDLES 영향 분석 — 실데이터 close_reason 분포 측정 후 조정 가능성 검토
+- **D(ML)**: OFI v2 buy_thresh=0.30 1h 탐색 (PAPER_SIM_STRATEGY_PARAMS만, Bundle OOS 변경 금지)
+- **F(리서치)**: close_reason 기반 PF 분석 + 최적 holding period 리서치
