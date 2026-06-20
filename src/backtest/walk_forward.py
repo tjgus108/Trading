@@ -24,7 +24,7 @@ from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 
 import pandas as pd
 
-from src.backtest.engine import BacktestEngine, BacktestResult, MIN_WFE
+from src.backtest.engine import BacktestEngine, BacktestResult, MIN_WFE, MAX_HOLD_CANDLES
 from src.strategy.base import Action, BaseStrategy, Confidence, Signal
 from src.strategy.regime import MarketRegime, MarketRegimeDetector
 
@@ -1228,7 +1228,7 @@ class RollingOOSValidator:
         slippage_pct: float = 0.0005,
     ) -> BundleOOSResult:
         """전략을 Rolling IS/OOS로 검증."""
-        engine = BacktestEngine(fee_rate=fee_rate, slippage_pct=slippage_pct)
+        engine = BacktestEngine(fee_rate=fee_rate, slippage_pct=slippage_pct, max_hold_override=MAX_HOLD_CANDLES)
         min_required = self.is_bars + self.oos_bars
 
         if len(df) < min_required:

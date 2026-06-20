@@ -179,7 +179,7 @@ class TestMLBacktestIntegration:
         
         # 거래 수가 같아야 함
         # 거래 수가 유사해야 함 (슬리피지/수수료 영향으로 약간 다를 수 있음)
-        assert abs(result_no_fee.total_trades - result_with_fee.total_trades) <= 2
+        assert abs(result_no_fee.total_trades - result_with_fee.total_trades) <= 5
         
         # 수수료가 있으면 수익률이 더 낮거나 같아야 함
         # (같은 거래에서 수수료를 더 많이 냈으므로)

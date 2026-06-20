@@ -1,57 +1,55 @@
 # Current Cycle Briefing
 
-_Cycle 336 | 2026-06-20 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 339 | 2026-06-20 | D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): MAX_HOLD_CANDLES=24 vs 48 실험
+### F(리서치): atr_multiplier_tp=3.5→4.0 실험 → FAIL → 즉시 revert
 
-- BTC 1h 실데이터로 close_reason 분포 측정 (engine.py 기존 필드 활용):
-  - price_cluster: max_hold% 12%→3%, Sharpe +0.498, PF +0.100, MDD +0.5%p
-  - roc_ma_cross: max_hold% 18%→5%, Sharpe +0.665, PF +0.120, MDD -6.4%p
-  - positional_scaling: max_hold% 17%→4%, Sharpe +0.295, PF +0.051, MDD -4.5%p
-  - tp% 전 전략 +7~8%p (TP 도달 기회 증가 — MAX_HOLD 억제 효과 확인)
-  - 세 전략 모두 여전히 FAIL (PF<1.5, MDD>20% 일부)
-- **결론**: MAX_HOLD=48 권장 → Cycle 337 B에서 engine.py 실제 변경 + Paper Sim 재실행 예정
-- 코드 변경 없음 (실험만 수행)
+- **실험**: `engine.py` `atr_multiplier_tp=3.5→4.0` (R:R=2.67, 이론 PF=1.63)
+- **Bundle OOS 결과**: **1/5 PASS** (catastrophic regression)
+  - cmf: FAIL (std=2.858, fold2 Sharpe=-2.443)
+  - order_flow_imbalance_v2: FAIL (fold3 OOS=-9.373, std=2.680)
+  - vwap_cross: FAIL (fold1 Sharpe=-2.270, std=2.929)
+  - value_area: FAIL (fold3,4 negative OOS Sharpe)
+  - supertrend_multi: PASS (레짐전환 fold4 제외)
+- **즉시 revert**: tp=3.5 복원 → Bundle OOS **5/5 PASS 복원 확인** ✅
+- **결론**: atr_multiplier_tp=4.0 사용 불가. 번들 전략들의 청산 구조와 충돌.
+  - TP 원거리화 → 손실 노출 기간 증가 → 전략별 risk 구조 붕괴
+  - **주의 사항 추가**: atr_multiplier_tp 상향 실험 금지 (영구)
 
-### D(ML): OFI v2 buy_thresh=0.30 1h Paper Sim 실험
+### D(ML): ML 모델 재훈련 시도 + ADWIN drift 분석
 
-- `scripts/paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS 변경:
-  - `order_flow_imbalance_v2: {"trend_span": 20, "buy_thresh": 0.30, "sell_thresh": -0.30}`
-- BTC 결과: rank10(Sharpe=-0.83, PF=0.95, 73trades) → rank5(Sharpe=-0.64, PF=1.04, 70trades) **개선**
-- ETH 결과: rank15(Sharpe=-2.40, PF=0.74) **악화**
-- SOL 결과: rank3(Sharpe=0.01, PF=1.04) 중립
-- **결론**: BTC 개선/ETH 악화 복합 결과 → Cycle 337 D에서 ETH 악화 원인 분석 후 결정
+- ADWIN drift (Cycle 338 paper sim): 3개 심볼 모두 "drift YES, retrain count=3"
+  - Feature drift 0/3이지만 ADWIN 윈도우 수축 3회 (레짐 변화 패턴)
+- **재훈련 결과**: 모두 FAIL
+  - BTC: train=0.755, val=0.500, test=0.512 → FAIL (< 0.55)
+  - ETH: train=0.778, val=0.413, test=0.447 → FAIL
+  - SOL: train=0.756, val=0.448, test=0.461 → FAIL
+  - 심각한 과적합: train 0.75-0.78 vs test 0.45-0.51
+  - 기존 모델 유지 (새 모델 저장 없음)
+- **결론**: 현재 피처 셋으로는 55% 정확도 달성 불가
+  - 향후 방향: 피처 수 감소 + GradientBoosting 앙상블
 
-### F(리서치): 구조적 FAIL 원인 분석
+## 시뮬레이션 결과 (Cycle 339)
 
-- 16사이클 연속 0/20 PASS:
-  - 주요 원인: SL=5%, TP=2% → 손절 우세 구조 (2.5:1 역R:R)
-  - 평균 WR 37~40%에서 PF>1.5 달성 어려움 (최소 WR ≈ 60% 필요)
-  - MAX_HOLD 강제청산 추가 악화 (12-18% 거래)
-- 다음 실험 후보: SL/TP 비율 재검토 (SL=2%, TP=4% = 1:2 리스크리워드)
+- **테스트**: 56 engine tests PASS ✅
 
-## 시뮬레이션 결과 (Cycle 336)
+- **Bundle OOS BTC 4h (atr_tp=4.0)**: **1/5 PASS** → 즉시 revert
+- **Bundle OOS BTC 4h (atr_tp=3.5 복원)**: **5/5 PASS** ✅
+  - rank1: order_flow_imbalance_v2 (avg=4.345)
+  - rank2: supertrend_multi (avg=3.892)
+  - rank3: value_area (avg=3.069)
+  - rank4: vwap_cross (avg=3.047)
+  - rank5: cmf (avg=2.508)
 
-- **테스트**: 8425 passed, 23 skipped (회귀 없음)
+- **Paper Sim BTC 1h (atr_tp=4.0 실험 중 실행)**: 아래 참조 (실험 데이터)
 
-- **Paper Sim BTC 1h (20전략, 8 windows, buy_thresh=0.30 적용)**: **0/20 PASS** (16사이클 연속)
-  - rank1: price_cluster (Sharpe=0.34, Return=+2.19%, PF=1.11, 1/8)
-  - rank2: roc_ma_cross (Sharpe=-0.41, PF=1.10, 2/8)
-  - rank3: positional_scaling (Sharpe=0.00, PF=1.18, 1/8)
-  - rank5: order_flow_imbalance_v2 (Sharpe=-0.64, PF=1.04, 70trades, 1/8) ← 이전 rank10 대비 개선
-  - 주요 FAIL 원인: profit_factor < 1.5 (전체)
+## 다음 사이클 (340 mod 5 = 0): D(ML) + E(실행) + F(리서치)
 
-- **Bundle OOS BTC 4h**: **5/5 PASS** ← 유지
-  - rank1: order_flow_imbalance_v2 (avg=4.345, std=0.907)
-  - rank2: supertrend_multi (avg=3.892, std=1.239)
-  - rank3: value_area (avg=3.069, std=0.085)
-  - rank4: vwap_cross (avg=3.047, std=1.437)
-  - rank5: cmf (avg=2.508, std=1.888)
-
-## 다음 사이클 (337 mod 5 = 2): B(리스크) + D(ML) + F(리서치)
-
-- **B(리스크)**: engine.py `MAX_HOLD_CANDLES = 24` → `48` 실제 변경 + Paper Sim 전체 재실행
-- **D(ML)**: OFI v2 ETH 악화 원인 분석 → buy_thresh=0.30 유지 or 복원 결정
-- **F(리서치)**: SL/TP 비율 재검토 (SL=2%, TP=4% 실험 가능성 탐색)
+- **F(리서치)**: R:R 개선 대안 탐색
+  - atr_multiplier_sl=1.5→1.2 실험 (SL 좁히기, R:R=2.92) - 단, WR 하락 가능
+  - OR min_hold_bars=4 효과 분석 (1h 재진입 쿨다운)
+  - OR price_cluster 트렌드 필터 (ATR slope 기반)
+- **D(ML)**: 피처 엔지니어링 개선 (과적합 해소)
+- **E(실행)**: live_paper_trader.py 상태 점검

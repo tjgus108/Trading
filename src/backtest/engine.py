@@ -24,7 +24,12 @@ MIN_TRADES = 15          # Cycle 140: 50 → 15 (실데이터 거래 수 부족 
 MIN_WFE = 0.5            # Walk-Forward Efficiency: OOS_Sharpe / IS_Sharpe 최솟값
 MC_P_THRESHOLD = 0.10    # Cycle296 B: 0.05→0.10, 15 trades 수준에서 검증력 부족 해소
 MC_N_PERMUTATIONS = 1000  # Cycle260: 500→1000, p-value 정밀도 향상 (경계값 오분류 감소)
-MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산)
+MAX_HOLD_CANDLES = 24  # 최대 보유 봉 수 (초과 시 강제 청산) — fallback용
+TF_MAX_HOLD: Dict[str, int] = {
+    "1h": 48,   # 2일 (Cycle336 개별 전략 실험에서 개선 확인)
+    "4h": 24,   # 4일 (기존 MAX_HOLD_CANDLES=24와 동일, 4h 행동 변경 없음)
+    "1d": 10,   # 10일
+}
 
 ANNUALIZATION = {
     "1m": 252 * 24 * 60,
@@ -119,7 +124,7 @@ class BacktestEngine:
         commission: float = DEFAULT_FEE_RATE,  # Bybit taker 0.055% (deprecated alias: use fee_rate)
         fee_rate: Optional[float] = None,  # 진입/청산 각 taker fee, 왕복 0.11%
         atr_multiplier_sl: float = 1.5,
-        atr_multiplier_tp: float = 3.5,  # Cycle 256: 3.0→3.5 (R:R=2.33:1, PF 임계값 낮춤)
+        atr_multiplier_tp: float = 3.5,  # Cycle 256: 3.0→3.5 (R:R=2.33:1, PF 임계값 낮춤); Cycle 339: 4.0 실험 → bundle OOS 1/5 FAIL → revert
         slippage: float = DEFAULT_SLIPPAGE,
         slippage_pct: Optional[float] = None,  # 기본 0.05% (보통 레짐)
         timeframe: str = "1h",
@@ -130,6 +135,7 @@ class BacktestEngine:
         mc_block_size: int = 1,  # MC block sign randomization 크기 (1=독립 셔플)
         consec_loss_scale_threshold: int = 0,  # Cycle298 B: 연속 손실 N회 시 포지션 50% 축소 (0=비활성)
         min_hold_bars: int = 0,  # Cycle331 B: 청산 후 재진입 대기 봉수 (0=비활성, 1h에서 4봉=4h 최소 대기)
+        max_hold_override: Optional[int] = None,  # Cycle338 B: TF_MAX_HOLD 대신 직접 지정 (bundle OOS 역호환용)
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -151,12 +157,14 @@ class BacktestEngine:
         # mc_min_trades: 0이면 MIN_TRADES(모듈 상수) 그대로 사용
         self.mc_min_trades = int(mc_min_trades) if mc_min_trades > 0 else MIN_TRADES
         self.mc_block_size = max(1, int(mc_block_size))
+        self._max_hold_override = int(max_hold_override) if max_hold_override is not None else None
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
         df: DataFeed.fetch()가 반환한 DataFrame (지표 포함)
         인덱스 0~end-1 순서로 워크 스루.
         """
+        max_hold = self._max_hold_override if self._max_hold_override is not None else TF_MAX_HOLD.get(self.timeframe, MAX_HOLD_CANDLES)
         balance = self.initial_balance
         peak_balance = balance
         trades = []
@@ -196,8 +204,8 @@ class BacktestEngine:
             if position:
                 position["hold_candles"] += 1
                 exit_slip = self._get_slippage(candle)
-                # MAX_HOLD_CANDLES 초과 시 강제 청산
-                if position["hold_candles"] >= MAX_HOLD_CANDLES:
+                # MAX_HOLD 초과 시 강제 청산 (TF별 max_hold 사용)
+                if position["hold_candles"] >= max_hold:
                     pnl, fee, slip = self._market_close(position, candle["close"], exit_slip)
                     balance += pnl
                     trades.append(pnl)
