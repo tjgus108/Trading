@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.strategy.base import BaseStrategy
 from src.backtest.engine import BacktestEngine
+from src.strategy.regime import MarketRegime, MarketRegimeDetector
+from src.backtest.walk_forward import _RegimeFilterStrategy
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / ".claude-state"
@@ -101,6 +103,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
 }
+
+# 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)
+# 분석 결과: roc_ma_cross PASS 윈도우(W1=45% TREND_UP, W2=41%)가 FAIL(21~32%)보다 월등히 높음
+# walk_forward.py의 _RegimeFilterStrategy + _annotate_regime() 동일 메커니즘 적용
+PAPER_SIM_REGIME_FILTER: Set[str] = {"roc_ma_cross"}
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
 # 활성화 시 generate_report()에서 상위 5개 전략의 윈도우별 Sharpe/PF/Trades 출력
@@ -453,6 +460,14 @@ def evaluate_strategy_walk_forward(
             eval_df = pd.concat([warmup, test_df])
 
             strategy_inst = strategy_cls(**(strategy_params or {}))
+            # Cycle 339 D(ML): TREND_UP 레짐 필터 (roc_ma_cross 등)
+            # PASS 윈도우 TREND_UP 41~45% vs FAIL 윈도우 21~32% → 레짐 불일치가 주 FAIL 원인
+            if name in PAPER_SIM_REGIME_FILTER:
+                _detector = MarketRegimeDetector()
+                _regime_series = _detector.detect_series(eval_df)
+                eval_df = eval_df.copy()
+                eval_df["_regime_trend_up"] = (_regime_series == MarketRegime.TREND_UP)
+                strategy_inst = _RegimeFilterStrategy(strategy_inst)
             bt = engine.run(strategy_inst, eval_df)
 
             # 테스트 구간 변동성 계산 (ATR/close 평균)

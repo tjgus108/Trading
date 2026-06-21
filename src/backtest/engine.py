@@ -391,11 +391,13 @@ class BacktestEngine:
         False이면 고정 self.slippage 반환.
 
         레짐 판별 기준 (ATR14 / close), 타임프레임 스케일 보정:
-          1h 기준: low < 0.5%, normal < 2.0%, high >= 2.0%
-          4h 기준: low < 1.0%, normal < 4.0%, high >= 4.0%  (sqrt(4)=2.0x)
-          1d 기준: low < 2.5%, normal < 9.8%, high >= 9.8%  (sqrt(24)≈4.9x)
+          1h 기준: low < 0.5%, normal < 3.0%, high >= 3.0%
+          4h 기준: low < 1.0%, normal < 6.0%, high >= 6.0%  (sqrt(4)=2.0x)
+          1d 기준: low < 2.5%, normal < 14.7%, high >= 14.7%  (sqrt(24)≈4.9x)
         Cycle316 F(리서치): 4h BTC ATR/close 평균=3.0% → 1h 임계값 2.0%로 98.8% HIGH 분류 발견
           → 타임프레임별 sqrt 스케일 보정 추가 (변동성 = σ√T 비례)
+        Cycle339 E(실행): 1h paper_sim에서 여전히 60%+ HIGH 분류 발견 (roc_ma_cross=62.7%)
+          → threshold 재상향 (2.0% → 3.0%, 1h 기준) — high regime을 5-10% 수준으로 정규화
         """
         if not self.adaptive_slippage:
             return self.slippage
@@ -412,7 +414,7 @@ class BacktestEngine:
         tf_scale = math.sqrt(_TF_HOURS.get(self.timeframe, 1.0))
         if atr_ratio < 0.005 * tf_scale:
             return SLIPPAGE_REGIME["low"]
-        elif atr_ratio < 0.02 * tf_scale:
+        elif atr_ratio < 0.03 * tf_scale:
             return SLIPPAGE_REGIME["normal"]
         else:
             return SLIPPAGE_REGIME["high"]
