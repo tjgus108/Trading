@@ -82,6 +82,9 @@ class BacktestResult:
     sl_hits: int = 0
     tp_hits: int = 0
     max_hold_closes: int = 0
+    # Cycle341 B(리스크): 2단계 손실 스케일링 적용 횟수 (각 진입 시점 기준)
+    loss_scale_half_count: int = 0   # 75% 스케일 적용 횟수 (consec_loss >= half_thresh)
+    loss_scale_full_count: int = 0   # 50% 스케일 적용 횟수 (consec_loss >= threshold)
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
@@ -176,6 +179,9 @@ class BacktestEngine:
         sl_hits = 0
         tp_hits = 0
         max_hold_closes = 0
+        # Cycle341 B(리스크): 손실 스케일링 적용 횟수
+        loss_scale_half_count = 0
+        loss_scale_full_count = 0
         # Cycle309 E(실행): adaptive_slippage 레짐별 진입 카운트
         slip_regime_counts: Dict[str, int] = {"low": 0, "normal": 0, "high": 0}
 
@@ -262,8 +268,10 @@ class BacktestEngine:
                             half_thresh = max(1, self.consec_loss_scale_threshold // 2)
                             if consec_losses >= self.consec_loss_scale_threshold:
                                 loss_scale = 0.5
+                                loss_scale_full_count += 1
                             elif consec_losses >= half_thresh:
                                 loss_scale = 0.75
+                                loss_scale_half_count += 1
                             else:
                                 loss_scale = 1.0
                         else:
@@ -333,6 +341,8 @@ class BacktestEngine:
         result.sl_hits = sl_hits
         result.tp_hits = tp_hits
         result.max_hold_closes = max_hold_closes
+        result.loss_scale_half_count = loss_scale_half_count
+        result.loss_scale_full_count = loss_scale_full_count
         if self.min_hold_bars > 0 and cooldown_suppressed > 0:
             logger.debug(
                 "Cooldown suppressed %d signal(s) (min_hold_bars=%d)",

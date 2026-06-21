@@ -499,6 +499,18 @@ def evaluate_strategy_walk_forward(
                 mkt_ret = float((test_df["close"].iloc[-1] - test_df["close"].iloc[0]) / (test_df["close"].iloc[0] + 1e-9))
                 mkt_state = "bull" if mkt_ret > 0.05 else ("bear" if mkt_ret < -0.05 else "sideways")
 
+            # Cycle 341 D(ML): IS Sharpe 추가 (verbose-windows 활성화 시만 계산)
+            # IS_end=TREND_UP → OOS PASS 상관관계 분석용 (roc_ma_cross 패턴)
+            is_sharpe = None
+            _verbose = getattr(sys.modules[__name__], "VERBOSE_WINDOWS", False)
+            if _verbose:
+                try:
+                    _is_inst = strategy_cls(**(strategy_params or {}))
+                    _bt_is = engine.run(_is_inst, train_df)
+                    is_sharpe = round(_bt_is.sharpe_ratio, 3)
+                except Exception:
+                    is_sharpe = None
+
             window_results.append({
                 "window": i + 1,
                 "sharpe": bt.sharpe_ratio,
@@ -517,6 +529,7 @@ def evaluate_strategy_walk_forward(
                 "is_regime": is_regime,
                 "oos_regime": oos_regime,
                 "regime_match": is_regime == oos_regime,
+                "is_sharpe": is_sharpe,
             })
         except Exception as e:
             window_vols.append(0.0)
@@ -809,20 +822,22 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                     f"consistency={r['passed_windows']}/{r['total_windows']}, "
                     f"regime_mismatch={mismatch_n}/{len(wrs)})\n"
                 )
-                lines.append("| Window | Sharpe | PF | Trades | MDD | Market | IS_Reg | OOS_Reg | Match | Pass | Fail Reasons |")
-                lines.append("|--------|--------|-----|--------|-----|--------|--------|---------|-------|------|--------------|")
+                lines.append("| Window | IS_Sh | Sharpe | PF | Trades | MDD | Market | IS_Reg | OOS_Reg | Match | Pass | Fail Reasons |")
+                lines.append("|--------|-------|--------|-----|--------|-----|--------|--------|---------|-------|------|--------------|")
                 _reg_short = {"TREND_UP": "UP↑", "TREND_DOWN": "DN↓", "RANGING": "RG~", "HIGH_VOL": "HV!"}
                 for wr in wrs:
                     if "error" in wr:
-                        lines.append(f"| W{wr['window']} | ERROR | — | — | — | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
+                        lines.append(f"| W{wr['window']} | — | ERROR | — | — | — | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
                         continue
                     p = "✅" if wr["passed"] else "❌"
                     reasons = "; ".join(wr.get("fail_reasons", [])[:2])
                     is_r = _reg_short.get(wr.get("is_regime", ""), wr.get("is_regime", "?"))
                     oos_r = _reg_short.get(wr.get("oos_regime", ""), wr.get("oos_regime", "?"))
                     match = "✓" if wr.get("regime_match", True) else "✗"
+                    is_sh = wr.get("is_sharpe")
+                    is_sh_str = f"{is_sh:.2f}" if is_sh is not None else "N/A"
                     lines.append(
-                        f"| W{wr['window']} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
+                        f"| W{wr['window']} | {is_sh_str} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
                         f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | "
                         f"{is_r} | {oos_r} | {match} | {p} | {reasons} |"
                     )

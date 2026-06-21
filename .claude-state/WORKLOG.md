@@ -1,3 +1,26 @@
+## [2026-06-21] Cycle 341 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] price_cluster W5 구조적 FAIL 확인 + 손실 스케일링 추적 추가**
+1. W5 OOS 분석: volatility=0.054로 CLT=0/5/7 모두 PF<1.5 → 구조적 FAIL (손실 스케일링 무관)
+2. `src/backtest/engine.py`: BacktestResult에 `loss_scale_half_count`, `loss_scale_full_count` 추가
+   - run() 루프에서 75%/50% 스케일 적용 횟수 추적
+   - 진단 목적: 향후 윈도우별 스케일링 영향 정량화 가능
+
+**[D(ML)] IS end-state→OOS 상관관계 정량화 + is_sharpe 컬럼 추가**
+3. roc_ma_cross W1~W8 상세 분석: IS=RANGING(W3~W7) → OOS 전부 FAIL, IS=TREND_UP(W1,W2) → PASS
+4. W8 예외 확인: IS=TREND_UP이지만 OOS=RANGING → OOS Sharpe=-1.59 FAIL
+5. `scripts/paper_simulation.py`: window_results에 `is_sharpe` 필드 추가 (VERBOSE_WINDOWS 시 계산)
+6. verbose-windows 테이블에 `IS_Sh` 컬럼 추가 (IS Sharpe 표시용)
+
+**[F(리서치)] TREND_UP 비율 분석 (ADX=22 vs 18)**
+7. BTC 1h 전구간: ADX=22→TREND_UP=31.3%, ADX=18→34.3% (+3.0% 개선)
+8. 구조적 RANGING 지배(41~47%) 유지 확인 → ADX=22 현행 유지 결정
+
+**시뮬레이션**: 0/20 PASS (21연속), Bundle OOS 5/5 PASS 유지
+**테스트**: backtest engine 56 passed (회귀 없음)
+
+---
+
 ## [2026-06-21] Cycle 340 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] IS/OOS 레짐 불일치 진단 기능 추가**
@@ -880,6 +903,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-21 15:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-21 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-21 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-21 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-21 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-21 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-21 20:06 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

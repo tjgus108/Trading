@@ -1,54 +1,49 @@
 # Next Steps
 
-_Last updated: 2026-06-21 (Cycle 340 완료)_
+_Last updated: 2026-06-21 (Cycle 341 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 340
+### 이번 세션 완료 사이클: 341
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 338 | C+B+F | TP=2.5 역효과 확인(TP=3.5 확정), 2단계 손실스케일링, 윈도우별 레짐 분석, 0/20 18연속 |
 | 339 | D+E+F | 레짐필터 역효과(roc_ma_cross -0.43→롤백), 슬리피지 임계값 2→3%, 0/20 19연속 |
 | 340 | A+C+F | IS/OOS 레짐 진단 추가, roc_ma_cross 필터 롤백 확인(+0.34↑), 0/20 20연속 |
+| 341 | B+D+F | W5 구조적 FAIL 확인, IS→OOS 상관관계 정량화, loss_scale 추적 추가, 0/20 21연속 |
 
-### 🎯 Cycle 341 작업 방향 (341 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 342 작업 방향 (342 mod 5 = 2 → C(데이터) + E(실행) + A(품질))
 
-#### B(리스크): price_cluster W5 근접 PASS 분석 및 리스크 조정
+#### C(데이터): 데이터 품질 검증 및 피처 엔지니어링 개선
 
-- **배경**: Cycle 340 F(리서치) 결과: price_cluster W5(RANGING+RANGING, mkt=sideways, Sharpe=0.99)
-  - 0.01 차이로 FAIL. PF도 아슬아슬 FAIL. 리스크 파라미터 조정으로 해결 가능할 수도.
-  - W5 구간(Nov 2023 ~Jan 2024): 횡보장 — price_cluster 최적 환경
-- **작업 방향**:
-  - W5 구간 price_cluster 상세 분석: PF FAIL 원인 파악
-  - kelly_sizer 또는 position sizing 미세 조정 (손실 스케일링 threshold 튜닝)
-  - DrawdownMonitor의 W5 구간 영향 분석
-
-#### D(ML): roc_ma_cross W1/W2 PASS 패턴 활용 검토
-
-- **배경**: roc_ma_cross는 IS=TREND_UP인 구간에서만 PASS (W1: IS끝 TREND_UP + OOS=TREND_UP)
-  - 현재 2/8 consistency → PASS 기준(50%) 미달
-  - IS끝 레짐이 TREND_UP일 때만 전략 활성화 → paper_simulation 레벨에서 검토
-- **주의**: 이전 Cycle 339에서 개별봉 레짐 필터 역효과 확인 → 봉 수준 필터 금지
-  - 윈도우 수준 필터 고려: IS가 TREND_UP으로 끝나는 경우만 OOS 결과 카운트
-  - 단, 이는 실제 배포에서 구현이 복잡 — 검토만 수행
+- **배경**: 현재 BTC 1h 12000행, ETH/SOL 합성 데이터. 4h CSV 없음 (리샘플)
 - **작업**:
-  - verbose-windows 활용해 roc_ma_cross W3~W8의 상세 fail reason 파악
-  - IS end-state와 strategy 성과 상관관계 정량화
+  - BTC 1h.csv의 OHLCV 정합성 재확인 (가격 스파이크, gap 검사)
+  - paper_simulation.py의 `enrich_indicators()` 함수 검토
+    - Donchian, MACD 계산 정확성 확인
+    - ATR14 0값 발생 빈도 확인 (`signals_skipped_atr0` 분석)
 
-#### F(리서치): RANGING 지배 문제와 대응 전략 리서치
+#### E(실행): 진입 슬리피지 분포 분석 + 고변동성 구간 최적화
 
-- **배경**: 분석 결과 OOS dominant regime이 RANGING인 경우가 8개 윈도우 중 6개 이상
-  - MarketRegimeDetector가 TREND_UP을 너무 보수적으로 감지 (ADX>22 필요)
-  - BTC 1h봉에서 TREND_UP 비율이 낮음 → roc_ma_cross는 구조적으로 불리
+- **배경**: Cycle 341 B 분석: volatility=0.054(낮음)인 W5에서 price_cluster PF<1.5
+  - 고변동성 구간과 저변동성 구간에서 슬리피지 레짐 분포 차이 확인 필요
+  - 새로 추가된 `loss_scale_half_count`, `loss_scale_full_count` 활용
 - **작업**:
-  - detect_series()로 전체 BTC CSV TREND_UP 비율 계산
-  - ADX 임계값 완화(22→18) 시 TREND_UP 비율 변화 측정
-  - RANGING 지배 환경에서 효과적인 전략 특성 분석 (price_cluster 참고)
+  - paper_sim에서 slippage_regime_counts와 loss_scale_counts 윈도우별 비교
+  - 고변동성(W6, volatility=0.104) vs 저변동성(W5, 0.054) 슬리피지 분포 비교
 
-### ⚠️ 주의 사항 (Cycle 341)
+#### A(품질): price_cluster PF 개선 방향 탐색
+
+- **배경**: price_cluster 8개 윈도우 중 7개 FAIL. 주요 FAIL 원인: PF<1.5(W5), sharpe<1.0(others)
+  - W6만 PASS (Sharpe=3.78, PF 확인 필요)
+  - price_cluster._BOUNCE_PCT=0.01, _CLOSE_WINDOW=50, _N_BINS=5 현재값
+- **작업**:
+  - W6 PASS 원인 분석: 슬리피지 레짐, 손실 스케일 사용 현황
+  - loss_scale_half/full_count를 통한 스케일링 영향 정량화
+
+### ⚠️ 주의 사항 (Cycle 342)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨

@@ -1,42 +1,61 @@
 # Current Cycle Briefing
 
-_Cycle 340 | 2026-06-21 | A(품질) + C(데이터) + F(리서치)_
+_Cycle 341 | 2026-06-21 | B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### A(품질): IS/OOS 레짐 불일치 진단 기능 추가
+### B(리스크): price_cluster W5 구조적 FAIL 확인 + 손실 스케일링 추적 추가
 
-`scripts/paper_simulation.py` 개선:
-1. `evaluate_strategy_walk_forward()`: 각 윈도우에 IS end-state 레짐 + OOS dominant regime 추가
-   - IS regime: `_reg_diag.detect(train_df).value` (단일 호출)
-   - OOS dominant regime: `detect_series(eval_df).iloc[-len(test_df):].mode()[0].value`
-2. verbose-windows 출력에 `IS_Reg | OOS_Reg | Match` 컬럼 추가
-3. 레짐 불일치 카운트를 전략 헤더에 표시
+분석:
+- W5 OOS (2023-11-27~2024-01-26): volatility=0.054 (낮은 변동성)
+- CLT=0 시 Sharpe=1.458, PF=1.314 → FAIL (PF<1.5)
+- CLT=5(현재) 시 Sharpe=1.298, PF=1.281 → FAIL
+- CLT=7 시 Sharpe=1.382, PF=1.299 → FAIL
+- **결론**: W5 FAIL은 구조적 — 낮은 변동성에서 price_cluster가 PF≥1.5 달성 불가. 손실 스케일링이 결정 요인 아님
+- W6 PASS는 CLT 무관하게 유지 (더 높은 volatility=0.104)
 
-### C(데이터): 데이터 현황 확인
+코드 개선 (`src/backtest/engine.py`):
+- `BacktestResult`에 `loss_scale_half_count`, `loss_scale_full_count` 필드 추가
+- `run()`에서 75%/50% 스케일 적용 횟수 추적 → 손실 스케일링 영향도 정량화 가능
 
-- BTC 1h CSV: 12000행, 2023-01-01~2024-05-14 (499일), 4h.csv 없음 (리샘플로 처리)
-- SSL 차단으로 외부 데이터 수집 불가 — 현재 데이터가 최적
-- Bundle OOS: `--csv-dir data/historical` 필수 플래그 확인
+### D(ML): IS end-state→OOS 상관관계 정량화 + is_sharpe 컬럼 추가
 
-### F(리서치): IS/OOS 레짐 진단 분석 (price_cluster, roc_ma_cross)
+roc_ma_cross 8개 윈도우 분석:
 
-핵심 발견:
-- **price_cluster**: OOS_dom=RANGING + mkt=sideways(W6)에서만 PASS — 순수 횡보장 전략
-  - W1(IS=TREND_UP, OOS=TREND_UP, bull): Sharpe=-1.43 — 상승장에서도 실패
-  - W5(RANGING/RANGING, sideways): Sharpe=0.99 — 0.01 차이로 FAIL, 근접
-- **roc_ma_cross**: IS=TREND_UP 종료 시에만 PASS
-  - W1(IS=TREND_UP, OOS=TREND_UP, bull): Sharpe=4.04 PASS
-  - W2(IS=TREND_UP, OOS=RANGING, bull): Sharpe=3.84 PASS
-  - IS가 RANGING인 W3~W8 전부 FAIL
+| Window | IS_end | IS_Sharpe | OOS_Sharpe | Result |
+|--------|--------|-----------|------------|--------|
+| W1 | TREND_UP | -0.49 | 4.69 | PASS |
+| W2 | TREND_UP | -0.20 | 3.41 | PASS |
+| W3 | RANGING | -0.16 | 0.10 | FAIL (PF) |
+| W4 | RANGING | -0.58 | -0.71 | FAIL |
+| W5 | RANGING | +0.19 | -2.98 | FAIL |
+| W6 | RANGING | -0.06 | 1.25 | FAIL (PF=1.30) |
+| W7 | RANGING | -0.27 | -0.16 | FAIL |
+| W8 | TREND_UP | -0.41 | -1.59 | FAIL (OOS=RANGING) |
 
-## 시뮬레이션 결과
+- **핵심 패턴**: IS=RANGING이면 OOS FAIL 확실. IS=TREND_UP이지만 OOS=RANGING이면 FAIL (W8)
+- IS 음수 Sharpe + IS_end=TREND_UP → OOS 강한 양전 (W1, W2)
 
-- Paper Sim BTC 1h: **0/20 PASS** (20사이클 연속)
-  - rank1: price_cluster (Sharpe=0.87, 1/8)
-  - rank2: roc_ma_cross (Sharpe=0.34, 2/8) ← Cycle339 -0.43→+0.34 (필터 롤백 확인!)
-- Bundle OOS BTC 4h: **5/5 PASS** ✅
+코드 개선 (`scripts/paper_simulation.py`):
+- `window_results`에 `is_sharpe` 필드 추가 (VERBOSE_WINDOWS 활성화 시 계산)
+- verbose-windows 테이블에 `IS_Sh` 컬럼 추가
+
+### F(리서치): TREND_UP 비율 분석 (ADX=22 vs 18)
+
+BTC 1h CSV 전구간 (12000 행):
+- ADX=22: TREND_UP=31.3%, RANGING=47.3%, TREND_DOWN=21.4%
+- ADX=18: TREND_UP=34.3%, RANGING=41.6%, TREND_DOWN=24.1% (+3.0% TREND_UP)
+- ADX=20: TREND_UP=32.9%, RANGING=44.4%
+
+**결론**: ADX 임계값 완화로 TREND_UP +3% 획득 가능하나 구조적 RANGING 지배(41~47%) 유지. 임계값 변경만으로는 roc_ma_cross 문제 해결 불가 → 현재 ADX=22 유지
+
+## 시뮬레이션 결과 (이번 사이클)
+
+- Paper Sim BTC 1h: **0/20 PASS** (21사이클 연속)
+  - rank1: price_cluster (Sharpe=0.87, 1/8) ← 유지
+  - rank2: roc_ma_cross (Sharpe=0.34, 2/8) ← 유지
+- Bundle OOS BTC 4h: **5/5 PASS** ✅ (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
 
 ## 테스트
 
-- pytest: **8425 passed, 23 skipped** (회귀 없음)
+- pytest backtest engine: **56 passed** (회귀 없음, loss_scale 추적 추가 후)
