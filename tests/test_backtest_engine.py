@@ -256,7 +256,7 @@ def test_profit_factor_zero_division_guard():
 
 
 def test_max_hold_candles_constant():
-    """MAX_HOLD_CANDLES 상수가 24로 정의되어야 한다."""
+    """MAX_HOLD_CANDLES 상수가 24로 정의되어야 한다 (4h 기본값; 1h는 engine.max_hold_candles=48)."""
     assert MAX_HOLD_CANDLES == 24
 
 

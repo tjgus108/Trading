@@ -177,7 +177,6 @@ class TestMLBacktestIntegration:
         )
         result_with_fee = engine_with_fee.run(strategy, df)
         
-        # 거래 수가 같아야 함
         # 거래 수가 유사해야 함 (슬리피지/수수료 영향으로 약간 다를 수 있음)
         assert abs(result_no_fee.total_trades - result_with_fee.total_trades) <= 2
         

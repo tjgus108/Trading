@@ -93,7 +93,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle300 C: buy_thresh=0.30 실험 → 역효과 (3/8→1/8 PASS, mc_p_value 실패 증가) → 기본값(0.25) 복원
     # Cycle332 D(ML): trend_span=15, delta_window=7 실험 → 역효과 확인 후 복원
     #   avg=4.036 (4.345→-0.309 악화), std=2.771 (0.907→+1.864 악화) → Bundle OOS FAIL
-    "order_flow_imbalance_v2": {"trend_span": 20, "buy_thresh": 0.30, "sell_thresh": -0.30},
+    # Cycle336 D(ML): buy_thresh=0.30 재시도 → BTC 소폭 개선(-0.83→-0.64), ETH 급락(rank15, Sharpe=-2.40)
+    # Cycle337 D(ML): buy_thresh 기본값(0.25) 복원 — ETH 악화 과도, Cycle300 역효과 전례 재확인
+    "order_flow_imbalance_v2": {"trend_span": 20},
     # Cycle309 D(ML): buy_thresh=0.10 효과 미미 (rank14, Sharpe -1.21, trades=72)
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
@@ -1177,6 +1179,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         adaptive_slippage=True,
         # Cycle332 B(리스크): 청산 후 재진입 대기 봉수 (0=비활성)
         min_hold_bars=min_hold_bars,
+        # Cycle337 B: 1h paper_sim MAX_HOLD=48봉(48h) → 4h Bundle OOS 24봉(4일)과 분리
+        max_hold_candles_override=48,
     )
 
     sections = []

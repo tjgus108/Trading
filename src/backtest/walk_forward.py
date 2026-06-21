@@ -1203,6 +1203,7 @@ class RollingOOSValidator:
         regime_transition_is_min: Optional[float] = None,  # B Cycle 287: IS Sharpe 이 값 초과 + WFE<0이면 레짐 전환 fold로 제외
         is_negative_regime_max: Optional[float] = None,  # D Cycle 321: IS Sharpe 이 값 미만 + abs(OOS)<0.5 → 약세 레짐 구조 미작동 fold 제외
         bear_oos_max: Optional[float] = None,  # B Cycle 322: is_negative_regime_max 조건의 |OOS| 임계값 전략별 오버라이드 (기본 0.5)
+        timeframe: str = "1h",  # Cycle337 B: 타임프레임 전달 → BacktestEngine max_hold_candles 결정
     ):
         self.is_bars = is_bars
         self.oos_bars = oos_bars
@@ -1214,6 +1215,7 @@ class RollingOOSValidator:
         self.regime_transition_is_min = regime_transition_is_min
         self.is_negative_regime_max = is_negative_regime_max
         self.bear_oos_max = bear_oos_max if bear_oos_max is not None else 0.5
+        self.timeframe = timeframe  # Cycle337 B: BacktestEngine에 전달하여 max_hold_candles 결정
         # 인스턴스별 기준 덮어쓰기 가능: 합성 데이터 환경에서는 완화, 실 데이터에서는 강화
         if max_oos_sharpe_std is not None:
             self._oos_sharpe_std_max = float(max_oos_sharpe_std)

@@ -676,6 +676,7 @@ def run_bundle_oos(
             regime_transition_is_min=overrides.get("regime_transition_is_min", None),
             is_negative_regime_max=overrides.get("is_negative_regime_max", None),
             bear_oos_max=overrides.get("bear_oos_max", None),
+            timeframe=timeframe,  # Cycle337 B: 4h=max_hold_candles 24봉, 1h=48봉 분리
         )
         try:
             strategy = load_strategy(module_name, class_name)
