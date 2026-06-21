@@ -1134,7 +1134,8 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
 def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
                    fee_rate_override: Optional[float] = None,
                    slippage_override: Optional[float] = None,
-                   min_hold_bars: int = 0):
+                   min_hold_bars: int = 0,
+                   atr_multiplier_tp: float = 3.5):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
@@ -1166,6 +1167,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
     if slippage_override is not None:
         print(f"[CONFIG] slippage overridden: {_slippage}", flush=True)
 
+    if atr_multiplier_tp != 3.5:
+        print(f"[CONFIG] atr_multiplier_tp overridden: {atr_multiplier_tp} (default 3.5)", flush=True)
     engine = BacktestEngine(
         initial_balance=10_000,
         fee_rate=_fee_rate,
@@ -1181,6 +1184,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         min_hold_bars=min_hold_bars,
         # Cycle337 B: 1h paper_sim MAX_HOLD=48봉(48h) → 4h Bundle OOS 24봉(4일)과 분리
         max_hold_candles_override=48,
+        # Cycle338 B(리스크): atr_multiplier_tp 탐색 (3.5→2.5 비교)
+        atr_multiplier_tp=atr_multiplier_tp,
     )
 
     sections = []
@@ -1323,6 +1328,12 @@ if __name__ == "__main__":
         default=0,
         help="Cycle332 B: 청산 후 재진입 대기 봉수 (기본 0=비활성, 예: 4=4봉 대기)",
     )
+    parser.add_argument(
+        "--atr-multiplier-tp",
+        type=float,
+        default=3.5,
+        help="Cycle338 B: ATR TP 배수 (기본 3.5, 예: 2.5 — R:R 축소, BEP WR 38% 상승)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1367,4 +1378,5 @@ if __name__ == "__main__":
         fee_rate_override=args.fee_rate,
         slippage_override=args.slippage,
         min_hold_bars=args.min_hold_bars,
+        atr_multiplier_tp=args.atr_multiplier_tp,
     ))

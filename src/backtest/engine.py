@@ -256,10 +256,18 @@ class BacktestEngine:
                         # Cycle 258: HIGH 1.2→1.35 (ETH/SOL 혼합 결과 중간값)
                         conf_name = getattr(signal.confidence, 'name', str(signal.confidence)).upper()
                         conf_mult = {"HIGH": 1.35, "MEDIUM": 1.0, "LOW": 0.5}.get(conf_name, 1.0)
-                        # Cycle298 B: 연속 손실 N회 시 포지션 사이즈 50% 축소 (consec_loss_scale_threshold > 0)
-                        loss_scale = (0.5 if (self.consec_loss_scale_threshold > 0
-                                               and consec_losses >= self.consec_loss_scale_threshold)
-                                      else 1.0)
+                        # Cycle338 B(리스크): 2단계 연속 손실 스케일링
+                        # threshold/2 도달 시 0.75, threshold 도달 시 0.50 (Cycle298 단일 0.50→2단계)
+                        if self.consec_loss_scale_threshold > 0:
+                            half_thresh = max(1, self.consec_loss_scale_threshold // 2)
+                            if consec_losses >= self.consec_loss_scale_threshold:
+                                loss_scale = 0.5
+                            elif consec_losses >= half_thresh:
+                                loss_scale = 0.75
+                            else:
+                                loss_scale = 1.0
+                        else:
+                            loss_scale = 1.0
                         risk_amt = balance * 0.01 * conf_mult * loss_scale
                         size = risk_amt / sl_dist
                         close = candle["close"]
