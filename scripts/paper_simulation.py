@@ -105,9 +105,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)
-# 분석 결과: roc_ma_cross PASS 윈도우(W1=45% TREND_UP, W2=41%)가 FAIL(21~32%)보다 월등히 높음
-# walk_forward.py의 _RegimeFilterStrategy + _annotate_regime() 동일 메커니즘 적용
-PAPER_SIM_REGIME_FILTER: Set[str] = {"roc_ma_cross"}
+# Cycle 339 실험 결과: roc_ma_cross 적용 → Sharpe +0.32→-0.43, trades 57→18 (역효과)
+# BUY 신호 ~70% 차단으로 trade frequency 붕괴 → 거래 수 부족 → Sharpe 음전환
+# 결론: 윈도우 레벨 TREND_UP% 분석과 개별 봉 레벨 필터링은 다른 문제
+# Cycle 340 방향: 레짐 전환 타이밍이 아닌 IS/OOS 구간 레짐 매칭 방식 재검토
+PAPER_SIM_REGIME_FILTER: Set[str] = set()  # 빈 집합 = 레짐 필터 비활성화
 
 # 윈도우별 상세 출력 플래그 (--verbose-windows CLI 옵션으로 활성화)
 # 활성화 시 generate_report()에서 상위 5개 전략의 윈도우별 Sharpe/PF/Trades 출력

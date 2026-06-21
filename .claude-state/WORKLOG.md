@@ -29,7 +29,17 @@
 
 **테스트 결과 (Cycle 339)**
 - python3 -m pytest: **8425 passed, 23 skipped** (회귀 없음)
-- 시뮬레이션 결과: 실행 중 (완료 후 Cycle 340 WORKLOG에 기록)
+- Paper Sim BTC 1h (8 windows, 20전략, MAX_HOLD=48): **0/20 PASS** (19사이클 연속)
+  - rank1: price_cluster (Sharpe=0.87, +4.99%, PF=1.20, 1/8) ← **+0.03** (슬리피지 개선 효과)
+  - rank2: frama (Sharpe=0.24, +1.60%, 1/8) ← +0.05 개선
+  - rank14: roc_ma_cross (Sharpe=-0.43, trades=18, 0/8) ← **역효과** (Cycle338 +0.32→-0.43)
+  - ⚠️ 레짐 필터 역효과: BUY 신호 ~70% 차단 → trades 57→18 → Sharpe 음전환
+  - 결론: PAPER_SIM_REGIME_FILTER 즉시 빈 집합으로 복원 (D(ML) 실험 롤백)
+  - 슬리피지 개선(E): price_cluster +0.03, frama +0.05 — 긍정적, 유지
+- Bundle OOS BTC 4h: **5/5 PASS** ← 유지
+  - rank1: order_flow_imbalance_v2 (avg=4.345, std=0.907)
+  - rank2: supertrend_multi (avg=3.892, std=1.239)
+  - rank5: cmf (avg=2.508, std=1.888)
 
 ---
 ## [2026-06-21] Cycle 338 — C(데이터) + B(리스크) + F(리서치)

@@ -12,20 +12,21 @@ _Last updated: 2026-06-21 (Cycle 339 완료)_
 |-------|---------|----------|
 | 337 | B+D+F | max_hold_candles_override=48(1h전용), OFI buy_thresh복원, 5/5 Bundle PASS 유지, 0/20 17연속 |
 | 338 | C+B+F | TP=2.5 역효과 확인(TP=3.5 확정), 2단계 손실스케일링 추가, 윈도우별 레짐 분석, 0/20 18연속 |
-| 339 | D+E+F | roc_ma_cross TREND_UP 레짐 필터(paper_sim), 슬리피지 임계값 2→3%(1h), 시뮬결과 Cycle340서 확인 |
+| 339 | D+E+F | 레짐필터 역효과(roc_ma_cross Sharpe -0.75 급락→롤백), 슬리피지 임계값 2→3%(price_cluster+0.03), 0/20 19연속 |
 
 ### 🎯 Cycle 340 작업 방향 (340 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### A(품질): Cycle 339 레짐 필터 효과 검증 + 품질 감사
+#### A(품질): 레짐 필터 방향 전환 + 테스트 커버리지
 
-- **배경**: Cycle 339에서 두 가지 변경사항 적용됨
-  - `roc_ma_cross` TREND_UP 레짐 필터 (`PAPER_SIM_REGIME_FILTER`)
-  - 슬리피지 임계값 0.02→0.03 (1h 기준 normal upper bound 2%→3%)
-- **작업**:
-  - Paper Simulation 결과 분석: roc_ma_cross Sharpe 변화 확인 (필터 적용 전 0.32 → 적용 후 기대 개선/악화)
-  - 레짐 필터가 FAIL 윈도우(W3~W8)에서 신호를 얼마나 차단했는지 확인
-  - 만약 trades가 너무 감소(< 15)했으면 `PAPER_SIM_REGIME_FILTER` 제거 고려
-  - HIGH_VOL 레짐도 차단 여부: `_RegimeFilterStrategy`는 TREND_UP만 허용 (RANGING/TREND_DOWN/HIGH_VOL 차단)
+- **배경**: Cycle 339 D(ML) 레짐 필터 역효과 확인
+  - 개별 봉 TREND_UP 필터: BUY 신호 ~70% 차단 → trades 57→18 → Sharpe +0.32→-0.43
+  - **근본 원인**: 윈도우 수준 TREND_UP% 상관관계 ≠ 개별 봉 수준 필터링 효과
+  - 슬리피지 임계값 2%→3% 변경: price_cluster +0.03, frama +0.05 — 미미하지만 긍정적
+- **작업 방향**:
+  - PAPER_SIM_REGIME_FILTER는 이미 빈 집합으로 롤백됨 (Cycle 339 말미)
+  - 레짐 필터 대신 IS/OOS 구간 레짐 **매칭** 방식 검토 (같은 레짐 구간에서만 IS→OOS 전이)
+  - price_cluster 1/8 consistency 원인 분석: W6/W8에서만 PASS — 왜 이 구간만?
+  - 테스트 커버리지: `tests/test_regime.py` 있는지 확인, 없으면 기존 파일에 추가
 
 #### C(데이터): BTC 히스토리 데이터 확장 검토
 
@@ -53,21 +54,22 @@ _Last updated: 2026-06-21 (Cycle 339 완료)_
 - **2단계 손실 스케일링 유지**: threshold=5 기준 2→75%, 5→50%.
 - **order_flow_imbalance_v2 현재 상태**: `{"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - **슬리피지 임계값 변경 금지**: Cycle 339 E(실행) 수정. `atr_ratio < 0.03 * tf_scale` (1h 기준 3%)
-- **PAPER_SIM_REGIME_FILTER**: `{"roc_ma_cross"}` — Cycle 340 결과 보고 확장/철수 결정
+- **PAPER_SIM_REGIME_FILTER**: `set()` (빈 집합) — Cycle 339 D(ML) 역효과 확인. 개별 봉 필터링 방식 포기
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 339 — 시뮬 결과 대기 중)
+### 핵심 메트릭 (Cycle 339 확정)
 
 | 지표 | Cycle 338 | Cycle 339 | 변화 |
 |------|-----------|-----------|------|
-| roc_ma_cross Sharpe | 0.32 | TBD (시뮬 실행 중) | — |
-| roc_ma_cross MDD | 8.2% | TBD | — |
-| price_cluster Sharpe | 0.84 | TBD | — |
-| 1h PASS 수 | 0/20 (18연속) | TBD | — |
-| Bundle OOS PASS | 5/5 | TBD | — |
+| roc_ma_cross Sharpe | 0.32 | **-0.43** | -0.75 ↓↓ (레짐필터 역효과→롤백) |
+| roc_ma_cross Trades | ~57 | 18 | -68% (필터로 신호 차단) |
+| price_cluster Sharpe | 0.84 | **0.87** | +0.03 ↑ (슬리피지 개선 효과) |
+| frama Sharpe | 0.19 | **0.24** | +0.05 ↑ |
+| 1h PASS 수 | 0/20 (18연속) | **0/20 (19연속)** | — |
+| Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 
-> 시뮬레이션 완료 후 Cycle 340 WORKLOG에 결과 기록 예정
+> ⚠️ PAPER_SIM_REGIME_FILTER 빈 집합으로 롤백됨. 슬리피지 임계값 0.03은 유지.
 
 ### 핵심 메트릭 (Cycle 338: MAX_HOLD 분리 아키텍처, 유지)
 
