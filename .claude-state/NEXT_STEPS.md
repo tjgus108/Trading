@@ -1,75 +1,92 @@
 # Next Steps
 
-_Last updated: 2026-06-21 (Cycle 339 완료)_
+_Last updated: 2026-06-21 (Cycle 340 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 339
+### 이번 세션 완료 사이클: 340
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 337 | B+D+F | max_hold_candles_override=48(1h전용), OFI buy_thresh복원, 5/5 Bundle PASS 유지, 0/20 17연속 |
-| 338 | C+B+F | TP=2.5 역효과 확인(TP=3.5 확정), 2단계 손실스케일링 추가, 윈도우별 레짐 분석, 0/20 18연속 |
-| 339 | D+E+F | 레짐필터 역효과(roc_ma_cross Sharpe -0.75 급락→롤백), 슬리피지 임계값 2→3%(price_cluster+0.03), 0/20 19연속 |
+| 338 | C+B+F | TP=2.5 역효과 확인(TP=3.5 확정), 2단계 손실스케일링, 윈도우별 레짐 분석, 0/20 18연속 |
+| 339 | D+E+F | 레짐필터 역효과(roc_ma_cross -0.43→롤백), 슬리피지 임계값 2→3%, 0/20 19연속 |
+| 340 | A+C+F | IS/OOS 레짐 진단 추가, roc_ma_cross 필터 롤백 확인(+0.34↑), 0/20 20연속 |
 
-### 🎯 Cycle 340 작업 방향 (340 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 341 작업 방향 (341 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): 레짐 필터 방향 전환 + 테스트 커버리지
+#### B(리스크): price_cluster W5 근접 PASS 분석 및 리스크 조정
 
-- **배경**: Cycle 339 D(ML) 레짐 필터 역효과 확인
-  - 개별 봉 TREND_UP 필터: BUY 신호 ~70% 차단 → trades 57→18 → Sharpe +0.32→-0.43
-  - **근본 원인**: 윈도우 수준 TREND_UP% 상관관계 ≠ 개별 봉 수준 필터링 효과
-  - 슬리피지 임계값 2%→3% 변경: price_cluster +0.03, frama +0.05 — 미미하지만 긍정적
+- **배경**: Cycle 340 F(리서치) 결과: price_cluster W5(RANGING+RANGING, mkt=sideways, Sharpe=0.99)
+  - 0.01 차이로 FAIL. PF도 아슬아슬 FAIL. 리스크 파라미터 조정으로 해결 가능할 수도.
+  - W5 구간(Nov 2023 ~Jan 2024): 횡보장 — price_cluster 최적 환경
 - **작업 방향**:
-  - PAPER_SIM_REGIME_FILTER는 이미 빈 집합으로 롤백됨 (Cycle 339 말미)
-  - 레짐 필터 대신 IS/OOS 구간 레짐 **매칭** 방식 검토 (같은 레짐 구간에서만 IS→OOS 전이)
-  - price_cluster 1/8 consistency 원인 분석: W6/W8에서만 PASS — 왜 이 구간만?
-  - 테스트 커버리지: `tests/test_regime.py` 있는지 확인, 없으면 기존 파일에 추가
+  - W5 구간 price_cluster 상세 분석: PF FAIL 원인 파악
+  - kelly_sizer 또는 position sizing 미세 조정 (손실 스케일링 threshold 튜닝)
+  - DrawdownMonitor의 W5 구간 영향 분석
 
-#### C(데이터): BTC 히스토리 데이터 확장 검토
+#### D(ML): roc_ma_cross W1/W2 PASS 패턴 활용 검토
 
-- **배경**: 현재 BTC CSV는 2023-01~2024-05 (12000행). 더 긴 기간 데이터가 있으면 윈도우 수 증가
+- **배경**: roc_ma_cross는 IS=TREND_UP인 구간에서만 PASS (W1: IS끝 TREND_UP + OOS=TREND_UP)
+  - 현재 2/8 consistency → PASS 기준(50%) 미달
+  - IS끝 레짐이 TREND_UP일 때만 전략 활성화 → paper_simulation 레벨에서 검토
+- **주의**: 이전 Cycle 339에서 개별봉 레짐 필터 역효과 확인 → 봉 수준 필터 금지
+  - 윈도우 수준 필터 고려: IS가 TREND_UP으로 끝나는 경우만 OOS 결과 카운트
+  - 단, 이는 실제 배포에서 구현이 복잡 — 검토만 수행
 - **작업**:
-  - `data/historical/binance/BTCUSDT/` 폴더 확인 (1h.csv만 있는지, 4h.csv 있는지)
-  - 4h Bundle OOS는 12000행 1h → resample 3000행 4h = 2023-01~2024-05. 더 긴 기간 필요한지?
-  - 데이터 추가 수집이 불가능하면 (SSL 차단) 현재 데이터 최대 활용 방안 검토
+  - verbose-windows 활용해 roc_ma_cross W3~W8의 상세 fail reason 파악
+  - IS end-state와 strategy 성과 상관관계 정량화
 
-#### F(리서치): 레짐 필터 효과 심층 분석
+#### F(리서치): RANGING 지배 문제와 대응 전략 리서치
 
-- **배경**: TREND_UP 필터가 roc_ma_cross W3-W8에서 얼마나 신호를 줄였는지 검증 필요
+- **배경**: 분석 결과 OOS dominant regime이 RANGING인 경우가 8개 윈도우 중 6개 이상
+  - MarketRegimeDetector가 TREND_UP을 너무 보수적으로 감지 (ADX>22 필요)
+  - BTC 1h봉에서 TREND_UP 비율이 낮음 → roc_ma_cross는 구조적으로 불리
 - **작업**:
-  - `--verbose-windows` 옵션으로 roc_ma_cross 8개 윈도우 Sharpe/Trades 상세 확인
-  - trades가 0으로 떨어진 윈도우: 레짐 필터 과도 → PAPER_SIM_REGIME_FILTER 해제 고려
-  - trades가 줄었지만 Sharpe 개선: 필터 효과 입증 → 다른 전략(frama, lob_maker)에도 확장 검토
-  - 비교: Cycle 338 roc_ma_cross 전 윈도우 Sharpe vs 339 필터 후 윈도우 Sharpe
+  - detect_series()로 전체 BTC CSV TREND_UP 비율 계산
+  - ADX 임계값 완화(22→18) 시 TREND_UP 비율 변화 측정
+  - RANGING 지배 환경에서 효과적인 전략 특성 분석 (price_cluster 참고)
 
-### ⚠️ 주의 사항 (Cycle 340)
+### ⚠️ 주의 사항 (Cycle 341)
 
-- **max_hold_candles_override=48 유지**: `paper_simulation.py` engine에 고정, 절대 제거 금지
-  - Bundle OOS engine에는 전달 안 함 (RollingOOSValidator → BacktestEngine 기본값 24 유지)
+- **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
-- **atr_multiplier_tp=3.5 유지**: Cycle 338 실험으로 확정.
-- **2단계 손실 스케일링 유지**: threshold=5 기준 2→75%, 5→50%.
-- **order_flow_imbalance_v2 현재 상태**: `{"trend_span": 20}` ← Cycle 337 D(ML) 복원
-- **슬리피지 임계값 변경 금지**: Cycle 339 E(실행) 수정. `atr_ratio < 0.03 * tf_scale` (1h 기준 3%)
-- **PAPER_SIM_REGIME_FILTER**: `set()` (빈 집합) — Cycle 339 D(ML) 역효과 확인. 개별 봉 필터링 방식 포기
+- **atr_multiplier_tp=3.5 유지**: Cycle 338 실험으로 확정
+- **2단계 손실 스케일링 유지**: threshold=5 기준 2→75%, 5→50%
+- **슬리피지 임계값 변경 금지**: `atr_ratio < 0.03 * tf_scale`
+- **PAPER_SIM_REGIME_FILTER**: `set()` (빈 집합) — 유지
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 339 확정)
+### 핵심 메트릭 (Cycle 340 확정)
 
-| 지표 | Cycle 338 | Cycle 339 | 변화 |
+| 지표 | Cycle 339 | Cycle 340 | 변화 |
 |------|-----------|-----------|------|
-| roc_ma_cross Sharpe | 0.32 | **-0.43** | -0.75 ↓↓ (레짐필터 역효과→롤백) |
-| roc_ma_cross Trades | ~57 | 18 | -68% (필터로 신호 차단) |
-| price_cluster Sharpe | 0.84 | **0.87** | +0.03 ↑ (슬리피지 개선 효과) |
-| frama Sharpe | 0.19 | **0.24** | +0.05 ↑ |
-| 1h PASS 수 | 0/20 (18연속) | **0/20 (19연속)** | — |
+| roc_ma_cross Sharpe | -0.43 | **+0.34** | +0.77 ↑↑ (레짐필터 롤백 효과 확인) |
+| roc_ma_cross Trades | 18 | 36 | +100% (신호 복구) |
+| roc_ma_cross Consistency | 0/8 | **2/8** | 개선 ↑ |
+| price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| price_cluster Consistency | 1/8 | **1/8** | 유지 |
+| 1h PASS 수 | 0/20 (19연속) | **0/20 (20연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 
-> ⚠️ PAPER_SIM_REGIME_FILTER 빈 집합으로 롤백됨. 슬리피지 임계값 0.03은 유지.
+### IS/OOS 레짐 진단 결과 (Cycle 340 신규)
+
+| Window | IS end-state | OOS dominant | mkt | price_cluster | roc_ma_cross |
+|--------|-------------|--------------|-----|---------------|--------------|
+| W1 | TREND_UP | TREND_UP | bull | -1.43 FAIL | 4.04 PASS |
+| W2 | TREND_UP | RANGING | bull | 0.11 FAIL | 3.84 PASS |
+| W3 | RANGING | RANGING | bear | 0.00 FAIL | -0.04 FAIL |
+| W4 | RANGING | RANGING | bear | -0.41 FAIL | -2.01 FAIL |
+| W5 | RANGING | RANGING | sideways | 0.99 FAIL | -3.77 FAIL |
+| W6 | RANGING | RANGING | sideways | **3.78 PASS** | -0.28 FAIL |
+| W7 | RANGING | RANGING | bull | -0.08 FAIL | -1.12 FAIL |
+| W8 | TREND_UP | RANGING | bull | 0.21 FAIL | -2.05 FAIL |
+
+- price_cluster 최적 환경: RANGING+RANGING+sideways (W6)
+- roc_ma_cross 최적 환경: IS=TREND_UP + bull market momentum (W1, W2)
+- 근본 문제: 8개 윈도우 중 IS=TREND_UP인 구간은 W1, W2, W8뿐 → roc_ma_cross에 불리한 데이터 구조
 
 ### 핵심 메트릭 (Cycle 338: MAX_HOLD 분리 아키텍처, 유지)
 
@@ -86,7 +103,7 @@ _Last updated: 2026-06-21 (Cycle 339 완료)_
 - Bundle OOS: `--csv-dir data/historical` 필수 (합성 데이터 run은 리포트 덮어쓰기 방지됨)
 - Paper simulation 1h: **20 전략** × 8 windows → 약 13분 소요 (BTC only)
 
-### BUNDLE_STRATEGY_INIT_PARAMS 현재 설정 (Cycle 339 변경 없음)
+### BUNDLE_STRATEGY_INIT_PARAMS 현재 설정 (Cycle 340 변경 없음)
 - `vwap_cross: {}` ← 기본 파라미터
 - `supertrend_multi: {atr_threshold=0.5, atr_threshold_max=1.5, ema_filter=True, confidence_filter=True, rsi_ob_filter=True, rsi_ob_threshold=80, trend_confirm_bars=2, cmf_confirm=False}` ← 고정
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← 최적 확정 (delta_window=10 기본값)
@@ -98,7 +115,7 @@ _Last updated: 2026-06-21 (Cycle 339 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 339 변경 없음)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 340 변경 없음)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}`
 - `relative_volume: {"rvol_buy_sell": 1.2}`
@@ -106,23 +123,7 @@ _Last updated: 2026-06-21 (Cycle 339 완료)_
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - `cmf: {"buy_thresh": 0.10}`
 
-### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 신규)
-- `{"roc_ma_cross"}` ← TREND_UP 레짐에서만 BUY 허용 (TREND_DOWN/RANGING/HIGH_VOL 차단)
-- 근거: PASS W1(TREND_UP=45.5%), W2(41.0%) vs FAIL W3~W8(21~32%)
-- Cycle 340 검증 후 확장(frama 등) 또는 철수 결정
-
-### 윈도우별 성능 분석 (Cycle 338 F(리서치) 결과, TP=3.5 기준)
-
-| Window | Market | price_cluster | roc_ma_cross |
-|--------|--------|---------------|--------------|
-| W1 | bull | Sharpe=-0.55 ❌ | Sharpe=4.39 ✅ |
-| W2 | bull | Sharpe=-0.05 ❌ | Sharpe=3.51 ✅ |
-| W3 | bear | Sharpe=-0.12 ❌ | Sharpe=0.20 ❌ |
-| W4 | bear | Sharpe=0.62 ❌ | Sharpe=-0.45 ❌ |
-| W5 | sideways | Sharpe=0.98 ❌ | Sharpe=-3.91 ❌ |
-| W6 | sideways | Sharpe=3.17 ✅ | Sharpe=0.28 ❌ |
-| W7 | bull | Sharpe=0.94 ❌ | Sharpe=0.26 ❌ |
-| W8 | bull | Sharpe=2.23 ✅ | Sharpe=-2.25 ❌ |
-
-- 레짐 의존성: price_cluster ↔ late sideways/bull | roc_ma_cross ↔ early strong bull only
-- roc_ma_cross W5 -3.91: 횡보장 whipsaw → TREND_UP 필터 적용 (Cycle 339 D(ML)) 효과 Cycle 340 확인
+### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
+- `set()` ← 빈 집합 (레짐 필터 비활성화)
+- 이유: 개별 봉 수준 TREND_UP 필터 → roc_ma_cross trades 57→18, Sharpe +0.32→-0.43 역효과 확인
+- 윈도우 수준 레짐 매칭 방식은 Cycle 341 D(ML)에서 검토 예정

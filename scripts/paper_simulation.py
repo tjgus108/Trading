@@ -453,6 +453,7 @@ def evaluate_strategy_walk_forward(
     name = strategy.name
 
     window_vols = []  # 윈도우별 변동성 (regime weighting용)
+    _reg_diag = MarketRegimeDetector()  # IS/OOS 레짐 진단용 (Cycle 340 A품질)
 
     for i, (train_df, test_df) in enumerate(windows):
         try:
@@ -471,6 +472,17 @@ def evaluate_strategy_walk_forward(
                 eval_df["_regime_trend_up"] = (_regime_series == MarketRegime.TREND_UP)
                 strategy_inst = _RegimeFilterStrategy(strategy_inst)
             bt = engine.run(strategy_inst, eval_df)
+
+            # IS/OOS 레짐 진단 (Cycle 340 A품질)
+            # IS: IS 말미 end-state (detect, 단일 호출 ~0.5ms)
+            # OOS: OOS 구간 dominant regime (detect_series mode, ~15ms) → end-state보다 정확
+            try:
+                is_regime = _reg_diag.detect(train_df).value
+                _oos_series = _reg_diag.detect_series(eval_df).iloc[-len(test_df):]
+                oos_regime = _oos_series.mode()[0].value if len(_oos_series) > 0 else MarketRegime.RANGING.value
+            except Exception:
+                is_regime = MarketRegime.RANGING.value
+                oos_regime = MarketRegime.RANGING.value
 
             # 테스트 구간 변동성 계산 (ATR/close 평균)
             if all(c in test_df.columns for c in ["high", "low", "close"]):
@@ -502,6 +514,9 @@ def evaluate_strategy_walk_forward(
                 "market_return": round(mkt_ret, 4),
                 "market_state": mkt_state,
                 "slippage_regime_counts": dict(bt.slippage_regime_counts),
+                "is_regime": is_regime,
+                "oos_regime": oos_regime,
+                "regime_match": is_regime == oos_regime,
             })
         except Exception as e:
             window_vols.append(0.0)
@@ -787,18 +802,29 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
             lines.append("## 윈도우별 상세 분석 (상위 5 전략)\n")
             lines.append("_각 전략의 윈도우별 Sharpe/PF/Trades/Pass 상세. FAIL 원인 진단용._\n")
             for r in top_strats:
-                lines.append(f"### `{r['name']}` (rank_score={r.get('rank_score', 0):.1f}, consistency={r['passed_windows']}/{r['total_windows']})\n")
-                lines.append("| Window | Sharpe | PF | Trades | MDD | Market | Pass | Fail Reasons |")
-                lines.append("|--------|--------|-----|--------|-----|--------|------|--------------|")
-                for wr in r.get("window_results", []):
+                wrs = r.get("window_results", [])
+                mismatch_n = sum(1 for wr in wrs if not wr.get("regime_match", True) and "error" not in wr)
+                lines.append(
+                    f"### `{r['name']}` (rank_score={r.get('rank_score', 0):.1f}, "
+                    f"consistency={r['passed_windows']}/{r['total_windows']}, "
+                    f"regime_mismatch={mismatch_n}/{len(wrs)})\n"
+                )
+                lines.append("| Window | Sharpe | PF | Trades | MDD | Market | IS_Reg | OOS_Reg | Match | Pass | Fail Reasons |")
+                lines.append("|--------|--------|-----|--------|-----|--------|--------|---------|-------|------|--------------|")
+                _reg_short = {"TREND_UP": "UP↑", "TREND_DOWN": "DN↓", "RANGING": "RG~", "HIGH_VOL": "HV!"}
+                for wr in wrs:
                     if "error" in wr:
-                        lines.append(f"| W{wr['window']} | ERROR | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
+                        lines.append(f"| W{wr['window']} | ERROR | — | — | — | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
                         continue
                     p = "✅" if wr["passed"] else "❌"
                     reasons = "; ".join(wr.get("fail_reasons", [])[:2])
+                    is_r = _reg_short.get(wr.get("is_regime", ""), wr.get("is_regime", "?"))
+                    oos_r = _reg_short.get(wr.get("oos_regime", ""), wr.get("oos_regime", "?"))
+                    match = "✓" if wr.get("regime_match", True) else "✗"
                     lines.append(
                         f"| W{wr['window']} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
-                        f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | {p} | {reasons} |"
+                        f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | "
+                        f"{is_r} | {oos_r} | {match} | {p} | {reasons} |"
                     )
                 lines.append("")
 
