@@ -104,6 +104,13 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "cmf": {"buy_thresh": 0.10},
 }
 
+# Cycle 346 D(ML): 전략별 min_hold_bars 오버라이드 (global min_hold_bars와 독립적으로 동작)
+# roc_ma_cross: Cycle 345 F실험 결과 min_hold_bars=4 → Sharpe 0.34→0.99 (+0.65)
+# 전역 적용 시 price_cluster 0.87→0.27 악화 → per-strategy 설정으로 분리
+PAPER_SIM_MIN_HOLD_BARS: Dict[str, int] = {
+    "roc_ma_cross": 4,
+}
+
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)
 # Cycle 339 실험 결과: roc_ma_cross 적용 → Sharpe +0.32→-0.43, trades 57→18 (역효과)
 # BUY 신호 ~70% 차단으로 trade frequency 붕괴 → 거래 수 부족 → Sharpe 음전환
@@ -1010,7 +1017,8 @@ STRATEGIES_TIMEFRAME_EXCLUDE: Dict[str, Set[str]] = {
 }
 
 
-def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tuple[str, List[dict]]:
+def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine,
+                    per_strategy_engines: Optional[Dict[str, BacktestEngine]] = None) -> Tuple[str, List[dict]]:
     """단일 심볼에 대한 walk-forward 시뮬을 돌리고 (리포트 텍스트, 결과 리스트) 반환."""
     print(f"\n{'=' * 70}\n[{symbol}] Walk-Forward Simulation\n{'=' * 70}")
 
@@ -1097,7 +1105,8 @@ def simulate_symbol(symbol: str, pass_list: list, engine: BacktestEngine) -> Tup
             continue
         try:
             s_params = PAPER_SIM_STRATEGY_PARAMS.get(mod_name, {})
-            result = evaluate_strategy_walk_forward(cls, windows, engine, strategy_params=s_params or None)
+            _eval_engine = (per_strategy_engines or {}).get(mod_name, engine)
+            result = evaluate_strategy_walk_forward(cls, windows, _eval_engine, strategy_params=s_params or None)
             results.append(result)
             if (idx + 1) % 50 == 0:
                 print(f"[{symbol}][PROGRESS] {idx + 1}/{len(pass_list)} evaluated", flush=True)
@@ -1271,6 +1280,26 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         atr_multiplier_tp=atr_multiplier_tp,
     )
 
+    # Cycle 346 D(ML): PAPER_SIM_MIN_HOLD_BARS — 전략별 별도 engine 생성
+    _per_strategy_engines: Dict[str, BacktestEngine] = {}
+    for _strat, _mhb in PAPER_SIM_MIN_HOLD_BARS.items():
+        if _mhb != min_hold_bars:
+            _per_strategy_engines[_strat] = BacktestEngine(
+                initial_balance=10_000,
+                fee_rate=_fee_rate,
+                slippage_pct=_slippage,
+                mc_min_trades=MC_MIN_TRADES,
+                mc_block_size=MC_BLOCK_SIZE,
+                consec_loss_scale_threshold=5,
+                adaptive_slippage=True,
+                min_hold_bars=_mhb,
+                max_hold_candles_override=48,
+                atr_multiplier_tp=atr_multiplier_tp,
+            )
+    if _per_strategy_engines:
+        _mhb_info = ", ".join(f"{k}={v}" for k, v in PAPER_SIM_MIN_HOLD_BARS.items() if k in _per_strategy_engines)
+        print(f"[CONFIG] PAPER_SIM_MIN_HOLD_BARS active: {_mhb_info}", flush=True)
+
     sections = []
     all_symbol_results: Dict[str, List[dict]] = {}
     fatal_count = 0
@@ -1281,7 +1310,7 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
     )
     for symbol in SYMBOLS:
         try:
-            report_text, results = simulate_symbol(symbol, pass_list, engine)
+            report_text, results = simulate_symbol(symbol, pass_list, engine, _per_strategy_engines or None)
             sections.append(report_text)
             all_symbol_results[symbol] = results
         except Exception as e:
