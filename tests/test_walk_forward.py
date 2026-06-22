@@ -1789,3 +1789,101 @@ def test_regime_filter_true_blocks_buy_on_ranging():
     assert sig_trend.action == Action.BUY, (
         f"TREND_UP 구간에서 BUY가 차단됨: {sig_trend.action}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 345 A(품질): BundleOOSResult.avg_oos_mdd 테스트
+# ---------------------------------------------------------------------------
+
+def test_bundle_oos_result_avg_oos_mdd_none_summary():
+    """avg_oos_mdd=None (기본값) → summary에 avg_oos_mdd 줄 없음."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.5, oos_sharpe=1.0,
+        is_mdd=0.05, oos_mdd=0.0, wfe=0.667,
+        oos_pf=1.8, oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.667, avg_oos_sharpe=1.0, avg_oos_pf=1.8,
+        all_passed=True, fail_reasons=[],
+        avg_oos_mdd=None,
+    )
+    summary = result.summary()
+    assert "avg_oos_mdd" not in summary
+
+
+def test_bundle_oos_result_avg_oos_mdd_low_tag():
+    """avg_oos_mdd=0.05 (5%) → summary에 LOW 태그."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.5, oos_sharpe=1.0,
+        is_mdd=0.05, oos_mdd=0.05, wfe=0.667,
+        oos_pf=1.8, oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.667, avg_oos_sharpe=1.0, avg_oos_pf=1.8,
+        all_passed=True, fail_reasons=[],
+        avg_oos_mdd=0.05,
+    )
+    summary = result.summary()
+    assert "5.00%" in summary
+    assert "LOW" in summary
+
+
+def test_bundle_oos_result_avg_oos_mdd_med_tag():
+    """avg_oos_mdd=0.10 (10%) → summary에 MED 태그 (0.08 < x <= 0.15)."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=2.0, oos_sharpe=1.5,
+        is_mdd=0.08, oos_mdd=0.10, wfe=0.750,
+        oos_pf=2.0, oos_trades=15, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.750, avg_oos_sharpe=1.5, avg_oos_pf=2.0,
+        all_passed=True, fail_reasons=[],
+        avg_oos_mdd=0.10,
+    )
+    summary = result.summary()
+    assert "10.00%" in summary
+    assert "MED" in summary
+
+
+def test_bundle_oos_result_avg_oos_mdd_high_tag():
+    """avg_oos_mdd=0.16 (16%) → summary에 HIGH 태그 (> 0.15)."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.2, oos_sharpe=0.8,
+        is_mdd=0.10, oos_mdd=0.16, wfe=0.667,
+        oos_pf=1.6, oos_trades=12, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.667, avg_oos_sharpe=0.8, avg_oos_pf=1.6,
+        all_passed=True, fail_reasons=[],
+        avg_oos_mdd=0.16,
+    )
+    summary = result.summary()
+    assert "16.00%" in summary
+    assert "HIGH" in summary
+
+
+def test_bundle_oos_result_avg_oos_mdd_boundary_med():
+    """avg_oos_mdd=0.08 경계값 → LOW (> 0.08이어야 MED)."""
+    from src.backtest.walk_forward import BundleOOSResult, OOSFoldResult
+    fold = OOSFoldResult(
+        fold_id=0, is_sharpe=1.5, oos_sharpe=1.0,
+        is_mdd=0.05, oos_mdd=0.08, wfe=0.667,
+        oos_pf=1.8, oos_trades=20, passed=True, fail_reasons=[],
+    )
+    result = BundleOOSResult(
+        strategy_name="test_strat", folds=[fold],
+        avg_wfe=0.667, avg_oos_sharpe=1.0, avg_oos_pf=1.8,
+        all_passed=True, fail_reasons=[],
+        avg_oos_mdd=0.08,
+    )
+    summary = result.summary()
+    assert "8.00%" in summary
+    assert "LOW" in summary  # 0.08 == not > 0.08 → LOW

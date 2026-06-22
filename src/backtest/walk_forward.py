@@ -1202,6 +1202,7 @@ class BundleOOSResult:
     oos_sharpe_std: float = 0.0  # fold별 OOS Sharpe 표준편차
     dsr_pvalue: Optional[float] = None  # Deflated Sharpe Ratio p-value
     is_sharpe_significant: Optional[bool] = None  # DSR significance at α=0.05
+    avg_oos_mdd: Optional[float] = None  # Cycle 344 D(ML): 활성 fold 평균 OOS MDD (0~1)
 
     def summary(self) -> str:
         verdict = "PASS" if self.all_passed else "FAIL"
@@ -1214,6 +1215,9 @@ class BundleOOSResult:
             f"  avg_oos_pf: {self.avg_oos_pf:.3f}",
             f"  verdict: {verdict}",
         ]
+        if self.avg_oos_mdd is not None:
+            mdd_tag = "HIGH" if self.avg_oos_mdd > 0.15 else ("MED" if self.avg_oos_mdd > 0.08 else "LOW")
+            lines.append(f"  avg_oos_mdd: {self.avg_oos_mdd:.2%} ({mdd_tag})")
         if self.dsr_pvalue is not None:
             sig_tag = "SIGNIFICANT" if self.is_sharpe_significant else "NOT_SIGNIFICANT"
             lines.append(f"  dsr_pvalue: {self.dsr_pvalue:.4f} ({sig_tag})")
@@ -1552,6 +1556,10 @@ class RollingOOSValidator:
             )
             all_passed = False
 
+        # Cycle 344 D(ML): avg_oos_mdd — 활성 fold의 OOS MDD 평균 (진단용)
+        _oos_mdds = [f.oos_mdd for f in active_folds if f.oos_mdd > 0]
+        _avg_oos_mdd = round(sum(_oos_mdds) / len(_oos_mdds), 4) if _oos_mdds else None
+
         result = BundleOOSResult(
             strategy_name=strategy.name,
             folds=folds,
@@ -1563,6 +1571,7 @@ class RollingOOSValidator:
             fail_reasons=bundle_fails,
             dsr_pvalue=round(dsr_pvalue, 4) if dsr_pvalue is not None else None,
             is_sharpe_significant=is_sig,
+            avg_oos_mdd=_avg_oos_mdd,
         )
         logger.info(result.summary())
         return result

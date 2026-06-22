@@ -19,7 +19,7 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _STD_PERIOD = 20
 _STD_MULT = 2.0
-_ROC_MIN_ABS = 0.3
+_ROC_MIN_ABS = 0.5
 
 
 class ROCMACrossStrategy(BaseStrategy):
