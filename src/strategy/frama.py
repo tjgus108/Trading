@@ -124,10 +124,12 @@ class FRAMAStrategy(BaseStrategy):
     """
     name = "frama"
 
-    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14, **kwargs) -> None:
+    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14,
+                 signal_thresh: float = 1.0, **kwargs) -> None:
         self.period = period
         self.rsi_period = rsi_period
         self.atr_period = atr_period
+        self.signal_thresh = signal_thresh
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
@@ -182,10 +184,10 @@ class FRAMAStrategy(BaseStrategy):
 
         # ATR 변동성 필터: 이전봉 대비 ATR이 감소 추세
         atr_contracting = not np.isnan(prev_atr) and not np.isnan(last_atr) and last_atr < prev_atr * 1.05
-        
-        # RSI 필터: gap > 1.0% (강한 신호)는 거의 필터 안 함 (극단값만)
-        # gap <= 1.0%는 더 엄격함 (극단값 필요)
-        strong_signal = gap_pct >= 1.0
+
+        # RSI 필터: gap > signal_thresh (강한 신호)는 거의 필터 안 함 (극단값만)
+        # gap <= signal_thresh는 더 엄격함 (극단값 필요)
+        strong_signal = gap_pct >= self.signal_thresh
         
         if strong_signal:
             # 강한 신호: 극단값만 배제

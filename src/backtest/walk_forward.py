@@ -147,9 +147,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "ema_slope_min_buy": [0.0, 0.001, 0.002],   # BUY: EMA20 slope ≥ N (상승추세 필수)
         "ema_slope_max_sell": [0.0, -0.001, -0.002], # SELL: EMA20 slope ≤ N (하락추세 필수)
     },
+    # Cycle346 F(리서치): signal_thresh 파라미터 추가 (gap_pct 진입 임계값)
+    #   signal_thresh=1.0 기본값 → 0.5/1.0/1.5 탐색으로 횡보 노이즈 vs 추세 민감도 최적화
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
+        "signal_thresh": [0.5, 1.0, 1.5],
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
@@ -1107,6 +1110,7 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
         return FRAMAStrategy(
             period=params.get("period", 16),
             rsi_period=params.get("rsi_period", 14),
+            signal_thresh=params.get("signal_thresh", 1.0),
         )
 
     opt = WalkForwardOptimizer(

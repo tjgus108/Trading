@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-06-22T20:07:41.454604Z_
-_Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
+_Generated: 2026-06-22T20:29:00.942392Z_
+_Symbols: BTC/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-06-22T20:14:34.571200Z_
+_Generated: 2026-06-22T20:35:51.021611Z_
 _Symbol: BTC/USDT_
 _Data Source: CSV fallback BTC/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_

@@ -257,6 +257,7 @@ class RiskManager:
         "BEAR":       (2.0,  None),
         "CRISIS":     (2.5,  None),  # 위기: 최소 2.5 (큰 움직임 허용)
         "HIGH_VOL":   (2.0,  None),
+        "RANGING":    (1.5,  2.5),   # 횡보: floor=1.5 (노이즈 흡수), ceiling=2.5 (과도한 스톱 방지)
     }
 
     @staticmethod

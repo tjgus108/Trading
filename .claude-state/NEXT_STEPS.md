@@ -1,52 +1,48 @@
 # Next Steps
 
-_Last updated: 2026-06-22 (Cycle 345 완료)_
+_Last updated: 2026-06-22 (Cycle 346 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 345
+### 이번 세션 완료 사이클: 346
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 23연속 |
 | 344 | D+E+F | BundleOOSResult.avg_oos_mdd 필드화, SlipH% window진단, 슬리피지 무관 확인, 0/20 24연속 |
 | 345 | A+C+F | WFO그리드 vol_regime_filter 버그수정, ema20_slope 동기화, ccxt타이밍버그수정, 0/20 25연속 |
+| 346 | B+D+F | RANGING 스톱 바운드 추가, frama signal_thresh 파라미터화, 0/20 26연속 |
 
-### 🎯 Cycle 346 작업 방향 (346 mod 5 = 1 → B(리스크) + D(ML) + F)
+### 🎯 Cycle 347 작업 방향 (347 mod 5 = 2 → C(데이터) + E(실행) + F)
 
-#### B(리스크): RANGING 환경 리스크 파라미터 재검토
+#### C(데이터): price_cluster vol_regime_filter 효과 검증 (D 연속)
 
-- **배경**: Cycle 343에서 RANGING kill multiplier 1.5→1.2로 강화. 25연속 0/20
-  - RANGING에서 position sizing 더 줄이는 방향 검토
-  - WFO grid에 vol_regime_filter=True 추가 효과: 다음 시뮬에서 확인 예정
+- **배경**: Cycle 345 WFO 그리드 vol_regime_filter=True 추가 → 다음 paper_sim에서 효과 확인
+  - price_cluster AvgTrades가 41에서 줄어드는지 (RANGING 진입 차단)
+  - Sharpe std 1.10이 감소하는지 (W5/W6 분산 감소)
 - **작업**:
-  - `src/risk/manager.py` RANGING 레짐 처리 코드 재검토
-  - RANGING에서 Kelly 계수 추가 감소 or 포지션 완전 중단 옵션 검토
-  - `tests/test_risk.py` 회귀 확인
+  - paper_simulation.py 실행 후 price_cluster W5/W6 비교
+  - vol_atr_trend_min 최적값 분석 (1.5 vs 2.0 vs 2.5 중 어느 값이 선택되는지)
 
-#### D(ML): price_cluster vol_regime_filter 효과 검증
+#### E(실행): frama signal_thresh 효과 검증
 
-- **배경**: Cycle 345 A(품질)에서 WFO 그리드 수정 (vol_regime_filter=True 추가)
-  - 기존: vol_atr_trend_min이 vol_regime_filter=False로 무효화 → 54조합 모두 동일
-  - 수정: vol_regime_filter=True 고정, 실제 레짐 필터 활성화
+- **배경**: Cycle 346 F(리서치)에서 frama signal_thresh 파라미터화
+  - signal_thresh=[0.5, 1.0, 1.5] WFO 탐색 추가 (27조합)
+  - 다음 시뮬에서 signal_thresh 최적값 확인
 - **작업**:
-  - 다음 paper_simulation.py 실행 시 price_cluster 결과 주목
-  - vol_regime_filter=True에서 거래 수(AvgTrades)가 41에서 얼마나 줄어드는지 확인
-  - Sharpe std 1.10이 줄어드는지 (W5/W6 분산 감소) 확인
+  - paper_simulation.py 실행 후 frama OOS 결과 비교
+  - signal_thresh=1.5 (엄격) vs 0.5 (완화) 중 어느 게 OOS에서 유리한지 분석
 
-#### F(리서치): frama 전략 분석
+#### F(리서치): RANGING 리스크 바운드 효과 분석
 
-- **배경**: frama가 BTC 1h에서 rank3(Sharpe=0.24, PF=1.12, 1/8 consistency)
-  - FRAMA (Fractal Adaptive Moving Average): 시장 변동성에 적응하는 MA
-  - 현재 WFO 그리드: period=[14,16,18], rsi_period=[12,14,16]
+- **배경**: Cycle 346 B(리스크)에서 RANGING stop 바운드 추가 (floor=1.5, ceiling=2.5)
+  - paper_simulation.py에서 RANGING 레짐 감지 시 stoploss 변화 여부 확인
 - **작업**:
-  - `src/strategy/frama.py` 전략 로직 확인
-  - WFO 그리드에 추가 파라미터 탐색 가능성 (signal_thresh 등)
-  - 4h frama 성능 vs 1h frama 비교 (bundle OOS에 추가 가능성)
+  - RANGING 환경 손절 피격률 분석 (데이터 있으면)
+  - adaptive_stop_multiplier RANGING 실제 반영 여부 점검
 
-### ⚠️ 주의 사항 (Cycle 346)
+### ⚠️ 주의 사항 (Cycle 347)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -57,25 +53,25 @@ _Last updated: 2026-06-22 (Cycle 345 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 345 확정)
+### 핵심 메트릭 (Cycle 346 확정)
 
-| 지표 | Cycle 344 | Cycle 345 | 변화 |
+| 지표 | Cycle 345 | Cycle 346 | 변화 |
 |------|-----------|-----------|------|
-| price_cluster Sharpe | 0.87 | **0.87** | 유지 |
-| price_cluster Consistency | 1/8 | **1/8** | 유지 |
-| roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
-| roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (24연속) | **0/20 (25연속)** | — |
+| price_cluster Sharpe | 0.87 | **TBD** | — |
+| price_cluster Consistency | 1/8 | **TBD** | — |
+| roc_ma_cross Sharpe | 0.34 | **TBD** | — |
+| roc_ma_cross Consistency | 2/8 | **TBD** | — |
+| 1h PASS 수 | 0/20 (25연속) | **TBD** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| Bundle OOS avg_mdd | 5.2%/4.9%/3.1%/2.4%/2.9% | **5.2%/3.4%/2.2%/2.7%/1.9%** | OFI/ST/VA 개선 |
+| Bundle OOS avg_mdd | cmf5.2/OFI3.4/ST2.2/VA1.9% | **cmf5.2/OFI3.4/ST2.2/VA2.7/VA1.9%** | 유지 |
 
-### Cycle 345 코드 변경 요약
+### Cycle 346 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `src/backtest/walk_forward.py` | price_cluster WFO 그리드에 vol_regime_filter=[True] 추가 (vol_atr_trend_min 실효화 버그 수정) |
-| `tests/test_exchange.py` | ccxt 설치 타이밍 버그 수정 — if not HAS_CCXT 제거, connector 동적 교체 보장 |
-| `scripts/paper_simulation.py` | enrich_indicators()에 ema20_slope 추가 (feed.py 동기화) |
+| `src/risk/manager.py` | `_REGIME_STOP_BOUNDS`에 RANGING 항목 추가 (floor=1.5, ceiling=2.5) |
+| `src/strategy/frama.py` | `signal_thresh` 파라미터 추가 (gap_pct 진입 임계값 파라미터화) |
+| `src/backtest/walk_forward.py` | frama 그리드에 `signal_thresh: [0.5, 1.0, 1.5]` 추가 (27조합) |
 
 ### E(실행) 슬리피지 진단 결과 (Cycle 344 확정)
 
