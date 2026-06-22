@@ -1204,10 +1204,10 @@ def test_dm_regime_cooldown_trend_down():
 
 
 def test_dm_regime_cooldown_ranging():
-    """RANGING 레짐에서 cooldown 배수 1.0x (기본과 동일)."""
+    """RANGING 레짐에서 cooldown 배수 1.2x (Cycle 343 B: 빠른 kill 강화)."""
     monitor = DrawdownMonitor(cooldown_seconds=3600.0)
     monitor.set_regime("RANGING")
-    assert monitor._effective_cooldown_seconds() == 3600.0  # 3600 * 1.0
+    assert monitor._effective_cooldown_seconds() == 4320.0  # 3600 * 1.2
 
 
 # ── CircuitBreaker 일일 거래 횟수 제한 테스트 ─────────────────────────────────

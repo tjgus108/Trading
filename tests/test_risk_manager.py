@@ -1471,9 +1471,14 @@ class TestShouldKillStrategyRegime:
         assert dd.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="HIGH_VOL") is True
 
     def test_unknown_regime_uses_full_multiplier(self):
-        """Unknown regime: cap=multiplier(passthrough), effective=1.5."""
+        """Unknown regime (SIDEWAYS): cap=multiplier(passthrough), effective=1.5."""
         dd = self._dd()
-        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="RANGING") is False
+        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="SIDEWAYS") is False
+
+    def test_ranging_regime_tighter_threshold(self):
+        """RANGING: cap=1.2 (Cycle 343 B) → effective=1.2, 0.14 > 0.10*1.2=0.12 → KILL."""
+        dd = self._dd()
+        assert dd.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="RANGING") is True
 
     def test_none_regime_uses_full_multiplier(self):
         """regime=None: effective=1.5 (레짐 무관)."""
