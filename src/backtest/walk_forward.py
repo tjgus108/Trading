@@ -154,12 +154,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
     # bounce_pct=0.025 확정 (Cycle301 B), 양방향 탐색 [0.020, 0.025, 0.030]
-    # vol_atr_trend_min: 1.3 역효과(Cycle301 D) 제거, Cycle331 D(ML): 상향 [1.5,2.0,2.5] 탐색
+    # Cycle345 A(품질): vol_regime_filter=True 명시 추가
+    #   vol_atr_trend_min은 vol_regime_filter=False(기본값)일 때 무효 → 무의미한 그리드 탐색 제거
+    #   vol_regime_filter=True로 고정하고 vol_atr_trend_min [1.5,2.0,2.5] 유의미하게 탐색
     # Cycle304 D(ML): close_window [40,50]→[50,60] (40 역효과 Cycle303 확인, 60 탐색)
     "price_cluster": {
         "bounce_pct": [0.020, 0.025, 0.030],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
+        "vol_regime_filter": [True],
         "vol_atr_trend_min": [1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
