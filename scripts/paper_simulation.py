@@ -526,6 +526,8 @@ def evaluate_strategy_walk_forward(
                 "market_return": round(mkt_ret, 4),
                 "market_state": mkt_state,
                 "slippage_regime_counts": dict(bt.slippage_regime_counts),
+                "loss_scale_half_count": getattr(bt, "loss_scale_half_count", 0),
+                "loss_scale_full_count": getattr(bt, "loss_scale_full_count", 0),
                 "is_regime": is_regime,
                 "oos_regime": oos_regime,
                 "regime_match": is_regime == oos_regime,
@@ -600,6 +602,10 @@ def evaluate_strategy_walk_forward(
             if regime in slip_agg:
                 slip_agg[regime] += cnt
 
+    # 2단계 손실 스케일 적용 횟수 집계 (창별 합산)
+    total_loss_scale_half = sum(wr.get("loss_scale_half_count", 0) for wr in window_results if "error" not in wr)
+    total_loss_scale_full = sum(wr.get("loss_scale_full_count", 0) for wr in window_results if "error" not in wr)
+
     return {
         "name": name,
         "window_results": window_results,
@@ -618,6 +624,8 @@ def evaluate_strategy_walk_forward(
         "top_fail_reasons": top_fail_reasons,
         "robustness_label": "",  # perturbation_check 결과 (빈 문자열 = 미실행)
         "slippage_regime_agg": slip_agg,
+        "total_loss_scale_half_count": total_loss_scale_half,
+        "total_loss_scale_full_count": total_loss_scale_full,
     }
 
 
@@ -842,6 +850,19 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                         f"{is_r} | {oos_r} | {match} | {p} | {reasons} |"
                     )
                 lines.append("")
+
+    # 2단계 손실 스케일 적용 현황 (전략별 집계)
+    scale_data = [(r["name"], r.get("total_loss_scale_half_count", 0), r.get("total_loss_scale_full_count", 0))
+                  for r in results if r.get("total_loss_scale_half_count", 0) + r.get("total_loss_scale_full_count", 0) > 0]
+    if scale_data:
+        lines.append("## 2단계 손실 스케일 적용 현황\n")
+        lines.append("_연속손실 ≥2: 75% 스케일(half), ≥5: 50% 스케일(full) 적용 횟수_\n")
+        lines.append("| Strategy | Half(75%) | Full(50%) | 비율(full/half) |")
+        lines.append("|----------|-----------|-----------|-----------------|")
+        for name, half_c, full_c in sorted(scale_data, key=lambda x: x[2], reverse=True)[:10]:
+            ratio = f"{full_c/half_c:.2f}" if half_c > 0 else "N/A"
+            lines.append(f"| `{name}` | {half_c} | {full_c} | {ratio} |")
+        lines.append("")
 
     # 슬리피지 레짐 분포 (adaptive_slippage=True 시 표시)
     slip_data = [(r["name"], r.get("slippage_regime_agg", {})) for r in results

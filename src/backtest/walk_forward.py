@@ -221,6 +221,10 @@ class WalkForwardResult:
     # = mean(neighbor_sharpes) / best_sharpe.  1.0에 가까울수록 안정적.
     # None이면 계산 불가 (그리드 내 이웃 없음 등)
     plateau_score: Optional[float] = None
+    # is_oos_pearson: fold별 IS Sharpe와 OOS Sharpe 간 Pearson 상관계수
+    # 양수(특히 > 0.3)이면 IS 성능이 OOS를 예측 → 과최적화 낮음
+    # 음수이면 IS 최적화가 OOS를 역방향 예측 → 심각한 과최적화 신호
+    is_oos_pearson: Optional[float] = None
 
     @property
     def is_robust(self) -> bool:
@@ -250,6 +254,9 @@ class WalkForwardResult:
         if self.plateau_score is not None:
             plateau_tag = "STABLE" if self.plateau_score >= 0.8 else "SENSITIVE"
             lines.append(f"  plateau_score: {self.plateau_score:.3f} ({plateau_tag})")
+        if self.is_oos_pearson is not None:
+            pearson_tag = "PREDICTIVE" if self.is_oos_pearson > 0.3 else ("ANTI" if self.is_oos_pearson < -0.1 else "WEAK")
+            lines.append(f"  is_oos_pearson: {self.is_oos_pearson:.3f} ({pearson_tag})")
         if self.param_stability_cv:
             unstable = {k: v for k, v in self.param_stability_cv.items() if v > 0.5}
             lines.append(f"  param_cv: {self.param_stability_cv}")
@@ -557,6 +564,25 @@ class WalkForwardOptimizer:
         else:
             fold_pass_rate = None
 
+        # IS/OOS Pearson 상관계수: fold별 IS Sharpe와 OOS Sharpe 간 선형 관계
+        is_oos_pearson: Optional[float] = None
+        if len(window_results) >= 3:
+            is_sh_arr = [wr.is_sharpe for wr in window_results]
+            oos_sh_arr = [wr.oos_sharpe for wr in window_results]
+            n_f = len(is_sh_arr)
+            is_mean = sum(is_sh_arr) / n_f
+            oos_mean = sum(oos_sh_arr) / n_f
+            is_var = sum((x - is_mean) ** 2 for x in is_sh_arr) / n_f
+            oos_var = sum((x - oos_mean) ** 2 for x in oos_sh_arr) / n_f
+            import math as _math_p
+            if is_var > 1e-18 and oos_var > 1e-18:
+                cov = sum((a - is_mean) * (b - oos_mean) for a, b in zip(is_sh_arr, oos_sh_arr)) / n_f
+                is_oos_pearson = round(cov / (_math_p.sqrt(is_var) * _math_p.sqrt(oos_var)), 4)
+                logger.info(
+                    "[%s] IS/OOS Pearson=%.3f (n_folds=%d)",
+                    self.strategy_name, is_oos_pearson, n_f,
+                )
+
         fail_reasons = []
         is_stable = True
         if oos_std > OOS_STD_MAX:
@@ -614,6 +640,7 @@ class WalkForwardOptimizer:
             fold_pass_rate=fold_pass_rate,
             low_trades_folds=low_trades_folds,
             plateau_score=plateau_score,
+            is_oos_pearson=is_oos_pearson,
         )
         logger.info(result.summary())
         return result

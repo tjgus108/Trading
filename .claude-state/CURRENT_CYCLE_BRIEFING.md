@@ -1,61 +1,67 @@
 # Current Cycle Briefing
 
-_Cycle 341 | 2026-06-21 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 342 | 2026-06-22 | B(리스크) + D(ML) + F(리서치)_
 
 ## 완료된 작업
 
-### B(리스크): price_cluster W5 구조적 FAIL 확인 + 손실 스케일링 추적 추가
+### B(리스크): loss_scale 집계를 paper_simulation 보고서에 연결
 
-분석:
-- W5 OOS (2023-11-27~2024-01-26): volatility=0.054 (낮은 변동성)
-- CLT=0 시 Sharpe=1.458, PF=1.314 → FAIL (PF<1.5)
-- CLT=5(현재) 시 Sharpe=1.298, PF=1.281 → FAIL
-- CLT=7 시 Sharpe=1.382, PF=1.299 → FAIL
-- **결론**: W5 FAIL은 구조적 — 낮은 변동성에서 price_cluster가 PF≥1.5 달성 불가. 손실 스케일링이 결정 요인 아님
-- W6 PASS는 CLT 무관하게 유지 (더 높은 volatility=0.104)
+Cycle 341에서 추가한 `loss_scale_half_count`/`loss_scale_full_count` (engine.py) 를
+paper_simulation.py 보고서에 완전 연결:
 
-코드 개선 (`src/backtest/engine.py`):
-- `BacktestResult`에 `loss_scale_half_count`, `loss_scale_full_count` 필드 추가
-- `run()`에서 75%/50% 스케일 적용 횟수 추적 → 손실 스케일링 영향도 정량화 가능
+**`scripts/paper_simulation.py` 변경**:
+- `window_results` dict에 `loss_scale_half_count`, `loss_scale_full_count` 필드 추가
+  ```python
+  "loss_scale_half_count": getattr(bt, "loss_scale_half_count", 0),
+  "loss_scale_full_count": getattr(bt, "loss_scale_full_count", 0),
+  ```
+- 전략별 전체 집계: `total_loss_scale_half_count`, `total_loss_scale_full_count`
+- 보고서에 "2단계 손실 스케일 적용 현황" 테이블 추가:
+  - Half(75%) = 연속손실≥2 시 적용 횟수
+  - Full(50%) = 연속손실≥5 시 적용 횟수
+  - 비율(full/half) = 손실 스케일 강도 지표
 
-### D(ML): IS end-state→OOS 상관관계 정량화 + is_sharpe 컬럼 추가
+### D(ML): IS/OOS Pearson 상관계수 WalkForwardResult에 추가
 
-roc_ma_cross 8개 윈도우 분석:
+**`src/backtest/walk_forward.py` 변경**:
+- `WalkForwardResult` 데이터클래스에 `is_oos_pearson: Optional[float]` 필드 추가
+  ```python
+  # IS/OOS Pearson: fold별 IS Sharpe와 OOS Sharpe 간 Pearson 상관계수
+  # 양수(특히 > 0.3)이면 IS 성능이 OOS를 예측 → 과최적화 낮음
+  # 음수이면 IS 최적화가 OOS를 역방향 예측 → 심각한 과최적화 신호
+  is_oos_pearson: Optional[float] = None
+  ```
+- `WalkForwardOptimizer.run()`에서 fold 수 ≥3 시 계산 (표준 Pearson)
+- `summary()` 출력에 태그: PREDICTIVE(>0.3) / ANTI(<-0.1) / WEAK
 
-| Window | IS_end | IS_Sharpe | OOS_Sharpe | Result |
-|--------|--------|-----------|------------|--------|
-| W1 | TREND_UP | -0.49 | 4.69 | PASS |
-| W2 | TREND_UP | -0.20 | 3.41 | PASS |
-| W3 | RANGING | -0.16 | 0.10 | FAIL (PF) |
-| W4 | RANGING | -0.58 | -0.71 | FAIL |
-| W5 | RANGING | +0.19 | -2.98 | FAIL |
-| W6 | RANGING | -0.06 | 1.25 | FAIL (PF=1.30) |
-| W7 | RANGING | -0.27 | -0.16 | FAIL |
-| W8 | TREND_UP | -0.41 | -1.59 | FAIL (OOS=RANGING) |
+### F(리서치): RANGING 시장 0 PASS 원인 분석
 
-- **핵심 패턴**: IS=RANGING이면 OOS FAIL 확실. IS=TREND_UP이지만 OOS=RANGING이면 FAIL (W8)
-- IS 음수 Sharpe + IS_end=TREND_UP → OOS 강한 양전 (W1, W2)
+핵심 발견:
+1. BTC 1h 8개 윈도우 중 75%(6/8)이 RANGING → trend-following 전략 구조적 불리
+2. WFO 레짐 변화 지연: IS=TREND_UP 최적화 후 OOS=RANGING 전환 시 성능 역전
+3. 저변동성(W5: vol=0.054) 구간에서 슬리피지가 PF를 0.5~1.0 침식
+4. 현재 고정 슬리피지 모델은 변동성 조건을 미반영 → 개선 여지
 
-코드 개선 (`scripts/paper_simulation.py`):
-- `window_results`에 `is_sharpe` 필드 추가 (VERBOSE_WINDOWS 활성화 시 계산)
-- verbose-windows 테이블에 `IS_Sh` 컬럼 추가
+## 시뮬레이션 결과
 
-### F(리서치): TREND_UP 비율 분석 (ADX=22 vs 18)
+### Paper Simulation (1h, 8-fold, BTC only)
+- **PASS: 0/20** (22연속)
+- Top: price_cluster (Sharpe=0.87, PF=1.20, 1/8), roc_ma_cross (0.34, 1.22, 2/8)
+- 주요 FAIL: profit_factor < 1.5 (전체 FAIL의 40%+)
 
-BTC 1h CSV 전구간 (12000 행):
-- ADX=22: TREND_UP=31.3%, RANGING=47.3%, TREND_DOWN=21.4%
-- ADX=18: TREND_UP=34.3%, RANGING=41.6%, TREND_DOWN=24.1% (+3.0% TREND_UP)
-- ADX=20: TREND_UP=32.9%, RANGING=44.4%
+### Bundle OOS (4h, BTC/USDT)
+- **PASS: 5/5** — cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area
+- #1 order_flow_imbalance_v2 (Score=62.0, OOS Sharpe=4.345)
 
-**결론**: ADX 임계값 완화로 TREND_UP +3% 획득 가능하나 구조적 RANGING 지배(41~47%) 유지. 임계값 변경만으로는 roc_ma_cross 문제 해결 불가 → 현재 ADX=22 유지
+## 테스트 결과
 
-## 시뮬레이션 결과 (이번 사이클)
+- 8425 passed, 23 skipped (전체 회귀 없음)
+- walk_forward + engine 테스트 130개 통과 확인
 
-- Paper Sim BTC 1h: **0/20 PASS** (21사이클 연속)
-  - rank1: price_cluster (Sharpe=0.87, 1/8) ← 유지
-  - rank2: roc_ma_cross (Sharpe=0.34, 2/8) ← 유지
-- Bundle OOS BTC 4h: **5/5 PASS** ✅ (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
+## 다음 사이클 (343) 방향
 
-## 테스트
+343 mod 5 = 3 → **C(데이터) + B(리스크) + F**
 
-- pytest backtest engine: **56 passed** (회귀 없음, loss_scale 추적 추가 후)
+1. C(데이터): BTC 1h CSV 품질 점검 (스파이크, 갭, ATR0 빈도)
+2. B(리스크): loss_scale 창별 분포 vs Sharpe 상관관계 분석 (새로 추가된 데이터 활용)
+3. F(리서치): RANGING 시장에서 PF≥1.5 달성 전략 케이스 스터디
