@@ -510,21 +510,22 @@ def format_summary_table(results: list[tuple[str, BundleOOSResult]]) -> str:
     """결과를 Markdown 테이블로 포맷."""
     header = (
         "| Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | "
-        "All Pass | Fail Reasons |"
+        "Avg OOS MDD | All Pass | Fail Reasons |"
     )
     separator = (
         "|----------|-------|---------|----------------|------------|"
-        "----------|--------------|"
+        "------------|----------|--------------|"
     )
     rows = [header, separator]
 
     for name, r in results:
         pass_str = "PASS" if r.all_passed else "FAIL"
         fails = "; ".join(r.fail_reasons) if r.fail_reasons else "-"
+        mdd_str = f"{r.avg_oos_mdd:.2%}" if r.avg_oos_mdd is not None else "-"
         rows.append(
             f"| {name} | {len(r.folds)} | {r.avg_wfe:.3f} | "
             f"{r.avg_oos_sharpe:.3f} | {r.avg_oos_pf:.3f} | "
-            f"{pass_str} | {fails} |"
+            f"{mdd_str} | {pass_str} | {fails} |"
         )
 
     return "\n".join(rows)

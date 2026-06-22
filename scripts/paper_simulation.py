@@ -830,12 +830,12 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                     f"consistency={r['passed_windows']}/{r['total_windows']}, "
                     f"regime_mismatch={mismatch_n}/{len(wrs)})\n"
                 )
-                lines.append("| Window | IS_Sh | Sharpe | PF | Trades | MDD | Market | IS_Reg | OOS_Reg | Match | Pass | Fail Reasons |")
-                lines.append("|--------|-------|--------|-----|--------|-----|--------|--------|---------|-------|------|--------------|")
+                lines.append("| Window | IS_Sh | Sharpe | PF | Trades | MDD | Slip_High% | Market | IS_Reg | OOS_Reg | Match | Pass | Fail Reasons |")
+                lines.append("|--------|-------|--------|-----|--------|-----|------------|--------|--------|---------|-------|------|--------------|")
                 _reg_short = {"TREND_UP": "UP↑", "TREND_DOWN": "DN↓", "RANGING": "RG~", "HIGH_VOL": "HV!"}
                 for wr in wrs:
                     if "error" in wr:
-                        lines.append(f"| W{wr['window']} | — | ERROR | — | — | — | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
+                        lines.append(f"| W{wr['window']} | — | ERROR | — | — | — | — | — | — | — | — | FAIL | {wr.get('error', '')[:60]} |")
                         continue
                     p = "✅" if wr["passed"] else "❌"
                     reasons = "; ".join(wr.get("fail_reasons", [])[:2])
@@ -844,9 +844,13 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
                     match = "✓" if wr.get("regime_match", True) else "✗"
                     is_sh = wr.get("is_sharpe")
                     is_sh_str = f"{is_sh:.2f}" if is_sh is not None else "N/A"
+                    # Cycle 344 E(실행): 창별 슬리피지 HIGH 비율 — W5 저변동성 구간 진단용
+                    slip_counts = wr.get("slippage_regime_counts", {})
+                    slip_total = sum(slip_counts.values())
+                    high_pct_str = f"{slip_counts.get('high',0)/slip_total:.0%}" if slip_total > 0 else "-"
                     lines.append(
                         f"| W{wr['window']} | {is_sh_str} | {wr['sharpe']:.2f} | {wr['profit_factor']:.2f} | "
-                        f"{wr['trades']} | {wr['max_dd']:.1%} | {wr.get('market_state','?')} | "
+                        f"{wr['trades']} | {wr['max_dd']:.1%} | {high_pct_str} | {wr.get('market_state','?')} | "
                         f"{is_r} | {oos_r} | {match} | {p} | {reasons} |"
                     )
                 lines.append("")

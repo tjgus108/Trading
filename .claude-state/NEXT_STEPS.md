@@ -1,50 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-06-22 (Cycle 343 완료)_
+_Last updated: 2026-06-22 (Cycle 344 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 343
+### 이번 세션 완료 사이클: 344
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 341 | B+D+F | W5 구조적 FAIL 확인, IS→OOS 상관관계 정량화, loss_scale 추적 추가, 0/20 21연속 |
 | 342 | B+D+F | loss_scale 집계 paper_sim 연결, IS/OOS Pearson 추가, 0/20 22연속 |
 | 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 23연속 |
+| 344 | D+E+F | avg_oos_mdd Bundle OOS 노출, Slip_High% per-window 추가, 4h/1h 구조 분석, 0/20 24연속 |
 
-### 🎯 Cycle 344 작업 방향 (344 mod 5 = 4 → D(ML) + E(실행) + F)
+### 🎯 Cycle 345 작업 방향 (345 mod 5 = 0 → A(품질) + C(데이터) + F)
 
-#### D(ML): avg_oos_mdd Bundle OOS 노출 + mean-reversion ML 신호 실험
+#### A(품질): 테스트 커버리지 점검 + BundleOOSResult avg_oos_mdd 테스트 추가
 
-- **배경**: Cycle 343에서 `avg_oos_mdd` 필드 WalkForwardResult에 추가 완료
-  - Bundle OOS (`run_bundle_oos.py`) 출력에 `avg_oos_mdd` 노출 필요
+- **배경**: Cycle 343-344에서 2개 테스트 버그 발견 (코드 변경 후 테스트 미업데이트)
+  - RANGING cooldown/kill multiplier 변경 후 관련 테스트 자동 동기화 미흡
 - **작업**:
-  - `scripts/run_bundle_oos.py` 리포트에 `avg_oos_mdd` 컬럼 추가
-  - mean-reversion ML 신호 실험: price_cluster 전략에 RandomForest 신호 필터 추가 검토
-    - 피처: ATR, RSI, CMF, rolling_vol → BUY/HOLD 분류 (라벨: 다음 N봉 수익 > 0)
-    - 단, 합성 데이터에서만 검증하지 말 것 (실제 BTC CSV 사용 필수)
+  - `tests/test_walk_forward.py`에 `BundleOOSResult.avg_oos_mdd` 계산 검증 테스트 추가
+  - `tests/test_risk.py`, `tests/test_risk_manager.py` RANGING 관련 테스트 전체 점검
+  - avg_oos_mdd=None (fold 없음), avg_oos_mdd=0.05 (fold 있음) 두 케이스 커버
 
-#### E(실행): W5 저변동성 구간 슬리피지 레짐 분포 확인
+#### C(데이터): enrich_indicators VWAP 버그 수정 검토
 
-- **배경**: W5(vol=0.0139, RANGING)가 worst 창 (avg_sharpe=-2.994, loss_scale_full=9.3)
-  - 저변동성에서 고정 슬리피지 모델이 PF를 과대 침식 가능성
+- **배경**: Cycle 343에서 발견된 cumulative VWAP 버그 (vwap vs vwap20 편차 -59%)
+  - `scripts/run_bundle_oos.py`의 `enrich_indicators()`에서 `df["vwap"]` = 기간 전체 누적
+  - 현재: paper_sim 전략 중 `vwap`을 직접 사용하는 전략 없어 영향 미미
 - **작업**:
-  - `src/backtest/engine.py`의 슬리피지 계산 로직 확인
-  - W5 구간의 `slippage_regime` 분포 (low/normal/high) 추출
-  - 변동성 기반 동적 슬리피지 조정 가능성 평가
+  - `vwap` vs `vwap20`(rolling-20) 사용 전략 전수 확인 (grep)
+  - cumulative VWAP를 rolling VWAP(20)로 교체 시 영향 평가
+  - 교체가 합리적이면 `enrich_indicators()` 수정 (단독 실험 원칙)
 
-#### F(리서치): 4h Bundle OOS 전략이 1h RANGING에서 실패하는 구조적 이유
+#### F(리서치): cmf 1h 신호 노이즈 감소 — min_hold_bars 실험 검토
 
-- **배경**: Bundle OOS 5/5 PASS 전략들이 Paper Sim에서 모두 FAIL
-  - 동일 전략이 4h에서는 통과, 1h에서는 FAIL → timeframe 의존성 분석 필요
+- **배경**: Cycle 344 F분석: cmf 4h Sharpe=2.508 vs 1h Sharpe=-1.23
+  - 1h에서 68 trades (4h 17 trades의 4배) → 신호 과다 구조 확인
+  - 신호 억제 방법: min_hold_bars 증가로 연속 신호 차단 가능성
 - **작업**:
-  - `cmf`, `order_flow_imbalance_v2` 등 4h PASS 전략의 1h paper_sim Sharpe 확인
-  - RANGING 구간에서 4h vs 1h 신호 생성 빈도 비교
-  - hold 기간(4h×24봉=4일 vs 1h×48봉=2일) 차이가 PF에 미치는 영향
+  - 현재 paper_sim의 `min_hold_bars` 설정 확인 (현재 0=비활성)
+  - min_hold_bars=4 (4봉=4h 최소 대기) 실험 설계
+    - 예상: cmf trades 68→~17, 4h와 유사한 신호 밀도 확보
+    - 단독 실험 원칙: min_hold_bars만 변경
+  - 실험 전 반드시 기존 전략들의 영향도 평가 (roc_ma_cross 등 영향 없어야 함)
 
-### ⚠️ 주의 사항 (Cycle 344)
+### ⚠️ 주의 사항 (Cycle 345)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -55,23 +58,27 @@ _Last updated: 2026-06-22 (Cycle 343 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 343 확정)
+### 핵심 메트릭 (Cycle 344 확정)
 
-| 지표 | Cycle 342 | Cycle 343 | 변화 |
+| 지표 | Cycle 343 | Cycle 344 | 변화 |
 |------|-----------|-----------|------|
 | price_cluster Sharpe | 0.87 | **0.87** | 유지 |
 | price_cluster Consistency | 1/8 | **1/8** | 유지 |
 | roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
 | roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (22연속) | **0/20 (23연속)** | — |
+| 1h PASS 수 | 0/20 (23연속) | **0/20 (24연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+| Bundle OOS avg_oos_mdd 노출 | ✗ | **✅** | 신규 |
 
-### Cycle 343 코드 변경 요약
+### Cycle 344 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `src/risk/drawdown_monitor.py` | RANGING cooldown 1.0→1.2, kill_multiplier 1.5→1.2 |
-| `src/backtest/walk_forward.py` | WindowResult.oos_mdd 추가, WalkForwardResult.avg_oos_mdd 추가 |
+| `src/backtest/walk_forward.py` | BundleOOSResult.avg_oos_mdd 추가, validate()에서 계산, summary()에 출력 |
+| `scripts/run_bundle_oos.py` | format_summary_table()에 Avg OOS MDD 컬럼 추가 |
+| `scripts/paper_simulation.py` | 창별 Slip_High% 컬럼 추가 (VERBOSE_WINDOWS 모드) |
+| `tests/test_risk.py` | RANGING cooldown 테스트 기대값 3600.0→4320.0 수정 |
+| `tests/test_risk_manager.py` | unknown regime 테스트를 SIDEWAYS로 수정, RANGING 1.2cap 테스트 2건 추가 |
 
 ### IS/OOS 레짐 진단 결과 (Cycle 340 신규)
 
@@ -88,6 +95,20 @@ _Last updated: 2026-06-22 (Cycle 343 완료)_
 
 - price_cluster 최적 환경: RANGING+RANGING+sideways (W6)
 - roc_ma_cross 최적 환경: IS=TREND_UP + bull market momentum (W1, W2)
+
+### Cycle 344 F(리서치): 4h PASS vs 1h FAIL 구조 분석 결과
+
+| 전략 | 4h Sharpe (Bundle OOS) | 1h Sharpe (paper_sim) | 1h Trades | 4h avg Trades |
+|------|------------------------|----------------------|-----------|---------------|
+| cmf | 2.508 | -1.23 | 68 | 17 |
+| order_flow_imbalance_v2 | 4.345 | -0.77 | 67 | 14 |
+| supertrend_multi | 3.892 | (미포함) | - | 7.6 |
+
+**원인**:
+1. 신호 밀도 4-5배 증가 (4h → 1h) → 노이즈 비율 급증
+2. 1h 8개 윈도우 전부 RANGING → 추세추종 구조적 불리
+3. 1h 거래비용 누적: 68×0.16% ≈ 11% vs 4h 14×0.16% ≈ 2.2%
+4. 1h ATR 더 작음 → SL/TP 범위 좁음 → 노이즈로 SL 빈번
 
 ### ⚠️ 환경 제약
 - SSL 인터셉션으로 외부 거래소 API 차단

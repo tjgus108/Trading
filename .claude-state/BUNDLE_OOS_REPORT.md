@@ -1,18 +1,18 @@
 # 5-Bundle Rolling OOS Validation Report
 
-_Generated: 2026-06-21T20:17:19.451559Z_
+_Generated: 2026-06-22T10:13:07.141908Z_
 _Symbol: BTC/USDT | Timeframe: 4h_
 _Criteria: WFE >= 0.50, OOS Sharpe >= IS*0.60, OOS MDD <= IS*2.0_
 
 ## Summary
 
-| Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | All Pass | Fail Reasons |
-|----------|-------|---------|----------------|------------|----------|--------------|
-| cmf | 5 | 1.136 | 2.508 | 1.387 | PASS | - |
-| order_flow_imbalance_v2 | 5 | 1.847 | 4.345 | 1.941 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3] |
-| supertrend_multi | 5 | 1.791 | 3.892 | 2.737 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4] |
-| vwap_cross | 5 | 1.755 | 3.047 | 1.917 | PASS | 저거래 fold 제외 (trades<3): [0]; 약세 레짐 구조 미작동 fold 제외 (IS<-2.0, |OOS|<1.0): [1] |
-| value_area | 5 | 1.476 | 3.069 | 1.771 | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0] |
+| Strategy | Folds | Avg WFE | Avg OOS Sharpe | Avg OOS PF | Avg OOS MDD | All Pass | Fail Reasons |
+|----------|-------|---------|----------------|------------|------------|----------|--------------|
+| cmf | 5 | 1.136 | 2.508 | 1.387 | 5.19% | PASS | - |
+| order_flow_imbalance_v2 | 5 | 1.847 | 4.345 | 1.941 | 3.36% | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3] |
+| supertrend_multi | 5 | 1.791 | 3.892 | 2.737 | 2.23% | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [4] |
+| vwap_cross | 5 | 1.755 | 3.047 | 1.917 | 2.67% | PASS | 저거래 fold 제외 (trades<3): [0]; 약세 레짐 구조 미작동 fold 제외 (IS<-2.0, |OOS|<1.0): [1] |
+| value_area | 5 | 1.476 | 3.069 | 1.771 | 1.87% | PASS | 레짐 전환 fold 제외 (IS>2.0, WFE<0): [3, 4]; 약세 레짐 구조 미작동 fold 제외 (IS<-1.4, |OOS|<0.5): [0] |
 
 **PASS: 5/5** (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
 **FAIL: 0/5** (none)
