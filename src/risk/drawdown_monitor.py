@@ -106,7 +106,7 @@ class DrawdownMonitor:
     REGIME_COOLDOWN_MULTIPLIERS: dict = {
         'TREND_UP': 0.5,     # 상승 추세: 짧은 cooldown
         'TREND_DOWN': 1.5,   # 하락 추세: 긴 cooldown
-        'RANGING': 1.0,      # 횡보: 기본 cooldown
+        'RANGING': 1.2,      # 횡보: 기본보다 20% 연장 (손실 빈도 높음, Cycle 343 B)
         'HIGH_VOL': 2.0,     # 고변동성: 가장 긴 cooldown
         # detect_regime() 별칭
         'BULL': 0.5,
@@ -815,7 +815,7 @@ class DrawdownMonitor:
     # 레짐별 kill multiplier 상한 — bear/crisis 구간에서 더 빨리 kill
     _REGIME_KILL_MULTIPLIER_MAX: dict = {
         'TREND_UP':   1.5,   # 상승장: 기본 multiplier 유지
-        'RANGING':    1.5,   # 횡보: 기본 유지
+        'RANGING':    1.2,   # 횡보: 추세추종 전략 구조적 실패 → 빠른 kill (Cycle 343 B)
         'TREND_DOWN': 1.2,   # 하락장: 1.2x까지 축소 (더 빠른 kill)
         'HIGH_VOL':   1.0,   # 고변동성: backtest MDD 초과 즉시 kill
         'BULL':       1.5,

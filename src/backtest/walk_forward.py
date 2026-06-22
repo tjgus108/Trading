@@ -187,6 +187,7 @@ class WindowResult:
     oos_passed: bool    # OOS 백테스트 통과 여부
     is_oos_ratio: float # OOS/IS 비율
     oos_trades: int = 0  # Cycle 257: OOS 거래 수 (저거래 std 오염 방지)
+    oos_mdd: float = 0.0  # Cycle 343 B: OOS 최대 낙폭 (0~1)
 
     def is_overfit(self) -> bool:
         return self.is_oos_ratio < IS_OOS_RATIO_MIN
@@ -225,6 +226,8 @@ class WalkForwardResult:
     # 양수(특히 > 0.3)이면 IS 성능이 OOS를 예측 → 과최적화 낮음
     # 음수이면 IS 최적화가 OOS를 역방향 예측 → 심각한 과최적화 신호
     is_oos_pearson: Optional[float] = None
+    # avg_oos_mdd: fold 평균 OOS MDD (0~1). RANGING 레짐 등 고-MDD 패턴 진단용
+    avg_oos_mdd: Optional[float] = None
 
     @property
     def is_robust(self) -> bool:
@@ -257,6 +260,9 @@ class WalkForwardResult:
         if self.is_oos_pearson is not None:
             pearson_tag = "PREDICTIVE" if self.is_oos_pearson > 0.3 else ("ANTI" if self.is_oos_pearson < -0.1 else "WEAK")
             lines.append(f"  is_oos_pearson: {self.is_oos_pearson:.3f} ({pearson_tag})")
+        if self.avg_oos_mdd is not None:
+            mdd_tag = "HIGH" if self.avg_oos_mdd > 0.15 else ("MED" if self.avg_oos_mdd > 0.08 else "LOW")
+            lines.append(f"  avg_oos_mdd: {self.avg_oos_mdd:.2%} ({mdd_tag})")
         if self.param_stability_cv:
             unstable = {k: v for k, v in self.param_stability_cv.items() if v > 0.5}
             lines.append(f"  param_cv: {self.param_stability_cv}")
@@ -447,6 +453,7 @@ class WalkForwardOptimizer:
                 oos_passed=oos_result.passed,
                 is_oos_ratio=ratio,
                 oos_trades=oos_result.total_trades,
+                oos_mdd=oos_result.max_drawdown,
             )
             window_results.append(wr)
             fold_params_history.append(best_params)
@@ -624,6 +631,11 @@ class WalkForwardOptimizer:
                 self.strategy_name, plateau_score,
             )
 
+        avg_oos_mdd: Optional[float] = None
+        oos_mdds = [wr.oos_mdd for wr in window_results if wr.oos_mdd > 0]
+        if oos_mdds:
+            avg_oos_mdd = round(sum(oos_mdds) / len(oos_mdds), 4)
+
         result = WalkForwardResult(
             strategy_name=self.strategy_name,
             best_params=best_final_params,
@@ -641,6 +653,7 @@ class WalkForwardOptimizer:
             low_trades_folds=low_trades_folds,
             plateau_score=plateau_score,
             is_oos_pearson=is_oos_pearson,
+            avg_oos_mdd=avg_oos_mdd,
         )
         logger.info(result.summary())
         return result

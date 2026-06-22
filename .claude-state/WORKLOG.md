@@ -1,3 +1,34 @@
+## [2026-06-22] Cycle 343 — C(데이터) + B(리스크) + F(리서치)
+
+**[C(데이터)] BTC 1h.csv 데이터 품질 재확인**
+1. OHLCV 정합성 검사: 스파이크 0, 갭 0, OHLC 위반 0, ATR14 0값 0 → 완벽
+2. 합성 데이터 확인: 시작가 20,000.0, 종가 266,400 (실제 BTC 가격 아님)
+3. `enrich_indicators()`의 cumulative VWAP 버그 발견: -59% 편차
+   - paper_sim 20개 전략 중 `df["vwap"]` 직접 사용 전략 없음 → 현재 성능 무영향
+   - `df["vwap20"]` (rolling-20)는 정상 (0.7% 편차)
+
+**[B(리스크)] loss_scale 창별 분포 vs Sharpe 상관관계 분석**
+4. `loss_scale_full_count` vs Sharpe: Pearson r = -0.668 (강한 음의 상관)
+5. W5(RANGING, vol=0.0139): avg_sharpe=-2.994, avg_full=9.3 → worst 창
+6. W8(TREND_UP 진입, vol=0.0138): avg_sharpe=+0.730, avg_full=3.5 → best 창
+7. `src/risk/drawdown_monitor.py` 수정:
+   - RANGING cooldown multiplier: 1.0 → 1.2
+   - RANGING kill_multiplier max: 1.5 → 1.2 (빠른 kill)
+8. `src/backtest/walk_forward.py` 수정:
+   - `WindowResult`에 `oos_mdd: float = 0.0` 추가
+   - `WalkForwardResult`에 `avg_oos_mdd: Optional[float]` 추가
+   - `summary()`에 avg_oos_mdd LOW/MED/HIGH 태그 출력
+
+**[F(리서치)] RANGING 시장 PF≥1.5 달성 전략 패턴 분석**
+9. W3~W5 Top3: price_cluster(W5 PF=1.63), lob_maker(W5 PF=1.46), frama(W4 PF=1.47)
+10. 공통 특징: mean-reversion, HIGH confidence 필터, 짧은 홀딩(~1.4일)
+11. PF≥1.5 달성 조건: 평균복귀 로직 + 동적 신뢰도 필터 + 빠른 이익실현
+
+**시뮬레이션**: 0/20 PASS (23연속), Bundle OOS 5/5 PASS 유지
+**테스트**: 162 passed (drawdown_monitor + walk_forward 회귀 없음)
+
+---
+
 ## [2026-06-22] Cycle 342 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] loss_scale 집계를 paper_simulation 보고서에 연결**

@@ -1,46 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-06-22 (Cycle 342 완료)_
+_Last updated: 2026-06-22 (Cycle 343 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 342
+### 이번 세션 완료 사이클: 343
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 340 | A+C+F | IS/OOS 레짐 진단 추가, roc_ma_cross +0.34↑, 0/20 20연속 |
 | 341 | B+D+F | W5 구조적 FAIL 확인, IS→OOS 상관관계 정량화, loss_scale 추적 추가, 0/20 21연속 |
 | 342 | B+D+F | loss_scale 집계 paper_sim 연결, IS/OOS Pearson 추가, 0/20 22연속 |
+| 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 23연속 |
 
-### 🎯 Cycle 343 작업 방향 (343 mod 5 = 3 → C(데이터) + B(리스크) + F)
+### 🎯 Cycle 344 작업 방향 (344 mod 5 = 4 → D(ML) + E(실행) + F)
 
-#### C(데이터): BTC 1h.csv 데이터 품질 재확인
+#### D(ML): avg_oos_mdd Bundle OOS 노출 + mean-reversion ML 신호 실험
 
-- **배경**: PF < 1.5 가 주요 FAIL 원인 (전체 FAIL의 40%+). 데이터 품질 문제가 PF를 인위적으로 낮출 수 있음
+- **배경**: Cycle 343에서 `avg_oos_mdd` 필드 WalkForwardResult에 추가 완료
+  - Bundle OOS (`run_bundle_oos.py`) 출력에 `avg_oos_mdd` 노출 필요
 - **작업**:
-  - BTC 1h.csv OHLCV 정합성 검사: 가격 스파이크(±20% 이상), 갭 분석
-  - paper_simulation.py의 `enrich_indicators()` 함수 검토
-    - ATR14 0값 발생 빈도 확인 (`signals_skipped_atr0`)
-    - Donchian/MACD 계산 정확성 확인
+  - `scripts/run_bundle_oos.py` 리포트에 `avg_oos_mdd` 컬럼 추가
+  - mean-reversion ML 신호 실험: price_cluster 전략에 RandomForest 신호 필터 추가 검토
+    - 피처: ATR, RSI, CMF, rolling_vol → BUY/HOLD 분류 (라벨: 다음 N봉 수익 > 0)
+    - 단, 합성 데이터에서만 검증하지 말 것 (실제 BTC CSV 사용 필수)
 
-#### B(리스크): loss_scale 적용 창별 분포 분석
+#### E(실행): W5 저변동성 구간 슬리피지 레짐 분포 확인
 
-- **배경**: Cycle 342에서 paper_sim 보고서에 loss_scale 섹션 추가
-  - 이제 창별 `loss_scale_half_count`, `loss_scale_full_count` 데이터 활용 가능
+- **배경**: W5(vol=0.0139, RANGING)가 worst 창 (avg_sharpe=-2.994, loss_scale_full=9.3)
+  - 저변동성에서 고정 슬리피지 모델이 PF를 과대 침식 가능성
 - **작업**:
-  - 창별 loss_scale 적용 빈도 vs Sharpe 상관관계 분석
-  - 고변동성(W6, vol=0.104) vs 저변동성(W5, vol=0.054) loss_scale 분포 비교
-  - loss_scale이 많이 적용된 창 = FAIL 패턴인지 확인
+  - `src/backtest/engine.py`의 슬리피지 계산 로직 확인
+  - W5 구간의 `slippage_regime` 분포 (low/normal/high) 추출
+  - 변동성 기반 동적 슬리피지 조정 가능성 평가
 
-#### F(리서치): 크립토 PF 1.5 달성 전략 케이스 스터디
+#### F(리서치): 4h Bundle OOS 전략이 1h RANGING에서 실패하는 구조적 이유
 
-- **배경**: 현재 BTC 1h RANGING 시장에서 모든 전략 PF < 1.5
-  - 횡보 시장에서 PF ≥ 1.5를 달성하는 전략 패턴 조사
-  - mean-reversion + volume filter 조합이 효과적인지 확인
+- **배경**: Bundle OOS 5/5 PASS 전략들이 Paper Sim에서 모두 FAIL
+  - 동일 전략이 4h에서는 통과, 1h에서는 FAIL → timeframe 의존성 분석 필요
+- **작업**:
+  - `cmf`, `order_flow_imbalance_v2` 등 4h PASS 전략의 1h paper_sim Sharpe 확인
+  - RANGING 구간에서 4h vs 1h 신호 생성 빈도 비교
+  - hold 기간(4h×24봉=4일 vs 1h×48봉=2일) 차이가 PF에 미치는 영향
 
-### ⚠️ 주의 사항 (Cycle 343)
+### ⚠️ 주의 사항 (Cycle 344)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -51,23 +55,23 @@ _Last updated: 2026-06-22 (Cycle 342 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 342 확정)
+### 핵심 메트릭 (Cycle 343 확정)
 
-| 지표 | Cycle 341 | Cycle 342 | 변화 |
+| 지표 | Cycle 342 | Cycle 343 | 변화 |
 |------|-----------|-----------|------|
 | price_cluster Sharpe | 0.87 | **0.87** | 유지 |
 | price_cluster Consistency | 1/8 | **1/8** | 유지 |
 | roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
 | roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (21연속) | **0/20 (22연속)** | — |
+| 1h PASS 수 | 0/20 (22연속) | **0/20 (23연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 
-### Cycle 342 코드 변경 요약
+### Cycle 343 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `scripts/paper_simulation.py` | window_results에 loss_scale 카운터 추가, 보고서 섹션 추가 |
-| `src/backtest/walk_forward.py` | WalkForwardResult에 is_oos_pearson 필드 + 계산 로직 추가 |
+| `src/risk/drawdown_monitor.py` | RANGING cooldown 1.0→1.2, kill_multiplier 1.5→1.2 |
+| `src/backtest/walk_forward.py` | WindowResult.oos_mdd 추가, WalkForwardResult.avg_oos_mdd 추가 |
 
 ### IS/OOS 레짐 진단 결과 (Cycle 340 신규)
 

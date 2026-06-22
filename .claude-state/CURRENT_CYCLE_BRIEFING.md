@@ -1,67 +1,71 @@
 # Current Cycle Briefing
 
-_Cycle 342 | 2026-06-22 | B(리스크) + D(ML) + F(리서치)_
+_Cycle 343 | 2026-06-22 | C(데이터) + B(리스크) + F(리서치)_
 
-## 완료된 작업
+## 완료된 사이클: 343
+**카테고리**: C(데이터) + B(리스크) + F(리서치)
 
-### B(리스크): loss_scale 집계를 paper_simulation 보고서에 연결
+### C(데이터): BTC 1h.csv 데이터 품질 재확인
 
-Cycle 341에서 추가한 `loss_scale_half_count`/`loss_scale_full_count` (engine.py) 를
-paper_simulation.py 보고서에 완전 연결:
+**발견 사항**:
+- OHLCV 정합성: 완벽 (스파이크 0, 갭 0, OHLC 위반 0, ATR14 0값 0)
+- **합성 데이터 확인**: 시작가 20,000.0 고정, 2024-05 종가 266,400 (실제 당시 ~60-65k와 불일치)
+- **cumulative VWAP 버그**: `enrich_indicators()`의 `df["vwap"]`는 12000봉 누적 가중평균 → 데이터 끝에서 -59% 편차
+  - 하지만 paper_sim 20개 전략 중 `df["vwap"]` 직접 사용 전략 없음 → 현재 성능에 무영향
+  - `df["vwap20"]` (rolling-20)는 정상 (0.7% 편차)
+- MACD, Donchian 계산 정확성 확인 → 정상
 
-**`scripts/paper_simulation.py` 변경**:
-- `window_results` dict에 `loss_scale_half_count`, `loss_scale_full_count` 필드 추가
-  ```python
-  "loss_scale_half_count": getattr(bt, "loss_scale_half_count", 0),
-  "loss_scale_full_count": getattr(bt, "loss_scale_full_count", 0),
-  ```
-- 전략별 전체 집계: `total_loss_scale_half_count`, `total_loss_scale_full_count`
-- 보고서에 "2단계 손실 스케일 적용 현황" 테이블 추가:
-  - Half(75%) = 연속손실≥2 시 적용 횟수
-  - Full(50%) = 연속손실≥5 시 적용 횟수
-  - 비율(full/half) = 손실 스케일 강도 지표
+### B(리스크): loss_scale 창별 분포 vs Sharpe 상관관계
 
-### D(ML): IS/OOS Pearson 상관계수 WalkForwardResult에 추가
+**핵심 발견**:
+- `loss_scale_full_count` vs Sharpe: **Pearson r = -0.668** (강한 음의 상관)
+- W5(vol=0.0139, RANGING)가 가장 나쁨: avg_sharpe=-2.994, avg_full=9.3
+- W8(vol=0.0138, TREND_UP 진입)이 가장 좋음: avg_sharpe=+0.730, avg_full=3.5
+- loss_scale_full이 많이 걸리는 창 = FAIL 예측 지표로 활용 가능
 
-**`src/backtest/walk_forward.py` 변경**:
-- `WalkForwardResult` 데이터클래스에 `is_oos_pearson: Optional[float]` 필드 추가
-  ```python
-  # IS/OOS Pearson: fold별 IS Sharpe와 OOS Sharpe 간 Pearson 상관계수
-  # 양수(특히 > 0.3)이면 IS 성능이 OOS를 예측 → 과최적화 낮음
-  # 음수이면 IS 최적화가 OOS를 역방향 예측 → 심각한 과최적화 신호
-  is_oos_pearson: Optional[float] = None
-  ```
-- `WalkForwardOptimizer.run()`에서 fold 수 ≥3 시 계산 (표준 Pearson)
-- `summary()` 출력에 태그: PREDICTIVE(>0.3) / ANTI(<-0.1) / WEAK
+**코드 변경 1** — `src/risk/drawdown_monitor.py`:
+```python
+REGIME_COOLDOWN_MULTIPLIERS = {
+    'RANGING': 1.2,  # 1.0 → 1.2 (RANGING 손실 빈도 높음)
+}
+_REGIME_KILL_MULTIPLIER_MAX = {
+    'RANGING': 1.2,  # 1.5 → 1.2 (하락장 수준으로 빠른 kill)
+}
+```
 
-### F(리서치): RANGING 시장 0 PASS 원인 분석
+**코드 변경 2** — `src/backtest/walk_forward.py`:
+- `WindowResult`에 `oos_mdd: float = 0.0` 추가 (fold별 OOS 낙폭)
+- `WalkForwardResult`에 `avg_oos_mdd: Optional[float]` 추가
+- `summary()` 출력에 MDD 태그 (LOW/MED/HIGH)
 
-핵심 발견:
-1. BTC 1h 8개 윈도우 중 75%(6/8)이 RANGING → trend-following 전략 구조적 불리
-2. WFO 레짐 변화 지연: IS=TREND_UP 최적화 후 OOS=RANGING 전환 시 성능 역전
-3. 저변동성(W5: vol=0.054) 구간에서 슬리피지가 PF를 0.5~1.0 침식
-4. 현재 고정 슬리피지 모델은 변동성 조건을 미반영 → 개선 여지
+### F(리서치): RANGING 시장 PF≥1.5 달성 전략 패턴
+
+**발견**:
+- W3~W5 Top3: price_cluster(W5 PF=1.63 유일 PASS), lob_maker(W5 PF=1.46), frama(W4 PF=1.47)
+- 공통 특징: mean-reversion 기반, HIGH confidence 필터, 짧은 홀딩(~1.4일/포지션)
+- PF≥1.5 달성 조건: 평균복귀 로직 + 동적 신뢰도 필터 + 빠른 이익실현
 
 ## 시뮬레이션 결과
 
 ### Paper Simulation (1h, 8-fold, BTC only)
-- **PASS: 0/20** (22연속)
+- **PASS: 0/20** (23연속)
 - Top: price_cluster (Sharpe=0.87, PF=1.20, 1/8), roc_ma_cross (0.34, 1.22, 2/8)
 - 주요 FAIL: profit_factor < 1.5 (전체 FAIL의 40%+)
 
 ### Bundle OOS (4h, BTC/USDT)
 - **PASS: 5/5** — cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area
-- #1 order_flow_imbalance_v2 (Score=62.0, OOS Sharpe=4.345)
+- #1 order_flow_imbalance_v2 (Score=62.0, OOS Sharpe=4.345, PF=1.941)
 
 ## 테스트 결과
 
-- 8425 passed, 23 skipped (전체 회귀 없음)
-- walk_forward + engine 테스트 130개 통과 확인
+- 162 passed (drawdown_monitor + walk_forward 회귀 없음)
+- drawdown_monitor 변경 후 기존 테스트 전체 통과
+- walk_forward 변경 후 기존 테스트 전체 통과
 
-## 다음 사이클 (343) 방향
+## 다음 사이클 (344) 방향
 
-343 mod 5 = 3 → **C(데이터) + B(리스크) + F**
+344 mod 5 = 4 → **D(ML) + E(실행) + F**
 
-1. C(데이터): BTC 1h CSV 품질 점검 (스파이크, 갭, ATR0 빈도)
-2. B(리스크): loss_scale 창별 분포 vs Sharpe 상관관계 분석 (새로 추가된 데이터 활용)
-3. F(리서치): RANGING 시장에서 PF≥1.5 달성 전략 케이스 스터디
+1. D(ML): mean-reversion ML 신호 실험, `avg_oos_mdd` 필드 Bundle OOS 노출
+2. E(실행): W5 저변동성 구간 슬리피지 레짐 분포 확인 (low/normal/high 비율)
+3. F(리서치): 4h Bundle OOS 전략이 1h RANGING에서 실패하는 구조적 이유 분석
