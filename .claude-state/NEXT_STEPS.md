@@ -1,52 +1,48 @@
 # Next Steps
 
-_Last updated: 2026-06-22 (Cycle 344 완료)_
+_Last updated: 2026-06-22 (Cycle 346 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 344
+### 이번 세션 완료 사이클: 346
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 342 | B+D+F | loss_scale paper_sim 연결, IS/OOS Pearson 추가, 0/20 22연속 |
-| 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 23연속 |
 | 344 | D+E+F | BundleOOSResult.avg_oos_mdd 필드화, SlipH% window진단, 슬리피지 무관 확인, 0/20 24연속 |
+| 345 | A+C+F | WFO그리드 vol_regime_filter 버그수정, ema20_slope 동기화, ccxt타이밍버그수정, 0/20 25연속 |
+| 346 | B+D+F | RANGING 스톱 바운드 추가, frama signal_thresh 파라미터화, 0/20 26연속 |
 
-### 🎯 Cycle 345 작업 방향 (345 mod 5 = 0 → A(품질) + C(데이터) + F)
+### 🎯 Cycle 347 작업 방향 (347 mod 5 = 2 → C(데이터) + E(실행) + F)
 
-#### A(품질): price_cluster 1h PASS 가능성 집중 분석
+#### C(데이터): price_cluster vol_regime_filter 효과 검증 (D 연속)
 
-- **배경**: price_cluster Sharpe=0.87, Consistency=1/8 — 현재 best performer 유지
-  - 실패 창 패턴: W2~W5 (RANGING) → cluster bounce 신호가 RANGING에서 역방향
-  - W6 (RANGING+RANGING+sideways) 1개 PASS — 이 창의 특성 분석 필요
+- **배경**: Cycle 345 WFO 그리드 vol_regime_filter=True 추가 → 다음 paper_sim에서 효과 확인
+  - price_cluster AvgTrades가 41에서 줄어드는지 (RANGING 진입 차단)
+  - Sharpe std 1.10이 감소하는지 (W5/W6 분산 감소)
 - **작업**:
-  - W6에서 PASS한 파라미터(cluster_tolerance, bounce_pct) 값 확인
-  - RANGING에서 작동하는 조건 분석: 저변동성 range 내에서 cluster bounce만 선택
-  - `src/backtest/walk_forward.py` window IS 파라미터 최적 분석 (WFO 그리드 확인)
+  - paper_simulation.py 실행 후 price_cluster W5/W6 비교
+  - vol_atr_trend_min 최적값 분석 (1.5 vs 2.0 vs 2.5 중 어느 값이 선택되는지)
 
-#### C(데이터): 실제 데이터 인디케이터 추가 검토
+#### E(실행): frama signal_thresh 효과 검증
 
-- **배경**: BTC 1h.csv 품질 검증 완료(Cycle 343). ETH/SOL은 합성 데이터 확인됨
-  - 현재 indicator set: ATR, EMA, SMA, RSI, BB, MACD, VWAP, Donchian
-  - 누락 후보: OBV (거래량 추세), Stochastic RSI, Williams %R
+- **배경**: Cycle 346 F(리서치)에서 frama signal_thresh 파라미터화
+  - signal_thresh=[0.5, 1.0, 1.5] WFO 탐색 추가 (27조합)
+  - 다음 시뮬에서 signal_thresh 최적값 확인
 - **작업**:
-  - `src/data/feed.py`의 `enrich_indicators()` 함수 확인
-  - 전략 중 OBV/Stochastic 요구 전략이 있으나 지표 미제공 버그 있는지 점검
-  - `paper_simulation.py` enrich_indicators()와 feed.py 지표 동기화 여부 확인
+  - paper_simulation.py 실행 후 frama OOS 결과 비교
+  - signal_thresh=1.5 (엄격) vs 0.5 (완화) 중 어느 게 OOS에서 유리한지 분석
 
-#### F(리서치): RANGING 환경에서 PF≥1.5 달성 패턴 추가 연구
+#### F(리서치): RANGING 리스크 바운드 효과 분석
 
-- **배경**: Cycle 344에서 슬리피지 무관 확인 → RANGING 자체가 PF 구조적 문제
-  - HIGH% 평균 < 1% → 동적 슬리피지 조정 불필요 확인됨
-  - 4h 5/5 PASS vs 1h 0/24 FAIL → timeframe 의존성이 핵심
+- **배경**: Cycle 346 B(리스크)에서 RANGING stop 바운드 추가 (floor=1.5, ceiling=2.5)
+  - paper_simulation.py에서 RANGING 레짐 감지 시 stoploss 변화 여부 확인
 - **작업**:
-  - mean-reversion 전략 리서치: 어떤 파라미터가 RANGING PF≥1.5를 달성하는가?
-  - price_cluster W6 PASS 창의 평균 홀딩 기간 vs 전체 창 비교
-  - roc_ma_cross 2/8 PASS 창의 공통 특성 (IS_Reg, vol 범위) 분석
+  - RANGING 환경 손절 피격률 분석 (데이터 있으면)
+  - adaptive_stop_multiplier RANGING 실제 반영 여부 점검
 
-### ⚠️ 주의 사항 (Cycle 345)
+### ⚠️ 주의 사항 (Cycle 347)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -57,27 +53,25 @@ _Last updated: 2026-06-22 (Cycle 344 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 344 확정)
+### 핵심 메트릭 (Cycle 346 확정)
 
-| 지표 | Cycle 343 | Cycle 344 | 변화 |
+| 지표 | Cycle 345 | Cycle 346 | 변화 |
 |------|-----------|-----------|------|
-| price_cluster Sharpe | 0.87 | **0.87** | 유지 |
-| price_cluster Consistency | 1/8 | **1/8** | 유지 |
-| roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
-| roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (23연속) | **0/20 (24연속)** | — |
+| price_cluster Sharpe | 0.87 | **TBD** | — |
+| price_cluster Consistency | 1/8 | **TBD** | — |
+| roc_ma_cross Sharpe | 0.34 | **TBD** | — |
+| roc_ma_cross Consistency | 2/8 | **TBD** | — |
+| 1h PASS 수 | 0/20 (25연속) | **TBD** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| Bundle OOS avg_mdd | — | **5.2%/4.9%/3.1%/2.4%/2.9%** | 신규 노출 |
+| Bundle OOS avg_mdd | cmf5.2/OFI3.4/ST2.2/VA1.9% | **cmf5.2/OFI3.4/ST2.2/VA2.7/VA1.9%** | 유지 |
 
-### Cycle 344 코드 변경 요약
+### Cycle 346 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `src/backtest/walk_forward.py` | BundleOOSResult에 avg_oos_mdd 필드 추가, validate()에서 계산 |
-| `scripts/run_bundle_oos.py` | format_summary_table()에 Avg OOS MDD 컬럼 추가 |
-| `scripts/paper_simulation.py` | window 상세 테이블에 SlipH% 컬럼 추가 |
-| `tests/test_risk.py` | test_dm_regime_cooldown_ranging 기대값 수정 (1.0→1.2배수) |
-| `tests/test_risk_manager.py` | unknown_regime 테스트를 SIDEWAYS로 수정, RANGING 전용 테스트 추가 |
+| `src/risk/manager.py` | `_REGIME_STOP_BOUNDS`에 RANGING 항목 추가 (floor=1.5, ceiling=2.5) |
+| `src/strategy/frama.py` | `signal_thresh` 파라미터 추가 (gap_pct 진입 임계값 파라미터화) |
+| `src/backtest/walk_forward.py` | frama 그리드에 `signal_thresh: [0.5, 1.0, 1.5]` 추가 (27조합) |
 
 ### E(실행) 슬리피지 진단 결과 (Cycle 344 확정)
 

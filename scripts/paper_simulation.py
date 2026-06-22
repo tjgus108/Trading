@@ -297,6 +297,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # EMA / SMA
     df["ema20"] = close.ewm(span=20, adjust=False).mean()
     df["ema50"] = close.ewm(span=50, adjust=False).mean()
+    df["ema20_slope"] = df["ema20"].diff() / df["ema20"]  # feed.py 동기화: narrow_range 필터용
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()
 

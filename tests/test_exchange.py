@@ -52,17 +52,16 @@ import ccxt  # noqa: E402 — 이제 실제든 mock이든 import 가능
 from src.exchange.connector import ExchangeConnector, API_CALL_TIMEOUT  # noqa: E402
 from src.exchange.paper_connector import PaperConnector  # noqa: E402
 
-# 이미 로드된 모듈의 ccxt 참조를 mock으로 교체 (테스트 순서 의존 방지)
-if not HAS_CCXT:
-    import src.exchange.connector as _conn_mod
-    if _conn_mod.ccxt is None:
-        _conn_mod.ccxt = ccxt
-    try:
-        import src.data.feed as _feed_mod
-        if _feed_mod.ccxt is None:
-            _feed_mod.ccxt = ccxt
-    except Exception:
-        pass
+# 이미 로드된 모듈의 ccxt 참조를 교체 (ccxt 설치 타이밍 무관하게 None 방지)
+import src.exchange.connector as _conn_mod
+if _conn_mod.ccxt is None:
+    _conn_mod.ccxt = ccxt
+try:
+    import src.data.feed as _feed_mod
+    if _feed_mod.ccxt is None:
+        _feed_mod.ccxt = ccxt
+except Exception:
+    pass
 
 
 # ─────────────────────────────────────────────────────────────
