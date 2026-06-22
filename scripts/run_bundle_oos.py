@@ -432,12 +432,13 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["donchian_high"] = high.shift(1).rolling(20, min_periods=1).max()
     df["donchian_low"] = low.shift(1).rolling(20, min_periods=1).min()
 
+    # VWAP — rolling(20) 기준 (cumulative VWAP는 전 구간 누적으로 현재 레벨과 편차 발생)
     tp = (high + low + close) / 3
-    df["vwap"] = (tp * df["volume"]).cumsum() / df["volume"].cumsum()
-    df["vwap20"] = (
+    df["vwap"] = (
         (tp * df["volume"]).rolling(20, min_periods=1).sum()
         / df["volume"].rolling(20, min_periods=1).sum()
     )
+    df["vwap20"] = df["vwap"]
     df["volume_sma20"] = df["volume"].rolling(20, min_periods=1).mean()
     df["return_5"] = close.pct_change(5)
 
