@@ -1,3 +1,51 @@
+## [2026-06-23] Cycle 346 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor RANGING 매크로 방향성 중립 판별 추가**
+1. `DrawdownMonitor.set_ranging_macro_neutral(ema50_slope, threshold=0.0005)` 메서드 추가
+   - RANGING 레짐 내 매크로 방향성 중립 여부를 ema50 slope 절댓값으로 판별
+   - neutral(|ema50_slope| ≤ 0.0005): cooldown 0.9x (mean-reversion 유리)
+   - directional(|ema50_slope| > 0.0005): cooldown 1.5x (mean-reversion 불리)
+   - 정보 없음(기본): cooldown 1.2x (기존 동작 유지)
+   - 근거: BTC 1h RANGING 중 |ema50_slope| < 0.0005 = 45.1% 캔들
+   - 근거: W6 PASS(mkt=sideways): neutral macro + RANGING → mean-reversion 작동
+   - 근거: W2-W5 FAIL(mkt=bull/bear): directional macro + RANGING → 역방향 bounce
+   - `RANGING_MACRO_NEUTRAL_MULT: 0.9` / `RANGING_MACRO_DIRECTIONAL_MULT: 1.5` 클래스 상수 추가
+2. 새 테스트 4개 추가 (test_risk.py): neutral/directional/타레짐 미영향/reset 검증
+   - `test_dm_ranging_macro_neutral_cooldown_shorter`: neutral → 3600*0.9=3240.0s ✓
+   - `test_dm_ranging_macro_directional_cooldown_longer`: directional → 3600*1.5=5400.0s ✓
+   - `test_dm_ranging_macro_neutral_no_effect_on_other_regimes`: TREND_UP에 미영향 ✓
+   - `test_dm_ranging_macro_neutral_reset_clears_state`: reset 후 None 복원 ✓
+
+**[D(ML)] narrow_range WFO 그리드 ema_slope 범위 조정**
+3. `walk_forward.py` DEFAULT_GRIDS narrow_range ema_slope 그리드 업데이트
+   - `ema_slope_min_buy`: [0.0, 0.001, 0.002] → [0.0, 0.0005, 0.001]
+   - `ema_slope_max_sell`: [0.0, -0.001, -0.002] → [0.0, -0.0005, -0.001]
+   - 분석 근거:
+     - 0.002 → RANGING BUY ~20% 통과 (80% 차단): 과도하게 엄격, 제거
+     - 0.001 → RANGING BUY 27.1% 통과 (72.9% 차단): 거래 수 붕괴 위험
+     - 0.0005 → RANGING BUY 38.2% 통과 (61.8% 차단): 중간 균형점으로 탐색 추가
+   - narrow_range 1h paper_sim: AvgSharpe=-0.51, PF=0.97, 0/8 consistency
+   - 결론: ema_slope=0.001은 PAPER_SIM에 추가 불가 (거래 수 붕괴 확인)
+
+**[F(리서치)] 1h PASS 전략 실존 여부 분석 + BTC 1h 구조 재확인**
+4. ema50 slope 분포 분석:
+   - TREND_UP: ema50 slope mean=0.001391, neutral(<0.0005)=14.4%
+   - TREND_DOWN: ema50 slope mean=-0.001266, neutral(<0.0005)=18.9%
+   - RANGING: ema50 slope mean=0.000110, neutral(<0.0005)=45.1%
+   - 결론: RANGING에서만 중립 매크로 45.1% → mean-reversion 필요충분조건
+5. 1h PF < 1.5 구조 분석:
+   - 전체 20개 전략 FAIL 주요 원인: PF < 1.5 (가장 빈번)
+   - 수수료 0.11% round-trip → 1h 봉당 평균 수익 대비 상대비중 높음
+   - 4h에서 동일 전략(cmf, OFI) 5/5 PASS → 봉 크기가 수수료 상대비중을 결정
+   - 1h PASS를 달성하려면 PF 기준을 낮추거나 수수료가 낮은 전략 필요
+
+**시뮬레이션**:
+- Paper Sim 1h: 0/20 PASS (26연속 FAIL streak) — price_cluster rank1 (Sharpe=0.87, 1/8)
+- Bundle OOS 4h: 5/5 PASS 유지 — OFI=4.345, supertrend=3.892, value_area=3.069
+**테스트**: 8426 passed, 23 skipped (전체 회귀 없음) + 새 4개 추가 = 8430 passed
+
+---
+
 ## [2026-06-23] Cycle 345 — A(품질) + C(데이터) + F(리서치)
 
 **[C(데이터)] enrich_indicators() ema20_slope 동기화 버그 수정**
@@ -1966,6 +2014,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-23 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 05:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

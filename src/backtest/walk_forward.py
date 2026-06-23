@@ -144,8 +144,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # → trend_regime_filter=False 고정, nr_lookback 탐색으로 전환
         "trend_regime_filter": [False],
         # Cycle310 C(데이터): EMA slope 추세 필터 — fold1/3 베어마켓 BUY 차단, fold3 불마켓 SELL 차단
-        "ema_slope_min_buy": [0.0, 0.001, 0.002],   # BUY: EMA20 slope ≥ N (상승추세 필수)
-        "ema_slope_max_sell": [0.0, -0.001, -0.002], # SELL: EMA20 slope ≤ N (하락추세 필수)
+        # Cycle346 D(ML): 0.002 제거, 0.0005 추가 — BTC 1h RANGING 분석 결과
+        #   ema_slope_min_buy=0.001: RANGING 기간 BUY 27.1%만 통과 (72.9% 차단) → 거래 수 부족 위험
+        #   ema_slope_min_buy=0.0005: RANGING 기간 BUY 38.2%만 통과 (61.8% 차단) → 중간 균형점
+        #   ema_slope_min_buy=0.002: RANGING BUY ~20% 통과 → 과도하게 엄격, 제거
+        "ema_slope_min_buy": [0.0, 0.0005, 0.001],   # BUY: EMA20 slope ≥ N (상승추세 필수)
+        "ema_slope_max_sell": [0.0, -0.0005, -0.001], # SELL: EMA20 slope ≤ N (하락추세 필수)
     },
     "frama": {
         "period": [14, 16, 18],

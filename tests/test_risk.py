@@ -1204,10 +1204,47 @@ def test_dm_regime_cooldown_trend_down():
 
 
 def test_dm_regime_cooldown_ranging():
-    """RANGING 레짐에서 cooldown 배수 1.2x (Cycle 343 B: 빠른 kill 강화)."""
+    """RANGING 레짐에서 cooldown 배수 1.2x (매크로 정보 없을 때 기본값)."""
     monitor = DrawdownMonitor(cooldown_seconds=3600.0)
     monitor.set_regime("RANGING")
     assert monitor._effective_cooldown_seconds() == 4320.0  # 3600 * 1.2
+
+
+def test_dm_ranging_macro_neutral_cooldown_shorter():
+    """RANGING + 중립 매크로: cooldown 0.9x (mean-reversion 유리 구간)."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("RANGING")
+    monitor.set_ranging_macro_neutral(ema50_slope=0.0002, threshold=0.0005)  # neutral: |0.0002| < 0.0005
+    assert monitor._ranging_macro_neutral is True
+    assert monitor._effective_cooldown_seconds() == pytest.approx(3240.0)  # 3600 * 0.9
+
+
+def test_dm_ranging_macro_directional_cooldown_longer():
+    """RANGING + 방향성 매크로: cooldown 1.5x (mean-reversion 불리 구간)."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("RANGING")
+    monitor.set_ranging_macro_neutral(ema50_slope=0.0008, threshold=0.0005)  # directional: |0.0008| > 0.0005
+    assert monitor._ranging_macro_neutral is False
+    assert monitor._effective_cooldown_seconds() == pytest.approx(5400.0)  # 3600 * 1.5
+
+
+def test_dm_ranging_macro_neutral_no_effect_on_other_regimes():
+    """매크로 중립 상태는 TREND_UP 레짐에는 영향 없음."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("TREND_UP")
+    monitor.set_ranging_macro_neutral(ema50_slope=0.0, threshold=0.0005)
+    assert monitor._effective_cooldown_seconds() == pytest.approx(1800.0)  # 3600 * 0.5 (TREND_UP 배수)
+
+
+def test_dm_ranging_macro_neutral_reset_clears_state():
+    """reset() 호출 후 _ranging_macro_neutral은 None으로 초기화."""
+    monitor = DrawdownMonitor(cooldown_seconds=3600.0)
+    monitor.set_regime("RANGING")
+    monitor.set_ranging_macro_neutral(ema50_slope=0.0001, threshold=0.0005)
+    monitor.reset()
+    assert monitor._ranging_macro_neutral is None
+    monitor.set_regime("RANGING")
+    assert monitor._effective_cooldown_seconds() == pytest.approx(4320.0)  # 정보 없음 → 기본 1.2x
 
 
 # ── CircuitBreaker 일일 거래 횟수 제한 테스트 ─────────────────────────────────

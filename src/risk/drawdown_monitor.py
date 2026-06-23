@@ -114,6 +114,14 @@ class DrawdownMonitor:
         'CRISIS': 2.0,
     }
 
+    # RANGING 매크로 방향성별 cooldown 배수 (Cycle 346 B)
+    # 분석: RANGING+neutral macro(W6 sideways) → mean-reversion PASS
+    #        RANGING+directional macro(W2-W5 bull/bear) → mean-reversion FAIL
+    # neutral(|ema50_slope| <= threshold): mean-reversion 유리 → cooldown 단축
+    # directional(|ema50_slope| > threshold): mean-reversion 불리 → cooldown 연장
+    _RANGING_MACRO_NEUTRAL_MULT: float = 0.9   # neutral macro + RANGING: 기본 cooldown 단축
+    _RANGING_MACRO_DIRECTIONAL_MULT: float = 1.5  # directional macro + RANGING: cooldown 연장
+
     def __init__(
         self,
         max_drawdown_pct: float = 0.15,
@@ -195,6 +203,9 @@ class DrawdownMonitor:
         self._atr_vol_mult: float = 1.0            # ATR 필터 배수 (정상=1.0, 급등=0.5)
         # OOS Sharpe decay 필터: OOS/IS Sharpe 비율이 threshold 미만이면 0.5x 적용
         self._sharpe_decay_mult: float = 1.0
+        # RANGING 매크로 방향성 중립 상태 (Cycle 346 B)
+        # None=정보 없음(기본 1.2x), True=neutral macro(0.9x), False=directional macro(1.5x)
+        self._ranging_macro_neutral: Optional[bool] = None
 
         self._peak: Optional[float] = None
         self._current: float = 0.0
@@ -249,6 +260,32 @@ class DrawdownMonitor:
             )
         else:
             logger.debug('DrawdownMonitor: regime=%s (일일 한도=%.1f%%)', self._current_regime, self.daily_limit * 100)
+
+    def set_ranging_macro_neutral(self, ema50_slope: float, threshold: float = 0.0005) -> None:
+        """RANGING 레짐 내 매크로 방향성 중립 여부 설정.
+
+        RANGING micro 레짐에서 ema50 slope의 절댓값이 threshold 이하이면 중립 매크로로 판정.
+        중립 매크로 + RANGING → mean-reversion 전략 유리 → cooldown 단축 (0.9x).
+        방향성 매크로 + RANGING → mean-reversion 전략 불리 → cooldown 연장 (1.5x).
+
+        Cycle 346 B 분석 근거:
+          - BTC 1h RANGING 창에서 |ema50_slope| < 0.0005: 45.1%의 캔들 (중립 구간)
+          - W6 PASS (mkt=sideways): 중립 매크로 + RANGING → Sharpe 3.78
+          - W2-W5 FAIL (mkt=bull/bear): 방향성 매크로 + RANGING → Sharpe < 1.0
+
+        Args:
+            ema50_slope: 현재 EMA50 기울기 (close 대비 비율). `ema50.diff() / ema50` 계산값.
+            threshold:   중립 판정 절댓값 임계값 (기본 0.0005). BTC 1h EMA50 분포 기준 보수적 설정.
+        """
+        is_neutral = abs(ema50_slope) <= threshold
+        if is_neutral != self._ranging_macro_neutral:
+            tag = "중립" if is_neutral else "방향성"
+            mult = self._RANGING_MACRO_NEUTRAL_MULT if is_neutral else self._RANGING_MACRO_DIRECTIONAL_MULT
+            logger.info(
+                "DrawdownMonitor: RANGING 매크로 %s 전환 — |ema50_slope|=%.6f %s %.6f → cooldown %.1fx",
+                tag, abs(ema50_slope), "≤" if is_neutral else ">", threshold, mult,
+            )
+        self._ranging_macro_neutral = is_neutral
 
     def set_atr_state(self, atr: float, atr_ma: float, threshold: float = 1.5) -> None:
         """ATR 변동성 상태 설정. ATR > ATR_MA * threshold이면 포지션 사이즈를 0.5로 축소.
@@ -328,7 +365,17 @@ class DrawdownMonitor:
         return self.daily_limit
 
     def _regime_cooldown_multiplier(self) -> float:
-        """현재 레짐에 따른 cooldown 배수 반환. 레짐 미설정 시 1.0."""
+        """현재 레짐에 따른 cooldown 배수 반환. 레짐 미설정 시 1.0.
+
+        RANGING 레짐 + 매크로 방향성 정보가 있으면 세분화 배수 적용:
+          - neutral macro (_ranging_macro_neutral=True): _RANGING_MACRO_NEUTRAL_MULT (0.9x)
+          - directional macro (_ranging_macro_neutral=False): _RANGING_MACRO_DIRECTIONAL_MULT (1.5x)
+          - 정보 없음 (_ranging_macro_neutral=None): 기본 RANGING 배수 1.2x
+        """
+        if self._current_regime == 'RANGING' and self._ranging_macro_neutral is not None:
+            if self._ranging_macro_neutral:
+                return self._RANGING_MACRO_NEUTRAL_MULT
+            return self._RANGING_MACRO_DIRECTIONAL_MULT
         return self.REGIME_COOLDOWN_MULTIPLIERS.get(self._current_regime, 1.0)
 
     def _effective_cooldown_seconds(self) -> float:
@@ -775,6 +822,7 @@ class DrawdownMonitor:
         self._halt_drawdown = 0.0
         self._atr_vol_mult = 1.0
         self._sharpe_decay_mult = 1.0
+        self._ranging_macro_neutral = None
         logger.info("DrawdownMonitor: reset")
 
     def reset_daily(self, equity: float) -> None:
