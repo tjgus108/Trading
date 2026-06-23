@@ -156,8 +156,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # bounce_pct=0.025 확정 (Cycle301 B), 양방향 탐색 [0.020, 0.025, 0.030]
     # vol_atr_trend_min: 1.3 역효과(Cycle301 D) 제거, Cycle331 D(ML): 상향 [1.5,2.0,2.5] 탐색
     # Cycle304 D(ML): close_window [40,50]→[50,60] (40 역효과 Cycle303 확인, 60 탐색)
+    # Cycle345 A(품질): bounce_pct 하한 0.010 추가 — paper_sim W6 PASS(Sharpe=3.78)가 기본값(0.01)에서 달성됨
+    #   0.030 제거(상한 미효과 Cycle302 관찰), 탐색 범위 [0.010, 0.020, 0.025]로 조정
     "price_cluster": {
-        "bounce_pct": [0.020, 0.025, 0.030],
+        "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_atr_trend_min": [1.5, 2.0, 2.5],

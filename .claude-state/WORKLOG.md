@@ -1,3 +1,33 @@
+## [2026-06-23] Cycle 345 — A(품질) + C(데이터) + F(리서치)
+
+**[C(데이터)] enrich_indicators() ema20_slope 동기화 버그 수정**
+1. `paper_simulation.py` `enrich_indicators()`에 `ema20_slope` 컬럼 누락 발견
+   - `feed.py._add_indicators()`는 ema20_slope를 계산하지만 paper_sim에는 없었음
+   - `run_bundle_oos.py`는 Cycle311에 이미 수정됨 — paper_sim만 미동기화 상태였음
+   - 수정: `df["ema20_slope"] = df["ema20"].diff() / df["ema20"]` 1줄 추가
+   - 영향: `narrow_range` 전략의 EMA slope 필터가 paper_sim에서도 적용됨
+
+**[A(품질)] price_cluster WFO 그리드 bounce_pct 범위 조정**
+2. `walk_forward.py` DEFAULT_GRIDS `price_cluster` 업데이트
+   - bounce_pct 범위: [0.020, 0.025, 0.030] → [0.010, 0.020, 0.025]
+   - 근거: paper_sim W6 PASS(Sharpe=3.78)가 기본값 bounce_pct=0.010에서 달성됨
+   - 상한 0.030 제거 (Cycle302 관찰: 상한 값 미효과), 하한 0.010 추가
+   - WFO가 실제 PASS 가능 범위를 포함하도록 탐색 공간 수정
+
+**[F(리서치)] RANGING 환경 PF≥1.5 달성 패턴 분석**
+3. price_cluster 창별 패턴:
+   - W6 PASS(mkt=sideways): RANGING micro + neutral macro → bounce 방향 일치
+   - W2-W5 FAIL(mkt=bull/bear): RANGING micro + directional macro → bounce 역방향
+   - 핵심: RANGING 레짐만으로 충분하지 않음. 매크로 방향성 중립이 필요
+4. 4h Bundle OOS 5/5 PASS 안정 유지 (OFI Sharpe=4.345, supertrend=3.892)
+
+**시뮬레이션**:
+- Paper Sim 1h: 0/20 PASS (25연속 FAIL streak) — price_cluster rank1 (Sharpe=0.87, 1/8)
+- Bundle OOS 4h: 5/5 PASS 유지 — OFI=4.345, supertrend=3.892, value_area=3.069
+**테스트**: 8426 passed, 23 skipped (전체 회귀 없음)
+
+---
+
 ## [2026-06-22] Cycle 344 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] avg_oos_mdd Bundle OOS 노출**
@@ -1842,6 +1872,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-22 15:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 00:22 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 00:22 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

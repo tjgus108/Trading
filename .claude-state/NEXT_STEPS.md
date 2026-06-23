@@ -1,52 +1,54 @@
 # Next Steps
 
-_Last updated: 2026-06-22 (Cycle 344 완료)_
+_Last updated: 2026-06-23 (Cycle 345 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 344
+### 이번 세션 완료 사이클: 345
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 342 | B+D+F | loss_scale paper_sim 연결, IS/OOS Pearson 추가, 0/20 22연속 |
-| 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 23연속 |
+| 343 | C+B+F | BTC CSV 품질확인, RANGING kill 1.5→1.2, avg_oos_mdd 추가, 0/20 24연속 |
 | 344 | D+E+F | BundleOOSResult.avg_oos_mdd 필드화, SlipH% window진단, 슬리피지 무관 확인, 0/20 24연속 |
+| 345 | A+C+F | ema20_slope 동기화 버그 수정, price_cluster WFO 그리드 수정, 0/20 25연속 |
 
-### 🎯 Cycle 345 작업 방향 (345 mod 5 = 0 → A(품질) + C(데이터) + F)
+### 🎯 Cycle 346 작업 방향 (346 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): price_cluster 1h PASS 가능성 집중 분석
+#### B(리스크): RANGING 매크로 방향성 필터 탐색
 
-- **배경**: price_cluster Sharpe=0.87, Consistency=1/8 — 현재 best performer 유지
-  - 실패 창 패턴: W2~W5 (RANGING) → cluster bounce 신호가 RANGING에서 역방향
-  - W6 (RANGING+RANGING+sideways) 1개 PASS — 이 창의 특성 분석 필요
+- **배경**: Cycle 345 F(리서치) 분석 결과 — price_cluster FAIL 원인 확정
+  - RANGING micro + neutral macro(W6 mkt=sideways) → PASS (Sharpe=3.78)
+  - RANGING micro + directional macro(W2-W5 bull/bear) → FAIL
+  - 매크로 방향성 중립 여부가 mean-reversion PF≥1.5의 핵심 변수
 - **작업**:
-  - W6에서 PASS한 파라미터(cluster_tolerance, bounce_pct) 값 확인
-  - RANGING에서 작동하는 조건 분석: 저변동성 range 내에서 cluster bounce만 선택
-  - `src/backtest/walk_forward.py` window IS 파라미터 최적 분석 (WFO 그리드 확인)
+  - `src/risk/drawdown_monitor.py`의 RANGING 레짐 처리 검토
+  - 매크로 방향성 중립 판별: ema50 slope magnitude 임계값 탐색
+  - PAPER_SIM_STRATEGY_PARAMS에 price_cluster bounce_pct=0.010 명시적 등록 검토
 
-#### C(데이터): 실제 데이터 인디케이터 추가 검토
+#### D(ML): narrow_range ema_slope 필터 효과 검증
 
-- **배경**: BTC 1h.csv 품질 검증 완료(Cycle 343). ETH/SOL은 합성 데이터 확인됨
-  - 현재 indicator set: ATR, EMA, SMA, RSI, BB, MACD, VWAP, Donchian
-  - 누락 후보: OBV (거래량 추세), Stochastic RSI, Williams %R
+- **배경**: Cycle 345 C(데이터)에서 paper_sim에 ema20_slope 추가됨
+  - narrow_range 전략이 이제 paper_sim에서도 EMA slope 필터 적용
+  - WFO DEFAULT_GRIDS: ema_slope_min_buy=[0.0, 0.001, 0.002]
+  - 기본값 0.0 → 필터 비활성 (paper_sim은 기본 params 사용)
 - **작업**:
-  - `src/data/feed.py`의 `enrich_indicators()` 함수 확인
-  - 전략 중 OBV/Stochastic 요구 전략이 있으나 지표 미제공 버그 있는지 점검
-  - `paper_simulation.py` enrich_indicators()와 feed.py 지표 동기화 여부 확인
+  - PAPER_SIM_STRATEGY_PARAMS에 narrow_range: {"ema_slope_min_buy": 0.001} 추가 실험 검토
+  - 단, ema_slope=0.001 필터가 BTC 1h에서 RANGING 기간 BUY를 얼마나 차단하는지 먼저 확인
+  - ML 신호 품질: `src/backtest/walk_forward.py` is_oos_pearson 값 분석 (plateau_score와 함께)
 
-#### F(리서치): RANGING 환경에서 PF≥1.5 달성 패턴 추가 연구
+#### F(리서치): 1h PASS 전략 실존 여부 재탐색
 
-- **배경**: Cycle 344에서 슬리피지 무관 확인 → RANGING 자체가 PF 구조적 문제
-  - HIGH% 평균 < 1% → 동적 슬리피지 조정 불필요 확인됨
-  - 4h 5/5 PASS vs 1h 0/24 FAIL → timeframe 의존성이 핵심
+- **배경**: 25연속 0/20 FAIL → 1h 시장 구조 자체가 PF≥1.5 달성을 막는지 확인 필요
+  - 4h Bundle OOS 5/5 PASS → 동일 전략이 4h에선 작동
+  - 1h timeframe 구조적 한계: 수수료 상대비중, RANGING 비율 75%
 - **작업**:
-  - mean-reversion 전략 리서치: 어떤 파라미터가 RANGING PF≥1.5를 달성하는가?
-  - price_cluster W6 PASS 창의 평균 홀딩 기간 vs 전체 창 비교
-  - roc_ma_cross 2/8 PASS 창의 공통 특성 (IS_Reg, vol 범위) 분석
+  - 레짐별 수익 분해: bull 창(W1)에서 어떤 1h 전략이 Sharpe≥1.0 달성하는가?
+  - W1(TREND_UP→TREND_UP, mkt=bull): roc_ma_cross PASS 4.04 → 이 창에서 다른 트렌드 추종 전략 탐색
+  - Bundle OOS의 vwap_cross가 1h paper_sim rank로 진입 가능성 분석 (기본 파라미터 사용 중)
 
-### ⚠️ 주의 사항 (Cycle 345)
+### ⚠️ 주의 사항 (Cycle 346)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -57,57 +59,57 @@ _Last updated: 2026-06-22 (Cycle 344 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 344 확정)
+### 핵심 메트릭 (Cycle 345 확정)
 
-| 지표 | Cycle 343 | Cycle 344 | 변화 |
+| 지표 | Cycle 344 | Cycle 345 | 변화 |
 |------|-----------|-----------|------|
 | price_cluster Sharpe | 0.87 | **0.87** | 유지 |
 | price_cluster Consistency | 1/8 | **1/8** | 유지 |
 | roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
 | roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (23연속) | **0/20 (24연속)** | — |
+| 1h PASS 수 | 0/20 (24연속) | **0/20 (25연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| Bundle OOS avg_mdd | — | **5.2%/4.9%/3.1%/2.4%/2.9%** | 신규 노출 |
+| Bundle OOS OFI Sharpe | 4.345 | **4.345** | 유지 |
 
-### Cycle 344 코드 변경 요약
+### Cycle 345 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `src/backtest/walk_forward.py` | BundleOOSResult에 avg_oos_mdd 필드 추가, validate()에서 계산 |
-| `scripts/run_bundle_oos.py` | format_summary_table()에 Avg OOS MDD 컬럼 추가 |
-| `scripts/paper_simulation.py` | window 상세 테이블에 SlipH% 컬럼 추가 |
-| `tests/test_risk.py` | test_dm_regime_cooldown_ranging 기대값 수정 (1.0→1.2배수) |
-| `tests/test_risk_manager.py` | unknown_regime 테스트를 SIDEWAYS로 수정, RANGING 전용 테스트 추가 |
+| `scripts/paper_simulation.py` | enrich_indicators()에 ema20_slope 추가 (feed.py 동기화) |
+| `src/backtest/walk_forward.py` | price_cluster DEFAULT_GRIDS bounce_pct [0.020,0.025,0.030]→[0.010,0.020,0.025] |
+
+### F(리서치) RANGING 패턴 진단 결과 (Cycle 345 확정)
+
+| 창 | mkt | IS end | OOS dominant | price_cluster | 원인 분석 |
+|----|-----|--------|--------------|--------------|---------|
+| W1 | bull | TREND_UP | TREND_UP | -1.43 FAIL | 추세장, mean-reversion 역방향 |
+| W2 | bull | TREND_UP | RANGING | 0.11 FAIL | 매크로 상승 중 RANGING → bounce 하한 선매수 약세 |
+| W3 | bear | RANGING | RANGING | 0.00 FAIL | 하락 RANGING → 하단 bounce 실패 |
+| W4 | bear | RANGING | RANGING | -0.41 FAIL | 하락 RANGING → 하단 bounce 실패 |
+| W5 | sideways | RANGING | RANGING | 0.99 FAIL | sideways지만 변동성↑, PF 미달 |
+| W6 | sideways | RANGING | RANGING | **3.78 PASS** | **neutral macro + RANGING = bounce 성공** |
+| W7 | bull | RANGING | RANGING | -0.08 FAIL | 상승 재개 중 RANGING → bounce 하한 위험 |
+| W8 | bull | TREND_UP | RANGING | 0.21 FAIL | TREND_UP 후 RANGING 전환, 방향 불명확 |
+
+**핵심 결론**: W6만 sideways(중립) 매크로 + RANGING micro → mean-reversion 작동
+W5도 sideways지만 변동성이 높아 PF 미달 (W5 vol=1.39% vs W6 추정 낮음)
 
 ### E(실행) 슬리피지 진단 결과 (Cycle 344 확정)
 
 | 지표 | BTC 1h 전체 평균 |
 |------|----------------|
-| LOW 레짐 비율 | 0% (모든 전략) |
-| NORMAL 레짐 비율 | 92~100% |
 | HIGH 레짐 비율 | 0~8% (최대 dema_cross 8.3%) |
-| W5 vol=1.39% → 레짐 | NORMAL (0.5~3% 범위) |
-| 동적 슬리피지 조정 필요성 | **없음** — HIGH%가 무시할 수준 |
+| 동적 슬리피지 조정 필요성 | **없음** |
 
-### IS/OOS 레짐 진단 결과 (Cycle 340 신규, 유지)
+### Bundle OOS avg_oos_mdd (Cycle 344 확정)
 
-| Window | IS end-state | OOS dominant | mkt | price_cluster | roc_ma_cross |
-|--------|-------------|--------------|-----|---------------|--------------|
-| W1 | TREND_UP | TREND_UP | bull | -1.43 FAIL | 4.04 PASS |
-| W2 | TREND_UP | RANGING | bull | 0.11 FAIL | 3.84 PASS |
-| W3 | RANGING | RANGING | bear | 0.00 FAIL | -0.04 FAIL |
-| W4 | RANGING | RANGING | bear | -0.41 FAIL | -2.01 FAIL |
-| W5 | RANGING | RANGING | sideways | 0.99 FAIL | -3.77 FAIL |
-| W6 | RANGING | RANGING | sideways | **3.78 PASS** | -0.28 FAIL |
-| W7 | RANGING | RANGING | bull | -0.08 FAIL | -1.12 FAIL |
-| W8 | TREND_UP | RANGING | bull | 0.21 FAIL | -2.05 FAIL |
-
-### ⚠️ 환경 제약
-- SSL 인터셉션으로 외부 거래소 API 차단
-- BTC: real CSV (data/historical/binance/BTCUSDT/1h.csv, 2023-01~2024-05, 12000 rows, 갭 없음)
-- ETH/SOL: synthetic CSV (data/historical/synthetic/) — NaN 없음, OHLC 정상
-- Bundle OOS: `--csv-dir data/historical` 필수 (합성 데이터 run은 리포트 덮어쓰기 방지됨)
-- Paper simulation 1h: **20 전략** × 8 windows → 약 6분 소요 (BTC only)
+| 전략 | avg_oos_mdd |
+|------|-------------|
+| cmf | 5.2% |
+| order_flow_imbalance_v2 | 4.9% → Cycle 345: 4.85% |
+| supertrend_multi | 3.1% → Cycle 345: 3.14% |
+| vwap_cross | 2.4% → Cycle 345: 2.39% |
+| value_area | 2.9% → Cycle 345: 2.92% |
 
 ### BUNDLE_STRATEGY_INIT_PARAMS 현재 설정 (Cycle 340 변경 없음)
 - `vwap_cross: {}` ← 기본 파라미터
@@ -139,3 +141,10 @@ _Last updated: 2026-06-22 (Cycle 344 완료)_
 | 1h paper_sim | 48봉 (48시간) | `paper_simulation.py`: `max_hold_candles_override=48` |
 | 4h Bundle OOS | 24봉 (96시간=4일) | `BacktestEngine` 기본값 `MAX_HOLD_CANDLES=24` |
 | 기타(테스트 등) | 24봉 | `BacktestEngine` 기본값 |
+
+### ⚠️ 환경 제약
+- SSL 인터셉션으로 외부 거래소 API 차단
+- BTC: real CSV (data/historical/binance/BTCUSDT/1h.csv, 2023-01~2024-05, 12000 rows, 갭 없음)
+- ETH/SOL: synthetic CSV (data/historical/synthetic/) — NaN 없음, OHLC 정상
+- Bundle OOS: `--csv-dir data/historical` 필수 (합성 데이터 run은 리포트 덮어쓰기 방지됨)
+- Paper simulation 1h: **20 전략** × 8 windows → 약 6분 소요 (BTC only)
