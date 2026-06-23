@@ -1492,3 +1492,78 @@ class TestShouldKillStrategyRegime:
         assert status["effective_multiplier"] == pytest.approx(1.2)
         assert status["threshold"] == pytest.approx(0.12)
         assert status["should_kill"] is True
+
+
+# ── Cycle 347 B: RANGING 매크로 방향성 → RiskManager.evaluate() 연동 ─────────
+
+def _make_candle_df_with_ema_slope(slope_direction: str, n: int = 60) -> pd.DataFrame:
+    """EMA50 slope를 원하는 방향으로 유도하는 캔들 DataFrame.
+
+    'positive': 강한 상승 → ema50_slope >> 0.0005
+    'neutral':  횡보 sin 패턴 → ema50_slope ≈ 0
+    """
+    base = 50000.0
+    if slope_direction == 'positive':
+        closes = base + np.arange(n) * 50.0
+    else:
+        closes = base + np.sin(np.linspace(0, 4 * np.pi, n)) * 100.0
+
+    return pd.DataFrame({
+        "open": closes * 0.999,
+        "high": closes * 1.002,
+        "low": closes * 0.998,
+        "close": closes,
+        "volume": [1000.0] * n,
+    })
+
+
+class TestRangingMacroNeutralManagerIntegration:
+    """Cycle 347 B: RiskManager.evaluate()에서 regime='RANGING'일 때
+    candle_df EMA50 slope → DrawdownMonitor.set_ranging_macro_neutral() 자동 연동 검증.
+    """
+
+    def _make_rm_with_dm(self) -> tuple:
+        from src.risk.drawdown_monitor import DrawdownMonitor
+        dm = DrawdownMonitor()
+        dm.set_regime('RANGING')
+        rm = RiskManager(drawdown_monitor=dm)
+        return rm, dm
+
+    def test_ranging_regime_with_positive_slope_sets_directional(self):
+        """RANGING + 강한 상승 slope → DrawdownMonitor._ranging_macro_neutral=False(방향성)."""
+        rm, dm = self._make_rm_with_dm()
+        df = _make_candle_df_with_ema_slope('positive')
+        rm.evaluate(
+            action='BUY', entry_price=50000, atr=500,
+            account_balance=10000, regime='RANGING', candle_df=df,
+        )
+        assert dm._ranging_macro_neutral is False
+
+    def test_ranging_regime_with_neutral_slope_sets_neutral(self):
+        """RANGING + 횡보(sin wave) slope → DrawdownMonitor._ranging_macro_neutral=True(중립)."""
+        rm, dm = self._make_rm_with_dm()
+        df = _make_candle_df_with_ema_slope('neutral')
+        rm.evaluate(
+            action='BUY', entry_price=50000, atr=500,
+            account_balance=10000, regime='RANGING', candle_df=df,
+        )
+        assert dm._ranging_macro_neutral is True
+
+    def test_non_ranging_regime_does_not_set_macro_neutral(self):
+        """TREND_UP 레짐에서는 set_ranging_macro_neutral()가 호출되지 않아야 함."""
+        rm, dm = self._make_rm_with_dm()
+        df = _make_candle_df_with_ema_slope('positive')
+        rm.evaluate(
+            action='BUY', entry_price=50000, atr=500,
+            account_balance=10000, regime='TREND_UP', candle_df=df,
+        )
+        assert dm._ranging_macro_neutral is None  # 초기값 유지
+
+    def test_no_candle_df_does_not_set_macro_neutral(self):
+        """candle_df 없으면 set_ranging_macro_neutral() 호출 안 됨."""
+        rm, dm = self._make_rm_with_dm()
+        rm.evaluate(
+            action='BUY', entry_price=50000, atr=500,
+            account_balance=10000, regime='RANGING',
+        )
+        assert dm._ranging_macro_neutral is None  # 초기값 유지

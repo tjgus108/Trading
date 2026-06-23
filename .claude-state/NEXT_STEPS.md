@@ -1,52 +1,46 @@
 # Next Steps
 
-_Last updated: 2026-06-23 (Cycle 346 완료)_
+_Last updated: 2026-06-23 (Cycle 347 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 346
+### 이번 세션 완료 사이클: 347
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 344 | D+E+F | BundleOOSResult.avg_oos_mdd 필드화, SlipH% window진단, 슬리피지 무관 확인, 0/20 24연속 |
 | 345 | A+C+F | ema20_slope 동기화 버그 수정, price_cluster WFO 그리드 수정, 0/20 25연속 |
 | 346 | B+D+F | RANGING 매크로 중립 판별(DrawdownMonitor), narrow_range grid 0.0005 추가, 0/20 26연속 |
+| 347 | B+D+F | RANGING 매크로 manager.py 실전 연동(evaluate→set_ranging_macro_neutral), 0/20 27연속 |
 
-### 🎯 Cycle 347 작업 방향 (347 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 348 작업 방향 (348 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): RANGING 매크로 필터 실전 연동
+#### C(데이터): ETH/SOL 합성 데이터 슬리피지 레짐 이상 진단
 
-- **배경**: Cycle 346 B에서 DrawdownMonitor에 `set_ranging_macro_neutral()` 추가
-  - neutral(|ema50_slope| ≤ 0.0005): cooldown 0.9x
-  - directional(|ema50_slope| > 0.0005): cooldown 1.5x
+- **배경**: Cycle 347 F에서 ETH 합성 데이터 dema_cross High% = 94.9% 발견 (BTC: 8.3%)
 - **작업**:
-  - `paper_simulation.py` 또는 `BacktestEngine`에서 ema50_slope 계산 후 `set_ranging_macro_neutral()` 연동 검토
-  - 단, 백테스트 엔진과 DrawdownMonitor는 현재 결합되지 않음 → 연동 아키텍처 설계 필요
-  - 대안: `manager.py`의 RiskManager에서 feed.py의 ema50_slope를 읽어 set_ranging_macro_neutral() 호출
+  - `data/historical/synthetic/ETHUSDT/1h.csv` High/Low/Close 스프레드 비율 분석
+  - adaptive_slippage 계산 로직이 High 레짐으로 분류하는 조건 확인
+  - 필요시 합성 데이터 생성 스크립트의 HL 범위 보정
 
-#### D(ML): narrow_range 0.0005 필터 효과 WFO 실행 확인
+#### B(리스크): paper_simulation.py ↔ DrawdownMonitor 연결 여부 확인
 
-- **배경**: Cycle 346 D(ML)에서 ema_slope_min_buy=[0.0, 0.0005, 0.001] 로 그리드 수정
-  - 0.0005 → RANGING BUY 38.2% 통과 (61.8% 차단) — 중간 균형점
-  - 실제 WFO에서 0.0005가 선택되는지 확인 필요
+- **배경**: Cycle 347 B에서 manager.py evaluate()에 RANGING 매크로 연동 완료
+  - 그러나 paper_simulation.py가 RiskManager+DrawdownMonitor를 사용하는지 미확인
 - **작업**:
-  - `optimize_narrow_range()` 함수 직접 실행 또는 Bundle OOS에 narrow_range 추가 실험 검토
-  - 단, narrow_range는 현재 Bundle OOS 5개 전략에 포함되지 않음
-  - 1h paper_sim에서 narrow_range rank7 (Sharpe=-0.51, 0/8) → 0.0005 필터가 Sharpe 개선 여부 확인
+  - paper_simulation.py에서 RiskManager 생성 여부 확인
+  - DrawdownMonitor가 연결되지 않으면: 연결 추가 or 별도 ema50_slope 계산 필요 여부 문서화
 
-#### F(리서치): PF ≥ 1.5 달성 가능 전략 구조 분석
+#### F(리서치): 4h paper_sim 타당성 분석
 
-- **배경**: 26연속 0/20 FAIL → PF < 1.5가 핵심 병목
-  - 1h 수수료 0.11% round-trip 상대비중이 너무 높음
-  - 4h에서 동일 전략 5/5 PASS → 봉 크기가 PF를 결정
+- **배경**: 27연속 1h 0/20 FAIL, 4h Bundle OOS 5/5 PASS → 4h 전환 타당성 평가
 - **작업**:
-  - W1(TREND_UP→TREND_UP) 창에서 roc_ma_cross Sharpe=4.04, PF=? 확인
-  - 4h로 resample한 BTC 데이터로 paper_sim 실행 시험 (`--timeframe 4h`)
-  - 1h PASS 전략이 존재하지 않는다면: 4h 전환 가능성 문서화
+  - `data/historical/binance/BTCUSDT/4h.csv` 존재 여부 확인
+  - paper_simulation.py `--timeframe 4h` 지원 여부 확인 (현재 1h 고정인지)
+  - 4h resample 가능하면 소규모 테스트 실행, 결과로 4h 전환 결정
 
-### ⚠️ 주의 사항 (Cycle 347)
+### ⚠️ 주의 사항 (Cycle 348)
 
 - **max_hold_candles_override=48 유지**: paper_simulation.py engine에 고정
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
@@ -57,19 +51,26 @@ _Last updated: 2026-06-23 (Cycle 346 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 346 확정)
+### 핵심 메트릭 (Cycle 347 확정)
 
-| 지표 | Cycle 345 | Cycle 346 | 변화 |
+| 지표 | Cycle 346 | Cycle 347 | 변화 |
 |------|-----------|-----------|------|
 | price_cluster Sharpe | 0.87 | **0.87** | 유지 |
 | price_cluster Consistency | 1/8 | **1/8** | 유지 |
 | roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
 | roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
-| 1h PASS 수 | 0/20 (25연속) | **0/20 (26연속)** | — |
+| 1h PASS 수 | 0/20 (26연속) | **0/20 (27연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 | Bundle OOS OFI Sharpe | 4.345 | **4.345** | 유지 |
 
-### Cycle 346 코드 변경 요약
+### Cycle 347 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/risk/manager.py` | evaluate()에 RANGING 레짐 시 ema50_slope→set_ranging_macro_neutral() 자동 연동 추가 |
+| `tests/test_risk_manager.py` | _make_candle_df_with_ema_slope() 헬퍼 + TestRangingMacroNeutralManagerIntegration 4개 테스트 추가 |
+
+### Cycle 346 코드 변경 요약 (참고)
 
 | 파일 | 변경 내용 |
 |------|----------|

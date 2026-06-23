@@ -513,6 +513,16 @@ class RiskManager:
                     self.drawdown_monitor.set_atr_state(atr, _atr_ma)
                 except Exception:
                     pass
+                # RANGING 매크로 방향성 연동: ema50_slope로 neutral/directional 판별 (Cycle 347 B)
+                if regime is not None and regime.upper() == 'RANGING':
+                    try:
+                        _close = candle_df["close"]
+                        _ema50 = _close.ewm(span=50, adjust=False).mean()
+                        _ema50_slope = float((_ema50.diff() / _ema50).iloc[-1])
+                        if math.isfinite(_ema50_slope):
+                            self.drawdown_monitor.set_ranging_macro_neutral(_ema50_slope)
+                    except Exception:
+                        pass
         else:
             sl_mult = self.atr_multiplier_sl
         sl_distance = atr * sl_mult
