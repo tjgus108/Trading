@@ -91,11 +91,13 @@ def generate_garch_ohlcv(
         if i > 0:
             eps = np.clip(closes[i - 1] / max(opens[i - 1], 1e-10) - 1.0, -0.15, 0.15)
             sigma2 = omega + alpha * eps ** 2 + beta * sigma2
-            sigma2 = np.clip(sigma2, (base_vol * 0.3) ** 2, (base_vol * 10) ** 2)
+            # Cycle348 C(데이터): 10x→4x로 sigma 상한 축소 (ETH synthetic HL 2.88x 과장 수정)
+            sigma2 = np.clip(sigma2, (base_vol * 0.3) ** 2, (base_vol * 4) ** 2)
 
         # 변동성 스파이크 (50봉마다 일정 확률)
         if vol_spike_countdown > 0:
-            sigma2 *= 2.5
+            # Cycle348 C: 2.5x→1.5x로 스파이크 배율 감소 (과도한 HL 범위 방지)
+            sigma2 *= 1.5
             vol_spike_countdown -= 1
         elif i > 0 and i % 50 == 0 and rng.random() < params["vol_spike_prob"]:
             vol_spike_countdown = rng.integers(8, 15)
@@ -131,7 +133,8 @@ def generate_garch_ohlcv(
         close_p = max(close_p, open_p * 0.5)
 
         # wick 생성 (변동성 기반)
-        wick_scale = sigma * rng.uniform(0.3, 1.2)
+        # Cycle348 C: base_vol*3으로 wick 상한 추가 (스파이크 시 HL 폭발 방지)
+        wick_scale = min(sigma * rng.uniform(0.3, 1.2), base_vol * 3)
         high_p = max(open_p, close_p) * (1 + abs(wick_scale))
         low_p = min(open_p, close_p) * (1 - abs(wick_scale))
 
