@@ -1221,7 +1221,8 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
                    fee_rate_override: Optional[float] = None,
                    slippage_override: Optional[float] = None,
                    min_hold_bars: int = 0,
-                   atr_multiplier_tp: float = 3.5):
+                   atr_multiplier_tp: float = 3.5,
+                   max_hold_override: Optional[int] = None):
     print("=" * 70)
     print(f"Paper Trading Simulation (Walk-Forward) — {datetime.utcnow().isoformat()}Z")
     print(f"Symbols: {', '.join(SYMBOLS)} | Timeframe: {ACTIVE_TIMEFRAME}")
@@ -1269,7 +1270,11 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         # Cycle332 B(리스크): 청산 후 재진입 대기 봉수 (0=비활성)
         min_hold_bars=min_hold_bars,
         # Cycle337 B: 1h paper_sim MAX_HOLD=48봉(48h) → 4h Bundle OOS 24봉(4일)과 분리
-        max_hold_candles_override=48,
+        # Cycle349 E(실행): --max-hold-override로 CLI에서 조정 가능
+        #   기본값: 1h→48봉(48h), 4h→24봉(4일, Bundle OOS와 통일)
+        max_hold_candles_override=max_hold_override if max_hold_override is not None else (
+            24 if ACTIVE_TIMEFRAME == "4h" else 48
+        ),
         # Cycle338 B(리스크): atr_multiplier_tp 탐색 (3.5→2.5 비교)
         atr_multiplier_tp=atr_multiplier_tp,
     )
@@ -1420,6 +1425,12 @@ if __name__ == "__main__":
         default=3.5,
         help="Cycle338 B: ATR TP 배수 (기본 3.5, 예: 2.5 — R:R 축소, BEP WR 38% 상승)",
     )
+    parser.add_argument(
+        "--max-hold-override",
+        type=int,
+        default=None,
+        help="Cycle349 E: 최대 보유 봉수 오버라이드 (기본 48=1h 48h, 4h 시 24=4일 권장)",
+    )
     args = parser.parse_args()
     # Module-level vars: use sys.modules to avoid 'global' at module scope (Python 3.7)
     _this = sys.modules[__name__]
@@ -1458,6 +1469,8 @@ if __name__ == "__main__":
         print(f"[CONFIG] Strategy filter: {args.strategies}", flush=True)
     if args.min_hold_bars > 0:
         print(f"[CONFIG] min_hold_bars overridden: {args.min_hold_bars}", flush=True)
+    if args.max_hold_override is not None:
+        print(f"[CONFIG] max_hold_candles overridden: {args.max_hold_override}", flush=True)
     sys.exit(run_simulation(
         mc_p_threshold=args.mc_p_threshold,
         pass_ratio=args.pass_ratio,
@@ -1465,4 +1478,5 @@ if __name__ == "__main__":
         slippage_override=args.slippage,
         min_hold_bars=args.min_hold_bars,
         atr_multiplier_tp=args.atr_multiplier_tp,
+        max_hold_override=args.max_hold_override,
     ))

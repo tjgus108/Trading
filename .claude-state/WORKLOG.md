@@ -1,3 +1,50 @@
+## [2026-06-23] Cycle 349 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] 4h paper_sim 소규모 테스트 실행 (max_hold 비교)**
+1. 4h paper_sim (BTC/USDT, 4개 전략, max_hold=48봉):
+   - supertrend_multi: Sharpe=2.06, Trades=8 (1h 대비 큰 개선)
+   - cmf: Sharpe=0.58, Trades=18
+   - price_cluster: Sharpe=1.08, Trades=8
+   - roc_ma_cross: Sharpe=-1.61, Trades=9
+2. 4h paper_sim (max_hold=24봉 비교):
+   - cmf: Sharpe=0.84 (+45%), Trades=21 (개선!)
+   - price_cluster: Sharpe=2.26 (+109%), Trades=10 (대폭 개선!)
+   - supertrend_multi: Sharpe=2.20 (+7%), Trades=8
+   - roc_ma_cross: Sharpe=-2.42 (악화)
+   - **결론: max_hold=24봉(4일)이 4h에서 현저히 우수 — Bundle OOS와 통일 타당**
+
+**[E(실행)] paper_simulation.py max_hold 아키텍처 개선**
+3. `--max-hold-override` CLI 인자 추가 (`scripts/paper_simulation.py`)
+   - `run_simulation()` 함수에 `max_hold_override: Optional[int]` 파라미터 추가
+   - 사용법: `--max-hold-override 24` (4h 4일 보유 테스트)
+4. 4h 기본값 자동 설정: ACTIVE_TIMEFRAME 기반
+   - 1h → 48봉 (48시간, 기존 유지)
+   - 4h → 24봉 (4일, Bundle OOS와 통일) ← **신규**
+   - 기존 hardcode 48 → 조건부 `24 if ACTIVE_TIMEFRAME == "4h" else 48`
+
+**[F(리서치)] ETH dema_cross HIGH% 잔여 원인 분석 완료**
+5. 정량 분석 결과:
+   - ETH synthetic 전체 데이터 HIGH(>=3%) 비율: 21.0%
+   - dema_cross 전체 crossover 780건 HIGH%: 21.0% (동일)
+   - dist_pct >= 0.5% 필터 후 41 신호 HIGH%: **85.4%** (4배 상승!)
+   - dist_pct >= 0.2% 필터 시: 202 신호 HIGH%: 48.0% (중간 수준)
+   - **근본 원인**: 0.5% 거리 필터가 상위 5th percentile 분기만 선택 → 큰 이동 후 발생 = 고변동성 구간
+   - EMA crossover 구조적 특성 확정 (대응 불가 — 필터 완화 시 신호 품질 저하)
+6. SOL vol_spike_prob 분석:
+   - SOL: HIGH%(>=3%) = 54.0%, vol_spike_prob=0.35, daily_vol=0.055
+   - 완화 옵션: 0.35→0.25 (HIGH% ~40%대 목표) — 다음 사이클로 이월 (실제 SOL 데이터 없어 검증 불가)
+
+**시뮬레이션 (Cycle 349)**:
+- Paper Sim 1h: 0/20 PASS (29연속 FAIL streak)
+  - BTC best: price_cluster Sharpe=0.87, PF=1.20, 1/8 consistency (Cycle 348과 동일)
+  - BTC 2nd: roc_ma_cross Sharpe=0.34, PF=1.22, 2/8 consistency
+  - BTC 3rd: frama Sharpe=0.24, PF=1.12, 1/8 consistency (신규 진입)
+- Bundle OOS 4h: **5/5 PASS 유지** (2026-06-23T20:14:54 재확인)
+  - OFI Sharpe=4.345, supertrend 3.892, value_area 3.069, vwap_cross 3.047, cmf 2.508
+**테스트**: 8434 passed, 23 skipped (변화 없음)
+
+---
+
 ## [2026-06-23] Cycle 348 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] ETH 합성 데이터 HL 과장 진단 및 수정**
@@ -2663,6 +2710,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-23 15:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 20:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-23 20:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 20:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 20:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 20:07 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-23 20:07 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
