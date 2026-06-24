@@ -32,7 +32,7 @@ SYMBOL_PARAMS = {
         "bear_drift": -0.00050,
         "bull_to_bear": 0.006,
         "bear_to_bull": 0.05,
-        "vol_spike_prob": 0.28,
+        "vol_spike_prob": 0.10,  # Cycle 353 C(데이터): 0.28→0.10 (ETH 1h HIGH% 22.4%→~8% 목표)
         # OU 평균회귀 파라미터: 가격이 log-앵커로 회귀
         "ou_theta": 0.008,       # Cycle260: 0.003→0.008, max 6000 이하 목표
         "ou_anchor_mult": 2.0,   # 앵커 = start_price*2.0=2400 (2023 ETH 중간값)
