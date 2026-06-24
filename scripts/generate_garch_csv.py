@@ -48,7 +48,7 @@ SYMBOL_PARAMS = {
         "bear_drift": -0.00070,
         "bull_to_bear": 0.005,
         "bear_to_bull": 0.06,
-        "vol_spike_prob": 0.35,
+        "vol_spike_prob": 0.15,  # Cycle350 C: 0.35→0.15 (SOL HIGH% 54%→40% 이하 목표)
         # OU 평균회귀: SOL 2023 범위 ~10~250
         "ou_theta": 0.004,
         "ou_anchor_mult": 5.0,   # 앵커 = 15 * 5 = 75 (2023 SOL 중간값 ~60-80)

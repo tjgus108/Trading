@@ -1267,6 +1267,9 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         # Cycle299 E(실행): ATR 기반 레짐별 가변 슬리피지 (low=0.02%, normal=0.05%, high=0.15%)
         # 고변동성 구간의 시장 충격을 현실적으로 반영, 저변동성 sideways 구간 유리
         adaptive_slippage=True,
+        # Cycle350 A(품질): ACTIVE_TIMEFRAME 전달 — 4h 실행 시 tf_scale 보정 오작동 수정
+        # 미전달 시 engine 기본값 "1h"로 고정 → 4h ATR14/close가 1h 임계값에 비교돼 100% HIGH 오분류
+        timeframe=ACTIVE_TIMEFRAME,
         # Cycle332 B(리스크): 청산 후 재진입 대기 봉수 (0=비활성)
         min_hold_bars=min_hold_bars,
         # Cycle337 B: 1h paper_sim MAX_HOLD=48봉(48h) → 4h Bundle OOS 24봉(4일)과 분리
