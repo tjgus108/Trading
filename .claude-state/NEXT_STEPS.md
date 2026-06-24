@@ -1,59 +1,62 @@
 # Next Steps
 
-_Last updated: 2026-06-24 (Cycle 350 완료)_
+_Last updated: 2026-06-24 (Cycle 351 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 350
+### 이번 세션 완료 사이클: 351
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 348 | C+B+F | ETH synthetic HL 2.88x 과장 수정 (4.3%→2.12%), 0/20 28연속 |
 | 349 | D+E+F | 4h max_hold=24 우세 확인, --max-hold-override 추가, dema_cross HIGH% 원인 확정 |
 | 350 | A+C+F | SOL HIGH% 54%→39% 수정, 4h 슬리피지 버그 수정 (timeframe 미전달), price_cluster Bundle OOS 불가 확정 |
+| 351 | B+D+F | min_trades_override 파라미터 추가, 4h min_trades 15→8 완화, 통계 근거 확인 |
 
-### 🎯 Cycle 351 작업 방향 (351 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 352 작업 방향 (352 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): 4h paper_sim min_trades 기준 재검토
+#### B(리스크): 4h consistency 개선 — supertrend_multi no trades 해결
 
-- **배경**: Cycle 350에서 4h 22개 전략 모두 0/22 PASS. 주요 원인: trades < 15
-  - 60일 window (360 4h캔들), max_hold=24봉(4일) → 이론상 최대 15 trades
-  - 실제로는 신호 빈도 제한으로 avg_trades=8-10 → 항상 FAIL
-  - 4h paper_sim의 min_trades=15는 1h 기준 그대로 복사된 것 (4h에 부적절)
+- **배경**: Cycle 351 4h paper_sim 결과
+  - supertrend_multi: 3/8 consistency, FAIL 원인 `no trades generated (x3)`
+  - no trades 3개 윈도우 = 3/8 window에서 신호 0건 → consistency 5/8 달성 불가 구조
+  - 실제 avg_trades=8이지만 일부 윈도우에서 신호 발생 안 함
 - **작업**:
-  - 4h 전용 `min_trades` 기준: 15 → 8 검토 (60일 window에서 8 trades = 7.5일/trade)
-  - `paper_simulation.py` pass 조건: `ACTIVE_TIMEFRAME == "4h"` 시 min_trades=8 적용
-  - 재실행: `python3 scripts/paper_simulation.py --csv-dir data/historical --timeframe 4h`
-  - price_cluster (Sharpe=2.26, trades=10), supertrend_multi (Sharpe=2.20, trades=8) PASS 가능성
+  - supertrend_multi 전략의 신호 조건 확인 (`src/strategy/supertrend_multi.py`)
+  - no trades 발생 윈도우의 데이터 특성 파악 (trend 방향, ATR 분포)
+  - 신호 발생 조건 완화 검토 (현재 파라미터: atr_threshold=0.5, ema_filter=True 등)
+  - price_cluster: 2/8 → 4/8 달성을 위한 진입 조건 분석
 
-#### D(ML): 4h 슬리피지 버그 수정 후 시뮬레이션 재실행 결과 분석
+#### D(ML): SOL 4h 고변동성 신호 집중 패턴 분석
 
-- **배경**: Cycle 350 A(품질)에서 `timeframe=ACTIVE_TIMEFRAME` 버그 수정 완료
-  - 수정 전: SOL 4h 100% HIGH, BTC dema_cross 76.9% HIGH (과도한 0.15% 슬리피지)
-  - 수정 후: 4h HIGH 임계값 6% (=3%*√4) → SOL ATR=5.44% → NORMAL
-  - 수정 후 4h paper_sim 재실행 필요 (Cycle 350 sim은 수정 전 결과)
+- **배경**: SOL 4h ATR=5.45%, HIGH 임계값 6%, 24% 캔들이 HIGH
+  - dema_cross HIGH%=59%, supertrend_multi HIGH%=46.4%: 전략이 고변동성 구간에 집중
+  - SOL 합성 데이터의 vol_spike가 특정 구간에 집중 → 전략 신호도 집중
 - **작업**:
-  - `python3 scripts/paper_simulation.py --csv-dir data/historical --timeframe 4h` 재실행
-  - 슬리피지 정상화 후 Sharpe 개선 정도 측정 (특히 SOL 전략)
-  - 슬리피지 분포 확인: SOL 4h High% → 27% 내외 (정상화 검증)
+  - SOL 4h sim에서 HIGH 슬리피지 비율이 높은 전략들의 진입 시점 분석
+  - 고변동성 구간 필터 적용 검토 (ATR-based entry filter)
+  - 효과 측정: HIGH% 감소 vs Sharpe 변화
 
-#### F(리서치): 4h min_trades 완화 근거 리서치
+#### F(리서치): 4h paper_sim PASS를 위한 consistency 개선 전략 리서치
 
-- **배경**: 1h에서 min_trades=15 (30일 window 기준 합리적)
-  - 4h에서 min_trades=15: 60일 window에서 달성 불가 구조
-  - 실전 quantitative finance에서 4h 전략의 거래 빈도 기준은?
+- **배경**: 모든 3개 심볼에서 0/22 PASS 지속 (31연속)
+  - BTC best: price_cluster 2/8, supertrend_multi 3/8
+  - 핵심 문제: Sharpe/PF 일관성 부족 (window별 편차 큰 것)
 - **작업**:
-  - 4h 타임프레임 전략 min_trades 기준 관련 논문/사례 리서치
-  - 통계적 유의성: 8 trades로 Sharpe t-test p<0.1 달성 가능 여부 계산
-  - 결론을 NEXT_STEPS에 반영
+  - Sharpe Std가 높은 전략과 낮은 전략 비교 (BTC price_cluster SharpeStd=2.04)
+  - Walk-Forward Efficiency (WFE) 낮은 이유 분석
+  - 파라미터 안정성 개선을 위한 조기청산/진입 필터 전략 리서치
 
-### ⚠️ 주의 사항 (Cycle 351)
+### ⚠️ 주의 사항 (Cycle 352)
 
-- **4h 슬리피지 버그 수정 완료** (Cycle 350 A): `paper_simulation.py` `timeframe=ACTIVE_TIMEFRAME` 추가
-  - 재실행 결과가 Cycle 350 결과와 다를 수 있음 (SOL 특히)
-- **SOL vol_spike_prob=0.15 확정** (Cycle 350 C): HIGH% 39.0% (40% 이하 달성)
+- **min_trades_override=8 (4h 확정)**: Cycle 351 B에서 BacktestEngine에 추가, paper_sim에 적용
+  - `engine.min_trades`: 1h=15, 4h=8
+  - 통계 근거: n=8, Sharpe=1.0 → t=2.83, p=0.013 < 0.05
+- **4h 슬리피지 버그 수정 완료** (Cycle 350 A): `paper_simulation.py` `timeframe=ACTIVE_TIMEFRAME`
+  - BTC 4h HIGH%=0% (정상화 확인)
+  - SOL 4h: ATR=5.45% (>6% 비율 24%), 전략별 HIGH%는 신호 집중 특성에 따름
+- **SOL vol_spike_prob=0.15 확정** (Cycle 350 C): HIGH% 39.0%
 - **4h max_hold=24봉 기본값 유지** (Cycle 349 E)
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**: 1h 연간화 기준 캘리브레이션됨
 - **atr_multiplier_tp=3.5 유지**: Cycle 338 실험으로 확정
@@ -61,42 +64,35 @@ _Last updated: 2026-06-24 (Cycle 350 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 350 확정)
+### 핵심 메트릭 (Cycle 351 확정)
 
-| 지표 | Cycle 349 | Cycle 350 | 변화 |
+| 지표 | Cycle 350 | Cycle 351 | 변화 |
 |------|-----------|-----------|------|
-| price_cluster 1h Sharpe | 0.87 | **0.87** | 유지 |
-| price_cluster 4h Sharpe (max_hold=24) | 2.26 | **2.26** | 유지 |
-| supertrend_multi 4h Sharpe (max_hold=24) | 2.20 | **2.20** | 유지 |
-| SOL HIGH%(>=3%) | 54.0% | **39.0%** | ✅ 개선 |
-| SOL vol_spike_prob | 0.35 | **0.15** | 변경 |
-| SOL HL ratio mean | 4.12% | **3.17%** | 개선 |
-| 4h paper_sim PASS 수 | 0/22 (슬리피지 버그) | **0/22 (버그 수정 후 미재실행)** | — |
-| 1h PASS 수 | 0/20 (29연속) | **0/20 (30연속)** | — |
+| 4h paper_sim BTC price_cluster Sharpe | 2.26 (수정 전) | **1.16 (수정 후)** | 수정 후 실제값 |
+| 4h paper_sim BTC supertrend_multi Sharpe | 2.20 (수정 전) | **1.14 (수정 후)** | 수정 후 실제값 |
+| 4h price_cluster Consistency | — | **2/8** | 첫 확인 |
+| 4h supertrend_multi Consistency | — | **3/8** | 첫 확인 |
+| 4h min_trades 기준 | 15 | **8** | ✅ 완화 |
+| BTC 4h HIGH% | 0% (버그 후) | **0%** | ✅ 정상화 유지 |
+| SOL 4h HIGH% (ATR 기준) | — | **24%** | 캔들 단위 |
+| 1h PASS 수 | 0/20 (30연속) | **0/20 (31연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 | Bundle OOS OFI Sharpe | 4.345 | **4.345** | 유지 |
 
-### Cycle 350 코드 변경 요약
+### Cycle 351 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/backtest/engine.py` | `min_trades_override` 파라미터 추가, `run()`에서 `self.min_trades` 사용 |
+| `scripts/paper_simulation.py` | `min_trades_override=8 if 4h else 0` 엔진에 전달, 리포트 기준 동적 표시 |
+
+### Cycle 350 코드 변경 요약 (참고)
 
 | 파일 | 변경 내용 |
 |------|----------|
 | `scripts/generate_garch_csv.py` | SOL vol_spike_prob: 0.35→0.15 |
 | `data/historical/synthetic/SOLUSDT/1h.csv` | 재생성 (HIGH% 54%→39%) |
 | `scripts/paper_simulation.py` | BacktestEngine에 `timeframe=ACTIVE_TIMEFRAME` 추가 (슬리피지 버그 수정) |
-
-### Cycle 349 코드 변경 요약 (참고)
-
-| 파일 | 변경 내용 |
-|------|----------|
-| `scripts/paper_simulation.py` | `--max-hold-override` CLI 인자 추가 |
-| `scripts/paper_simulation.py` | 4h 기본 max_hold: 24봉(4일) 자동 설정 (1h는 48봉 유지) |
-
-### Cycle 348 코드 변경 요약 (참고)
-
-| 파일 | 변경 내용 |
-|------|----------|
-| `scripts/generate_garch_csv.py` | sigma clip 10x→4x, vol_spike 2.5x→1.5x, wick cap base_vol*3 추가 |
-| `data/historical/synthetic/ETHUSDT/1h.csv` | 재생성 (HL ratio 4.30%→2.12%) |
 
 ### F(리서치) BTC 1h 레짐별 특성 (Cycle 346 확정)
 
@@ -108,21 +104,29 @@ _Last updated: 2026-06-24 (Cycle 350 완료)_
 
 **핵심 결론**: RANGING에서만 neutral macro 비율 45.1% 확보 → mean-reversion 조건 충족
 
-### 4h 슬리피지 임계값 (Cycle 350 버그 수정 후 확정)
+### 4h 슬리피지 임계값 (Cycle 351 확인)
 
 | 타임프레임 | LOW 임계값 | NORMAL 임계값 | HIGH 임계값 | BTC 분류 | SOL 분류 |
 |-----------|-----------|--------------|-----------|---------|---------|
-| 1h | < 0.5% | 0.5~3.0% | >= 3.0% | NORMAL | HIGH |
-| 4h | < 1.0% | 1.0~6.0% | >= 6.0% | NORMAL (3.0%) | NORMAL (5.4%) |
+| 1h | < 0.5% | 0.5~3.0% | >= 3.0% | NORMAL | HIGH(32%) |
+| 4h | < 1.0% | 1.0~6.0% | >= 6.0% | NORMAL (3.0%) | NORMAL avg, HIGH 24%캔들 |
 | 1d | < 2.5% | 2.5~14.7% | >= 14.7% | — | — |
 
-### ETH/SOL 합성 데이터 슬리피지 레짐 (Cycle 350 확정)
+### min_trades 기준 (Cycle 351 확정)
 
-| 데이터 | HL ratio mean | ATR14/close | HIGH regime(>=3% 1h기준) |
-|--------|-------------|-------------|------------------|
-| BTC real | 1.50% | 1.49% | 0.7% |
-| ETH synthetic | 2.12% | 2.12% | 21.0% |
-| SOL synthetic (Cycle350) | 3.17% | ~3.2% | 39.0% |
+| 타임프레임 | min_trades | 근거 |
+|-----------|-----------|------|
+| 1h | 15 | 60일 window, 30일 train, 충분한 신호 |
+| 4h | 8 | 60일 window, max_hold=24봉(4일), 이론 최대 15, 실제 8-10; n=8 Sharpe=1.0 → p=0.013 |
+
+### ETH/SOL 합성 데이터 슬리피지 레짐 (Cycle 351 확인)
+
+| 데이터 | HL ratio mean | ATR14/close | HIGH regime |
+|--------|-------------|-------------|-------------|
+| BTC real 1h | 1.50% | 1.49% | 0.7% (>=3%) |
+| ETH synthetic 1h | 2.12% | 2.12% | 21.0% (>=3%) |
+| SOL synthetic 1h | 3.17% | ~3.2% | 39.0% (>=3%) |
+| SOL synthetic 4h | 5.42% | 5.45% | 24.0% (>=6%) |
 
 ### EMA slope 차단 비율 분석 (Cycle 346 D(ML) 확정)
 

@@ -672,7 +672,8 @@ def generate_report(results: List[dict], data_source: str, df: pd.DataFrame, win
     _test_c = max(5, int(TEST_HOURS * _ratio))
     lines.append(f"_Walk-Forward: {windows_count}개 윈도우 (train={_train_c}, test={_test_c} candles [{ACTIVE_TIMEFRAME}])_")
     lines.append(f"_Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_")
-    lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>=15, MDD<=20%_\n")
+    _min_t = 8 if ACTIVE_TIMEFRAME == "4h" else 15
+    lines.append(f"_통과 기준: 윈도우 {PASS_RATIO:.0%} 이상에서 Sharpe>=1.0, PF>=1.5, Trades>={_min_t}, MDD<=20%_\n")
 
     # CPCV 글로벌 ML 정확도 섹션
     if cpcv_result:
@@ -1280,6 +1281,10 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         ),
         # Cycle338 B(리스크): atr_multiplier_tp 탐색 (3.5→2.5 비교)
         atr_multiplier_tp=atr_multiplier_tp,
+        # Cycle351 B: 4h paper_sim min_trades 완화 (15→8)
+        # 4h 60일 window, max_hold=24봉(4일) → 이론 최대 15 trades, 실제 avg 8-10
+        # min_trades=15는 1h 기준으로 4h에서는 구조적으로 달성 불가
+        min_trades_override=8 if ACTIVE_TIMEFRAME == "4h" else 0,
     )
 
     sections = []

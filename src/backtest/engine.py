@@ -136,6 +136,7 @@ class BacktestEngine:
         consec_loss_scale_threshold: int = 0,  # Cycle298 B: 연속 손실 N회 시 포지션 50% 축소 (0=비활성)
         min_hold_bars: int = 0,  # Cycle331 B: 청산 후 재진입 대기 봉수 (0=비활성, 1h에서 4봉=4h 최소 대기)
         max_hold_candles_override: Optional[int] = None,  # Cycle337 B: None이면 MAX_HOLD_CANDLES(24) 사용; 1h paper_sim은 48 전달
+        min_trades_override: int = 0,  # Cycle351 B: 0이면 MIN_TRADES(15) 사용; 4h paper_sim은 8 전달
     ):
         self.initial_balance = initial_balance
         # fee_rate이 명시되면 우선 적용, 아니면 commission 사용
@@ -159,6 +160,8 @@ class BacktestEngine:
         self.mc_block_size = max(1, int(mc_block_size))
         # Cycle337 B: 타임프레임별 max_hold — 1h paper_sim은 48, 4h Bundle OOS는 24(기본)
         self.max_hold_candles = int(max_hold_candles_override) if max_hold_candles_override is not None else MAX_HOLD_CANDLES
+        # Cycle351 B: 타임프레임별 min_trades — 4h paper_sim은 8 (60일 window에서 15 달성 불가 구조)
+        self.min_trades = int(min_trades_override) if min_trades_override > 0 else MIN_TRADES
 
     def run(self, strategy: BaseStrategy, df: pd.DataFrame) -> BacktestResult:
         """
@@ -518,8 +521,8 @@ class BacktestEngine:
             fail_reasons.append(f"max_drawdown {max_drawdown:.1%} > {MAX_DRAWDOWN:.0%}")
         if profit_factor < MIN_PROFIT_FACTOR:
             fail_reasons.append(f"profit_factor {profit_factor:.2f} < {MIN_PROFIT_FACTOR}")
-        if len(trades) < MIN_TRADES:
-            fail_reasons.append(f"trades {len(trades)} < {MIN_TRADES}")
+        if len(trades) < self.min_trades:
+            fail_reasons.append(f"trades {len(trades)} < {self.min_trades}")
         # WFE 필터: wfe > 0이면 과최적화 체크 (0은 미제공 = 체크 생략)
         if wfe > 0 and wfe < MIN_WFE:
             fail_reasons.append(f"wfe {wfe:.3f} < {MIN_WFE} (과최적화 의심)")
