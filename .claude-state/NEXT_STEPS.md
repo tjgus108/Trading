@@ -1,55 +1,61 @@
 # Next Steps
 
-_Last updated: 2026-06-24 (Cycle 351 완료)_
+_Last updated: 2026-06-24 (Cycle 352 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 351
+### 이번 세션 완료 사이클: 352
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
 | 349 | D+E+F | 4h max_hold=24 우세 확인, --max-hold-override 추가, dema_cross HIGH% 원인 확정 |
 | 350 | A+C+F | SOL HIGH% 54%→39% 수정, 4h 슬리피지 버그 수정 (timeframe 미전달), price_cluster Bundle OOS 불가 확정 |
 | 351 | B+D+F | min_trades_override 파라미터 추가, 4h min_trades 15→8 완화, 통계 근거 확인 |
+| 352 | B+D+F | supertrend_multi no-trades 근본 원인 확정 (Supertrend divergence), SOL HIGH% 개선 (46.4%→10위 밖) |
 
-### 🎯 Cycle 352 작업 방향 (352 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 353 작업 방향 (353 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): 4h consistency 개선 — supertrend_multi no trades 해결
+#### C(데이터): ETH/SOL 합성 데이터 품질 재검토
 
-- **배경**: Cycle 351 4h paper_sim 결과
-  - supertrend_multi: 3/8 consistency, FAIL 원인 `no trades generated (x3)`
-  - no trades 3개 윈도우 = 3/8 window에서 신호 0건 → consistency 5/8 달성 불가 구조
-  - 실제 avg_trades=8이지만 일부 윈도우에서 신호 발생 안 함
+- **배경**: ETH 4h avg HIGH%=7-15%, SOL 4h avg HIGH%=24% — synthetic data가 실제 데이터보다 과도하게 volatile
+  - ETH/SOL은 synthetic CSV 사용 중 (SSL 차단으로 실데이터 불가)
+  - HIGH% 과도한 전략들 (dema_cross SOL 59%, lob_maker SOL 48%): 슬리피지 비용이 Sharpe 음전환 주 원인
 - **작업**:
-  - supertrend_multi 전략의 신호 조건 확인 (`src/strategy/supertrend_multi.py`)
-  - no trades 발생 윈도우의 데이터 특성 파악 (trend 방향, ATR 분포)
-  - 신호 발생 조건 완화 검토 (현재 파라미터: atr_threshold=0.5, ema_filter=True 등)
-  - price_cluster: 2/8 → 4/8 달성을 위한 진입 조건 분석
+  - ETH 합성 데이터 ATR 분포 확인 (GARCH 파라미터 검토)
+  - SOL synthetic vs BTC real ATR 비율 비교 (정상 범위: BTC 1h=1.5%, ETH 2.12%, SOL 3.17%)
+  - 합성 데이터 캔들별 vol_spike 집중 여부 분석
 
-#### D(ML): SOL 4h 고변동성 신호 집중 패턴 분석
+#### B(리스크): supertrend_multi min_agree_count 파라미터 추가 (신중하게)
 
-- **배경**: SOL 4h ATR=5.45%, HIGH 임계값 6%, 24% 캔들이 HIGH
-  - dema_cross HIGH%=59%, supertrend_multi HIGH%=46.4%: 전략이 고변동성 구간에 집중
-  - SOL 합성 데이터의 vol_spike가 특정 구간에 집중 → 전략 신호도 집중
+- **배경**: Cycle 352 B 분석 결과
+  - no-trades 3개 윈도우(W4,W5,W7): 3개 Supertrend가 단 한 번도 동시 합의 안 됨 (ranging market)
+  - ATR 필터는 원인이 아님 (atr_threshold=0.5 변경 → 효과 없음 확인)
+  - 현재: `all(t == 1 for t in last_trends)` (3/3 합의 필요)
+  - 해결 방향: `min_agree_count` 파라미터 추가 → 2/3 합의로 완화 가능
 - **작업**:
-  - SOL 4h sim에서 HIGH 슬리피지 비율이 높은 전략들의 진입 시점 분석
-  - 고변동성 구간 필터 적용 검토 (ATR-based entry filter)
-  - 효과 측정: HIGH% 감소 vs Sharpe 변화
+  - `src/strategy/supertrend_multi.py`에 `min_agree_count: int = 3` 파라미터 추가
+  - `all_bullish = sum(1 for t in last_trends if t==1) >= min_agree_count` 로직 변경
+  - **paper_sim에만** `min_agree_count=2` 적용, Bundle OOS는 현재값 유지 (3/3)
+  - 효과 측정: no-trades 윈도우 해소 여부, 새 FAIL 원인 발생 여부
+  - ⚠️ Bundle OOS 결과 변화 없는지 재확인 필수
 
-#### F(리서치): 4h paper_sim PASS를 위한 consistency 개선 전략 리서치
+#### F(리서치): 4h PASS 전략 구조 분석
 
-- **배경**: 모든 3개 심볼에서 0/22 PASS 지속 (31연속)
-  - BTC best: price_cluster 2/8, supertrend_multi 3/8
-  - 핵심 문제: Sharpe/PF 일관성 부족 (window별 편차 큰 것)
+- **배경**: 32연속 0/22 PASS → 근본적 접근 재검토 필요
+  - BTC 4h supertrend_multi 3/8 (구조적 한계: 3/8 no-trades)
+  - 5/8 이상 달성하려면 no-trades 해결 + 현재 FAIL 2개 중 1개 수정 필요
 - **작업**:
-  - Sharpe Std가 높은 전략과 낮은 전략 비교 (BTC price_cluster SharpeStd=2.04)
-  - Walk-Forward Efficiency (WFE) 낮은 이유 분석
-  - 파라미터 안정성 개선을 위한 조기청산/진입 필터 전략 리서치
+  - BTC 4h Walk-Forward 윈도우별 시장 레짐 분석 (W4,W5,W7 횡보 비율)
+  - Bundle OOS PASS 전략(cmf, ofi_v2, supertrend_multi) 4h paper_sim FAIL 이유 심층 분석
+  - Walk-Forward Efficiency(WFE) vs paper_sim consistency 상관관계 계산
 
-### ⚠️ 주의 사항 (Cycle 352)
+### ⚠️ 주의 사항 (Cycle 353)
 
+- **supertrend_multi atr_threshold=0.5 확정** (Cycle 352): PAPER_SIM_STRATEGY_PARAMS에 추가
+  - `atr_threshold=0.5`: Bundle OOS와 동일화, ATR 차단 없음 확인
+  - `atr_threshold_max=1.5`: SOL HIGH% 개선 (46.4%→top-10 밖), trades 16→13
 - **min_trades_override=8 (4h 확정)**: Cycle 351 B에서 BacktestEngine에 추가, paper_sim에 적용
   - `engine.min_trades`: 1h=15, 4h=8
   - 통계 근거: n=8, Sharpe=1.0 → t=2.83, p=0.013 < 0.05
@@ -64,22 +70,25 @@ _Last updated: 2026-06-24 (Cycle 351 완료)_
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 - **합성 데이터 실험 금지**: 반드시 `--csv-dir data/historical` 사용
 
-### 핵심 메트릭 (Cycle 351 확정)
+### 핵심 메트릭 (Cycle 352 확정)
 
-| 지표 | Cycle 350 | Cycle 351 | 변화 |
+| 지표 | Cycle 351 | Cycle 352 | 변화 |
 |------|-----------|-----------|------|
-| 4h paper_sim BTC price_cluster Sharpe | 2.26 (수정 전) | **1.16 (수정 후)** | 수정 후 실제값 |
-| 4h paper_sim BTC supertrend_multi Sharpe | 2.20 (수정 전) | **1.14 (수정 후)** | 수정 후 실제값 |
-| 4h price_cluster Consistency | — | **2/8** | 첫 확인 |
-| 4h supertrend_multi Consistency | — | **3/8** | 첫 확인 |
-| 4h min_trades 기준 | 15 | **8** | ✅ 완화 |
-| BTC 4h HIGH% | 0% (버그 후) | **0%** | ✅ 정상화 유지 |
-| SOL 4h HIGH% (ATR 기준) | — | **24%** | 캔들 단위 |
-| 1h PASS 수 | 0/20 (30연속) | **0/20 (31연속)** | — |
+| 4h supertrend_multi BTC Consistency | **3/8** | **3/8** | 변화 없음 (no-trades=Supertrend 불일치) |
+| 4h supertrend_multi BTC avg_trades | 8 | 8 | 변화 없음 |
+| 4h supertrend_multi SOL avg_trades | 16 | **13** | ↓ (atr_threshold_max=1.5 효과) |
+| 4h supertrend_multi SOL Sharpe | -1.92 | **-1.16** | ↑ 개선 (HIGH 진입 감소) |
+| SOL supertrend_multi HIGH% 순위 | #3 (46.4%) | **top-10 밖** | ✅ 개선 |
+| 1h PASS 수 | 0/20 (31연속) | **0/20 (32연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| Bundle OOS OFI Sharpe | 4.345 | **4.345** | 유지 |
 
-### Cycle 351 코드 변경 요약
+### Cycle 352 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["supertrend_multi"] = {"atr_threshold": 0.5, "atr_threshold_max": 1.5}` 추가 |
+
+### Cycle 351 코드 변경 요약 (참고)
 
 | 파일 | 변경 내용 |
 |------|----------|
