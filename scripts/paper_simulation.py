@@ -107,6 +107,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Bundle OOS 동일 파라미터로 PASS(3.892 Sharpe, 3/5 folds) 확인
     #   atr_threshold_max=2.0→1.5: 극단적 고변동성 구간(SOL HIGH%) 일부 차단
     #   confidence_filter/rsi_ob_filter 제외: 4h avg_trades=8, 추가 필터 시 trades<8 위험
+    # Cycle 353 B(리스크): min_agree_count=2 실험 결과 NEGATIVE → 기본값 3/3 유지
+    #   실험 결과: 2/3 합의로 완화 시 BTC consistency 3/8→2/8, Sharpe 1.14→0.96
+    #   ranging 구간 진입 신호 품질 낮음 → 기존 3/3 필터가 정확한 판단
     "supertrend_multi": {"atr_threshold": 0.5, "atr_threshold_max": 1.5},
 }
 

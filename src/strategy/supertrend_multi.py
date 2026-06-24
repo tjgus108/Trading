@@ -34,7 +34,7 @@ class SupertrendMultiStrategy(BaseStrategy):
                  ema_filter: bool = True, confidence_filter: bool = False,
                  rsi_ob_filter: bool = False, rsi_ob_threshold: float = 75.0,
                  trend_confirm_bars: int = 2, cmf_confirm: bool = False,
-                 cmf_period: int = 20) -> None:
+                 cmf_period: int = 20, min_agree_count: int = 3) -> None:
         # Cycle 274: atr_threshold 파라미터화
         # Cycle 279 D(ML): 기본값 0.9→0.7, atr_threshold_max 추가
         # Cycle 280 A(품질): ema_filter 추가 — close > EMA200 시 SELL 차단
@@ -43,6 +43,7 @@ class SupertrendMultiStrategy(BaseStrategy):
         # Cycle 283 B(리스크): trend_confirm_bars 파라미터화 — 2→3으로 증가 시 post-ATH whipsaw 감소
         # Cycle 284 D(ML): cmf_confirm 추가 — CMF>0 시에만 BUY 허용 (ATH 이후 자금 이탈 선행 감지)
         #   근거: cmf fold4 PASS(OOS=1.451) vs supertrend fold4 FAIL(OOS=-1.538) — CMF가 ATH 이후 자금이탈 빠르게 감지
+        # Cycle 353 B(리스크): min_agree_count 파라미터 추가 — 3/3→2/3 합의 완화로 ranging 구간 no-trades 해결
         self.atr_threshold = atr_threshold
         self.atr_threshold_max = atr_threshold_max
         self.ema_filter = ema_filter
@@ -52,6 +53,9 @@ class SupertrendMultiStrategy(BaseStrategy):
         self.trend_confirm_bars = max(2, int(trend_confirm_bars))
         self.cmf_confirm = cmf_confirm
         self.cmf_period = max(5, int(cmf_period))
+        # min_agree_count: Supertrend 합의 최소 개수 (2/3 or 3/3)
+        # Bundle OOS는 기본값 3 유지, paper_sim만 2 적용
+        self.min_agree_count = max(1, min(3, int(min_agree_count)))
         # (n_rows, close_last) → trend 배열 캐시: 동일 데이터 재계산 방지
         self._trend_cache: dict = {}
 
@@ -182,9 +186,11 @@ class SupertrendMultiStrategy(BaseStrategy):
 
         # 마지막 완성봉 기준으로 추세 확인
         last_trends = [int(t.iloc[-2]) for t in trends_series]
-        
-        all_bullish = all(t == 1 for t in last_trends)
-        all_bearish = all(t == -1 for t in last_trends)
+
+        bullish_count = sum(1 for t in last_trends if t == 1)
+        bearish_count = sum(1 for t in last_trends if t == -1)
+        all_bullish = bullish_count >= self.min_agree_count
+        all_bearish = bearish_count >= self.min_agree_count
 
         # 추세 확인 필터 (마지막 2봉 일치 여부)
         trend_confirmed = self._trend_confirmation_pass(trends_series)
@@ -243,9 +249,9 @@ class SupertrendMultiStrategy(BaseStrategy):
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
-                reasoning=f"3개 Supertrend 모두 bullish + 추세 확인{vol_info}. trends={trend_str}",
-                invalidation="Supertrend 중 하나라도 bearish 전환 시 무효",
-                bull_case=f"ATR 기반 3중 bullish 확인 + 추세 연속성. trends={trend_str}",
+                reasoning=f"{bullish_count}/3 Supertrend bullish + 추세 확인{vol_info}. trends={trend_str}",
+                invalidation="Supertrend 합의 이탈 시 무효",
+                bull_case=f"ATR 기반 {bullish_count}중 bullish 확인 + 추세 연속성. trends={trend_str}",
                 bear_case="추세 반전 가능성 존재",
             )
 
@@ -260,10 +266,10 @@ class SupertrendMultiStrategy(BaseStrategy):
                 confidence=conf,
                 strategy=self.name,
                 entry_price=entry,
-                reasoning=f"3개 Supertrend 모두 bearish + 추세 확인{vol_info}. trends={trend_str}",
-                invalidation="Supertrend 중 하나라도 bullish 전환 시 무효",
+                reasoning=f"{bearish_count}/3 Supertrend bearish + 추세 확인{vol_info}. trends={trend_str}",
+                invalidation="Supertrend 합의 이탈 시 무효",
                 bull_case="추세 반전 가능성 존재",
-                bear_case=f"ATR 기반 3중 bearish 확인 + 추세 연속성. trends={trend_str}",
+                bear_case=f"ATR 기반 {bearish_count}중 bearish 확인 + 추세 연속성. trends={trend_str}",
             )
 
         if all_bullish or all_bearish:
