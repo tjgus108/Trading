@@ -287,30 +287,46 @@ class DrawdownMonitor:
             )
         self._ranging_macro_neutral = is_neutral
 
-    def set_atr_state(self, atr: float, atr_ma: float, threshold: float = 1.5) -> None:
+    def set_atr_state(self, atr: float, atr_ma: float, threshold: float = 1.5,
+                      atr_pct: float = 0.0, atr_pct_threshold: float = 0.06) -> None:
         """ATR 변동성 상태 설정. ATR > ATR_MA * threshold이면 포지션 사이즈를 0.5로 축소.
 
         Args:
-            atr:       현재 ATR 값.
-            atr_ma:    ATR 이동평균 값.
-            threshold: 급등 판정 배수 (기본 1.5 — ATR이 MA의 1.5배 초과 시 급등).
+            atr:               현재 ATR 값.
+            atr_ma:            ATR 이동평균 값.
+            threshold:         상대 급등 판정 배수 (기본 1.5 — ATR이 MA의 1.5배 초과 시 급등).
+            atr_pct:           현재 ATR/close 비율 (0~1). 0이면 절댓값 체크 비활성.
+                               SOL 4h처럼 avg ATR이 높아 상대 배수로는 HIGH 슬리피지 레짐이
+                               감지되지 않을 때, 절댓값 임계값으로 보완한다.
+                               예) ATR=0.065, close=1.0 → atr_pct=0.065.
+            atr_pct_threshold: 절댓값 ATR% 임계값 (기본 0.06 = 6%).
+                               atr_pct > atr_pct_threshold이면 elevated로 판정.
+                               Cycle352 D(ML): SOL 4h HIGH 슬리피지 임계값(6%)과 일치.
         """
         if atr_ma <= 0 or atr <= 0:
             self._atr_vol_elevated = False
             self._atr_vol_mult = 1.0
             return
         ratio = atr / atr_ma
-        elevated = ratio >= threshold
+        # 상대 배수 OR 절댓값 ATR% 중 하나라도 초과 시 elevated 판정
+        abs_elevated = (atr_pct > 0 and atr_pct > atr_pct_threshold)
+        elevated = ratio >= threshold or abs_elevated
         if elevated != self._atr_vol_elevated:
             if elevated:
-                logger.info(
-                    "DrawdownMonitor: ATR 급등 감지 — ratio=%.2fx ≥ %.1fx → size_mult 0.5 적용",
-                    ratio, threshold,
-                )
+                if abs_elevated:
+                    logger.info(
+                        "DrawdownMonitor: ATR 급등 감지 (절댓값) — atr_pct=%.3f > %.3f → size_mult 0.5 적용",
+                        atr_pct, atr_pct_threshold,
+                    )
+                else:
+                    logger.info(
+                        "DrawdownMonitor: ATR 급등 감지 — ratio=%.2fx ≥ %.1fx → size_mult 0.5 적용",
+                        ratio, threshold,
+                    )
             else:
                 logger.info(
-                    "DrawdownMonitor: ATR 정상화 — ratio=%.2fx < %.1fx → size_mult 복원",
-                    ratio, threshold,
+                    "DrawdownMonitor: ATR 정상화 — ratio=%.2fx < %.1fx, atr_pct=%.3f → size_mult 복원",
+                    ratio, threshold, atr_pct,
                 )
         self._atr_vol_elevated = elevated
         self._atr_vol_mult = 0.5 if elevated else 1.0

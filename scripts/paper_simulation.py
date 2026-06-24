@@ -102,6 +102,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
+    # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
+    #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
+    #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
+    "supertrend_multi": {"atr_threshold": 0.5},
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

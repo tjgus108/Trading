@@ -1,55 +1,55 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-06-24 (Cycle 351 완료)_
+_Last updated: 2026-06-24 (Cycle 352 완료)_
 
 ## 현재 상태 요약
 
-- **완료 사이클**: 351
+- **완료 사이클**: 352
 - **카테고리**: B(리스크) + D(ML) + F(리서치)
-- **1h PASS 연속 FAIL**: 31연속 0/20 (BTC 실데이터 기준)
-- **4h PASS (min_trades=8 완화)**: 0/22 (consistency 부족)
-- **Bundle OOS**: 5/5 PASS 유지 (2026-06-23 결과, SSL 차단으로 재실행 불가)
+- **1h PASS 연속 FAIL**: 32연속 0/20 (BTC/ETH/SOL 모두 0 PASS)
+- **Bundle OOS**: 5/5 PASS 유지 (2026-06-24 재실행 확인)
 
-## Cycle 351 핵심 성과
+## Cycle 352 핵심 성과
 
 ### ✅ 완료
-1. **min_trades_override 파라미터 추가** (`src/backtest/engine.py`)
-   - 4h paper_sim: min_trades 15→8 완화
-   - 통계 근거: n=8, Sharpe=1.0 → t=2.83, p=0.013 < 0.05
-2. **4h paper_sim 재실행 (슬리피지 버그 수정 후 첫 정상 결과)**
-   - BTC HIGH%=0% → 버그 수정 효과 확인
-   - price_cluster: Sharpe=1.16, Consistency=2/8
-   - supertrend_multi: Sharpe=1.14, Consistency=3/8
-3. **F(리서치)**: 8 trades로 Sharpe=1.0 기준 t-test p=0.013 < 0.05 — 합리적 근거 확보
+1. **supertrend_multi atr_threshold=0.5 적용** (`scripts/paper_simulation.py`)
+   - 근거: 4h 저변동성 window에서 atr_threshold=0.7이 모든 신호 차단 → 3개 window no trades
+   - Bundle OOS도 동일 값(0.5) 사용하며 PASS → paper_sim도 일치시킴
+2. **DrawdownMonitor 절댓값 ATR% 임계값 추가** (`src/risk/drawdown_monitor.py`)
+   - `set_atr_state()` 확장: `atr_pct`, `atr_pct_threshold=0.06` 파라미터 추가
+   - SOL처럼 avg ATR이 높아 상대 배수(ratio=1.5)로 감지 안 되는 경우에 절댓값 6% 보완
+3. **Bundle OOS 4h 재실행**: 5/5 PASS 유지, supertrend_multi OOS Sharpe=3.892
 
 ### 🔍 핵심 발견
-- **4h 주요 FAIL 원인 전환**: trades 부족 → Sharpe/PF 일관성 부족 (consistency 4/8 미달)
-  - supertrend_multi: no trades generated 3개 윈도우 → 신호 조건 과도한 제한
-  - price_cluster: 2/8 consistency → 일부 윈도우에서 Sharpe 음수
-- **SOL 4h 슬리피지**: 평균 ATR=5.45% (6% 임계값 미만), 24% 캔들이 HIGH
-  - 전략별 HIGH%가 다른 것은 고변동성 구간 집중 신호 특성 (버그 아님)
-- **BTC 4h 정상화 확인**: HIGH%=0% → 슬리피지 버그 수정(Cycle 350) 효과
+- **wick_reversal 구조 문제**: ETH/SOL 1h에서 모든 8개 window 0 trades
+  - 합성 데이터에 wick 패턴이 충분히 없는 것으로 추정
+  - C(데이터) 사이클에서 조사/수정 필요
+- **dema_cross ETH 1h**: Sharpe=1.12 (>1.0!) but trades=6 (<15) → FAIL
+  - Sharpe 조건은 충족, trades만 문제 → 진입 파라미터 조정으로 PASS 가능성 있음
+- **SOL 1h HIGH%** 극단적: dema_cross=85.5%, frama=52.5%
+  - 1h SOL은 극고변동성 레짐 → 대부분 전략이 슬리피지로 수익 상쇄
+- **engulfing_zone**: ETH 1h 2/8, SOL 1h 1/8으로 크로스심볼 상위권 (BTC는 미진입)
 
-## 다음 우선순위
+## 다음 우선순위 (Cycle 353 — C+E+F)
 
 | 우선순위 | 카테고리 | 작업 |
 |---------|---------|------|
-| 1 | B(리스크) | supertrend_multi no trades 원인 진단, 신호 조건 분석 |
-| 2 | D(ML) | price_cluster/supertrend_multi 4h consistency 개선 파라미터 탐색 |
-| 3 | F(리서치) | 4h Sharpe 편차 감소 전략 (파라미터 안정화 기법) 리서치 |
+| 1 | C(데이터) | wick_reversal ETH/SOL 0 trades 원인 분석, 합성 데이터 wick 패턴 생성 확인 |
+| 2 | E(실행) | dema_cross ETH 1h trades=6 → 진입 조건 분석, 파라미터 완화 검토 |
+| 3 | F(리서치) | engulfing_zone BTC vs ETH/SOL 성과 차이 구조 분석 |
 
 ## 코드 변경 현황
 
 | 파일 | 변경 | 사이클 |
 |------|------|-------|
+| `scripts/paper_simulation.py` | `"supertrend_multi": {"atr_threshold": 0.5}` 추가 | 352 B |
+| `src/risk/drawdown_monitor.py` | `set_atr_state()` atr_pct 절댓값 임계값 확장 | 352 D |
 | `src/backtest/engine.py` | `min_trades_override` 파라미터 추가 | 351 B |
-| `scripts/paper_simulation.py` | min_trades_override=8 (4h) 전달, 리포트 동적 표시 | 351 B |
-| `scripts/generate_garch_csv.py` | SOL vol_spike_prob 0.35→0.15 | 350 C |
-| `data/historical/synthetic/SOLUSDT/1h.csv` | 재생성 (HIGH% 39%) | 350 C |
-| `scripts/paper_simulation.py` | BacktestEngine `timeframe=ACTIVE_TIMEFRAME` 추가 | 350 A |
+| `scripts/paper_simulation.py` | min_trades_override=8 (4h) 전달 | 351 B |
+| `scripts/paper_simulation.py` | `timeframe=ACTIVE_TIMEFRAME` 추가 (슬리피지 버그) | 350 A |
 
 ## 환경 상태
 
-- 테스트: 8434 passed, 23 skipped (Cycle 351 확인)
-- SSL 차단: bybit/binance/okx 모두 불가 → Bundle OOS 신규 실행 불가
+- 테스트: 8434 passed, 23 skipped (Cycle 351 확인, 352 변경 후 관련 테스트 PASS)
 - 데이터: BTC real (12000 1h rows), ETH/SOL synthetic (각 12000 1h rows)
+- Bundle OOS 5/5: cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area
