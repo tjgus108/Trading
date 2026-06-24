@@ -1013,8 +1013,11 @@ STRATEGY_FILTER: Optional[List[str]] = None
 # Cycle 325 A(품질):
 #   value_area: 1h Sharpe=-3.08, 0/8 PASS; Bundle 4h PASS(3.069) → 4h 전용 확정
 #   supertrend_multi: 1h WFO avg OOS=-2.858 WFE=-2.71; Bundle 4h PASS(3.892) → 4h 전용 확정
+# Cycle 353 C(데이터):
+#   wick_reversal: BTC 1h Sharpe=-2.64(-9.31% return), ETH 0 trades x8, SOL 0 trades x8
+#   min_volatility=0.001(완화)도 ETH/SOL 합성 데이터에서 wick 패턴 미생성 → 구조적 1h 제외
 STRATEGIES_TIMEFRAME_EXCLUDE: Dict[str, Set[str]] = {
-    "1h": {"value_area", "supertrend_multi"},
+    "1h": {"value_area", "supertrend_multi", "wick_reversal"},
 }
 
 

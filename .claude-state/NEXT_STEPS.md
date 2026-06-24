@@ -1,92 +1,90 @@
 # Next Steps
 
-_Last updated: 2026-06-24 (Cycle 352 완료)_
+_Last updated: 2026-06-24 (Cycle 353 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 352
+### 이번 세션 완료 사이클: 353
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 350 | A+C+F | SOL HIGH% 54%→39% 수정, 4h 슬리피지 버그 수정, price_cluster Bundle OOS 불가 확정 |
 | 351 | B+D+F | min_trades_override 추가, 4h min_trades 15→8 완화, 통계 근거 확인 |
 | 352 | B+D+F | supertrend_multi atr_threshold=0.5 적용, DrawdownMonitor 절댓값 ATR% 필터 추가 |
+| 353 | C+E+F | wick_reversal 1h 제외, dema_cross fast=8/slow=20 실험→롤백, engulfing_zone 크로스심볼 분석 |
 
-### 🎯 Cycle 353 작업 방향 (353 mod 5 = 3 → C(데이터) + E(실행) + F(리서치))
+### 🎯 Cycle 354 작업 방향 (354 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): wick_reversal ETH/SOL 1h 0 trades 문제 조사 및 수정
+#### D(ML): price_cluster BTC 1h Sharpe 개선 — ML 기반 파라미터 최적화
 
-- **배경**: Cycle 352 1h sim 결과
-  - wick_reversal: ETH 8/8 window 0 trades, SOL 8/8 window 0 trades
-  - BTC에서도 wick_reversal 성과 불량 (return=-9.31% worst in BTC)
-  - 원인 후보: 합성 데이터의 고가/저가 분포가 wick 패턴을 생성하지 않음
+- **배경**: price_cluster 3사이클 연속 BTC rank=1 (Sharpe=0.87, return=+4.99%)
+  - Sharpe=0.87 (기준 1.0 미달 0.13 차이), PF=1.20 (기준 1.5 미달)
+  - 가장 PASS에 근접한 전략이나 Sharpe/PF 모두 미달
 - **작업**:
-  - `src/strategy/wick_reversal.py` 신호 조건 분석
-  - ETH/SOL 합성 데이터에서 wick 패턴 발생 빈도 확인
-  - 수정 방향: 진입 조건 완화 OR 1h 시뮬레이션 제외 목록 추가 (value_area, supertrend_multi처럼)
+  - `src/strategy/price_cluster.py` 분석: 어떤 파라미터가 Sharpe를 제한하는지 확인
+  - BTC 1h 데이터에서 최적 클러스터 반경/수 조사
+  - `PAPER_SIM_STRATEGY_PARAMS`에 price_cluster 파라미터 실험 (실제 결과 확인 필수)
+  - 단, BTC real data 개선이 먼저 → 합성 ETH/SOL 개선은 부수적
 
-#### E(실행): dema_cross ETH 1h trades 부족 분석 — 진입 조건 최적화
+#### E(실행): dema_cross 대안 접근 — 거리 기반 신호 검토
 
-- **배경**: Cycle 352 ETH 1h — dema_cross Sharpe=1.12 (>1.0!) but trades=6 (<15)
-  - Sharpe 기준은 통과하지만 trades 부족으로 FAIL (consistency 0/8)
-  - trades만 늘리면 PASS 가능성 있는 가장 근접한 전략
+- **배경**: dema_cross 파라미터 조정 실험 결과
+  - fast=8/slow=20: BTC 5 trades, ETH 8 trades, SOL 13 trades → 여전히 15 미달
+  - ETH Sharpe 1.12→0.00 (파라미터 조정 시 역효과)
+  - DEMA cross 자체가 너무 드문 이벤트 (주 1회 미만)
 - **작업**:
-  - dema_cross ETH 1h에서 trades 6건밖에 없는 이유 분석
-  - `src/strategy/dema_cross.py` 진입 조건 확인
-  - 파라미터 조정으로 trades 증가 검토 (e.g. period 단축, threshold 완화)
-  - 단, 합성 데이터에서만 개선 시 적용 금지 — BTC 1h에서도 검증 필수
+  - dema_cross 대신 "DEMA 거리/경사도" 신호 검토 (크로스 이외 조건 추가)
+  - 예: DEMA_fast와 DEMA_slow 간격이 임계값 이하로 좁아질 때 예비 신호 → 진입 증가
+  - 단, 전략 파일 수정이므로 backtest/walk_forward.py에서 검증 필수
+  - **주의**: 전략 파일 직접 수정 가능 (버그 픽스 성격), 단 실제 BTC 1h 검증 필수
 
-#### F(리서치): engulfing_zone 크로스심볼 일관성 분석
+#### F(리서치): price_cluster 왜 BTC에서만 작동하는가
 
-- **배경**: Cycle 352 1h 결과 — engulfing_zone이 ETH/SOL에서 top 1 (return +3.50%, +4.81%)
-  - BTC는 순위권 밖, ETH 2/8 consistency, SOL 1/8
-  - ETH 최고 성과 전략인데 BTC에서 왜 미순위?
+- **배경**: price_cluster BTC rank=1 (+4.99%) vs ETH rank=4 (-0.31%) vs SOL rank=19(-8.27%)
+  - BTC real: 클러스터 패턴이 실제 지지/저항으로 기능
+  - ETH/SOL synthetic: 클러스터 의미 없음 (GARCH 과정에는 가격 메모리 없음)
 - **작업**:
-  - engulfing_zone BTC 1h FAIL 원인 상세 분석 (어느 window에서 어떤 이유로 실패?)
-  - ETH/SOL에서 좋은 이유와 BTC에서 나쁜 이유의 구조적 차이 파악
-  - engulfing 패턴이 BTC vs ETH/SOL 데이터에서 다르게 나타나는지 확인
+  - price_cluster 전략 로직 분석 (클러스터 계산 방식)
+  - BTC real 데이터에서 클러스터 분포 확인 (가격 집중 구간)
+  - ETH/SOL synthetic 데이터에서 클러스터 분포 비교
+  - 결론: price_cluster가 BTC 전용 전략인지, 아니면 실제 ETH/SOL 데이터에서도 통할지
 
-### ⚠️ 주의 사항 (Cycle 353)
+### ⚠️ 주의 사항 (Cycle 354)
 
+- **wick_reversal 1h 제외 확정** (Cycle 353 C): `STRATEGIES_TIMEFRAME_EXCLUDE["1h"]`에 추가됨
+  - BTC 1h -9.31% + ETH/SOL 0 trades x8 → 구조적 실패. 4h 테스트는 미확인
+- **dema_cross 기본 파라미터 유지** (fast=10, slow=25): 파라미터 조정 실험 실패로 롤백
+  - 대안 접근 필요: 크로스 감지 방식 자체를 바꾸거나 진입 주기를 다른 방식으로 증가
 - **min_trades_override=8 (4h)**: `engine.min_trades` 1h=15, 4h=8
-- **supertrend_multi atr_threshold=0.5**: paper_sim `PAPER_SIM_STRATEGY_PARAMS`에 반영 (Cycle 352 B)
-- **DrawdownMonitor.set_atr_state() 시그니처 변경** (Cycle 352 D): `atr_pct`, `atr_pct_threshold` 파라미터 추가
-  - 하위호환: 기본값 `atr_pct=0.0` (비활성) → 기존 호출자 영향 없음
-- **4h 슬리피지 버그 수정 완료** (Cycle 350 A): BTC 4h HIGH%=0% 정상화 유지
-- **SOL 1h HIGH% 극단적**: dema_cross=85.5%, frama=52.5% → SOL 1h 고변동성 레짐 주의
+- **supertrend_multi atr_threshold=0.5**: paper_sim `PAPER_SIM_STRATEGY_PARAMS`에 반영
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 352 확정)
+### 핵심 메트릭 (Cycle 353 확정)
 
-| 지표 | Cycle 351 | Cycle 352 | 변화 |
+| 지표 | Cycle 352 | Cycle 353 | 변화 |
 |------|-----------|-----------|------|
+| 1h 테스트 전략 수 | 20개 | **19개** | wick_reversal 제외 |
 | 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
-| 1h BTC price_cluster SharpeStd | — | **1.10** | 최안정 확인 |
-| 1h BTC roc_ma_cross Consistency | — | **2/8** | 최고 일관성 |
-| 1h ETH engulfing_zone Consistency | — | **2/8** | ETH 최고 |
-| 1h ETH dema_cross Sharpe | — | **1.12** | trades=6로 FAIL |
-| 1h SOL dema_cross HIGH% | — | **85.5%** | 극고변동성 확인 |
-| 1h PASS 수 | 0/20 (31연속) | **0/20 (32연속)** | — |
+| 1h BTC roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
+| 1h ETH engulfing_zone Consistency | 2/8 | **2/8** | 유지 |
+| 1h ETH dema_cross Sharpe | 1.12 | **0.00** | fast=8/slow=20→롤백 |
+| 1h PASS 수 | 0/20 (32연속) | **0/19 (33연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| supertrend_multi atr_threshold | 0.7 (기본) | **0.5** (paper_sim 4h) | ✅ no-trades 해결 |
 
-### Cycle 351 코드 변경 요약
-
-| 파일 | 변경 내용 |
-|------|----------|
-| `src/backtest/engine.py` | `min_trades_override` 파라미터 추가, `run()`에서 `self.min_trades` 사용 |
-| `scripts/paper_simulation.py` | `min_trades_override=8 if 4h else 0` 엔진에 전달, 리포트 기준 동적 표시 |
-
-### Cycle 350 코드 변경 요약 (참고)
+### Cycle 353 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `scripts/generate_garch_csv.py` | SOL vol_spike_prob: 0.35→0.15 |
-| `data/historical/synthetic/SOLUSDT/1h.csv` | 재생성 (HIGH% 54%→39%) |
-| `scripts/paper_simulation.py` | BacktestEngine에 `timeframe=ACTIVE_TIMEFRAME` 추가 (슬리피지 버그 수정) |
+| `scripts/paper_simulation.py` | `STRATEGIES_TIMEFRAME_EXCLUDE["1h"]`에 `"wick_reversal"` 추가 |
+
+### Cycle 352 코드 변경 요약 (참고)
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `scripts/paper_simulation.py` | `"supertrend_multi": {"atr_threshold": 0.5}` 추가 |
+| `src/risk/drawdown_monitor.py` | `set_atr_state()` atr_pct 절댓값 임계값 확장 |
 
 ### F(리서치) BTC 1h 레짐별 특성 (Cycle 346 확정)
 
@@ -142,16 +140,23 @@ _Last updated: 2026-06-24 (Cycle 352 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 340 변경 없음)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 353 업데이트)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
-- `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}`
+- `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}` ← 1h paper_sim에서 제외됨
 - `relative_volume: {"rvol_buy_sell": 1.2}`
 - `momentum_quality: {"quality_score_buy_threshold": 0.8, "consistency_buy_threshold": 0.3}`
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - `cmf: {"buy_thresh": 0.10}`
+- `supertrend_multi: {"atr_threshold": 0.5}` ← Cycle 352 B 추가
 
 ### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
 - `set()` ← 빈 집합 (레짐 필터 비활성화)
+
+### STRATEGIES_TIMEFRAME_EXCLUDE 현재 설정 (Cycle 353 업데이트)
+- `"1h": {"value_area", "supertrend_multi", "wick_reversal"}`
+  - value_area: 1h 구조적 실패 (Cycle 325), 4h Bundle PASS
+  - supertrend_multi: 1h 구조적 실패 (Cycle 325), 4h Bundle PASS
+  - wick_reversal: ETH/SOL 0 trades x8, BTC Sharpe=-2.64 (Cycle 353 C)
 
 ### 핵심 메트릭 (Cycle 338: MAX_HOLD 분리 아키텍처, 유지)
 
