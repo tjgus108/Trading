@@ -106,6 +106,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
     "supertrend_multi": {"atr_threshold": 0.5},
+    # Cycle354 D(ML): vol_regime_filter=True 실험 → 효과 없음 (BTC에서 ATR/ATR_MA > 1.5 희박)
+    #   실험 결과: Sharpe=0.87, trades=41 → 동일 (필터 비활성 시와 차이 없음)
+    #   결론: BTC 1h 데이터에서 ATR이 ATR_MA 대비 1.5배 초과 구간이 거의 없어 필터 무효
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)
