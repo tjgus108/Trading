@@ -165,12 +165,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle354 D(ML): vol_regime_filter=[True] 추가 — 기존 vol_atr_trend_min은 filter=False 시 dead parameter였음
     #   price_cluster sideways 전용 전략 근거: W5/W6 PASS, BTC rank1 연속 → sideways 필터 활성화
     #   vol_regime_filter 항상 True로 고정, vol_atr_trend_min 탐색으로 최적 임계값 찾기
+    # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [True],
-        "vol_atr_trend_min": [1.5, 2.0, 2.5],
+        "vol_atr_trend_min": [1.2, 1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank2(2/8 consistency), Sharpe=-0.35, PF=1.12 — 파라미터 탐색 필요

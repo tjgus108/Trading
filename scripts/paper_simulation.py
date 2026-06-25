@@ -102,11 +102,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
-    # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험
-    #   근거: BTC rank1 연속(Sharpe=0.87) — sideways 필터 활성화 시 trending 구간 손실 억제 가능성
-    #   vol_atr_trend_min=1.5: ATR/ATR_MA > 1.5이면 추세장 → 신호 억제 (가장 관대한 임계값)
-    #   기대 효과: trending 구간 false signal 차단 → PF 1.20→1.5+ 개선, Sharpe 0.87→1.0+ 목표
-    "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.5},
+    # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험 (1.5 → 효과 없음 확인)
+    # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화
+    #   근거: 1.5(ATR/ATR_MA>1.5 억제)로 BTC Sharpe=0.87, PF=1.20 변화 없음 → 더 공격적 임계값 필요
+    #   1.2: ATR이 MA 대비 20% 이상 높으면 추세장 → 신호 억제 (더 많은 trending 구간 차단)
+    #   목표: PF 1.20→1.5+, WR 37.2%→42.5% (PF=1.5 달성 필요 수준)
+    "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.2},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
