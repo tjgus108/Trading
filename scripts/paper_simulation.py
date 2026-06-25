@@ -106,7 +106,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화 → Sharpe=0.87, PF=1.20 (1.5와 동일)
     # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원
     #   결론: vol_atr_trend_min 하향 (1.0)은 신호 과도 차단으로 역효과 확정
-    #   다음 방향: vol_regime_filter=False 비활성화 실험 (Cycle357 검토)
+    # Cycle357 F(리서치): vol_regime_filter=False 시도 → ETH Sharpe=-0.44 (악화) → 복원
+    #   BTC는 동일(Sharpe=0.87), ETH에서 역효과 → vol_regime_filter=False 방향 포기
+    #   결론: vol_regime_filter=True, vol_atr_trend_min=1.2 유지 확정
     "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.2},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%

@@ -1,85 +1,88 @@
 # Next Steps
 
-_Last updated: 2026-06-25 (Cycle 356 완료)_
+_Last updated: 2026-06-25 (Cycle 357 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 356
+### 이번 세션 완료 사이클: 357
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 354 | D+E+F | walk_forward price_cluster grid 버그 수정, vol_regime_filter 실험 추가, convergence_signal BTC 검증 실패 |
 | 355 | A+C+F | vol_atr_trend_min 1.5→1.2 강화, WFO 그리드 확장, dema_cross 거리필터 0.5%→0.1% 완화 |
 | 356 | B+D+F | DrawdownMonitor 검증(정상), dema_cross fast=8/slow=20(trades 3→50!), price_cluster 1.0 실험→악화→1.2복원 |
+| 357 | B+D+F | DrawdownMonitor to_dict/from_dict ATR/Sharpe 직렬화 수정, dema_cross 0.002 실험 실패→복원, price_cluster filter=False 실험 실패→복원 |
 
-### 🎯 Cycle 357 작업 방향 (357 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 358 작업 방향 (358 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor ATR 상태 직렬화 누락 확인
+#### C(데이터): DataFeed 캐시 전략 / OrderFlow 검증
 
-- **배경**: Cycle 356 B에서 DrawdownMonitor 로직 검증 완료. 추가 검토 사항 발견
+- **배경**: Cycle 357에서 데이터 레이어는 변경 없었음. C 카테고리 순서 도래
 - **작업**:
-  - `to_dict()`/`from_dict()`: `_atr_vol_elevated`, `_atr_vol_mult`, `_sharpe_decay_mult` 미직렬화 확인
-  - 라이브 재시작 시 ATR/Sharpe 상태 복원 안 됨 → `to_dict()` / `from_dict()` 보완 검토
-  - `DrawdownStatus`의 `cooldown_active` 필드가 streak cooldown이 아닌 single loss cooldown만 반영 → 문서화
+  - `src/data/` 폴더 현황 점검: DataFeed 캐시 인터페이스, stale 데이터 방지 로직 확인
+  - `src/data/feeds.py` 또는 관련 모듈에서 OrderFlow/VPIN 계산 정확도 확인
+  - synthetic ETH/SOL 데이터 HL ratio 문제: ETH 2.12%(HIGH slippage 46%), SOL 3.17% — 실제 거래소 데이터 확보 방법 탐색 (SSL 차단 환경에서 가능한 방법)
 
-#### D(ML): dema_cross fast=8/slow=20 안정화
+#### B(리스크): DrawdownMonitor 추가 강화
 
-- **배경**: Cycle 356 D에서 fast=8/slow=20으로 BTC trades 3→50, Sharpe -2.08→0.37 달성
+- **배경**: Cycle 357 B에서 to_dict/from_dict ATR/Sharpe 직렬화 수정 완료
 - **작업**:
-  - ETH dema_cross 고슬리피지 분석: 37.3% HIGH slippage (207/556 trades)
-    - 원인: ETH synthetic data HL ratio 2.12% — 신호 품질 문제인지 데이터 특성인지 구분
-  - BTC Sharpe std=2.61 (불안정) → noise 감소 방법 탐색:
-    - RSI 필터 강화 (RSI>65 차단, 현재 70) — noise trade 줄이기
-    - 또는 dist_pct 0.001→0.002 (약간 상향) — 너무 약한 cross 차단
-  - 다음 paper_sim에서 fast=8/slow=20 BTC Sharpe 변화 모니터링
+  - `tests/test_drawdown_monitor.py` 직렬화 복원 테스트 추가 확인 (ATR/Sharpe 상태 복원 단위 테스트)
+  - `get_kelly_fraction_multiplier()` 로직 재검토: MDD > kelly_reduce_at_mdd(0.08) 시 0.5 적용 — BacktestEngine에서 활용 여부
+  - streak 회복 조건: consecutive_losses 초기화는 오직 win 시만 → 장기 횡보 시 영구 축소 가능성 검토
 
-#### F(리서치): price_cluster vol_regime_filter 비활성화 실험
+#### F(리서치): dema_cross BTC Sharpe std 개선 방법 탐색
 
-- **배경**: vol_atr_trend_min 1.5→1.2→1.0 모두 효과 없음/역효과 확인 (Cycle 354~356)
+- **배경**: Cycle 357에서 dist_pct(0.001→0.002) 실험 실패. 다른 접근법 탐색 필요
+- **배경**: price_cluster vol_regime_filter 방향 전환 (False 실험 실패)
 - **작업**:
-  - `scripts/paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS["price_cluster"] 변경:
-    - `{"vol_regime_filter": True, "vol_atr_trend_min": 1.2}` → `{"vol_regime_filter": False}`
-    - 필터 비활성화로 원래 price_cluster 신호 복원 → Sharpe 0.87 이상 달성 여부 확인
-  - walk_forward.py DEFAULT_GRIDS["price_cluster"]에 `"vol_regime_filter": [False, True]` 추가
-  - 효과 없으면: vol_regime_filter 관련 파라미터 완전 제거 검토
+  - dema_cross BTC Sharpe std=2.61 (불안정) → RSI 필터 강화 탐색:
+    - RSI>65 차단 (현재 70) 실험: `paper_simulation.py`에 `{"fast": 8, "slow": 20, "rsi_ob": 65}` 시도
+    - 단, dema_cross.py에 rsi_ob 파라미터가 없으므로 하드코딩 → 파라미터화 필요
+  - price_cluster 방향 전환: 필터 파라미터 조정 대신 bounce_pct/n_bins 최적화에 집중
+    - 현재 paper_sim: bounce_pct, n_bins은 WFO 그리드에만 있음 → paper_sim 고정값 최적화
+    - bounce_pct=0.020 vs 0.025 비교 실험
 
-### ⚠️ 주의 사항 (Cycle 357)
+### ⚠️ 주의 사항 (Cycle 358)
 
+- **DrawdownMonitor to_dict/from_dict 완료** (Cycle 357 B): ATR/Sharpe 상태 직렬화 수정됨
 - **dema_cross fast=8/slow=20 확정** (Cycle 356 D): `PAPER_SIM_STRATEGY_PARAMS["dema_cross"]` 유지
-  - ETH 고슬리피지(37.3%) 주의: BTC 위주로 평가
-  - SharpeStd=2.61 → 아직 불안정, 추가 noise 감소 방법 탐색
-- **price_cluster vol_atr_trend_min=1.2 복원** (Cycle 356 F): 1.0 실험 실패 → 1.2 유지
-  - 다음 사이클 F에서 vol_regime_filter=False 비활성화 실험 예정
+  - dist_pct=0.001 복원 (Cycle357 D: 0.002 실험 실패)
+  - BTC Sharpe std=2.61 → RSI>65 차단 실험 예정 (Cycle 358 F)
+- **price_cluster vol_regime_filter=True, vol_atr_trend_min=1.2 확정** (Cycle 357 F): False 실험 실패
+  - ETH에서 역효과 확인 → 이 방향 포기
+  - walk_forward.py 그리드에는 [False, True] 유지 (WFO 자동 비교)
 - **walk_forward DEFAULT_GRIDS["dema_cross"] 추가됨** (Cycle 356 D): [8,10,12] x [15,20,25]
 - **walk_forward DEFAULT_GRIDS["price_cluster"] vol_atr_trend_min 1.0 추가됨** (Cycle 356 F)
+- **walk_forward DEFAULT_GRIDS["price_cluster"] vol_regime_filter=[False,True] 추가됨** (Cycle 357 F)
 - **wick_reversal 1h 제외 확정** (Cycle 353 C): `STRATEGIES_TIMEFRAME_EXCLUDE["1h"]`에 추가됨
 - **min_trades_override=8 (4h)**: `engine.min_trades` 1h=15, 4h=8
 - **supertrend_multi atr_threshold=0.5**: paper_sim `PAPER_SIM_STRATEGY_PARAMS`에 반영
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 356 확정)
+### 핵심 메트릭 (Cycle 357 확정)
 
-| 지표 | Cycle 355 | Cycle 356 | 변화 |
+| 지표 | Cycle 356 | Cycle 357 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Trades | 3 | **50** | ⬆️ 대폭 증가 (fast=8/slow=20) |
-| 1h BTC dema_cross Sharpe | -2.08 | **0.37** | ⬆️ 개선 (여전히 FAIL) |
-| 1h BTC dema_cross Consistency | 0/8 | **2/8** | ⬆️ 개선 |
-| 1h BTC price_cluster Sharpe | 0.87 (1.2) | **-0.30 (1.0→복원)** | 실험 후 1.2복원 |
-| 1h PASS 수 | 0/19 (35연속) | **0/19 (36연속)** | — |
+| 1h BTC dema_cross Trades | 50 (0.001) | **32 (0.002→복원)** | 실험 실패 → 복원 |
+| 1h BTC dema_cross Sharpe | 0.37 (0.001) | **0.24 (0.002) → 복원** | 악화 확인 |
+| 1h BTC price_cluster Sharpe | 0.87 (1.2) | **0.87 (filter=False=동일)** | ETH 악화 |
+| 1h PASS 수 | 0/19 (36연속) | **0/19 (37연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
 
-### Cycle 356 코드 변경 요약
+### Cycle 357 코드 변경 요약
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["dema_cross"]` fast=8, slow=20 추가 (Cycle356 D) |
-| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` vol_atr_trend_min 1.2→1.0→1.2 복원 (Cycle356 F) |
-| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["dema_cross"]` 추가: fast=[8,10,12], slow=[15,20,25] (Cycle356 D) |
-| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]` vol_atr_trend_min에 1.0 추가 (Cycle356 F) |
+| `src/risk/drawdown_monitor.py` | `to_dict()` `_atr_vol_elevated`, `_atr_vol_mult`, `_sharpe_decay_mult` 추가 (Cycle357 B) |
+| `src/risk/drawdown_monitor.py` | `from_dict()` 동일 필드 복원 추가 (Cycle357 B) |
+| `src/risk/drawdown_monitor.py` | `DrawdownStatus.cooldown_active` 주석 명확화 (Cycle357 B) |
+| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]` `vol_regime_filter=[False,True]` 추가 (Cycle357 F) |
+| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` Filter=False 실험 후 복원 (Cycle357 F) |
+| `src/strategy/dema_cross.py` | dist_pct 0.001→0.002 실험 후 복원 (Cycle357 D) |
 
 ### Cycle 355 코드 변경 요약
 
