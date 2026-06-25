@@ -122,8 +122,8 @@ class DEMACrossStrategy(BaseStrategy):
                     )
 
         # 거리 필터 (1%→0.5%→0.1%: Cycle355 F(리서치) — 0.5%가 cross 신호도 차단)
-        # BTC 1h: 3 trades avg → cross 이벤트 자체가 희귀. 0.5%로 cross 시 gap이 이미 소멸한 경우 차단됨
-        # 0.1%로 완화: 실제 cross가 발생하면 허용. 신호 품질보다 빈도 우선 (15 trades 기준 충족 목표)
+        # BTC 1h fast=8/slow=20: Cycle357 D dist_pct 0.001→0.002 실험 → trades 50→32, Sharpe 0.37→0.24 (악화)
+        # 결론: 0.002는 좋은 cross까지 차단 → 0.001(0.1%) 복원 확정
         if dist_pct < 0.001:
             return Signal(
                 action=Action.HOLD,
