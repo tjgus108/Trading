@@ -166,12 +166,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   price_cluster sideways 전용 전략 근거: W5/W6 PASS, BTC rank1 연속 → sideways 필터 활성화
     #   vol_regime_filter 항상 True로 고정, vol_atr_trend_min 탐색으로 최적 임계값 찾기
     # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
+    # Cycle356 F(리서치): 1.2에서도 효과 없음(Sharpe=0.87 유지) → 1.0 추가
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [True],
-        "vol_atr_trend_min": [1.2, 1.5, 2.0, 2.5],
+        "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank2(2/8 consistency), Sharpe=-0.35, PF=1.12 — 파라미터 탐색 필요
@@ -180,6 +181,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     "roc_ma_cross": {
         "roc_period": [10, 12, 15],
         "ma_period": [3, 5, 7],
+    },
+    # Cycle356 D(ML): dema_cross WFO 그리드 추가
+    # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)
+    # 0.1% 거리 필터 완화(Cycle355)에도 trades=3 유지 → cross 이벤트 자체가 희귀
+    # 더 짧은 주기(fast=8/slow=15~20)로 cross 빈도 향상 탐색
+    # slow=25(기존) 유지로 기존 동작과의 비교 가능
+    "dema_cross": {
+        "fast": [8, 10, 12],
+        "slow": [15, 20, 25],
     },
 }
 

@@ -103,15 +103,19 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
     # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험 (1.5 → 효과 없음 확인)
-    # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화
-    #   근거: 1.5(ATR/ATR_MA>1.5 억제)로 BTC Sharpe=0.87, PF=1.20 변화 없음 → 더 공격적 임계값 필요
-    #   1.2: ATR이 MA 대비 20% 이상 높으면 추세장 → 신호 억제 (더 많은 trending 구간 차단)
-    #   목표: PF 1.20→1.5+, WR 37.2%→42.5% (PF=1.5 달성 필요 수준)
+    # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화 → Sharpe=0.87, PF=1.20 (1.5와 동일)
+    # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원
+    #   결론: vol_atr_trend_min 하향 (1.0)은 신호 과도 차단으로 역효과 확정
+    #   다음 방향: vol_regime_filter=False 비활성화 실험 (Cycle357 검토)
     "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.2},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
-    #   코드는 dema_cross.py에 convergence_signal 파라미터로 보존 (ETH real data 검증용)
+    # Cycle355 F(리서치): 거리 필터 0.5%→0.1% 완화 → BTC 여전히 3 trades (cross 이벤트 희귀)
+    # Cycle356 D(ML): fast=8/slow=20 실험 (현재 fast=10/slow=25 기본값)
+    #   근거: 짧은 주기 → DEMA 반응 빠름 → cross 이벤트 빈도 증가 기대 (목표: 3→10+ trades)
+    #   slow=25(기존 기본값) 대비 slow=20으로 단축 + fast=8로 민감도 향상
+    "dema_cross": {"fast": 8, "slow": 20},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
