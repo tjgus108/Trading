@@ -21,9 +21,20 @@ def _dema(series: pd.Series, period: int) -> pd.Series:
 class DEMACrossStrategy(BaseStrategy):
     name = "dema_cross"
 
-    def __init__(self, fast: int = 10, slow: int = 25) -> None:
+    def __init__(
+        self,
+        fast: int = 10,
+        slow: int = 25,
+        convergence_signal: bool = False,
+        convergence_threshold: float = 0.02,
+    ) -> None:
         self.fast = fast
         self.slow = slow
+        # Cycle354 E(실행): DEMA 수렴 사전 신호 — 크로스 직전 gap이 threshold 이내로 좁아질 때 예비 신호
+        # convergence_signal=True + gap < convergence_threshold(2%) + gap 축소 중 → MEDIUM 신호
+        # 기본값 False: 기존 cross-only 행동 유지 (신호 빈도 문제 해결용 실험 파라미터)
+        self.convergence_signal = convergence_signal
+        self.convergence_threshold = convergence_threshold
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -62,14 +73,54 @@ class DEMACrossStrategy(BaseStrategy):
 
         close_price = float(df["close"].iloc[idx])
         dist_pct = abs(df_now - ds_now) / max(abs(close_price), 1e-10)
-        
+
         # ✅ NEW: RSI 필터 (과매수/과매도 회피)
         rsi_val = 50.0
         if "rsi14" in df.columns:
             rsi_val = float(df["rsi14"].iloc[idx])
             if rsi_val != rsi_val:  # NaN check
                 rsi_val = 50.0
-        
+
+        # Cycle354 E(실행): DEMA 수렴 사전 신호
+        # 크로스 없지만 gap이 수렴 중(축소) + convergence_threshold 이내 → 예비 신호 생성
+        # 실제 cross 이벤트보다 일찍 진입 → 신호 빈도 증가 (BTC 3→더 많은 거래 목표)
+        if self.convergence_signal and not cross_up and not cross_down:
+            gap_now = df_now - ds_now    # + = fast above slow
+            gap_prev = df_prev - ds_prev
+            gap_narrowing = abs(gap_now) < abs(gap_prev)
+            if gap_narrowing and dist_pct < self.convergence_threshold:
+                entry_c = float(self._last(df)["close"])
+                if gap_now < 0 and rsi_val <= 70:
+                    return Signal(
+                        action=Action.BUY,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry_c,
+                        reasoning=(
+                            f"DEMA 수렴 BUY: fast→slow 접근중 "
+                            f"({dist_pct*100:.3f}%<{self.convergence_threshold*100:.1f}%), "
+                            f"FAST={df_now:.4f}, SLOW={ds_now:.4f}"
+                        ),
+                        invalidation=f"DEMA_fast가 DEMA_slow ({ds_now:.4f}) 아래로 다시 벌어질 시",
+                        bull_case=f"DEMA 수렴 → 임박한 골든크로스 예상",
+                        bear_case=f"수렴 실패 시 현 방향 지속",
+                    )
+                if gap_now > 0 and rsi_val >= 30:
+                    return Signal(
+                        action=Action.SELL,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry_c,
+                        reasoning=(
+                            f"DEMA 수렴 SELL: fast→slow 접근중 "
+                            f"({dist_pct*100:.3f}%<{self.convergence_threshold*100:.1f}%), "
+                            f"FAST={df_now:.4f}, SLOW={ds_now:.4f}"
+                        ),
+                        invalidation=f"DEMA_fast가 DEMA_slow ({ds_now:.4f}) 위로 다시 벌어질 시",
+                        bull_case=f"수렴 실패 시 현 방향 지속",
+                        bear_case=f"DEMA 수렴 → 임박한 데드크로스 예상",
+                    )
+
         # 거리 필터 (1%→0.5%: 거래 빈도 증가)
         if dist_pct < 0.005:
             return Signal(

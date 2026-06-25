@@ -102,6 +102,15 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
+    # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험
+    #   근거: BTC rank1 연속(Sharpe=0.87) — sideways 필터 활성화 시 trending 구간 손실 억제 가능성
+    #   vol_atr_trend_min=1.5: ATR/ATR_MA > 1.5이면 추세장 → 신호 억제 (가장 관대한 임계값)
+    #   기대 효과: trending 구간 false signal 차단 → PF 1.20→1.5+ 개선, Sharpe 0.87→1.0+ 목표
+    "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.5},
+    # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
+    #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
+    #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
+    #   코드는 dema_cross.py에 convergence_signal 파라미터로 보존 (ETH real data 검증용)
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치

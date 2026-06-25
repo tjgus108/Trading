@@ -1,77 +1,86 @@
 # Next Steps
 
-_Last updated: 2026-06-24 (Cycle 353 완료)_
+_Last updated: 2026-06-25 (Cycle 354 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 353
+### 이번 세션 완료 사이클: 354
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 351 | B+D+F | min_trades_override 추가, 4h min_trades 15→8 완화, 통계 근거 확인 |
 | 352 | B+D+F | supertrend_multi atr_threshold=0.5 적용, DrawdownMonitor 절댓값 ATR% 필터 추가 |
 | 353 | C+E+F | wick_reversal 1h 제외, dema_cross fast=8/slow=20 실험→롤백, engulfing_zone 크로스심볼 분석 |
+| 354 | D+E+F | walk_forward price_cluster grid 버그 수정, vol_regime_filter 실험 추가, convergence_signal BTC 검증 실패 |
 
-### 🎯 Cycle 354 작업 방향 (354 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 355 작업 방향 (355 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): price_cluster BTC 1h Sharpe 개선 — ML 기반 파라미터 최적화
+#### A(품질): price_cluster vol_regime_filter 실험 결과 평가
 
-- **배경**: price_cluster 3사이클 연속 BTC rank=1 (Sharpe=0.87, return=+4.99%)
-  - Sharpe=0.87 (기준 1.0 미달 0.13 차이), PF=1.20 (기준 1.5 미달)
-  - 가장 PASS에 근접한 전략이나 Sharpe/PF 모두 미달
+- **배경**: Cycle 354에서 `PAPER_SIM_STRATEGY_PARAMS["price_cluster"] = {"vol_regime_filter": True, "vol_atr_trend_min": 1.5}` 추가
+  - 목적: BTC Sharpe 0.87→1.0+, PF 1.20→1.5+ 개선 시도
+  - 예상 메커니즘: ATR/ATR_MA > 1.5이면 추세장 → 신호 억제 → trending 구간 false signal 제거
 - **작업**:
-  - `src/strategy/price_cluster.py` 분석: 어떤 파라미터가 Sharpe를 제한하는지 확인
-  - BTC 1h 데이터에서 최적 클러스터 반경/수 조사
-  - `PAPER_SIM_STRATEGY_PARAMS`에 price_cluster 파라미터 실험 (실제 결과 확인 필수)
-  - 단, BTC real data 개선이 먼저 → 합성 ETH/SOL 개선은 부수적
+  - paper_sim 재실행 후 price_cluster 결과 비교 (filter 적용 전: Sharpe=0.87, PF=1.20)
+  - 효과 있으면: vol_atr_trend_min 범위 탐색 (1.5, 2.0, 2.5 비교)
+  - 효과 없으면: vol_regime_filter=True 제거하고 다른 방향 탐색
 
-#### E(실행): dema_cross 대안 접근 — 거리 기반 신호 검토
+#### C(데이터): 신호 빈도 분석 — price_cluster vs roc_ma_cross 비교
 
-- **배경**: dema_cross 파라미터 조정 실험 결과
-  - fast=8/slow=20: BTC 5 trades, ETH 8 trades, SOL 13 trades → 여전히 15 미달
-  - ETH Sharpe 1.12→0.00 (파라미터 조정 시 역효과)
-  - DEMA cross 자체가 너무 드문 이벤트 (주 1회 미만)
+- **배경**: BTC rank=1/2 두 전략 모두 Sharpe 미달
+  - price_cluster: Sharpe=0.87 (0.13 미달), PF=1.20 (PF 미달이 더 큰 문제)
+  - roc_ma_cross: 2/8 consistency (가장 높은 일관성) but Sharpe=0.34
 - **작업**:
-  - dema_cross 대신 "DEMA 거리/경사도" 신호 검토 (크로스 이외 조건 추가)
-  - 예: DEMA_fast와 DEMA_slow 간격이 임계값 이하로 좁아질 때 예비 신호 → 진입 증가
-  - 단, 전략 파일 수정이므로 backtest/walk_forward.py에서 검증 필수
-  - **주의**: 전략 파일 직접 수정 가능 (버그 픽스 성격), 단 실제 BTC 1h 검증 필수
+  - price_cluster PF=1.20인 이유 분석: 승률 37.2% vs 필요 수준 확인
+  - roc_ma_cross가 2/8 consistent한 윈도우 기간 분석 (어떤 시장 환경에서 PASS?)
+  - 두 전략의 신호 겹침 분석: 동시 BUY/SELL 시 포트폴리오 상관관계
 
-#### F(리서치): price_cluster 왜 BTC에서만 작동하는가
+#### F(리서치): dema_cross 대안 — 완전히 다른 전략 로직 검토
 
-- **배경**: price_cluster BTC rank=1 (+4.99%) vs ETH rank=4 (-0.31%) vs SOL rank=19(-8.27%)
-  - BTC real: 클러스터 패턴이 실제 지지/저항으로 기능
-  - ETH/SOL synthetic: 클러스터 의미 없음 (GARCH 과정에는 가격 메모리 없음)
+- **배경**: Cycle 354 E 결론 — convergence 접근은 BTC에서 치명적 실패
+  - 23 trades(baseline) vs 867 trades(convergence) → Sharpe -2.37, -76% 손실
+  - dema_cross 기본 크로스 방식 자체도 BTC에서 Sharpe=-2.08, 3 trades (거의 동작 안 함)
 - **작업**:
-  - price_cluster 전략 로직 분석 (클러스터 계산 방식)
-  - BTC real 데이터에서 클러스터 분포 확인 (가격 집중 구간)
-  - ETH/SOL synthetic 데이터에서 클러스터 분포 비교
-  - 결론: price_cluster가 BTC 전용 전략인지, 아니면 실제 ETH/SOL 데이터에서도 통할지
+  - dema_cross를 포기하고 같은 slots(1h paper_sim 19개 전략)에서 더 나은 전략 후보 탐색
+  - 단 **새 전략 파일 생성 금지** — 기존 355개 중 미테스트 전략 중 후보 탐색
+  - 또는 dema_cross 거리 필터 0.5% → 0.1%로 완화 (현재 필터가 cross 신호도 차단 가능성)
 
-### ⚠️ 주의 사항 (Cycle 354)
+### ⚠️ 주의 사항 (Cycle 355)
 
 - **wick_reversal 1h 제외 확정** (Cycle 353 C): `STRATEGIES_TIMEFRAME_EXCLUDE["1h"]`에 추가됨
   - BTC 1h -9.31% + ETH/SOL 0 trades x8 → 구조적 실패. 4h 테스트는 미확인
-- **dema_cross 기본 파라미터 유지** (fast=10, slow=25): 파라미터 조정 실험 실패로 롤백
-  - 대안 접근 필요: 크로스 감지 방식 자체를 바꾸거나 진입 주기를 다른 방식으로 증가
+- **dema_cross convergence_signal 접근 FAIL** (Cycle 354 E): BTC -76% (-2.37 Sharpe) 검증 완료
+  - convergence_signal 파라미터는 dema_cross.py에 보존(기본값 False) — ETH real data용
+  - 다음 방향: dema_cross 거리 필터 완화 또는 다른 전략으로 교체 검토
+- **price_cluster vol_regime_filter=True 실험 중** (Cycle 354 D): paper_sim에 추가됨
+  - 다음 사이클에 시뮬 결과 평가 필수
+- **walk_forward price_cluster 그리드 개선** (Cycle 354 D): vol_regime_filter=[True] 추가
+  - 기존 vol_atr_trend_min이 dead parameter였던 버그 수정
 - **min_trades_override=8 (4h)**: `engine.min_trades` 1h=15, 4h=8
 - **supertrend_multi atr_threshold=0.5**: paper_sim `PAPER_SIM_STRATEGY_PARAMS`에 반영
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 353 확정)
+### 핵심 메트릭 (Cycle 354 확정)
 
-| 지표 | Cycle 352 | Cycle 353 | 변화 |
+| 지표 | Cycle 353 | Cycle 354 | 변화 |
 |------|-----------|-----------|------|
-| 1h 테스트 전략 수 | 20개 | **19개** | wick_reversal 제외 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (vol_filter 실험 준비) |
 | 1h BTC roc_ma_cross Consistency | 2/8 | **2/8** | 유지 |
 | 1h ETH engulfing_zone Consistency | 2/8 | **2/8** | 유지 |
-| 1h ETH dema_cross Sharpe | 1.12 | **0.00** | fast=8/slow=20→롤백 |
-| 1h PASS 수 | 0/20 (32연속) | **0/19 (33연속)** | — |
+| 1h ETH dema_cross Sharpe | 0.00 | **1.12** | 기본파라미터 복원 (전사이클 롤백) |
+| 1h PASS 수 | 0/19 (33연속) | **0/19 (34연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 354 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]`에 `"vol_regime_filter": [True]` 추가 (dead parameter 버그 수정) |
+| `src/strategy/dema_cross.py` | `convergence_signal=False`, `convergence_threshold=0.02` 파라미터 추가 (기본값 False, 실험용) |
+| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"] = {"vol_regime_filter": True, "vol_atr_trend_min": 1.5}` 추가 |
 
 ### Cycle 353 코드 변경 요약
 
@@ -140,7 +149,7 @@ _Last updated: 2026-06-24 (Cycle 353 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 353 업데이트)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 354 업데이트)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}` ← 1h paper_sim에서 제외됨
 - `relative_volume: {"rvol_buy_sell": 1.2}`
@@ -148,6 +157,7 @@ _Last updated: 2026-06-24 (Cycle 353 완료)_
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - `cmf: {"buy_thresh": 0.10}`
 - `supertrend_multi: {"atr_threshold": 0.5}` ← Cycle 352 B 추가
+- `price_cluster: {"vol_regime_filter": True, "vol_atr_trend_min": 1.5}` ← Cycle 354 D 추가 (실험)
 
 ### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
 - `set()` ← 빈 집합 (레짐 필터 비활성화)
