@@ -105,9 +105,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험 (1.5 → 효과 없음 확인)
     # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화 → Sharpe=0.87, PF=1.20 (1.5와 동일)
     # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원
-    #   결론: vol_atr_trend_min 하향 (1.0)은 신호 과도 차단으로 역효과 확정
-    #   다음 방향: vol_regime_filter=False 비활성화 실험 (Cycle357 검토)
-    "price_cluster": {"vol_regime_filter": True, "vol_atr_trend_min": 1.2},
+    #   결론: vol_atr_trend_min 하향 방향은 한계 도달
+    # Cycle357 F(리서치): vol_regime_filter=False 비활성화 실험
+    #   목표: 필터 제거로 원래 price_cluster 신호 복원 → Sharpe 0.87 이상 달성 여부 확인
+    "price_cluster": {"vol_regime_filter": False},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류

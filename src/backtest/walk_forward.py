@@ -167,11 +167,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   vol_regime_filter 항상 True로 고정, vol_atr_trend_min 탐색으로 최적 임계값 찾기
     # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
     # Cycle356 F(리서치): 1.2에서도 효과 없음(Sharpe=0.87 유지) → 1.0 추가
+    # Cycle357 F(리서치): vol_regime_filter=[False, True] 추가 — 비활성화 실험 (필터 없이 원신호 복원)
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
-        "vol_regime_filter": [True],
+        "vol_regime_filter": [False, True],
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
