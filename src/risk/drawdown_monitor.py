@@ -996,6 +996,8 @@ class DrawdownMonitor:
             "mdd_warn_hysteresis_pct": self.mdd_warn_hysteresis_pct,
             "kelly_reduce_at_mdd": self.kelly_reduce_at_mdd,
             "rolling_window": self._rolling_window,
+            "transition_cushion_enabled": self.transition_cushion_enabled,
+            "transition_cushion_threshold": self.transition_cushion_threshold,
             "_in_warn_mode": self._in_warn_mode,
             "_peak": self._peak,
             "_current": self._current,
@@ -1012,6 +1014,12 @@ class DrawdownMonitor:
             "_equity_history": list(self._equity_history),
             "_tiered_halt": self._tiered_halt,
             "_halt_drawdown": self._halt_drawdown,
+            # ATR/Sharpe/regime 런타임 상태 (Cycle357 B: 재시작 시 복원 누락 수정)
+            "_atr_vol_elevated": self._atr_vol_elevated,
+            "_atr_vol_mult": self._atr_vol_mult,
+            "_sharpe_decay_mult": self._sharpe_decay_mult,
+            "_current_regime": self._current_regime,
+            "_ranging_macro_neutral": self._ranging_macro_neutral,
         }
 
     @classmethod
@@ -1035,6 +1043,8 @@ class DrawdownMonitor:
             mdd_warn_hysteresis_pct=data.get("mdd_warn_hysteresis_pct", 0.015),
             rolling_window=data.get("rolling_window", 50),
             kelly_reduce_at_mdd=data.get("kelly_reduce_at_mdd", 0.08),
+            transition_cushion_enabled=data.get("transition_cushion_enabled", False),
+            transition_cushion_threshold=data.get("transition_cushion_threshold", 0.70),
         )
         obj._in_warn_mode = data.get("_in_warn_mode", False)
         obj._peak = data["_peak"]
@@ -1053,6 +1063,12 @@ class DrawdownMonitor:
         obj._halt_drawdown = data.get("_halt_drawdown", 0.0)
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
+        # ATR/Sharpe/regime 런타임 상태 복원 (Cycle357 B: 재시작 시 누락 수정)
+        obj._atr_vol_elevated = data.get("_atr_vol_elevated", False)
+        obj._atr_vol_mult = data.get("_atr_vol_mult", 1.0)
+        obj._sharpe_decay_mult = data.get("_sharpe_decay_mult", 1.0)
+        obj._current_regime = data.get("_current_regime", "")
+        obj._ranging_macro_neutral = data.get("_ranging_macro_neutral", None)
         return obj
 
 
