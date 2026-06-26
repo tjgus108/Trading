@@ -142,15 +142,15 @@ class DEMACrossStrategy(BaseStrategy):
         entry = float(self._last(df)["close"])
 
         if cross_up:
-            # ✅ BUY 시 RSI < 70 (과매수 회피)
-            if rsi_val > 70:
+            # ✅ BUY 시 RSI < 65 (과매수 회피 — Cycle357 D: 70→65 강화로 noise 감소)
+            if rsi_val > 65:
                 return Signal(
                     action=Action.HOLD,
                     confidence=Confidence.MEDIUM,
                     strategy=self.name,
                     entry_price=entry,
                     reasoning=(
-                        f"DEMA 상향 크로스 있으나 과매수(RSI={rsi_val:.1f} > 70). "
+                        f"DEMA 상향 크로스 있으나 과매수(RSI={rsi_val:.1f} > 65). "
                         f"신호 무시하고 대기."
                     ),
                     invalidation="",
@@ -163,7 +163,7 @@ class DEMACrossStrategy(BaseStrategy):
                 entry_price=entry,
                 reasoning=(
                     f"DEMA_fast ({df_now:.4f}) crossed above DEMA_slow ({ds_now:.4f}). "
-                    f"dist={dist_pct*100:.3f}%, RSI={rsi_val:.1f}"
+                    f"dist={dist_pct*100:.3f}%, RSI={rsi_val:.1f} (threshold=65)"
                 ),
                 invalidation=f"DEMA_fast가 DEMA_slow ({ds_now:.4f}) 아래로 이탈 시",
                 bull_case=f"DEMA_fast={df_now:.4f} > DEMA_slow={ds_now:.4f}, 상향 크로스",

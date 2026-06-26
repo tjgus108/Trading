@@ -70,7 +70,9 @@ class DrawdownStatus:
     monthly_drawdown_pct: float = 0.0
     consecutive_losses: int = 0
     size_multiplier: float = 1.0   # 포지션 사이즈 배수 (1.0=정상, 0.5=연속손실 축소)
-    cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
+    # 단일 큰 손실(single_loss_halt_pct 초과) 쿨다운 중 여부 → size_multiplier=0.0 (완전 차단)
+    # 참고: streak cooldown(연속 손실 N회)은 별도로 is_in_streak_cooldown()으로 확인 (size=0.5)
+    cooldown_active: bool = False
     mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
@@ -1012,6 +1014,13 @@ class DrawdownMonitor:
             "_equity_history": list(self._equity_history),
             "_tiered_halt": self._tiered_halt,
             "_halt_drawdown": self._halt_drawdown,
+            # ATR 변동성 필터 상태 (Cycle357 B: 재시작 복원 누락 수정)
+            "_atr_vol_elevated": self._atr_vol_elevated,
+            "_atr_vol_mult": self._atr_vol_mult,
+            # OOS Sharpe decay 필터 상태
+            "_sharpe_decay_mult": self._sharpe_decay_mult,
+            # RANGING 매크로 방향성 중립 상태
+            "_ranging_macro_neutral": self._ranging_macro_neutral,
         }
 
     @classmethod
@@ -1051,6 +1060,13 @@ class DrawdownMonitor:
         obj._last_loss_at = data.get("_last_loss_at", 0.0)
         obj._tiered_halt = data.get("_tiered_halt", False)
         obj._halt_drawdown = data.get("_halt_drawdown", 0.0)
+        # ATR 변동성 필터 상태 복원 (Cycle357 B: 재시작 시 누락 수정)
+        obj._atr_vol_elevated = data.get("_atr_vol_elevated", False)
+        obj._atr_vol_mult = data.get("_atr_vol_mult", 1.0)
+        # OOS Sharpe decay 필터 상태 복원
+        obj._sharpe_decay_mult = data.get("_sharpe_decay_mult", 1.0)
+        # RANGING 매크로 방향성 중립 상태 복원
+        obj._ranging_macro_neutral = data.get("_ranging_macro_neutral", None)
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
         return obj
