@@ -102,12 +102,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
-    # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험 (1.5 → 효과 없음 확인)
-    # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화 → Sharpe=0.87, PF=1.20 (1.5와 동일)
-    # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원
-    #   결론: vol_atr_trend_min 하향 (1.0)은 신호 과도 차단으로 역효과 확정
-    # Cycle357 F(리서치): vol_regime_filter=False 비활성화 실험 (원래 신호 복원 → Sharpe 0.87+ 기대)
-    "price_cluster": {"vol_regime_filter": False},
+    # Cycle354-357: vol_regime_filter 실험 (True/False 모두 Sharpe=0.87 동일 → 필터 효과 없음 확정)
+    # Cycle358 F(리서치): 기본값(`{}`) 복원 — vol_regime_filter 기본값=False, 필터 비활성 상태
+    "price_cluster": {},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
@@ -120,6 +117,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
     "supertrend_multi": {"atr_threshold": 0.5},
+    # Cycle358 C(데이터): roc_period=10/ma_period=5 실험 → BTC Sharpe 0.34→-1.93 (역효과 확정)
+    # roc_period=12/ma_period=3 기본값 복원 (Cycle358 결론: 파라미터 변경 불필요)
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

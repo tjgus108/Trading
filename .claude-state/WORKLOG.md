@@ -1,3 +1,39 @@
+## [2026-06-26] Cycle 358 — C(데이터) + B(리스크) + F(리서치)
+
+**[C(데이터)] roc_ma_cross 파라미터 탐색 실험 → 실패**
+1. `scripts/paper_simulation.py`: roc_period=10/ma_period=5 추가 실험
+   - 목표: BTC Sharpe 0.34→0.5+, 2/8 consistency 개선 기대
+   - 결과: BTC Sharpe 0.34→**-1.93** (역효과 확정, 1/8 consistency)
+   - ETH: Sharpe=-2.83 (rank 15/19)
+   - 결론: 단축 ROC + 강화 스무딩 조합이 오히려 신호 품질 저하
+   - **Cycle 358 종료 시 기본값(roc_period=12/ma_period=3)으로 복원**
+
+**[B(리스크)] DrawdownMonitor ATR/Sharpe 직렬화 round-trip 테스트 추가**
+2. `tests/test_drawdown_monitor.py`에 6개 테스트 추가:
+   - `test_atr_state_elevated_roundtrip`: elevated 상태 → mult=0.5 → 직렬화 복원 ✅
+   - `test_atr_state_normal_roundtrip`: normal 상태 → mult=1.0 → 직렬화 복원 ✅
+   - `test_sharpe_decay_decayed_roundtrip`: decayed 상태 → mult=0.5 → 직렬화 복원 ✅
+   - `test_sharpe_decay_normal_roundtrip`: normal 상태 → mult=1.0 → 직렬화 복원 ✅
+   - `test_atr_state_affects_get_size_multiplier`: ATR elevated → get_size_multiplier=0.5 → 직렬화 ✅
+   - `test_sharpe_decay_affects_get_size_multiplier`: Sharpe decayed → get_size_multiplier=0.5 → 직렬화 ✅
+   - Cycle 357 B에서 추가한 5개 필드 serialization 검증 완료
+
+**[F(리서치)] price_cluster vol_regime_filter 완전 제거**
+3. `src/backtest/walk_forward.py` DEFAULT_GRIDS["price_cluster"] 업데이트:
+   - vol_regime_filter/vol_atr_trend_min 완전 제거
+   - bounce_pct/n_bins/close_window 원래 탐색 공간으로 복원
+   - 근거: Cycle354-357 4사이클 filter=True(1.5→1.2→1.0)/False 모두 Sharpe=0.87 동일 → 필터 효과 없음 확정
+4. `scripts/paper_simulation.py` price_cluster 파라미터 기본값(`{}`) 복원
+
+**[시뮬레이션 결과]**
+- Paper Sim (1h WF): 0/19 PASS (38연속 FAIL)
+  - BTC best: price_cluster (Sharpe=0.87, 1/8), dema_cross (Sharpe=0.47, 2/8)
+  - roc_ma_cross: Sharpe=-1.93 (역효과 확인 → 기본값 복원)
+- Bundle OOS (4h): **5/5 PASS** ✅ (기존 리포트 보호, 실 CSV 기준 유지)
+- 테스트: 8440 passed, 23 skipped (전체)
+
+---
+
 ## [2026-06-26] Cycle 357 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor to_dict/from_dict 직렬화 보완**
@@ -5196,6 +5232,194 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-26 10:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:37 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-26 10:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:41 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-26 10:41 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

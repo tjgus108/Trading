@@ -162,18 +162,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle304 D(ML): close_window [40,50]→[50,60] (40 역효과 Cycle303 확인, 60 탐색)
     # Cycle345 A(품질): bounce_pct 하한 0.010 추가 — paper_sim W6 PASS(Sharpe=3.78)가 기본값(0.01)에서 달성됨
     #   0.030 제거(상한 미효과 Cycle302 관찰), 탐색 범위 [0.010, 0.020, 0.025]로 조정
-    # Cycle354 D(ML): vol_regime_filter=[True] 추가 — 기존 vol_atr_trend_min은 filter=False 시 dead parameter였음
-    #   price_cluster sideways 전용 전략 근거: W5/W6 PASS, BTC rank1 연속 → sideways 필터 활성화
-    #   vol_regime_filter 항상 True로 고정, vol_atr_trend_min 탐색으로 최적 임계값 찾기
-    # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
-    # Cycle356 F(리서치): 1.2에서도 효과 없음(Sharpe=0.87 유지) → 1.0 추가
-    # Cycle357 F(리서치): vol_regime_filter=False 추가 — filter 비활성화 원래 신호 복원 탐색
+    # Cycle354-357: vol_regime_filter 실험 → Cycles 354/355/356/357 filter=True/False 모두 Sharpe=0.87 동일
+    # Cycle358 F(리서치): vol_regime_filter/vol_atr_trend_min 완전 제거 — 필터 효과 없음 확정
+    #   WFO를 bounce_pct/n_bins/close_window 원래 탐색 공간으로 복원
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
-        "vol_regime_filter": [False, True],
-        "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank2(2/8 consistency), Sharpe=-0.35, PF=1.12 — 파라미터 탐색 필요

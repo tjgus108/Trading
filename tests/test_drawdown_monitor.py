@@ -1117,3 +1117,74 @@ def test_mdd_warn_hysteresis_from_dict_preserves_state():
     # 복원 후도 히스테리시스 동작: 4.5%는 NORMAL 복귀 임계값(5%-2%=3%) 미달
     m2.update(9550)  # dd=4.5%
     assert m2.get_mdd_level() == MddLevel.WARN
+
+
+# ── [B] Cycle 358: ATR/Sharpe 직렬화 round-trip 테스트 ─────────────────────────────────────
+
+
+def test_atr_state_elevated_roundtrip():
+    """set_atr_state(elevated) → to_dict → from_dict → get_atr_vol_multiplier() == 0.5."""
+    m = DrawdownMonitor()
+    # atr=2.0, atr_ma=1.0 → ratio=2.0 >= threshold=1.5 → elevated=True → mult=0.5
+    m.set_atr_state(atr=2.0, atr_ma=1.0)
+    assert m.get_atr_vol_multiplier() == 0.5
+    assert m._atr_vol_elevated is True
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2._atr_vol_elevated is True
+    assert m2.get_atr_vol_multiplier() == 0.5
+
+
+def test_atr_state_normal_roundtrip():
+    """set_atr_state(not elevated) → to_dict → from_dict → get_atr_vol_multiplier() == 1.0."""
+    m = DrawdownMonitor()
+    # atr=1.0, atr_ma=2.0 → ratio=0.5 < threshold=1.5 → elevated=False → mult=1.0
+    m.set_atr_state(atr=1.0, atr_ma=2.0)
+    assert m.get_atr_vol_multiplier() == 1.0
+    assert m._atr_vol_elevated is False
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2._atr_vol_elevated is False
+    assert m2.get_atr_vol_multiplier() == 1.0
+
+
+def test_sharpe_decay_decayed_roundtrip():
+    """set_sharpe_decay(decayed) → to_dict → from_dict → get_sharpe_decay_multiplier() == 0.5."""
+    m = DrawdownMonitor()
+    # recent=0.2, historical=1.0 → ratio=0.2 < threshold=0.5 → decayed → mult=0.5
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.get_sharpe_decay_multiplier() == 0.5
+
+
+def test_sharpe_decay_normal_roundtrip():
+    """set_sharpe_decay(not decayed) → to_dict → from_dict → get_sharpe_decay_multiplier() == 1.0."""
+    m = DrawdownMonitor()
+    # recent=0.8, historical=1.0 → ratio=0.8 >= threshold=0.5 → not decayed → mult=1.0
+    m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0)
+    assert m.get_sharpe_decay_multiplier() == 1.0
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.get_sharpe_decay_multiplier() == 1.0
+
+
+def test_atr_state_affects_get_size_multiplier():
+    """ATR elevated 상태가 get_size_multiplier()에 반영되며 직렬화 후에도 유지."""
+    m = DrawdownMonitor()
+    m.set_atr_state(atr=2.0, atr_ma=1.0)  # elevated → mult=0.5
+    assert m.get_size_multiplier() == 0.5
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.get_size_multiplier() == 0.5
+
+
+def test_sharpe_decay_affects_get_size_multiplier():
+    """Sharpe decay 상태가 get_size_multiplier()에 반영되며 직렬화 후에도 유지."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=0.1, historical_sharpe=1.0)  # decayed → mult=0.5
+    assert m.get_size_multiplier() == 0.5
+
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.get_size_multiplier() == 0.5
