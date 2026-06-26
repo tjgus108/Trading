@@ -70,7 +70,8 @@ class DrawdownStatus:
     monthly_drawdown_pct: float = 0.0
     consecutive_losses: int = 0
     size_multiplier: float = 1.0   # 포지션 사이즈 배수 (1.0=정상, 0.5=연속손실 축소)
-    cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
+    cooldown_active: bool = False  # 단일 손실(single_loss_halt_pct 초과) 쿨다운 중 여부만 반영.
+    # streak cooldown(is_in_streak_cooldown)은 별도이며 이 필드에 포함되지 않음.
     mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD
@@ -1012,6 +1013,11 @@ class DrawdownMonitor:
             "_equity_history": list(self._equity_history),
             "_tiered_halt": self._tiered_halt,
             "_halt_drawdown": self._halt_drawdown,
+            "_atr_vol_elevated": self._atr_vol_elevated,
+            "_atr_vol_mult": self._atr_vol_mult,
+            "_sharpe_decay_mult": self._sharpe_decay_mult,
+            "_ranging_macro_neutral": self._ranging_macro_neutral,
+            "_current_regime": self._current_regime,
         }
 
     @classmethod
@@ -1051,6 +1057,11 @@ class DrawdownMonitor:
         obj._last_loss_at = data.get("_last_loss_at", 0.0)
         obj._tiered_halt = data.get("_tiered_halt", False)
         obj._halt_drawdown = data.get("_halt_drawdown", 0.0)
+        obj._atr_vol_elevated = data.get("_atr_vol_elevated", False)
+        obj._atr_vol_mult = data.get("_atr_vol_mult", 1.0)
+        obj._sharpe_decay_mult = data.get("_sharpe_decay_mult", 1.0)
+        obj._ranging_macro_neutral = data.get("_ranging_macro_neutral", None)
+        obj._current_regime = data.get("_current_regime", "")
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
         return obj
