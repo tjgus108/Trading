@@ -1012,6 +1012,14 @@ class DrawdownMonitor:
             "_equity_history": list(self._equity_history),
             "_tiered_halt": self._tiered_halt,
             "_halt_drawdown": self._halt_drawdown,
+            # ATR / Sharpe / 레짐 런타임 상태 (Cycle357 B: 재시작 복원용)
+            "_atr_vol_elevated": self._atr_vol_elevated,
+            "_atr_vol_mult": self._atr_vol_mult,
+            "_sharpe_decay_mult": self._sharpe_decay_mult,
+            "_ranging_macro_neutral": self._ranging_macro_neutral,
+            "_current_regime": self._current_regime,
+            "transition_cushion_enabled": self.transition_cushion_enabled,
+            "transition_cushion_threshold": self.transition_cushion_threshold,
         }
 
     @classmethod
@@ -1053,6 +1061,14 @@ class DrawdownMonitor:
         obj._halt_drawdown = data.get("_halt_drawdown", 0.0)
         for eq in data.get("_equity_history", []):
             obj._equity_history.append(float(eq))
+        # ATR / Sharpe / 레짐 런타임 상태 복원 (Cycle357 B)
+        obj._atr_vol_elevated = data.get("_atr_vol_elevated", False)
+        obj._atr_vol_mult = data.get("_atr_vol_mult", 1.0)
+        obj._sharpe_decay_mult = data.get("_sharpe_decay_mult", 1.0)
+        obj._ranging_macro_neutral = data.get("_ranging_macro_neutral", None)
+        obj._current_regime = data.get("_current_regime", "")
+        obj.transition_cushion_enabled = data.get("transition_cushion_enabled", False)
+        obj.transition_cushion_threshold = data.get("transition_cushion_threshold", 0.70)
         return obj
 
 

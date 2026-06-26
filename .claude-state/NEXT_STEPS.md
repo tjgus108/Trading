@@ -1,76 +1,84 @@
 # Next Steps
 
-_Last updated: 2026-06-25 (Cycle 356 완료)_
+_Last updated: 2026-06-26 (Cycle 357 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 356
+### 이번 세션 완료 사이클: 357
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 354 | D+E+F | walk_forward price_cluster grid 버그 수정, vol_regime_filter 실험 추가, convergence_signal BTC 검증 실패 |
-| 355 | A+C+F | vol_atr_trend_min 1.5→1.2 강화, WFO 그리드 확장, dema_cross 거리필터 0.5%→0.1% 완화 |
+| 355 | A+C+F | vol_atr_trend_min 1.5→1.2 강화, WFO 그리드 확장, dema_cross 거리필터 완화 |
 | 356 | B+D+F | DrawdownMonitor 검증(정상), dema_cross fast=8/slow=20(trades 3→50!), price_cluster 1.0 실험→악화→1.2복원 |
+| 357 | B+D+F | DrawdownMonitor 직렬화 누락 7필드 수정, dema_cross RSI 70→65(Sharpe 0.37→0.47), price_cluster filter=False(Sharpe -0.30→0.87!) |
 
-### 🎯 Cycle 357 작업 방향 (357 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 358 작업 방향 (358 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor ATR 상태 직렬화 누락 확인
+#### C(데이터): price_cluster vol_regime_filter=False 일관성 분석
 
-- **배경**: Cycle 356 B에서 DrawdownMonitor 로직 검증 완료. 추가 검토 사항 발견
+- **배경**: Cycle 357 F에서 filter=False → BTC Sharpe 0.87 달성, 그러나 1/8 consistency
 - **작업**:
-  - `to_dict()`/`from_dict()`: `_atr_vol_elevated`, `_atr_vol_mult`, `_sharpe_decay_mult` 미직렬화 확인
-  - 라이브 재시작 시 ATR/Sharpe 상태 복원 안 됨 → `to_dict()` / `from_dict()` 보완 검토
-  - `DrawdownStatus`의 `cooldown_active` 필드가 streak cooldown이 아닌 single loss cooldown만 반영 → 문서화
+  - 8개 WF 윈도우 중 PASS 윈도우(1개)와 FAIL(7개) 분석
+    - PASS 윈도우: 어떤 시장 레짐인지, 왜 성과 차이가 큰지
+    - FAIL 윈도우: 추세장인지, 횡보장인지, filter=False가 오신호 생성하는 구간 확인
+  - 결론에 따라: filter=False 유지 or False+vol_atr_trend_min 조합 탐색
+  - walk_forward.py: vol_regime_filter=[False, True] 이미 추가됨 (Cycle357)
 
-#### D(ML): dema_cross fast=8/slow=20 안정화
+#### B(리스크): DrawdownMonitor cooldown_active 문서화
 
-- **배경**: Cycle 356 D에서 fast=8/slow=20으로 BTC trades 3→50, Sharpe -2.08→0.37 달성
+- **배경**: Cycle 357 B에서 to_dict/from_dict 7필드 보완 완료
 - **작업**:
-  - ETH dema_cross 고슬리피지 분석: 37.3% HIGH slippage (207/556 trades)
-    - 원인: ETH synthetic data HL ratio 2.12% — 신호 품질 문제인지 데이터 특성인지 구분
-  - BTC Sharpe std=2.61 (불안정) → noise 감소 방법 탐색:
-    - RSI 필터 강화 (RSI>65 차단, 현재 70) — noise trade 줄이기
-    - 또는 dist_pct 0.001→0.002 (약간 상향) — 너무 약한 cross 차단
-  - 다음 paper_sim에서 fast=8/slow=20 BTC Sharpe 변화 모니터링
+  - `DrawdownStatus.cooldown_active` 필드가 단일 손실 쿨다운만 반영 (streak cooldown 미포함) 확인
+  - 문서화: docstring 또는 인라인 주석으로 "streak cooldown은 is_in_streak_cooldown() 참조" 명시
+  - `streak_cooldown_active` 필드 추가 검토 (DrawdownStatus에 추가)
 
-#### F(리서치): price_cluster vol_regime_filter 비활성화 실험
+#### F(리서치): dema_cross RSI 65 효과 분석
 
-- **배경**: vol_atr_trend_min 1.5→1.2→1.0 모두 효과 없음/역효과 확인 (Cycle 354~356)
+- **배경**: Cycle 357 D에서 RSI 65 → Sharpe 0.37→0.47, SharpeStd 2.61→2.69 (불안정 지속)
 - **작업**:
-  - `scripts/paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS["price_cluster"] 변경:
-    - `{"vol_regime_filter": True, "vol_atr_trend_min": 1.2}` → `{"vol_regime_filter": False}`
-    - 필터 비활성화로 원래 price_cluster 신호 복원 → Sharpe 0.87 이상 달성 여부 확인
-  - walk_forward.py DEFAULT_GRIDS["price_cluster"]에 `"vol_regime_filter": [False, True]` 추가
-  - 효과 없으면: vol_regime_filter 관련 파라미터 완전 제거 검토
+  - SharpeStd 불안정 원인 분석: 어떤 윈도우에서 큰 낙차가 발생하는지
+  - dist_pct 0.001→0.002 (약간 상향) 실험 고려: 너무 약한 cross 차단으로 품질 향상
+  - 또는 trend 필터 추가: EMA50 slope > 0 구간에서만 BUY → 추세 방향성 확인
 
-### ⚠️ 주의 사항 (Cycle 357)
+### ⚠️ 주의 사항 (Cycle 358)
 
-- **dema_cross fast=8/slow=20 확정** (Cycle 356 D): `PAPER_SIM_STRATEGY_PARAMS["dema_cross"]` 유지
-  - ETH 고슬리피지(37.3%) 주의: BTC 위주로 평가
-  - SharpeStd=2.61 → 아직 불안정, 추가 noise 감소 방법 탐색
-- **price_cluster vol_atr_trend_min=1.2 복원** (Cycle 356 F): 1.0 실험 실패 → 1.2 유지
-  - 다음 사이클 F에서 vol_regime_filter=False 비활성화 실험 예정
-- **walk_forward DEFAULT_GRIDS["dema_cross"] 추가됨** (Cycle 356 D): [8,10,12] x [15,20,25]
-- **walk_forward DEFAULT_GRIDS["price_cluster"] vol_atr_trend_min 1.0 추가됨** (Cycle 356 F)
+- **DrawdownMonitor to_dict/from_dict 7필드 보완** (Cycle 357 B): 재시작 시 ATR/Sharpe/레짐 상태 복원됨
+- **dema_cross RSI 65 확정** (Cycle 357 D): 기존 70 대비 noise 감소, Sharpe 소폭 개선
+  - SharpeStd=2.69 → 여전히 불안정, 추가 noise 감소 방법 탐색
+- **price_cluster vol_regime_filter=False** (Cycle 357 F): Sharpe 0.87 달성, 1/8 consistency
+  - 필터 비활성화 효과 확인됨 → 다음 사이클에서 일관성 향상 방법 탐색
+- **walk_forward DEFAULT_GRIDS["price_cluster"] vol_regime_filter=[False, True]** (Cycle357 F): 추가됨
+- **dema_cross fast=8/slow=20 유지** (Cycle 356 D): `PAPER_SIM_STRATEGY_PARAMS["dema_cross"]`
 - **wick_reversal 1h 제외 확정** (Cycle 353 C): `STRATEGIES_TIMEFRAME_EXCLUDE["1h"]`에 추가됨
 - **min_trades_override=8 (4h)**: `engine.min_trades` 1h=15, 4h=8
 - **supertrend_multi atr_threshold=0.5**: paper_sim `PAPER_SIM_STRATEGY_PARAMS`에 반영
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 356 확정)
+### 핵심 메트릭 (Cycle 357 확정)
 
-| 지표 | Cycle 355 | Cycle 356 | 변화 |
+| 지표 | Cycle 356 | Cycle 357 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Trades | 3 | **50** | ⬆️ 대폭 증가 (fast=8/slow=20) |
-| 1h BTC dema_cross Sharpe | -2.08 | **0.37** | ⬆️ 개선 (여전히 FAIL) |
-| 1h BTC dema_cross Consistency | 0/8 | **2/8** | ⬆️ 개선 |
-| 1h BTC price_cluster Sharpe | 0.87 (1.2) | **-0.30 (1.0→복원)** | 실험 후 1.2복원 |
-| 1h PASS 수 | 0/19 (35연속) | **0/19 (36연속)** | — |
+| 1h BTC price_cluster Sharpe | -0.30 (1.0실험) | **0.87 (filter=False)** | ⬆️ 대폭 개선 |
+| 1h BTC price_cluster Consistency | 0/8 | **1/8** | ⬆️ 소폭 개선 |
+| 1h BTC dema_cross Sharpe | 0.37 (RSI70) | **0.47 (RSI65)** | ⬆️ 소폭 개선 |
+| 1h BTC dema_cross Trades | 50 | **48** | noise 2개 제거 |
+| 1h BTC dema_cross Consistency | 2/8 | **2/8** | 유지 |
+| 1h PASS 수 | 0/19 (36연속) | **0/19 (37연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 357 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/risk/drawdown_monitor.py` | `to_dict()` ATR/Sharpe/레짐 7필드 추가 (Cycle357 B) |
+| `src/risk/drawdown_monitor.py` | `from_dict()` 대응 복원 코드 추가 (Cycle357 B) |
+| `src/strategy/dema_cross.py` | BUY RSI 필터 70→65 강화 (Cycle357 D) |
+| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` vol_regime_filter=False (Cycle357 F) |
+| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]["vol_regime_filter"]` [True]→[False, True] (Cycle357 F) |
 
 ### Cycle 356 코드 변경 요약
 
@@ -80,22 +88,6 @@ _Last updated: 2026-06-25 (Cycle 356 완료)_
 | `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` vol_atr_trend_min 1.2→1.0→1.2 복원 (Cycle356 F) |
 | `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["dema_cross"]` 추가: fast=[8,10,12], slow=[15,20,25] (Cycle356 D) |
 | `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]` vol_atr_trend_min에 1.0 추가 (Cycle356 F) |
-
-### Cycle 355 코드 변경 요약
-
-| 파일 | 변경 내용 |
-|------|----------|
-| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` vol_atr_trend_min 1.5→1.2 (Cycle355 A) |
-| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]` vol_atr_trend_min에 1.2 추가 (Cycle355 A) |
-| `src/strategy/dema_cross.py` | 거리 필터 0.5%(0.005)→0.1%(0.001) 완화 (Cycle355 F) |
-
-### Cycle 354 코드 변경 요약
-
-| 파일 | 변경 내용 |
-|------|----------|
-| `src/backtest/walk_forward.py` | `DEFAULT_GRIDS["price_cluster"]`에 `"vol_regime_filter": [True]` 추가 (dead parameter 버그 수정) |
-| `src/strategy/dema_cross.py` | `convergence_signal=False`, `convergence_threshold=0.02` 파라미터 추가 (기본값 False, 실험용) |
-| `scripts/paper_simulation.py` | `PAPER_SIM_STRATEGY_PARAMS["price_cluster"]` 추가 (vol_regime_filter=True, 1.5) |
 
 ### F(리서치) BTC 1h 레짐별 특성 (Cycle 346 확정)
 
@@ -151,7 +143,7 @@ _Last updated: 2026-06-25 (Cycle 356 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 356 업데이트)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 357 업데이트)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}` ← 1h paper_sim에서 제외됨
 - `relative_volume: {"rvol_buy_sell": 1.2}`
@@ -159,8 +151,8 @@ _Last updated: 2026-06-25 (Cycle 356 완료)_
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - `cmf: {"buy_thresh": 0.10}`
 - `supertrend_multi: {"atr_threshold": 0.5}` ← Cycle 352 B 추가
-- `price_cluster: {"vol_regime_filter": True, "vol_atr_trend_min": 1.2}` ← Cycle 356 F 1.0→복원
-- `dema_cross: {"fast": 8, "slow": 20}` ← **Cycle 356 D 추가** (3 trades → 50 trades!)
+- `price_cluster: {"vol_regime_filter": False}` ← **Cycle 357 F 업데이트** (filter 비활성화 실험)
+- `dema_cross: {"fast": 8, "slow": 20}` ← Cycle 356 D 추가
 
 ### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
 - `set()` ← 빈 집합 (레짐 필터 비활성화)
