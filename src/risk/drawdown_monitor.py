@@ -70,7 +70,7 @@ class DrawdownStatus:
     monthly_drawdown_pct: float = 0.0
     consecutive_losses: int = 0
     size_multiplier: float = 1.0   # 포지션 사이즈 배수 (1.0=정상, 0.5=연속손실 축소)
-    cooldown_active: bool = False  # 시간 기반 쿨다운 중 여부
+    cooldown_active: bool = False  # 단일 손실 쿨다운만 반영 (_single_loss_cooldown_until); streak cooldown은 DrawdownMonitor.is_in_streak_cooldown() 직접 호출
     mdd_level: MddLevel = MddLevel.NORMAL          # 단계적 MDD 레벨
     mdd_size_multiplier: float = 1.0  # MDD 단계별 사이즈 배수 (1.0/0.5/0.0)
     rolling_mdd_pct: float = 0.0   # 롤링 윈도우(50봉) 내 MDD

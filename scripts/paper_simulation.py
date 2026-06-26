@@ -107,7 +107,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원
     #   결론: vol_atr_trend_min 하향 (1.0)은 신호 과도 차단으로 역효과 확정
     # Cycle357 F(리서치): vol_regime_filter=False 비활성화 실험 — 원래 price_cluster 신호 복원
-    #   가설: vol_regime_filter=True로 인해 유효 신호가 과도하게 차단됨 → False로 복원 후 Sharpe 개선 여부 확인
+    #   결과: Sharpe=0.87, PF=1.20 (PF가 주 FAIL 원인)
+    # Cycle358 C(데이터): bounce_pct 0.020 실험 → BTC Sharpe 0.87→0.72, PF 1.20→1.15 (악화)
+    #   결론: bounce_pct=0.020은 0.010보다 불리. 기본값(0.010) 유지 확정
     "price_cluster": {"vol_regime_filter": False},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%

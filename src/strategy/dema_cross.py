@@ -121,17 +121,17 @@ class DEMACrossStrategy(BaseStrategy):
                         bear_case=f"DEMA 수렴 → 임박한 데드크로스 예상",
                     )
 
-        # 거리 필터 (1%→0.5%→0.1%: Cycle355 F(리서치) — 0.5%가 cross 신호도 차단)
-        # BTC 1h: 3 trades avg → cross 이벤트 자체가 희귀. 0.5%로 cross 시 gap이 이미 소멸한 경우 차단됨
-        # 0.1%로 완화: 실제 cross가 발생하면 허용. 신호 품질보다 빈도 우선 (15 trades 기준 충족 목표)
-        if dist_pct < 0.001:
+        # 거리 필터 (1%→0.5%→0.1%→0.2%: Cycle358 F(리서치) — SharpeStd=2.69 불안정)
+        # BTC 1h fast=8/slow=20: 48 trades, Sharpe=0.47, SharpeStd=2.69 (std>2.5 위험 수준)
+        # 0.001→0.002: 매우 약한 cross(gap<0.2%) 차단으로 noise 감소 → 30~40 trades 예상, Sharpe 안정 기대
+        if dist_pct < 0.002:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.MEDIUM,
                 strategy=self.name,
                 entry_price=close_price,
                 reasoning=(
-                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < 0.1% "
+                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < 0.2% "
                     f"(FAST={df_now:.4f}, SLOW={ds_now:.4f})"
                 ),
                 invalidation="",

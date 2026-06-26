@@ -162,6 +162,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle304 D(ML): close_window [40,50]→[50,60] (40 역효과 Cycle303 확인, 60 탐색)
     # Cycle345 A(품질): bounce_pct 하한 0.010 추가 — paper_sim W6 PASS(Sharpe=3.78)가 기본값(0.01)에서 달성됨
     #   0.030 제거(상한 미효과 Cycle302 관찰), 탐색 범위 [0.010, 0.020, 0.025]로 조정
+    # Cycle358 C(데이터): paper_sim bounce_pct=0.020 실험 → BTC Sharpe 0.87→0.72 악화 확인
+    #   WFO 조합 탐색은 유지 (combination 효과 있을 수 있음), paper_sim은 0.010 복원
     # Cycle354 D(ML): vol_regime_filter=[True] 추가 — 기존 vol_atr_trend_min은 filter=False 시 dead parameter였음
     #   price_cluster sideways 전용 전략 근거: W5/W6 PASS, BTC rank1 연속 → sideways 필터 활성화
     #   vol_regime_filter 항상 True로 고정, vol_atr_trend_min 탐색으로 최적 임계값 찾기
