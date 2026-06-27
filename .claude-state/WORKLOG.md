@@ -1,3 +1,39 @@
+## [2026-06-27] Cycle 360 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] dema_cross rsi_dir_filter=True 실험 및 검증**
+1. `scripts/paper_simulation.py`: `dema_cross` 파라미터에 `rsi_dir_filter=True` 추가
+   - Cycle 359 D(ML)에서 추가한 코드(src/strategy/dema_cross.py)를 이번 사이클에서 paper_sim 검증
+   - BUY시 RSI>50, SELL시 RSI<50 → 크로스 방향과 모멘텀 일치 여부 확인
+   - 결과: Sharpe 0.37→0.40 (+0.03), PF 1.26→1.45 (+0.19), Trades 31→18 (-13)
+   - SharpeStd 2.32→2.25 (안정화), 단 2개 윈도우 trades=14<15 (경계)
+   - 판단: PF 1.45 (1.5 목표까지 +0.05) — 개선 방향 확인 → rsi_dir_filter=True 유지
+2. **테스트**: 8434 passed, 23 skipped (기존 테스트 전부 통과)
+
+**[C(데이터)] price_cluster close_window=40 실험**
+3. `scripts/paper_simulation.py`: `price_cluster` 파라미터에 `close_window=40` 실험
+   - 목적: 클러스터 계산 윈도우 축소(50→40)로 최근 가격 반응성 향상 기대
+   - 결과: Sharpe 0.72→0.07 (대폭 악화), PF 1.20→1.07 (악화)
+   - 결론: close_window=40 단축 시 클러스터 안정성 저하. 기본값(50) 최적 재확인
+   - Cycle303 실험(40 역효과)과 일치. close_window 탐색 방향 완료
+4. `scripts/paper_simulation.py` 복원: close_window 제거 (기본값 50 사용)
+5. `src/backtest/walk_forward.py`: close_window=40 Cycle360 재확인 주석 추가
+
+**[F(리서치)] Bundle OOS 재검증 + dema_cross WFO 그리드 분석**
+6. Bundle OOS (`--csv-dir data/historical --timeframe 4h`): **5/5 PASS** ✅ (변화 없음)
+   - cmf/ofi_v2/supertrend_multi/vwap_cross/value_area 모두 PASS 유지
+7. DEFAULT_GRIDS["dema_cross"]: fast=[8,10,12] × slow=[15,20,25] × rsi_dir_filter=[False,True] = 18 조합
+   - WFO 그리드에서 rsi_dir_filter 탐색 가능 (Cycle359 D 추가됨)
+
+**[시뮬레이션 결과]**
+- Paper Sim (1h WF, BTC): **0/19 PASS (43연속 FAIL)**
+  - BTC rank1(score): roc_ma_cross, Sharpe=0.34, SharpeStd=2.44, 2/8
+  - BTC rank4(score): dema_cross, Sharpe=0.40, SharpeStd=2.25, trades=18, 0/8
+    - rsi_dir_filter=True → PF 1.26→1.45 개선, trades 31→18 (2윈도우 14<15)
+  - price_cluster: Sharpe=0.07 (close_window=40 악화) → 복원 후 기본값(50) 유지 (Sharpe 0.72 복원 예상)
+- Bundle OOS (4h): **5/5 PASS** ✅ 유지
+
+---
+
 ## [2026-06-27] Cycle 359 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] dema_cross ATR 최소 변동성 필터 + RSI 방향성 필터 추가**
@@ -5744,6 +5780,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-27 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-27 05:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-27 05:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-27 05:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-27 05:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-27 05:06 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-27 05:06 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
