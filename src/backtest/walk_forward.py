@@ -190,9 +190,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # 0.1% 거리 필터 완화(Cycle355)에도 trades=3 유지 → cross 이벤트 자체가 희귀
     # 더 짧은 주기(fast=8/slow=15~20)로 cross 빈도 향상 탐색
     # slow=25(기존) 유지로 기존 동작과의 비교 가능
+    # Cycle359 D(ML): rsi_dir_filter=[False,True] 추가 — RSI 방향성 필터 WFO 탐색
+    #   True: BUY시 RSI>50, SELL시 RSI<50 요구 (모멘텀 방향 확인으로 신호 품질 향상)
+    #   False: 기존 과매수/과매도 회피만 적용 (현재 확정 동작)
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
+        "rsi_dir_filter": [False, True],
     },
 }
 

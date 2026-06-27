@@ -27,6 +27,8 @@ class DEMACrossStrategy(BaseStrategy):
         slow: int = 25,
         convergence_signal: bool = False,
         convergence_threshold: float = 0.02,
+        atr_vol_min_pct: float = 0.0,
+        rsi_dir_filter: bool = False,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -35,6 +37,14 @@ class DEMACrossStrategy(BaseStrategy):
         # 기본값 False: 기존 cross-only 행동 유지 (신호 빈도 문제 해결용 실험 파라미터)
         self.convergence_signal = convergence_signal
         self.convergence_threshold = convergence_threshold
+        # Cycle359 D(ML): ATR 최소 변동성 필터 — 극저변동성 구간 cross 차단
+        # atr14/close < atr_vol_min_pct 이면 신호 억제 (0.0=비활성, 예: 0.005=0.5%)
+        # 배경: BTC 1h ATR ~1.49% → 임계값 0.5%는 dead param. 다른 심볼/타임프레임용으로 보존
+        self.atr_vol_min_pct = atr_vol_min_pct
+        # Cycle359 D(ML): RSI 방향성 필터 — 크로스 방향과 모멘텀이 일치할 때만 신호
+        # BUY 시 RSI > 50 (상방 모멘텀 확인), SELL 시 RSI < 50 (하방 모멘텀 확인)
+        # 기본값 False: 기존 과매수/과매도 회피 필터만 유지
+        self.rsi_dir_filter = rsi_dir_filter
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -121,6 +131,25 @@ class DEMACrossStrategy(BaseStrategy):
                         bear_case=f"DEMA 수렴 → 임박한 데드크로스 예상",
                     )
 
+        # ATR 최소 변동성 필터 (Cycle359 D(ML): 극저변동성 구간 cross 차단)
+        if self.atr_vol_min_pct > 0.0 and "atr14" in df.columns:
+            atr14_val = float(df["atr14"].iloc[idx])
+            if atr14_val == atr14_val and atr14_val > 0:  # NaN check
+                atr_ratio = atr14_val / max(abs(close_price), 1e-10)
+                if atr_ratio < self.atr_vol_min_pct:
+                    return Signal(
+                        action=Action.HOLD,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=close_price,
+                        reasoning=(
+                            f"ATR 저변동성 차단: ATR/close={atr_ratio*100:.3f}% "
+                            f"< min={self.atr_vol_min_pct*100:.2f}% "
+                            f"(atr14={atr14_val:.4f})"
+                        ),
+                        invalidation="",
+                    )
+
         # 거리 필터 (1%→0.5%→0.1%→0.2%: Cycle358 F(리서치) — SharpeStd=2.69 불안정)
         # BTC 1h fast=8/slow=20: 48 trades, Sharpe=0.47, SharpeStd=2.69 (std>2.5 위험 수준)
         # 0.001→0.002: 매우 약한 cross(gap<0.2%) 차단으로 noise 감소 → 30~40 trades 예상, Sharpe 안정 기대
@@ -155,7 +184,20 @@ class DEMACrossStrategy(BaseStrategy):
                     ),
                     invalidation="",
                 )
-            
+            # Cycle359 D(ML): RSI 방향성 필터 — 상방 모멘텀 확인 (RSI > 50)
+            if self.rsi_dir_filter and rsi_val <= 50:
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=entry,
+                    reasoning=(
+                        f"DEMA 상향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} <= 50). "
+                        f"상방 모멘텀 부재."
+                    ),
+                    invalidation="",
+                )
+
             return Signal(
                 action=Action.BUY,
                 confidence=conf,
@@ -184,7 +226,20 @@ class DEMACrossStrategy(BaseStrategy):
                     ),
                     invalidation="",
                 )
-            
+            # Cycle359 D(ML): RSI 방향성 필터 — 하방 모멘텀 확인 (RSI < 50)
+            if self.rsi_dir_filter and rsi_val >= 50:
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=entry,
+                    reasoning=(
+                        f"DEMA 하향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} >= 50). "
+                        f"하방 모멘텀 부재."
+                    ),
+                    invalidation="",
+                )
+
             return Signal(
                 action=Action.SELL,
                 confidence=conf,

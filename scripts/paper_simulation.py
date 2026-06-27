@@ -110,6 +110,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   결과: Sharpe=0.87, PF=1.20 (PF가 주 FAIL 원인)
     # Cycle358 C(데이터): bounce_pct 0.020 실험 → BTC Sharpe 0.87→0.72, PF 1.20→1.15 (악화)
     #   결론: bounce_pct=0.020은 0.010보다 불리. 기본값(0.010) 유지 확정
+    # Cycle359 F(리서치): n_bins=6 실험 → BTC Sharpe 0.72→-0.84 (대폭 악화) → default(5) 복원
+    #   결론: n_bins=6은 과도한 분할로 cluster 정밀도 하락, 노이즈 증가. n_bins=5 최적 확정
     "price_cluster": {"vol_regime_filter": False},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
@@ -118,6 +120,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle356 D(ML): fast=8/slow=20 실험 (현재 fast=10/slow=25 기본값)
     #   근거: 짧은 주기 → DEMA 반응 빠름 → cross 이벤트 빈도 증가 기대 (목표: 3→10+ trades)
     #   slow=25(기존 기본값) 대비 slow=20으로 단축 + fast=8로 민감도 향상
+    # Cycle359 D(ML): atr_vol_min_pct=0.005 실험 → 효과 없음 (BTC ATR ~1.49%, 0.5% 임계값 미작동)
+    #   결론: BTC 1h는 항상 ATR >= 1%, atr_vol_min_pct 임계값 적용 불가 (dead param for BTC)
+    #   코드는 유지 (다른 심볼/타임프레임용). 다음 탐색: RSI 방향성 필터 (rsi_dir_filter)
     "dema_cross": {"fast": 8, "slow": 20},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단

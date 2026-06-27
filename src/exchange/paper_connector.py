@@ -26,6 +26,7 @@ class PaperConnector:
         slippage_pct: float = 0.05,
         partial_fill_prob: float = 0.05,
         timeout_prob: float = 0.01,
+        use_tiered_slippage: bool = False,  # Cycle359 E(실행): 심볼별 차등 슬리피지 (BTC=0.05%, SOL=0.2%)
     ):
         self.symbol = symbol
         self.paper_trader = PaperTrader(
@@ -34,10 +35,11 @@ class PaperConnector:
             slippage_pct=slippage_pct,
             partial_fill_prob=partial_fill_prob,
             timeout_prob=timeout_prob,
+            use_tiered_slippage=use_tiered_slippage,
         )
         logger.info(
-            "PaperConnector initialized: symbol=%s, balance=%.2f, slippage=%.2f%%",
-            symbol, initial_balance, slippage_pct
+            "PaperConnector initialized: symbol=%s, balance=%.2f, slippage=%.2f%%, tiered=%s",
+            symbol, initial_balance, slippage_pct, use_tiered_slippage
         )
 
     def connect(self) -> None:
