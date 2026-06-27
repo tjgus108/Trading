@@ -171,12 +171,18 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
     # Cycle356 F(리서치): 1.2에서도 효과 없음(Sharpe=0.87 유지) → 1.0 추가
     # Cycle357 F(리서치): vol_regime_filter=False 추가 — filter 비활성화 탐색 (paper_sim과 일관성)
+    # Cycle362 F(리서치): atr_bounce_factor=[0.0, 0.3, 0.5] 추가 — 고변동성 시 bounce_pct 자동 확대
+    #   atr_bounce_factor > 0: effective_bounce_pct = ATR(14)/close × factor (동적 bounce)
+    #   현재 paper_sim: vol_regime_filter=False 확정, PF=1.20 (목표 1.5까지 +0.30)
+    #   가설: ATR 기반 동적 bounce_pct가 오신호 필터링 역할 → PF 향상 기대
+    #   n_bins=[4,5,7]: 6은 기존 악화 확인(Cycle359), 7 탐색
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
-        "n_bins": [4, 5, 6],
+        "n_bins": [4, 5, 7],
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
+        "atr_bounce_factor": [0.0, 0.3, 0.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)
