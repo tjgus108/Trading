@@ -33,6 +33,8 @@ RETRAIN_LOG = MODELS_DIR / "retrain_log.json"
 AUTO_RETRAIN_LIMIT = 1000
 AUTO_RETRAIN_BINARY_THRESHOLD = 0.01
 AUTO_RETRAIN_MIN_ACC = 0.55
+# PFI 분석용 최소 test set 크기. 이 값 미만이면 CSV fallback으로 보충.
+PFI_MIN_TEST_SAMPLES = 200
 
 
 def parse_args():
@@ -304,17 +306,52 @@ def auto_retrain(symbol: str, timeframe: str, triple_barrier: bool = False,
     print(result.summary())
 
     # PFI 분석: test set 재구성 후 실행 (btc_close 포함된 df 사용)
+    # n_test_samples < PFI_MIN_TEST_SAMPLES(200) 이면 CSV fallback으로 대용량 test set 구성.
     try:
-        X_all, y_all = FeatureBuilder(
+        import pandas as _pd
+        fb = FeatureBuilder(
             forward_n=5, threshold=AUTO_RETRAIN_BINARY_THRESHOLD, binary=True,
             triple_barrier=triple_barrier, tb_tp_pct=tb_tp, tb_sl_pct=tb_sl,
-        ).build(df)
+        )
+        X_all, y_all = fb.build(df)
         y_all = y_all.astype(int)
         n_total = len(X_all)
         val_end = int(n_total * 0.80)
         X_test_pfi = X_all.iloc[val_end:]
         y_test_pfi = y_all.iloc[val_end:]
+
+        # test set이 PFI_MIN_TEST_SAMPLES(200) 미만이면 로컬 CSV로 보충
+        if len(X_test_pfi) < PFI_MIN_TEST_SAMPLES:
+            logger.info(
+                "PFI test set 소표본(%d < %d) — CSV fallback 시도",
+                len(X_test_pfi), PFI_MIN_TEST_SAMPLES,
+            )
+            safe_sym = symbol.replace("/", "").upper()  # BTC/USDT → BTCUSDT
+            csv_candidates = [
+                Path(__file__).parent.parent / "data" / "historical" / "binance" / safe_sym / "1h.csv",
+                Path(__file__).parent.parent / "data" / "historical" / "synthetic" / safe_sym / "1h.csv",
+            ]
+            for csv_path in csv_candidates:
+                if csv_path.exists():
+                    try:
+                        df_csv = _pd.read_csv(csv_path, index_col=0, parse_dates=True)
+                        X_csv, y_csv = fb.build(df_csv)
+                        y_csv = y_csv.astype(int)
+                        n_csv = len(X_csv)
+                        # 마지막 20%를 PFI test set으로 사용
+                        val_end_csv = int(n_csv * 0.80)
+                        X_test_pfi = X_csv.iloc[val_end_csv:]
+                        y_test_pfi = y_csv.iloc[val_end_csv:]
+                        logger.info(
+                            "PFI CSV fallback 성공: %s → test %d samples",
+                            csv_path.name, len(X_test_pfi),
+                        )
+                        break
+                    except Exception as csv_e:
+                        logger.warning("CSV fallback 실패 (%s): %s", csv_path, csv_e)
+
         if len(X_test_pfi) >= 20:
+            logger.info("PFI 분석: n_test_samples=%d", len(X_test_pfi))
             run_pfi_analysis(trainer, X_test_pfi, y_test_pfi, result, symbol)
         else:
             logger.warning("PFI 생략: test set 샘플 부족 (%d < 20)", len(X_test_pfi))
