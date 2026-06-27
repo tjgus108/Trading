@@ -1,3 +1,39 @@
+## [2026-06-27] Cycle 362 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] KellySizer + CircuitBreaker 파라미터 분석 (코드 변경 없음)**
+1. KellySizer 파라미터 적정성 확인:
+   - `max_fraction=0.10`이 실질 바인딩 제약 (Full Kelly~0.325 × 0.5 = 0.1625 → clip 0.10)
+   - `kelly_cap=0.20`은 Full Kelly > 40% 극단값 시에만 작동 (보험성 장치)
+   - HIGH_VOL 레짐: 0.10 × 0.3 = 0.03 (레짐 스케일이 지배)
+   - 결론: 현행 유지
+2. CircuitBreaker rapid_decline_window=5 분석:
+   - BTC 1h 5봉=5시간 급락 감지, threshold=5% — BTC 1h 실데이터 기준 월 2~5회 발생 범위로 적정
+   - `max_consecutive_losses` config=4, CB 기본=5 → 의도적 계층형 에스컬레이션 (DrawdownMonitor 3회 → CB 4회)
+   - 결론: 현행 유지
+
+**[D(ML)] PFI test set 소표본 개선**
+3. `scripts/train_ml.py` 수정:
+   - `PFI_MIN_TEST_SAMPLES=200` 상수 신설 (라인 36)
+   - auto_retrain() PFI 블록: test set < 200이면 로컬 BTC CSV(12000행) fallback → test ~2400행
+   - ETH/SOL synthetic CSV fallback도 지원
+   - 기존 n_test_samples~50 소표본 PFI 불안정 문제 해소 (소표본에서 macd_hist=-0.060 PFI 신뢰도 낮음)
+   - 다음 단계: --auto-retrain 재실행 후 200+ 샘플에서 음수 PFI 재검증
+
+**[F(리서치)] price_cluster DEFAULT_GRIDS 확장**
+4. `src/backtest/walk_forward.py` 수정:
+   - `atr_bounce_factor=[0.0, 0.3, 0.5]` 추가 — 고변동성 시 bounce_pct 자동 확대로 오신호 감소 기대
+   - `n_bins=[4, 5, 7]` — n_bins=6 확인된 악화(Cycle359), 7 신규 탐색
+   - 가설: ATR 기반 동적 bounce_pct(atr_bounce_factor>0)가 PF 향상 핵심
+
+**[시뮬레이션 결과]**
+- Paper Sim (1h WF, BTC): **0/19 PASS (45연속 FAIL)**
+  - rank1: price_cluster Sharpe=0.87, SharpeStd=1.10, PF=1.20, 1/8 (변화 없음)
+  - rank2: roc_ma_cross Sharpe=0.34, SharpeStd=2.44, PF=1.22, 2/8
+  - dema_cross: Sharpe=0.40, PF=1.45, 0/8 (파라미터 변화 없음)
+- Bundle OOS (4h): **5/5 PASS** ✅ (order_flow_imbalance_v2 rank1 Sharpe=4.345, cmf/ofi/supertrend/vwap/value_area 모두 PASS)
+
+---
+
 ## [2026-06-27] Cycle 361 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor / CircuitBreaker / VaR-CVaR 검토**
