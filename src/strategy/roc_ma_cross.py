@@ -57,20 +57,13 @@ class ROCMACrossStrategy(BaseStrategy):
         close = float(df["close"].iloc[idx])
         ema50 = float(df["ema50"].iloc[idx])
         
-        # ✅ NEW: EMA200 확인 (있으면 사용, 없으면 무시)
+        # EMA200 추가 필터 (200봉 이상 데이터 있을 때만 활성)
         ema200 = None
-        if "ema50" in df.columns and len(df) >= 200:
+        if len(df) >= 200:
             try:
                 ema200 = float(df["close"].ewm(span=200, adjust=False).mean().iloc[idx])
-            except:
+            except Exception:
                 pass
-        
-        # ✅ NEW: RSI 필터
-        rsi_val = 50.0
-        if "rsi14" in df.columns:
-            rsi_raw = float(df["rsi14"].iloc[idx])
-            if rsi_raw == rsi_raw:  # NaN check
-                rsi_val = rsi_raw
 
         if pd.isna(roc_ma_now) or pd.isna(roc_ma_prev):
             return Signal(

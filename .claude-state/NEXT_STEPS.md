@@ -1,47 +1,52 @@
 # Next Steps
 
-_Last updated: 2026-06-27 (Cycle 360 완료)_
+_Last updated: 2026-06-27 (Cycle 361 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 360
+### 이번 세션 완료 사이클: 361
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 358 | C+B+F | price_cluster bounce_pct=0.020 악화 확인→0.010 복원, cooldown_active 주석 보완, dema_cross dist_pct 0.001→0.002(SharpeStd 2.69→2.32 ✓) |
 | 359 | D+E+F | ATR필터(dead param for BTC), RSI방향성필터코드추가(미테스트), PaperConnector use_tiered 노출, n_bins=6 악화→n_bins=5복원 |
 | 360 | A+C+F | dema_cross rsi_dir_filter=True 검증(PF 1.26→1.45↑, trades 31→18↓), close_window=40 악화→기본값(50)복원, Bundle OOS 5/5 PASS 유지 |
+| 361 | B+D+F | DrawdownMonitor/CB/VaR검토(정상), RF PFI음수피처발견(macd_hist -0.060), roc_ma_cross EMA200조건정리+dead code제거, price_cluster Sharpe 0.87로 상승 |
 
-### 🎯 Cycle 361 작업 방향 (361 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 362 작업 방향 (362 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 안정성 개선
+#### B(리스크): DrawdownMonitor 연속 손실 기준 분석
 
-- **배경**: Cycle 357에서 직렬화 버그 수정 완료, cooldown_active 주석 보완 완료
+- **배경**: Cycle 361에서 CircuitBreaker(5회) vs DrawdownMonitor(3회) 불일치 의도적 설계 확인
 - **작업**:
-  - CircuitBreaker 룰 재검토 — 현재 기준이 과도한지/부족한지 확인
-  - VaR/CVaR 계산 로직 검증 (`src/risk/` 확인)
-  - Kelly Sizer 파라미터 현황 확인 (과도한 레버리지 방지)
+  - Kelly Sizer fraction 파라미터 재검토 (max_fraction=0.10, kelly_cap=0.20 적정성)
+  - CircuitBreaker rapid_decline_window=5 vs 실제 BTC 1h 급락 패턴 매칭 확인
+  - MDD 서킷브레이커 threshold 재검토 (mdd_warn=5%, mdd_block=10%, mdd_halt=20%)
 
-#### D(ML): dema_cross WFO 실행 또는 앙상블 가중치 검토
+#### D(ML): RF 모델 피처 제거 실험 (PFI 음수 피처)
 
-- **배경**: Cycle 360 A에서 rsi_dir_filter=True 확정 (PF 1.45, Sharpe 0.40)
-  - dema_cross: trades 18 (avg), 2개 윈도우 trades=14<15 경계치 주의
-  - PF=1.45 (PASS 기준 1.5까지 +0.05)
+- **배경**: Cycle 361 D에서 RF PFI 음수 피처 발견:
+  - `macd_hist`: PFI -0.060 (가장 해로움), `bb_position`: PFI -0.038, `volatility_20`: PFI -0.034, `donchian_pct`: PFI -0.030
+  - 핵심 피처(PFI 양수): `atr_pct`(0.030), `price_vs_ema50`(0.018), `volume_ratio_20`(0.018)
 - **작업 방향**:
-  - Option A: rsi_dir_filter=True로 dema_cross WFO 직접 실행하여 최적 fast/slow 확인
-  - Option B: 앙상블 RF 모델 피처 중요도 분석 (현재 어떤 피처가 주도?)
+  - `src/ml/features.py` 확인 → macd_hist, bb_position 제거 후 RF 재학습 실험 코드 작성
+  - OR: n_test_samples 확대 (현재 50 → 200+)하여 PFI 신뢰도 재검증
+  - 주의: n_test_samples=50은 소표본 → PFI 자체도 불안정할 수 있음
 
-#### F(리서치): roc_ma_cross 분석 (1h BTC rank1)
+#### F(리서치): price_cluster WFO 심층 탐색 (rank1, Sharpe 0.87)
 
-- **배경**: Cycle 360 paper_sim에서 roc_ma_cross rank1 (Sharpe=0.34, SharpeStd=2.44, 2/8 consistency)
-  - 2/8 consistency → 가장 일관된 PASS 후보 중 하나
-  - FAIL 원인: sharpe 0.02<1.0 (x1), PF 1.02<1.5 (x1), mc_p_value 0.485>0.1
-- **작업**: roc_ma_cross 파라미터 검토 및 개선 가능성 분석
-  - DEFAULT_GRIDS["roc_ma_cross"] 현황 확인 (roc_period=[10,12,15], ma_period=[3,5,7])
+- **배경**: Cycle 361 paper_sim에서 price_cluster rank1 (Sharpe=0.87↑, SharpeStd=1.10, PF=1.20, 1/8)
+  - Sharpe 0.72→0.87 자연 상승 (파라미터 변화 없음)
+  - SharpeStd=1.10 → 안정성 우수! (목표 2.5 이하, 현재 1.10 ✓)
+  - 1/8 consistency → PASS 못함. PF=1.20 (목표 1.5까지 +0.30)
+  - 현재 파라미터: n_bins=5, close_window=50, bounce_pct=0.010, vol_regime_filter=False
+- **작업**:
+  - `DEFAULT_GRIDS["price_cluster"]` 현황에서 아직 탐색 안 된 파라미터 확인
+  - vol_atr_trend_min 그리드 [1.0, 1.2, 1.5, 2.0, 2.5] 중 최적값 WFO 탐색
+  - PF 향상 가능성: 신호 필터 강화 (거짓 신호 제거)가 핵심
 
-### ⚠️ 주의 사항 (Cycle 361)
+### ⚠️ 주의 사항 (Cycle 362)
 
 - **dema_cross dist_pct=0.002 확정** (Cycle 358 F): SharpeStd 2.69→2.32, trades 48→31
   - 목표(SharpeStd<2.5) 달성. 유지.
@@ -67,18 +72,26 @@ _Last updated: 2026-06-27 (Cycle 360 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 360 업데이트)
+### 핵심 메트릭 (Cycle 361 업데이트)
 
-| 지표 | Cycle 359 | Cycle 360 | 변화 |
+| 지표 | Cycle 360 | Cycle 361 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Trades | 31 | **18** | rsi_dir_filter=True 적용 (-13) |
-| 1h BTC dema_cross Sharpe | 0.37 | **0.40** | ↑+0.03 개선 |
-| 1h BTC dema_cross PF | 1.26 | **1.45** | ↑+0.19 개선 (목표 1.5까지 +0.05) |
-| 1h BTC dema_cross SharpeStd | 2.32 | **2.25** | ↑ 안정화 |
-| 1h BTC price_cluster Sharpe | 0.72 | **0.72** | 복원 (close_window=40 악화→default(50) 복원) |
-| 1h PASS 수 | 0/19 (42연속) | **0/19 (43연속)** | — |
+| 1h BTC dema_cross Sharpe | 0.40 | **0.40** | 유지 |
+| 1h BTC dema_cross PF | 1.45 | **1.45** | 유지 |
+| 1h BTC dema_cross SharpeStd | 2.25 | **2.25** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.72 | **0.87** | ↑+0.15 (자연 상승!) |
+| 1h BTC price_cluster SharpeStd | — | **1.10** | 안정성 우수 |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (EMA200조건 정리) |
+| 1h PASS 수 | 0/19 (43연속) | **0/19 (44연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 361 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/roc_ma_cross.py` | EMA200 조건 `"ema50" in df.columns` 제거 (중복 체크), `rsi_val` dead code 제거, bare except → Exception (Cycle361 F) |
+| `src/backtest/walk_forward.py` | roc_ma_cross 주석 업데이트: rank1 상태 반영, Cycle361 F 수정 기록 (Cycle361 F) |
 
 ### Cycle 360 코드 변경 요약
 

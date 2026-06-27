@@ -179,9 +179,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
-    # 현재 상태: rank2(2/8 consistency), Sharpe=-0.35, PF=1.12 — 파라미터 탐색 필요
+    # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)
     # roc_period: ROC 계산 lookback (현재 12 고정) → 1h 노이즈 감안 짧게 [10,12,15]
     # ma_period: ROC 스무딩 MA 윈도우 (현재 3 고정) → 1h에서 3봉=3h 너무 짧음 [3,5,7]
+    # Cycle361 F: EMA200 조건 정리(ema50 체크 제거), rsi_val dead code 제거
     "roc_ma_cross": {
         "roc_period": [10, 12, 15],
         "ma_period": [3, 5, 7],
