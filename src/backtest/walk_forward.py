@@ -151,9 +151,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "ema_slope_min_buy": [0.0, 0.0005, 0.001],   # BUY: EMA20 slope ≥ N (상승추세 필수)
         "ema_slope_max_sell": [0.0, -0.0005, -0.001], # SELL: EMA20 slope ≤ N (하락추세 필수)
     },
+    # Cycle363 F(리서치): atr_period 추가 탐색
+    # frama ATR 수축 필터: last_atr < prev_atr*1.05 (ATR 감소 추세에서만 신호 허용)
+    # atr_period=10: 더 빠른 반응 (노이즈 증가), 14: 기본값, 18: 더 완만한 평활화 (지연)
+    # 배경: BTC rank3 Sharpe=0.24 PF=1.12 SharpeStd=1.60 (안정적) — PF 개선 가능성 탐색
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
+        "atr_period": [10, 14, 18],
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
@@ -195,8 +200,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle359 D(ML): rsi_dir_filter=[False,True] 추가 — RSI 방향성 필터 WFO 탐색
     #   True: BUY시 RSI>50, SELL시 RSI<50 요구 (모멘텀 방향 확인으로 신호 품질 향상)
     #   False: 기존 과매수/과매도 회피만 적용 (현재 확정 동작)
+    # Cycle363 C(데이터): fast=7 추가 — 신호 빈도 부족(trades<15 x2윈도우) 해결 탐색
+    # 실데이터 분석: fast=7/slow=20 → 31.0 trade/60d (fast=8 대비 +37%), 경계윈도우 해결 기대
     "dema_cross": {
-        "fast": [8, 10, 12],
+        "fast": [7, 8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
     },

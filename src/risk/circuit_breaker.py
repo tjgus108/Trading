@@ -28,8 +28,8 @@ class CircuitBreaker:
     total_drawdown_limit      0.15      0.10~0.20           config.yaml risk.max_drawdown 기반
     atr_surge_multiplier      2.0       1.5~3.0             BTC 1h ATR 평균 ~1.5%, surge ≥ 3%
     flash_crash_pct           0.10      0.08~0.15           config.yaml risk.flash_crash_pct
-    rapid_decline_pct         0.05      0.03~0.07           5분봉 기준; 1h봉이면 0.05 적정
-    rapid_decline_window      5         3~10                캔들 수, timeframe에 비례
+    rapid_decline_pct         0.05      0.03~0.07           BTC 1h 실데이터: pct=5% → 77h당 1회 (적정)
+    rapid_decline_window      5         3~10                BTC 1h: win=5 pct=5% → 156이벤트/12000봉(1.30%)
     rapid_decline_cooldown    30        10~60               캔들 단위, 5분봉=2.5h, 1h봉=30h
     max_consecutive_losses    5         3~7                 config.yaml risk.max_consecutive_losses
     cooldown_periods          3         2~5                 트레이드 횟수 단위
@@ -53,8 +53,8 @@ class CircuitBreaker:
         cooldown_periods: int = 3,            # 쿨다운 기간 (2~5 트레이드)
         max_daily_trades: int = 0,            # 일일 최대 거래 횟수 (0=무제한, ~50)
         correlation_tracker: Optional[SignalCorrelationTracker] = None,
-        rapid_decline_pct: float = 0.05,      # 급속 하락 임계 (BTC 1h: 0.03~0.07)
-        rapid_decline_window: int = 5,        # 급속 하락 감지 캔들 수 (3~10)
+        rapid_decline_pct: float = 0.05,      # 급속 하락 임계 (Cycle363 B: BTC 1h 실데이터 검증됨)
+        rapid_decline_window: int = 5,        # 감지 캔들 수 (Cycle363 B: win=5 pct=5% → 77h당 1회, 적정)
         rapid_decline_cooldown_periods: int = 30,  # 급속 하락 후 쿨다운 캔들 수 (10~60)
     ):
         self.daily_drawdown_limit = daily_drawdown_limit

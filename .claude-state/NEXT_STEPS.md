@@ -1,51 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-06-28 (Cycle 362 완료)_
+_Last updated: 2026-06-28 (Cycle 363 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 362
+### 이번 세션 완료 사이클: 363
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 360 | A+C+F | dema_cross rsi_dir_filter=True 검증(PF 1.26→1.45↑, trades 31→18↓), close_window=40 악화→기본값(50)복원, Bundle OOS 5/5 PASS 유지 |
 | 361 | B+D+F | DrawdownMonitor/CB/VaR검토(정상), RF PFI음수피처발견(macd_hist -0.060), roc_ma_cross EMA200조건정리+dead code제거, price_cluster Sharpe 0.87로 상승 |
 | 362 | B+D+F | KellySizer kelly_cap dead param 명시(로그), PFI n_repeats 소표본 자동증가(10), price_cluster vol_atr_trend_min dead param 확인 |
+| 363 | C+B+F | dema_cross fast=7 실험(신호빈도+37%), CB rapid_decline BTC 실증(window=5 pct=5% 77h당1회 적정), frama atr_period=[10,14,18] DEFAULT_GRIDS 추가 |
 
-### 🎯 Cycle 363 작업 방향 (363 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 364 작업 방향 (364 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): dema_cross trades<15 문제 해결
+#### D(ML): dema_cross fast=7 실험 결과 검증
 
-- **배경**: Cycle 362 paper_sim에서 dema_cross 0/8 FAIL 원인: trades<15 (2 윈도우에서 14<15)
-  - PF=1.45 (목표 1.5까지 +0.05), Sharpe=0.40, 현재 0/8
-  - trades=18 avg이지만 2개 윈도우에서 14건으로 경계 상황
+- **배경**: Cycle 363 C에서 paper_sim dema_cross를 fast=7/slow=20으로 변경
+  - 분석: fast=7로 31.0/60d (fast=8 대비 +37%) → 경계 윈도우(trades=14) → ~19 예상
+  - 리스크: fast DEMA 민감도 증가로 노이즈 증가 시 PF 악화 (현재 PF=1.45)
 - **작업**:
-  - `scripts/paper_simulation.py`의 dema_cross `max_hold_candles_override` 확인
-  - 현재 min_trades=15 vs 실제 신호 빈도 간극 분석
-  - 신호 빈도 증가 방안: fast/slow 조합 탐색 또는 rsi_dir_filter 조건 완화
+  - 새 paper_sim 결과에서 dema_cross trades, PF, Sharpe 변화 확인
+  - fast=7에서 PF 유지/향상이면: fast=7 확정, DEFAULT_GRIDS 주석 업데이트
+  - fast=7에서 PF 악화(<1.45)이면: fast=8 복원, slow 조정 또는 다른 방법 탐색
 
-#### B(리스크): CircuitBreaker rapid_decline_window 실증 검토
+#### E(실행): Paper Trading 시뮬레이션 실행 신뢰성 점검
 
-- **배경**: Cycle 362에서 파라미터 적정성만 확인, 실 데이터 매칭은 미수행
+- **배경**: Bundle OOS 5/5 PASS 유지 중이나 1h paper_sim 47연속 FAIL
+  - 전략들이 4h OOS에서는 강건하지만 1h에서는 noise 과다 가능성
+  - paper_sim의 fee/slippage 모델이 실제 거래 조건과 맞는지 재확인
 - **작업**:
-  - BTC 실데이터(data/historical/binance/BTCUSDT/1h.csv)에서 5시간 내 5% 하락 이벤트 빈도 계산
-  - rapid_decline_window=5, pct=0.05가 실제 BTC 이벤트를 얼마나 감지하는지 확인
-  - 결과에 따라 window=3 또는 pct=0.04 조정 검토
+  - `src/exchange/paper_connector.py` fee/slippage 모델 재검토
+  - 1h 통과 기준(Sharpe≥1.0, PF≥1.5)이 적합한지 검토 — 현재 4h보다 엄격한지 확인
 
-#### F(리서치): frama 전략 심층 탐색 (rank3 BTC, rank2 ETH)
+#### F(리서치): frama atr_period 그리드 효과 확인
 
-- **배경**: Cycle 362 paper_sim에서 frama BTC rank3 (Sharpe=0.24, PF=1.12, 1/8), ETH rank2 (Sharpe=0.51, PF=1.18, 1/8)
-  - BTC와 ETH 모두 양수 수익률 (+1.60%, +2.83%) — 다심볼 일관성 있음
-  - 현재 파라미터: 기본값 (탐색 안 됨)
-  - SharpeStd 낮음(BTC 1.60, ETH 1.55) — 안정적!
+- **배경**: Cycle 363 F에서 DEFAULT_GRIDS["frama"]에 atr_period=[10,14,18] 추가
+  - frama BTC rank3 (Sharpe=0.24, SharpeStd=1.60, PF=1.12) — 안정적이나 PF 낮음
+  - atr_period 탐색으로 ATR 수축 필터 최적화 기대
 - **작업**:
-  - `src/strategy/frama.py` 코드 확인: 주요 파라미터 파악
-  - `DEFAULT_GRIDS`에 frama 그리드 추가 검토 (없으면 추가)
-  - paper_sim 현재 설정 확인: PAPER_SIM_STRATEGY_PARAMS에 frama가 있는지
+  - walk_forward 실행 시 frama atr_period 탐색 결과 확인
+  - atr_period=10(빠른 반응)이 PF에 미치는 영향 분석
 
-### ⚠️ 주의 사항 (Cycle 363)
+### ⚠️ 주의 사항 (Cycle 364)
 
 - **dema_cross dist_pct=0.002 확정** (Cycle 358 F): SharpeStd 2.69→2.32, trades 48→31
   - 목표(SharpeStd<2.5) 달성. 유지.
@@ -71,20 +70,30 @@ _Last updated: 2026-06-28 (Cycle 362 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 362 업데이트)
+### 핵심 메트릭 (Cycle 363 업데이트)
 
-| 지표 | Cycle 361 | Cycle 362 | 변화 |
+| 지표 | Cycle 362 | Cycle 363 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.40 | **0.40** | 유지 |
+| 1h BTC dema_cross Sharpe | 0.40 | **0.40** | 유지 (fast=7 미적용) |
 | 1h BTC dema_cross PF | 1.45 | **1.45** | 유지 |
-| 1h BTC dema_cross SharpeStd | 2.25 | **2.25** | 유지 |
+| 1h BTC dema_cross fast param | 8 | **7 (실험)** | Cycle364에서 검증 |
 | 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
 | 1h BTC price_cluster SharpeStd | 1.10 | **1.10** | 안정성 우수 ✓ |
 | 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
-| 1h BTC frama Sharpe | — | **0.24** | 신규 주목 (rank3) |
-| 1h PASS 수 | 0/19 (44연속) | **0/19 (46연속)** | — |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank3) |
+| 1h BTC frama SharpeStd | 1.60 | **1.60** | 안정성 우수 ✓ |
+| 1h PASS 수 | 0/19 (46연속) | **0/19 (47연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 363 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `scripts/paper_simulation.py` | dema_cross fast=8→7 (신호빈도 +37%, trades<15 해결 실험) (Cycle363 C) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] fast=[8,10,12]→[7,8,10,12] (Cycle363 C) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["frama"] atr_period=[10,14,18] 추가 (Cycle363 F) |
+| `src/risk/circuit_breaker.py` | 독스트링+파라미터 주석: BTC 1h 실증 데이터 반영 (window=5 pct=5% 77h당1회) (Cycle363 B) |
 
 ### Cycle 362 코드 변경 요약
 
