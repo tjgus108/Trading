@@ -203,10 +203,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle363 C(데이터): fast=7 추가 실험 → Cycle364 D(ML) 검증 결과 역효과 확인 → 제거
     #   fast=7: trades 18→24 증가, 但 PF 1.45→1.00, Sharpe 0.40→-0.69 (노이즈 증가 확정)
     #   RSI 필터가 binding constraint — fast 단축으로 trades 증가 불가 (RSI filter 비율 일정)
+    # Cycle365 A(품질): rsi_dir_buy_thresh/rsi_dir_sell_thresh 추가 — 45/55 완화 탐색
+    #   현재 50/50(기본값)이 binding constraint → 45(BUY)/55(SELL) 완화 시 trades 증가 기대
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
+        "rsi_dir_buy_thresh": [45, 50],
+        "rsi_dir_sell_thresh": [50, 55],
     },
 }
 
