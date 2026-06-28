@@ -203,10 +203,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle363 C(데이터): fast=7 추가 실험 → Cycle364 D(ML) 검증 결과 역효과 확인 → 제거
     #   fast=7: trades 18→24 증가, 但 PF 1.45→1.00, Sharpe 0.40→-0.69 (노이즈 증가 확정)
     #   RSI 필터가 binding constraint — fast 단축으로 trades 증가 불가 (RSI filter 비율 일정)
+    # Cycle365 A(품질)/F(리서치): rsi_dir_threshold=[45,50] 추가 — 임계값 완화 실험
+    #   BTC 1h 실데이터 신호 분석: fast=8/slow=20/thr=50→10.1/60d, thr=45→13.4/60d
+    #   fast=8/slow=25/thr=45→16.5/60d (min_trades=15 항상 충족, slow=25 병행 탐색)
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
+        "rsi_dir_threshold": [45, 50],
     },
 }
 
@@ -1179,6 +1183,33 @@ def optimize_supertrend_multi(df: pd.DataFrame, n_windows: int = 3,
         n_windows=n_windows,
         plateau_pct=plateau_pct,
         trades_regularization_scale=0.1,  # sideways 0-trades 타이브레이커 (Cycle 294 E)
+    )
+    return opt.run(df)
+
+
+def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
+                        plateau_pct: float = 0.9) -> WalkForwardResult:
+    """DEMACross 전략 파라미터 최적화 (Cycle365 C(데이터): WFO 함수 추가).
+
+    DEFAULT_GRIDS["dema_cross"]는 Cycle356에서 추가됐으나 이 함수가 없어
+    WFO 탐색이 불가했음. rsi_dir_threshold=[45,50] 포함 그리드 탐색.
+    """
+    from src.strategy.dema_cross import DEMACrossStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return DEMACrossStrategy(
+            fast=params.get("fast", 8),
+            slow=params.get("slow", 20),
+            rsi_dir_filter=params.get("rsi_dir_filter", False),
+            rsi_dir_threshold=params.get("rsi_dir_threshold", 50),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="dema_cross",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["dema_cross"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
     )
     return opt.run(df)
 

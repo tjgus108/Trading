@@ -133,7 +133,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle363 C(데이터): fast=7 실험 → Cycle364 D(ML) 검증: PF 1.45→1.00, Sharpe 0.40→-0.69 (역효과)
     #   fast=7: Trades 18→24(+6 OK), 但 PF/Sharpe 대폭 악화. fast DEMA 민감도↑ → 노이즈 증가 확정
     #   결론: fast=8 복원. trades<15 x2윈도우는 구조적 제약 — RSI필터가 binding constraint
-    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True},
+    # Cycle365 A(품질)/F(리서치): rsi_dir_threshold=45 실험
+    #   배경: threshold=50 → BTC 1h 10.1/60d 신호, threshold=45 → 13.4/60d (+32%)
+    #   목표: PF 1.45 → 1.5 달성 (이전 fast 단축 실험에서 PF 악화 → threshold 완화로 접근)
+    #   리스크: RSI 45~50 구간 신호가 노이즈 증가로 PF 저하 가능 (fast=7 패턴 반복 주의)
+    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 45},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
