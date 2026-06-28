@@ -22,8 +22,9 @@ class PaperConnector:
         self,
         symbol: str,
         initial_balance: float = 10000.0,
-        fee_rate: float = 0.00055,    # Bybit taker 0.055%
-        slippage_pct: float = 0.05,
+        fee_rate: float = 0.00055,    # Bybit taker 0.055% (decimal fraction: 0.00055)
+        slippage_pct: float = 0.05,   # 단위: 퍼센트 포인트 (0.05 = 0.05%). BacktestEngine의 slippage_pct=0.0005(소수)와 동일 크기.
+        # 컨벤션 차이: PaperTrader는 price*(1+slip/100) 적용 → 0.05/100=0.0005; BacktestEngine은 price*(1+slip) 적용 → 0.0005 직접 사용.
         partial_fill_prob: float = 0.05,
         timeout_prob: float = 0.01,
         use_tiered_slippage: bool = False,  # Cycle359 E(실행): 심볼별 차등 슬리피지 (BTC=0.05%, SOL=0.2%)

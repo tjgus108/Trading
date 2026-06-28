@@ -1,62 +1,63 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-06-28 (Cycle 363 완료)_
+_Last updated: 2026-06-28 (Cycle 364 완료)_
 
 ## 현재 상태 요약
 
-- **완료 사이클**: 363
-- **카테고리**: C(데이터) + B(리스크) + F(리서치)
-- **1h PASS 연속 FAIL**: 47연속 0/19 (BTC/ETH/SOL 모두 0 PASS)
-- **Bundle OOS**: 5/5 PASS 유지 (BTC 4h real CSV, Cycle363 갱신)
+- **완료 사이클**: 364
+- **카테고리**: D(ML) + E(실행) + F(리서치)
+- **1h PASS 연속 FAIL**: 48연속 0/19 (BTC/ETH/SOL 모두 0 PASS)
+- **Bundle OOS**: 5/5 PASS 유지 (BTC 4h real CSV)
 
-## Cycle 363 핵심 성과
+## Cycle 364 핵심 성과
 
 ### ✅ 완료
-1. **C(데이터): dema_cross 신호 빈도 분석 + fast=7 실험 설정**
-   - BTC 1h 실데이터 직접 분석: fast=8/slow=20/rsi_dir=True → 22.6 trade/60d avg
-   - fast=7/slow=20/rsi_dir=True → 31.0 trade/60d (+37%) → 경계 윈도우(14→~19) 해결 기대
-   - `paper_simulation.py` dema_cross: fast=8→7 (Cycle364에서 검증)
-   - `walk_forward.py` DEFAULT_GRIDS["dema_cross"] fast=[7,8,10,12]로 확장
+1. **D(ML): dema_cross fast=7 실험 결과 검증**
+   - fast=7 실측: Trades=24(+6, ✅ 기대됨), PF=1.00(↓ from 1.45), Sharpe=-0.69(↓ from 0.40)
+   - 결론: fast=7은 역효과. DEMA 단기화 → 노이즈 증가, RSI필터가 binding constraint
+   - `paper_simulation.py` dema_cross: fast=7→8 복원
+   - `walk_forward.py` DEFAULT_GRIDS["dema_cross"] fast=[7,8,10,12]→[8,10,12] (7 제거)
 
-2. **B(리스크): CircuitBreaker rapid_decline 실증 검토**
-   - BTC 1h 12000봉 실증: window=5, pct=5% → 156 이벤트 (1.30%, 77h당 1회) ✅ 적정
-   - window=5, pct=4% → 369 (3.08%, daily → 과도), window=3, pct=5% → 31 (희귀 → 부족)
-   - 결론: 현재 설정 유지. 독스트링에 실증 데이터 기록.
+2. **E(실행): fee/slippage 모델 검토**
+   - fee_rate=0.00055 (Bybit taker 0.055%) ✅ 적정
+   - slippage_pct=0.0005 (0.05%) ✅ 적정 (BTC 대형 거래소 현실적)
+   - PaperConnector(0.05%) vs BacktestEngine(0.0005) 단위 컨벤션 불일치 발견 → 명문화
+   - `src/exchange/paper_connector.py` 슬리피지 단위 주석 추가
 
-3. **F(리서치): frama DEFAULT_GRIDS atr_period 탐색 추가**
-   - frama BTC rank3 (Sharpe=0.24, SharpeStd=1.60 안정!, PF=1.12)
-   - ATR 수축 필터(atr_period=14) 최적화를 위해 atr_period=[10,14,18] 그리드 추가
-   - 기존 period=[14,16,18], rsi_period=[12,14,16]과 조합 탐색 가능
+3. **F(리서치): frama atr_period 그리드 버그 수정**
+   - Cycle363에서 atr_period=[10,14,18] 그리드 추가했으나 factory에서 파라미터 전달 누락 발견
+   - `walk_forward.py` optimize_frama factory: `atr_period=params.get("atr_period", 14)` 추가
+   - 이제 atr_period 그리드가 실제 WFO에서 탐색됨
 
 ### 🔍 핵심 발견
-- **dema_cross**: fast=8/slow=20 시 avg 22.6/60d이나 2개 윈도우가 14<15
-  - fast=7 → ~31/60d로 해결 가능하나 PF 영향 모니터링 필요
-  - 현재 PF=1.45 (목표 1.5까지 +0.05)
-- **frama**: SharpeStd=1.60 (최안정 전략!), PF=1.12가 병목
-  - atr_period 탐색이 PF 개선 가능성을 열어줌
-- **Bundle OOS 5/5 PASS 유지**: 4h 강건성 계속 확인됨
+- **dema_cross**: RSI direction filter가 trade quality의 binding constraint
+  - fast 기간 단축(7) → 더 많은 진입 신호 → 하지만 RSI필터 통과 후 저품질 신호 잔류
+  - fast=8/slow=20이 현재 최적. trades<15 x2 윈도우는 구조적 제약
+- **frama**: WFO에서 atr_period 실제 탐색 시작 (Cycle365에서 효과 확인 예정)
+- **slippage 컨벤션**: PaperTrader는 % 포인트(0.05), BacktestEngine은 소수(0.0005) — 동일 크기
 
-## 다음 우선순위 (Cycle 364 — D+E+F)
+## 다음 우선순위 (Cycle 365 — A+C+F, 365 mod 5 = 0)
 
 | 우선순위 | 카테고리 | 작업 |
 |---------|---------|------|
-| 1 | D(ML) | dema_cross fast=7 실험 결과 검증 (PF 유지/향상 여부) |
-| 2 | E(실행) | Paper Connector fee/slippage 모델 재검토 |
-| 3 | F(리서치) | frama atr_period 탐색 효과 분석 |
+| 1 | A(전략) | dema_cross 다음 개선 탐색 (slow 조정? 아니면 다른 전략?) |
+| 2 | C(데이터) | frama atr_period WFO 효과 분석 (OOS Sharpe 변화 확인) |
+| 3 | F(리서치) | 49연속 FAIL 구조 분석 — 1h PASS 전략 존재 가능성 탐색 |
 
 ## 코드 변경 현황
 
 | 파일 | 변경 | 사이클 |
 |------|------|-------|
-| `scripts/paper_simulation.py` | dema_cross fast=8→7 (실험) | 363 C |
-| `src/backtest/walk_forward.py` | dema_cross DEFAULT_GRIDS fast 7 추가 | 363 C |
+| `scripts/paper_simulation.py` | dema_cross fast=7→8 복원 | 364 D |
+| `src/backtest/walk_forward.py` | dema_cross DEFAULT_GRIDS fast=[7,8,10,12]→[8,10,12] | 364 D |
+| `src/backtest/walk_forward.py` | optimize_frama factory atr_period 전달 버그 수정 | 364 F |
+| `src/exchange/paper_connector.py` | 슬리피지 단위 컨벤션 주석 추가 | 364 E |
 | `src/backtest/walk_forward.py` | frama DEFAULT_GRIDS atr_period=[10,14,18] 추가 | 363 F |
 | `src/risk/circuit_breaker.py` | 독스트링/파라미터 주석 BTC 실증 데이터 반영 | 363 B |
-| `src/risk/kelly_sizer.py` | kelly_cap > max_fraction 시 debug 로그 추가 | 362 B |
-| `src/ml/trainer.py` | select_features_pfi(): X_train<100행 시 n_repeats=10 | 362 D |
 
 ## 환경 상태
 
-- 테스트: 8434 passed, 23 skipped (Cycle 363 전체 실행 ✅)
+- 테스트: 8434 passed, 23 skipped (Cycle 363 기준, Cycle 364 개별 검증 완료)
 - 데이터: BTC real (12000 1h rows), ETH/SOL synthetic (각 12000 1h rows)
 - Bundle OOS 5/5: cmf(Sh=2.51), order_flow_imbalance_v2(Sh=4.35), supertrend_multi(Sh=3.89), vwap_cross(Sh=3.05), value_area(Sh=3.07)
+- dema_cross 현재 파라미터: fast=8, slow=20, rsi_dir_filter=True

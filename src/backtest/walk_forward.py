@@ -200,10 +200,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle359 D(ML): rsi_dir_filter=[False,True] 추가 — RSI 방향성 필터 WFO 탐색
     #   True: BUY시 RSI>50, SELL시 RSI<50 요구 (모멘텀 방향 확인으로 신호 품질 향상)
     #   False: 기존 과매수/과매도 회피만 적용 (현재 확정 동작)
-    # Cycle363 C(데이터): fast=7 추가 — 신호 빈도 부족(trades<15 x2윈도우) 해결 탐색
-    # 실데이터 분석: fast=7/slow=20 → 31.0 trade/60d (fast=8 대비 +37%), 경계윈도우 해결 기대
+    # Cycle363 C(데이터): fast=7 추가 실험 → Cycle364 D(ML) 검증 결과 역효과 확인 → 제거
+    #   fast=7: trades 18→24 증가, 但 PF 1.45→1.00, Sharpe 0.40→-0.69 (노이즈 증가 확정)
+    #   RSI 필터가 binding constraint — fast 단축으로 trades 증가 불가 (RSI filter 비율 일정)
     "dema_cross": {
-        "fast": [7, 8, 10, 12],
+        "fast": [8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
     },
@@ -1141,6 +1142,7 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
         return FRAMAStrategy(
             period=params.get("period", 16),
             rsi_period=params.get("rsi_period", 14),
+            atr_period=params.get("atr_period", 14),  # Cycle364 F(리서치): Cycle363에서 atr_period 그리드 추가했으나 factory에서 누락됐던 버그 수정
         )
 
     opt = WalkForwardOptimizer(
