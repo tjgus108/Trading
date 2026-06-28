@@ -107,6 +107,15 @@ class KellySizer:
         self.max_drawdown = max_drawdown
         self.leverage = leverage
         self.kelly_cap = kelly_cap
+        # kelly_cap이 max_fraction보다 크면 regime scale 이전에 적용되어도 max_fraction이
+        # 최종 binding constraint가 됨 → kelly_cap은 사실상 dead param.
+        # 예: kelly_cap=0.20, max_fraction=0.10 → 최종 사이즈는 항상 ≤ 0.10.
+        if kelly_cap > max_fraction:
+            logger.debug(
+                "KellySizer: kelly_cap(%.2f) > max_fraction(%.2f) — "
+                "max_fraction이 최종 binding constraint (kelly_cap은 regime scale 이전에만 유효)",
+                kelly_cap, max_fraction,
+            )
         self.regime_smooth_alpha = float(np.clip(regime_smooth_alpha, 0.0, 1.0))
         self.rolling_window = int(rolling_window)
         # 레짐 스무딩 상태: 이전 레짐명과 실효 스케일 추적

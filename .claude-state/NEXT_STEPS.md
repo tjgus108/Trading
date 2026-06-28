@@ -1,52 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-06-27 (Cycle 361 완료)_
+_Last updated: 2026-06-28 (Cycle 362 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 361
+### 이번 세션 완료 사이클: 362
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 359 | D+E+F | ATR필터(dead param for BTC), RSI방향성필터코드추가(미테스트), PaperConnector use_tiered 노출, n_bins=6 악화→n_bins=5복원 |
 | 360 | A+C+F | dema_cross rsi_dir_filter=True 검증(PF 1.26→1.45↑, trades 31→18↓), close_window=40 악화→기본값(50)복원, Bundle OOS 5/5 PASS 유지 |
 | 361 | B+D+F | DrawdownMonitor/CB/VaR검토(정상), RF PFI음수피처발견(macd_hist -0.060), roc_ma_cross EMA200조건정리+dead code제거, price_cluster Sharpe 0.87로 상승 |
+| 362 | B+D+F | KellySizer kelly_cap dead param 명시(로그), PFI n_repeats 소표본 자동증가(10), price_cluster vol_atr_trend_min dead param 확인 |
 
-### 🎯 Cycle 362 작업 방향 (362 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 363 작업 방향 (363 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 연속 손실 기준 분석
+#### C(데이터): dema_cross trades<15 문제 해결
 
-- **배경**: Cycle 361에서 CircuitBreaker(5회) vs DrawdownMonitor(3회) 불일치 의도적 설계 확인
+- **배경**: Cycle 362 paper_sim에서 dema_cross 0/8 FAIL 원인: trades<15 (2 윈도우에서 14<15)
+  - PF=1.45 (목표 1.5까지 +0.05), Sharpe=0.40, 현재 0/8
+  - trades=18 avg이지만 2개 윈도우에서 14건으로 경계 상황
 - **작업**:
-  - Kelly Sizer fraction 파라미터 재검토 (max_fraction=0.10, kelly_cap=0.20 적정성)
-  - CircuitBreaker rapid_decline_window=5 vs 실제 BTC 1h 급락 패턴 매칭 확인
-  - MDD 서킷브레이커 threshold 재검토 (mdd_warn=5%, mdd_block=10%, mdd_halt=20%)
+  - `scripts/paper_simulation.py`의 dema_cross `max_hold_candles_override` 확인
+  - 현재 min_trades=15 vs 실제 신호 빈도 간극 분석
+  - 신호 빈도 증가 방안: fast/slow 조합 탐색 또는 rsi_dir_filter 조건 완화
 
-#### D(ML): RF 모델 피처 제거 실험 (PFI 음수 피처)
+#### B(리스크): CircuitBreaker rapid_decline_window 실증 검토
 
-- **배경**: Cycle 361 D에서 RF PFI 음수 피처 발견:
-  - `macd_hist`: PFI -0.060 (가장 해로움), `bb_position`: PFI -0.038, `volatility_20`: PFI -0.034, `donchian_pct`: PFI -0.030
-  - 핵심 피처(PFI 양수): `atr_pct`(0.030), `price_vs_ema50`(0.018), `volume_ratio_20`(0.018)
-- **작업 방향**:
-  - `src/ml/features.py` 확인 → macd_hist, bb_position 제거 후 RF 재학습 실험 코드 작성
-  - OR: n_test_samples 확대 (현재 50 → 200+)하여 PFI 신뢰도 재검증
-  - 주의: n_test_samples=50은 소표본 → PFI 자체도 불안정할 수 있음
-
-#### F(리서치): price_cluster WFO 심층 탐색 (rank1, Sharpe 0.87)
-
-- **배경**: Cycle 361 paper_sim에서 price_cluster rank1 (Sharpe=0.87↑, SharpeStd=1.10, PF=1.20, 1/8)
-  - Sharpe 0.72→0.87 자연 상승 (파라미터 변화 없음)
-  - SharpeStd=1.10 → 안정성 우수! (목표 2.5 이하, 현재 1.10 ✓)
-  - 1/8 consistency → PASS 못함. PF=1.20 (목표 1.5까지 +0.30)
-  - 현재 파라미터: n_bins=5, close_window=50, bounce_pct=0.010, vol_regime_filter=False
+- **배경**: Cycle 362에서 파라미터 적정성만 확인, 실 데이터 매칭은 미수행
 - **작업**:
-  - `DEFAULT_GRIDS["price_cluster"]` 현황에서 아직 탐색 안 된 파라미터 확인
-  - vol_atr_trend_min 그리드 [1.0, 1.2, 1.5, 2.0, 2.5] 중 최적값 WFO 탐색
-  - PF 향상 가능성: 신호 필터 강화 (거짓 신호 제거)가 핵심
+  - BTC 실데이터(data/historical/binance/BTCUSDT/1h.csv)에서 5시간 내 5% 하락 이벤트 빈도 계산
+  - rapid_decline_window=5, pct=0.05가 실제 BTC 이벤트를 얼마나 감지하는지 확인
+  - 결과에 따라 window=3 또는 pct=0.04 조정 검토
 
-### ⚠️ 주의 사항 (Cycle 362)
+#### F(리서치): frama 전략 심층 탐색 (rank3 BTC, rank2 ETH)
+
+- **배경**: Cycle 362 paper_sim에서 frama BTC rank3 (Sharpe=0.24, PF=1.12, 1/8), ETH rank2 (Sharpe=0.51, PF=1.18, 1/8)
+  - BTC와 ETH 모두 양수 수익률 (+1.60%, +2.83%) — 다심볼 일관성 있음
+  - 현재 파라미터: 기본값 (탐색 안 됨)
+  - SharpeStd 낮음(BTC 1.60, ETH 1.55) — 안정적!
+- **작업**:
+  - `src/strategy/frama.py` 코드 확인: 주요 파라미터 파악
+  - `DEFAULT_GRIDS`에 frama 그리드 추가 검토 (없으면 추가)
+  - paper_sim 현재 설정 확인: PAPER_SIM_STRATEGY_PARAMS에 frama가 있는지
+
+### ⚠️ 주의 사항 (Cycle 363)
 
 - **dema_cross dist_pct=0.002 확정** (Cycle 358 F): SharpeStd 2.69→2.32, trades 48→31
   - 목표(SharpeStd<2.5) 달성. 유지.
@@ -72,19 +71,27 @@ _Last updated: 2026-06-27 (Cycle 361 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 361 업데이트)
+### 핵심 메트릭 (Cycle 362 업데이트)
 
-| 지표 | Cycle 360 | Cycle 361 | 변화 |
+| 지표 | Cycle 361 | Cycle 362 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.40 | **0.40** | 유지 |
 | 1h BTC dema_cross PF | 1.45 | **1.45** | 유지 |
 | 1h BTC dema_cross SharpeStd | 2.25 | **2.25** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.72 | **0.87** | ↑+0.15 (자연 상승!) |
-| 1h BTC price_cluster SharpeStd | — | **1.10** | 안정성 우수 |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (EMA200조건 정리) |
-| 1h PASS 수 | 0/19 (43연속) | **0/19 (44연속)** | — |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC price_cluster SharpeStd | 1.10 | **1.10** | 안정성 우수 ✓ |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
+| 1h BTC frama Sharpe | — | **0.24** | 신규 주목 (rank3) |
+| 1h PASS 수 | 0/19 (44연속) | **0/19 (46연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 362 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/risk/kelly_sizer.py` | `__init__`에 kelly_cap > max_fraction 시 debug 로그 추가 (dead param 명시) (Cycle362 B) |
+| `src/ml/trainer.py` | `select_features_pfi()`: X_train < 100행 시 n_repeats=10 자동 증가 (Cycle362 D) |
 
 ### Cycle 361 코드 변경 요약
 

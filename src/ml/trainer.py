@@ -238,9 +238,17 @@ class WalkForwardTrainer:
             k = max(2, min(top_k, len(feat_names)))
             return [f for f, _ in ranked[:k]]
 
+        # 소표본(< 100행)이면 n_repeats를 늘려 PFI 추정 분산 감소
+        n_samples = X_train.shape[0]
+        n_repeats = 10 if n_samples < 100 else 5
+        if n_samples < 100:
+            logger.warning(
+                "PFI: X_train 샘플 수(%d) < 100 — PFI 신뢰도 낮음, n_repeats=%d로 보완",
+                n_samples, n_repeats,
+            )
         result = permutation_importance(
             clf, X_train, y_train,
-            n_repeats=5,
+            n_repeats=n_repeats,
             random_state=42,
             n_jobs=-1,
         )
