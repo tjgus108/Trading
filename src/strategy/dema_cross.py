@@ -29,6 +29,8 @@ class DEMACrossStrategy(BaseStrategy):
         convergence_threshold: float = 0.02,
         atr_vol_min_pct: float = 0.0,
         rsi_dir_filter: bool = False,
+        rsi_dir_buy_thresh: int = 50,
+        rsi_dir_sell_thresh: int = 50,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -42,9 +44,14 @@ class DEMACrossStrategy(BaseStrategy):
         # 배경: BTC 1h ATR ~1.49% → 임계값 0.5%는 dead param. 다른 심볼/타임프레임용으로 보존
         self.atr_vol_min_pct = atr_vol_min_pct
         # Cycle359 D(ML): RSI 방향성 필터 — 크로스 방향과 모멘텀이 일치할 때만 신호
-        # BUY 시 RSI > 50 (상방 모멘텀 확인), SELL 시 RSI < 50 (하방 모멘텀 확인)
+        # BUY 시 RSI > rsi_dir_buy_thresh (기본 50, 상방 모멘텀 확인)
+        # SELL 시 RSI < rsi_dir_sell_thresh (기본 50, 하방 모멘텀 확인)
+        # Cycle365 A(품질): 임계값 파라미터화 — 45/55 완화 실험용 (현재 50/50)
+        # 완화 시 trades 증가 기대 (RSI가 binding constraint이므로)
         # 기본값 False: 기존 과매수/과매도 회피 필터만 유지
         self.rsi_dir_filter = rsi_dir_filter
+        self.rsi_dir_buy_thresh = rsi_dir_buy_thresh
+        self.rsi_dir_sell_thresh = rsi_dir_sell_thresh
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -184,15 +191,16 @@ class DEMACrossStrategy(BaseStrategy):
                     ),
                     invalidation="",
                 )
-            # Cycle359 D(ML): RSI 방향성 필터 — 상방 모멘텀 확인 (RSI > 50)
-            if self.rsi_dir_filter and rsi_val <= 50:
+            # Cycle359 D(ML): RSI 방향성 필터 — 상방 모멘텀 확인 (RSI > rsi_dir_buy_thresh)
+            # Cycle365 A(품질): 임계값 파라미터화 (기본 50, 완화 시 45)
+            if self.rsi_dir_filter and rsi_val <= self.rsi_dir_buy_thresh:
                 return Signal(
                     action=Action.HOLD,
                     confidence=Confidence.MEDIUM,
                     strategy=self.name,
                     entry_price=entry,
                     reasoning=(
-                        f"DEMA 상향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} <= 50). "
+                        f"DEMA 상향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} <= {self.rsi_dir_buy_thresh}). "
                         f"상방 모멘텀 부재."
                     ),
                     invalidation="",
@@ -226,15 +234,16 @@ class DEMACrossStrategy(BaseStrategy):
                     ),
                     invalidation="",
                 )
-            # Cycle359 D(ML): RSI 방향성 필터 — 하방 모멘텀 확인 (RSI < 50)
-            if self.rsi_dir_filter and rsi_val >= 50:
+            # Cycle359 D(ML): RSI 방향성 필터 — 하방 모멘텀 확인 (RSI < rsi_dir_sell_thresh)
+            # Cycle365 A(품질): 임계값 파라미터화 (기본 50, 완화 시 55)
+            if self.rsi_dir_filter and rsi_val >= self.rsi_dir_sell_thresh:
                 return Signal(
                     action=Action.HOLD,
                     confidence=Confidence.MEDIUM,
                     strategy=self.name,
                     entry_price=entry,
                     reasoning=(
-                        f"DEMA 하향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} >= 50). "
+                        f"DEMA 하향 크로스 있으나 RSI 방향 미확인(RSI={rsi_val:.1f} >= {self.rsi_dir_sell_thresh}). "
                         f"하방 모멘텀 부재."
                     ),
                     invalidation="",

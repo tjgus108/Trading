@@ -133,6 +133,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle363 C(데이터): fast=7 실험 → Cycle364 D(ML) 검증: PF 1.45→1.00, Sharpe 0.40→-0.69 (역효과)
     #   fast=7: Trades 18→24(+6 OK), 但 PF/Sharpe 대폭 악화. fast DEMA 민감도↑ → 노이즈 증가 확정
     #   결론: fast=8 복원. trades<15 x2윈도우는 구조적 제약 — RSI필터가 binding constraint
+    # Cycle363 C(데이터): fast=7 실험 → Cycle364 D(ML) 검증: PF 1.45→1.00, Sharpe 0.40→-0.69 (역효과)
+    #   결론: fast=8 복원. trades<15 x2윈도우는 구조적 제약 — RSI필터가 binding constraint
+    # Cycle365 A(품질): RSI 임계값 45/55 완화 실험 결과 — Sharpe 0.40→0.55(+), PF 1.45→1.35(-), Trades 18→26(+)
+    #   RSI 45-50 구간 신호 품질 < 1.0 → 평균 PF 1.35로 하락 (목표 1.5에서 멀어짐) → 역효과 확정
+    #   결론: rsi_dir_buy_thresh=50, rsi_dir_sell_thresh=50 기본값 유지 (PF 1.45 복원)
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단

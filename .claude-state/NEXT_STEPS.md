@@ -1,49 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-06-28 (Cycle 364 완료)_
+_Last updated: 2026-06-28 (Cycle 365 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 364
+### 이번 세션 완료 사이클: 365
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 362 | B+D+F | KellySizer kelly_cap dead param 명시(로그), PFI n_repeats 소표본 자동증가(10), price_cluster vol_atr_trend_min dead param 확인 |
-| 363 | C+B+F | dema_cross fast=7 실험(신호빈도+37%), CB rapid_decline BTC 실증(window=5 pct=5% 77h당1회 적정), frama atr_period=[10,14,18] DEFAULT_GRIDS 추가 |
-| 364 | D+E+F | dema_cross fast=7 역효과 확정(PF1.45→1.00, Sharpe0.40→-0.69)→fast=8 복원, optimize_frama atr_period 버그 수정, PaperConnector 슬리피지 단위 명문화 |
+| 363 | C+B+F | dema_cross fast=7 실험(신호빈도+37%), CB rapid_decline BTC 실증, frama atr_period=[10,14,18] DEFAULT_GRIDS 추가 |
+| 364 | D+E+F | dema_cross fast=7 역효과 확정→fast=8 복원, optimize_frama atr_period 버그 수정, PaperConnector 슬리피지 단위 명문화 |
+| 365 | A+C+F | RSI 45/55 역효과 확정(PF1.45→1.35), dema_cross rsi_dir_buy/sell_thresh 파라미터 추가, slow=20 vs slow=25 cross빈도 분석 |
 
-### 🎯 Cycle 365 작업 방향 (365 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 366 작업 방향 (366 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): dema_cross fast=8 복원 후 재검증
+#### B(리스크): KellySizer / DrawdownMonitor 로직 재검증
 
-- **배경**: Cycle364 D(ML)에서 fast=7 역효과 확정, fast=8로 복원
-  - 복원 후: AvgTrades=18, PF=1.45, Sharpe=0.40 재확인 필요
-  - 핵심 인사이트: RSI방향필터가 binding constraint — fast 변경으로 trades 증가 불가
+- **배경**: Cycle362에서 kelly_cap dead param 명시 완료. 다음은 실제 리스크 파라미터 효과 검증.
+  - DrawdownMonitor: single_loss_cooldown / daily_loss_limit 실효성 분석 (BTC 1h 기준)
+  - KellySizer: kelly_fraction 기본값 vs 최적값 비교 (현재 0.25 고정)
 - **작업**:
-  - paper_sim 결과에서 dema_cross(fast=8) 지표 재확인
-  - PF 1.45 → 1.5 달성 위한 다른 접근: slow 파라미터 변경 또는 RSI 임계값 조정 탐색
-  - rsi_dir_filter=True 하에서 RSI 임계값 45/55로 완화 실험 (현재 50/50)
+  - DrawdownMonitor single_loss_pct 임계값 조정 검토 (현재 2% — BTC ATR 1.49% 기준 적정성)
+  - kelly_fraction 0.25 vs 0.5 비교: price_cluster/dema_cross 기준 PF/Sharpe 영향 분석
 
-#### C(데이터): frama optimize_frama 버그 수정 효과 검증
+#### D(ML): frama atr_period WFO 최적값 발굴
 
-- **배경**: Cycle364 F에서 optimize_frama factory atr_period 누락 버그 수정
-  - atr_period=[10,14,18] 그리드가 Cycle363부터 추가됐으나 실제 탐색 안 됐음
-  - 버그 수정 후 실제 WFO 탐색 시 atr_period 효과 확인 필요
+- **배경**: Cycle363+364에서 atr_period=[10,14,18] 그리드 추가 + 버그 수정 완료
+  - 현재 frama: Sharpe=0.24, PF=1.12, SharpeStd=1.60 (안정적, rank4)
+  - WFO에서 atr_period=10(빠른 반응) vs 14(기본) vs 18(느린 평활)의 실제 성과 차이 탐색
 - **작업**:
-  - walk_forward optimize_frama() 실행하여 atr_period=10/14/18 최적 파라미터 비교
-  - atr_period 최적값이 PF 개선에 기여하는지 분석 (현재 PF=1.12)
+  - optimize_frama() 실행 → 최적 atr_period 식별
+  - atr_period=10이 더 나은 경우: frama Sharpe/PF 개선 방향 검토
+  - paper_simulation.py에 frama atr_period 파라미터 오버라이드 추가 (최적값 확정 후)
 
-#### F(리서치): dema_cross 다음 개선 방향 탐색
+#### F(리서치): dema_cross exit timing 개선 방향 탐색
 
-- **배경**: trades 문제 해결 방안 소진 (fast 단축=역효과, rsi_filter=binding constraint)
-  - 현재 상태: PF=1.45 (목표 1.5까지 +0.05), Sharpe=0.40, Trades=18 (2윈도우 14<15)
-  - fast=8로 복원 후 구조적 접근 필요
+- **배경**: RSI 임계값 조정 방향 소진 (45/55 역효과 확정, Cycle365 A)
+  - 현재: fast=8/slow=20/rsi_dir_filter=True/thresh=50/50 → PF=1.45, Sharpe=0.40
+  - PF 1.45→1.5 달성 위한 새 방향: 진입 조건 대신 청산 조건 검토
 - **탐색**:
-  - slow=25 복원 실험: 현재 slow=20 → slow=25로 되돌려 PF 비교 (Cycle356 이전 기준값)
-  - rsi_dir_filter 임계값 완화: 50→45(BUY)/55(SELL) 방향 검토
-  - 실데이터 분석: fast=8/slow=20/rsi=45 조합의 신호 빈도 및 품질 사전 분석
+  - 현재 청산 로직: max_hold_candles=48 (타임아웃) vs DEMA 역크로스 청산
+  - 빠른 청산 실험: max_hold=24 (현재 48) → trades 줄이되 PF 개선 여부 분석
+  - DEMA 재크로스 조건: 역방향 크로스 발생 시 즉시 청산 (현재 max_hold 대기)
+  - 실데이터 분석: 평균 보유 기간 분포 확인
 
 ### ⚠️ 주의 사항 (Cycle 365)
 
@@ -71,21 +72,29 @@ _Last updated: 2026-06-28 (Cycle 364 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 364 업데이트)
+### 핵심 메트릭 (Cycle 365 업데이트)
 
-| 지표 | Cycle 363 | Cycle 364 | 변화 |
+| 지표 | Cycle 364 | Cycle 365 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.40 | **-0.69 (fast=7)** | fast=7 역효과 확정 → fast=8 복원 |
-| 1h BTC dema_cross PF | 1.45 | **1.00 (fast=7)** | fast=7 역효과 확정 → fast=8 복원 |
-| 1h BTC dema_cross fast param | 7 (실험) | **8 (복원)** | Cycle364 D 검증 완료 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC dema_cross Sharpe | -0.69 (fast=7) | **0.55 (45/55 실험)** / 0.40 (50/50 복원) | 45/55 실험=+0.15, PF는 역효과 |
+| 1h BTC dema_cross PF | 1.00 (fast=7) | **1.35 (45/55 실험)** / 1.45 (50/50 복원) | 45/55 역효과 → 50/50 복원 |
+| 1h BTC dema_cross Trades | 24 (fast=7) | **26 (45/55)** | 2윈도우 14<15 문제 해결 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
 | 1h BTC price_cluster SharpeStd | 1.10 | **1.10** | 안정성 우수 ✓ |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank3) |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (rank3) |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank4) |
 | 1h BTC frama SharpeStd | 1.60 | **1.60** | 안정성 우수 ✓ |
-| 1h PASS 수 | 0/19 (47연속) | **0/19 (48연속)** | — |
+| 1h PASS 수 | 0/19 (48연속) | **0/19 (49연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+
+### Cycle 365 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/dema_cross.py` | rsi_dir_buy_thresh=50, rsi_dir_sell_thresh=50 파라미터 추가 (Cycle365 A) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] rsi_dir_buy_thresh=[45,50], rsi_dir_sell_thresh=[50,55] 추가 (Cycle365 A) |
+| `scripts/paper_simulation.py` | dema_cross 45/55 실험 → PF 악화 확정 → 50/50 복원 (주석으로 기록) (Cycle365 A) |
 
 ### Cycle 363 코드 변경 요약
 
