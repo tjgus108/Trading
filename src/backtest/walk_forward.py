@@ -206,6 +206,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle365 A(품질)/F(리서치): rsi_dir_threshold=[45,50] 추가 — 임계값 완화 실험
     #   BTC 1h 실데이터 신호 분석: fast=8/slow=20/thr=50→10.1/60d, thr=45→13.4/60d
     #   fast=8/slow=25/thr=45→16.5/60d (min_trades=15 항상 충족, slow=25 병행 탐색)
+    # Cycle366 D(ML): thr=45 paper_sim 결과 — net positive (rank5→2)
+    #   Sharpe: 0.40→0.55(+0.15↑), Trades: 18→26(+8↑), PF: 1.45→1.35(-0.10 mild↓)
+    #   fast=7 패턴(PF 1.00 대폭 하락) 아님 — 허용 가능한 PF 소폭 하락으로 thr=45 유지 확정
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],

@@ -12,7 +12,7 @@ import pytest
 
 from src.alpha.ensemble import MultiLLMEnsemble, EnsembleSignal
 from src.data.websocket_feed import BinanceWebSocketFeed, WebSocketDataAdapter, CandleBar
-from src.backtest.walk_forward import WalkForwardOptimizer, WalkForwardResult, optimize_ema_cross
+from src.backtest.walk_forward import WalkForwardOptimizer, WalkForwardResult, optimize_ema_cross, optimize_dema_cross
 from src.ml.lstm_model import LSTMSignalGenerator
 
 
@@ -433,6 +433,13 @@ class TestWalkForwardOptimizer:
         result = optimize_ema_cross(df, n_windows=2)
         assert isinstance(result, WalkForwardResult)
         assert result.strategy_name == "ema_cross"
+
+    def test_optimize_dema_cross_helper(self):
+        """optimize_dema_cross 헬퍼 함수 — rsi_dir_threshold 파라미터 포함 WFO."""
+        df = _make_df(400)
+        result = optimize_dema_cross(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "dema_cross"
 
     def test_iter_param_combinations(self):
         """파라미터 조합 수 계산."""

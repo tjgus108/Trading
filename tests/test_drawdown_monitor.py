@@ -1117,3 +1117,65 @@ def test_mdd_warn_hysteresis_from_dict_preserves_state():
     # 복원 후도 히스테리시스 동작: 4.5%는 NORMAL 복귀 임계값(5%-2%=3%) 미달
     m2.update(9550)  # dd=4.5%
     assert m2.get_mdd_level() == MddLevel.WARN
+
+
+# ── 일중 DD 회복 시나리오 (Cycle366 B 추가) ─────────────────────────────────
+
+
+def test_daily_dd_halt_releases_when_equity_recovers_intraday():
+    """일중 DD가 한도 초과 후 당일 회복 시 halt 자동 해제.
+
+    Cycle366 B: BTC 1h 데이터에서 일중 3%+ 급락 후 반등 시
+    WARNING halt가 자동 해제되는지 검증.
+    """
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+
+    # 초기 정상
+    m.update(10000)
+    assert m.is_halted() is False
+
+    # 일중 3.1% 급락 → WARNING halt
+    status = m.update(9690)
+    assert status.halted is True
+    assert status.alert_level == AlertLevel.WARNING
+    assert abs(status.daily_drawdown_pct - 0.031) < 0.001
+
+    # 당일 반등 → daily_dd 2.5%로 회복 → halt 해제
+    status_recovered = m.update(9750)
+    assert status_recovered.halted is False, (
+        "일중 DD 회복 시 WARNING halt가 자동 해제되어야 함"
+    )
+    assert status_recovered.alert_level == AlertLevel.NONE
+
+
+def test_weekly_dd_halt_persists_while_dd_exceeds_limit():
+    """주간 DD가 한도 초과 상태를 유지하는 동안 HALT가 지속된다.
+
+    Cycle366 B: weekly_dd가 7% 이상인 구간에서 소폭 반등해도 HALT가 유지되고,
+    reset_weekly()로 weekly_start를 갱신해야 해제됨을 검증.
+    """
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.update(10000)  # peak=10000 설정
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+
+    # 주간 7.2% 급락 → HALT
+    status = m.update(9280)
+    assert status.halted is True
+    assert status.alert_level == AlertLevel.HALT
+
+    # 소폭 반등 (weekly_dd 여전히 7.1%+) → tiered 체크 여전히 HALT
+    status2 = m.update(9290)   # weekly_dd=(10000-9290)/10000=7.1% > 7%
+    assert status2.halted is True, "weekly_dd 7.1% 초과 → HALT 유지"
+    assert status2.alert_level == AlertLevel.HALT
+
+    # reset_weekly() + reset_daily() 후 weekly/daily start 갱신 → HALT 해제
+    m.reset_weekly(9290)
+    m.reset_daily(9290)   # daily_start도 갱신해야 daily_dd가 한도 초과 안 함
+    status3 = m.update(9300)
+    assert status3.halted is False, "reset_weekly() 후 HALT 해제"
+    assert status3.alert_level == AlertLevel.NONE

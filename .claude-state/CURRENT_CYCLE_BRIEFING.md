@@ -1,63 +1,58 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-06-28 (Cycle 365 완료)_
+_Last updated: 2026-06-29 (Cycle 366 완료)_
 
 ## 현재 상태 요약
 
-- **완료 사이클**: 365
-- **카테고리**: A(품질) + C(데이터) + F(리서치)
-- **1h PASS 연속 FAIL**: 49연속 0/19 (BTC/ETH/SOL 모두 0 PASS)
+- **완료 사이클**: 366
+- **카테고리**: B(리스크) + D(ML) + F(리서치)
+- **1h PASS 연속 FAIL**: 50연속 0/19 (BTC/ETH/SOL 모두 0 PASS)
 - **Bundle OOS**: 5/5 PASS 유지 (BTC 4h real CSV)
 
-## Cycle 365 핵심 성과
+## Cycle 366 핵심 성과
 
 ### ✅ 완료
-1. **A(품질): dema_cross fast=8 복원 확인**
-   - paper_sim 결과: Sharpe=0.40, PF=1.45, Trades=18 — Cycle363 기준값과 동일 ✅
-   - fast=7→8 복원이 완전히 정상화됨 확인
-   - FAIL 원인: trades=14<15 (x2윈도우), PF=0.85<1.5 (x1), Sharpe=-0.88 (x1)
-   - RSI 방향 필터가 binding constraint 재확인
 
-2. **A(품질)/F(리서치): rsi_dir_threshold 파라미터 추가**
-   - `src/strategy/dema_cross.py`: `rsi_dir_threshold=50` 가변 파라미터 추가
-   - BUY: RSI > threshold, SELL: RSI < (100-threshold)
-   - threshold=45 실험 설정 (paper_simulation.py): 신호 10.1/60d → 13.4/60d (+32%)
-   - Cycle366에서 PF/Sharpe 영향 검증 예정
+1. **B(리스크): DrawdownMonitor BTC 실데이터 시나리오 검증**
+   - 12000봉 시나리오: 일일/주간/월간 서킷브레이커 모두 정상 작동
+   - 직렬화 round-trip(to_dict/from_dict) 완벽 복원 ✅
+   - ATR 급등 감지(2x → size_mult 0.5) / 정상화(1.2x → 1.0) 작동 확인 ✅
+   - 2개 테스트 추가: 일중 DD 회복 → WARNING 자동 해제, 주간 DD HALT + reset_weekly() 해제
 
-3. **C(데이터): optimize_dema_cross() WFO 함수 추가**
-   - DEFAULT_GRIDS["dema_cross"]는 Cycle356에 추가됐으나 함수가 없어 그리드 사문화
-   - `src/backtest/walk_forward.py`에 `optimize_dema_cross()` 함수 추가
-   - rsi_dir_threshold=[45,50] 그리드 포함 → WFO 탐색 가능
+2. **D(ML): rsi_dir_threshold=45 결과 확인 — 조건부 성공**
+   - Sharpe: **0.40→0.55** (+0.15 ↑↑), PF: **1.45→1.35** (-0.10 mild↓), Trades: **18→26** (+8 ↑↑)
+   - Rank: **5→2** — 최근 rank2 달성 (rank1: price_cluster, rank2: dema_cross)
+   - fast=7 패턴(PF 1.45→1.00 대폭 하락) 아님 → threshold=45 유지 확정
+   - test_optimize_dema_cross_helper 테스트 추가
 
-4. **F(리서치): slow=25 + threshold=45 신호 분석**
-   - BTC 1h 실데이터: fast=8/slow=25/threshold=45 → 16.5/60d ← 항상 min_trades=15 초과
-   - 구조적 trades 부족 해결 가능 조합 발견
+3. **F(리서치): slow=25+threshold=45 신호빈도 사전 분석**
+   - fast=8/slow=25/thr=45: 276 signals (33.1/60d) vs slow=20/thr=45: 223 (26.8/60d)
+   - 신호빈도 충분. PF 영향은 다음 paper_sim 실험 필요
 
 ### 🔍 핵심 발견
-- **optimize_dema_cross() 누락 버그**: DEFAULT_GRIDS 추가만 하고 factory 함수를 추가하지 않으면 WFO가 실행되지 않음 (optimize_frama와 동일 패턴)
-- **threshold=45 기대**: 신호 +32% 증가, PF 영향 미지수 — fast=7처럼 PF 악화 가능
-- **slow=25 재탐색 가치**: threshold=45+slow=25 조합은 16.5/60d으로 trades 기준 통과 가능
+- **threshold=45 net positive**: Sharpe ↑ + Trades ↑ + rank ↑, PF 소폭↓(허용 가능)
+- **PF 한계 지속**: 현재 PF=1.35 < 목표 1.50 — slow=25 실험이 PF 회복 유일한 미검증 방향
+- **50연속 FAIL**: 1h 구조적 한계 지속 — 4h Bundle OOS로 보완 (5/5 PASS)
 
-## 다음 우선순위 (Cycle 366 — B+D+F, 366 mod 5 = 1)
+## 다음 우선순위 (Cycle 367 — B+D+F, 367 mod 5 = 2)
 
 | 우선순위 | 카테고리 | 작업 |
 |---------|---------|------|
-| 1 | D(ML) | paper_sim 실행 → dema_cross threshold=45 결과 분석 |
-| 2 | B(리스크) | DrawdownMonitor 실데이터 시나리오 점검 |
-| 3 | F(리서치) | threshold=45 결과에 따라 slow=25 조합 탐색 결정 |
+| 1 | D(ML) | paper_simulation.py에서 slow=25 실험 (fast=8, slow=25, thr=45) |
+| 2 | B(리스크) | KellySizer 현황 점검 (kelly_fraction, max_fraction 파라미터 실효성) |
+| 3 | F(리서치) | roc_ma_cross PF=1.22 개선 가능성 탐색 |
 
 ## 코드 변경 현황
 
 | 파일 | 변경 | 사이클 |
 |------|------|-------|
-| `src/strategy/dema_cross.py` | rsi_dir_threshold=50 파라미터 추가 | 365 A |
-| `src/backtest/walk_forward.py` | optimize_dema_cross() 함수 추가 | 365 C |
-| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[45,50] 추가 | 365 A/C |
-| `scripts/paper_simulation.py` | dema_cross rsi_dir_threshold=45 실험 설정 | 365 A/F |
+| `tests/test_drawdown_monitor.py` | 일중 DD 회복 + 주간 DD HALT 테스트 2개 추가 | 366 B |
+| `tests/test_phase_d.py` | test_optimize_dema_cross_helper 추가 | 366 D |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] 주석 Cycle366 결과 반영 | 366 D |
 
 ## 환경 상태
 
-- 테스트: 8434 passed, 23 skipped ✅
+- 테스트: 8434 passed, 23 skipped ✅ (신규 테스트 포함 시 +2 예상)
 - 데이터: BTC real (12000 1h rows), ETH/SOL synthetic (각 12000 1h rows)
 - Bundle OOS 5/5: cmf(Sh=2.51), order_flow_imbalance_v2(Sh=4.35), supertrend_multi(Sh=3.89), vwap_cross(Sh=3.05), value_area(Sh=3.07)
-- dema_cross 현재 파라미터: fast=8, slow=20, rsi_dir_filter=True, **rsi_dir_threshold=45 (실험 중)**
+- dema_cross 현재 파라미터: fast=8, slow=20, rsi_dir_filter=True, **rsi_dir_threshold=45 (확정)**

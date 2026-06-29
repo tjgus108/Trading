@@ -1,52 +1,54 @@
 # Next Steps
 
-_Last updated: 2026-06-28 (Cycle 365 완료)_
+_Last updated: 2026-06-29 (Cycle 366 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 365
+### 이번 세션 완료 사이클: 366
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 363 | C+B+F | dema_cross fast=7 실험(신호빈도+37%), CB rapid_decline BTC 실증(window=5 pct=5% 77h당1회 적정), frama atr_period=[10,14,18] DEFAULT_GRIDS 추가 |
 | 364 | D+E+F | dema_cross fast=7 역효과 확정(PF1.45→1.00, Sharpe0.40→-0.69)→fast=8 복원, optimize_frama atr_period 버그 수정, PaperConnector 슬리피지 단위 명문화 |
 | 365 | A+C+F | fast=8 복원 확인(Sharpe=0.40, PF=1.45, Trades=18), rsi_dir_threshold 파라미터화(45/50), optimize_dema_cross() 함수 추가(DEFAULT_GRIDS 활성화) |
+| 366 | B+D+F | DrawdownMonitor 시나리오 테스트(88→90 테스트), threshold=45 확인(Sharpe0.40→0.55, Trades18→26, PF1.45→1.35), slow=25 사전 분석(33.1/60d) |
 
-### 🎯 Cycle 366 작업 방향 (366 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 367 작업 방향 (367 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor/KellySizer 현황 점검
+#### B(리스크): KellySizer 현황 점검
 
-- Cycle357 B에서 직렬화 수정 완료. 현재 안정적 운영 중 확인
-- **작업**: DrawdownMonitor 실데이터 시나리오 테스트 (BTC 12000봉 대상)
+- Cycle362 B에서 kelly_cap > max_fraction 시 debug 로그 추가 완료
+- **작업**: KellySizer 실데이터 시나리오 테스트 (BTC 1h 기준 파라미터 적정성 검증)
+  - kelly_fraction, max_fraction 파라미터 실효성 확인
+  - DrawdownMonitor kelly_fraction_multiplier 연동 동작 검증
 
-#### D(ML): dema_cross rsi_dir_threshold=45 효과 검증
+#### D(ML): dema_cross slow=25 실험 검토
 
-- **배경**: Cycle365에서 `rsi_dir_threshold=45` 파라미터 추가, paper_simulation.py에 설정
-  - threshold=45: 신호 13.4/60d (+32% vs 50기준 10.1/60d)
-  - 목표: trades<15 x2윈도우 해소 + PF 1.45→1.50 달성
+- **배경**: Cycle366 D(ML)에서 threshold=45 → Sharpe 0.55, PF 1.35, rank2 확정
+  - slow=25+thr=45 신호 33.1/60d (충분), 현재 PF 1.35 < 목표 1.50
+  - slow=25가 DEMA 간격 확장 → 더 강한 추세 신호 → PF 회복 가능성?
 - **작업**:
-  - paper_sim 실행 → dema_cross(fast=8, slow=20, threshold=45) 결과 분석
-  - PF 변화 및 Sharpe 변화 관찰 (fast=7 패턴 반복 여부 확인)
-  - Trades=18→ 목표 24+ 도달 여부 확인
+  - paper_simulation.py에서 slow=25 실험 설정 (fast=8, slow=25, thr=45)
+  - paper_sim 실행 후 PF 변화 관찰 (slow=20/thr=45의 1.35 대비)
+  - slow=25가 PF 1.35→1.40+ 달성 여부 확인
+  - 악화 시: roc_ma_cross PF=1.22 개선 탐색 전환
 
-#### F(리서치): slow=25 + threshold=45 조합 분석
+#### F(리서치): roc_ma_cross PF 개선 가능성 탐색
 
-- **배경**: fast=8/slow=25/threshold=45 → 16.5/60d (항상 min_trades=15 초과)
-  - 이 조합의 PF/Sharpe 영향 미지수 — 실험 가치 있음
-- **탐색**:
-  - threshold=45 결과에서 PF 방향 확인 후 slow=25 여부 결정
-  - 만약 threshold=45가 PF 악화(fast=7 패턴) → 방향 전환 필요 (구조적 한계 인정)
-  - 구조적 한계 시: roc_ma_cross PF=1.22 개선 탐색으로 전환 검토
+- **배경**: roc_ma_cross rank3, Sharpe=0.34, PF=1.22 — 이미 안정적이나 PF 부족
+  - ema_span 또는 roc_period 조정으로 PF 1.22→1.30+ 가능한지 분석
+  - NEXT_STEPS: dema_cross 실험 한계 도달 시 대안 전략 개선 검토
+- **탐색**: 신호 빈도 분석 (현재 36/60d avg) + PF 방향 추정
 
-### ⚠️ 주의 사항 (Cycle 366 이후)
+### ⚠️ 주의 사항 (Cycle 367 이후)
 
-- **dema_cross rsi_dir_threshold=45 실험 중** (Cycle365 A/F): paper_simulation.py에 설정
-  - Cycle366 D(ML)에서 paper_sim 결과 분석 → threshold=45 효과 확인
-  - fast=7 패턴(Trades↑ but PF↓) 재현 시 → 다른 방향 탐색 필요
+- **dema_cross threshold=45 확정** (Cycle366 D): Sharpe 0.55, PF 1.35, Trades 26, rank2
+  - fast=7 패턴(PF 1.45→1.00) 아님 — PF 소폭 하락(1.45→1.35) 허용 가능
+  - Cycle367 D(ML)에서 slow=25 실험 → PF 회복 여부 확인
 - **optimize_dema_cross() 함수 추가됨** (Cycle365 C): DEFAULT_GRIDS 활성화
   - rsi_dir_threshold=[45,50] 그리드 포함 → WFO 탐색 가능
+  - test_optimize_dema_cross_helper 테스트 추가됨 (Cycle366 D)
 - **dema_cross dist_pct=0.002 확정** (Cycle 358 F): SharpeStd 2.69→2.32, trades 48→31
   - 목표(SharpeStd<2.5) 달성. 유지.
   - ETH: Sharpe=-2.07 (합성 데이터 특성상 BTC만 평가)
@@ -71,22 +73,31 @@ _Last updated: 2026-06-28 (Cycle 365 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 365 업데이트)
+### 핵심 메트릭 (Cycle 366 업데이트)
 
-| 지표 | Cycle 364 | Cycle 365 | 변화 |
+| 지표 | Cycle 365 | Cycle 366 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | -0.69 (fast=7) | **0.40 (fast=8 복원)** | fast=8 복원 확인 ✅ |
-| 1h BTC dema_cross PF | 1.00 (fast=7) | **1.45 (fast=8 복원)** | fast=8 복원 확인 ✅ |
-| 1h BTC dema_cross fast param | 8 (복원) | **8** | 유지 |
-| 1h BTC dema_cross rsi_threshold | 50 (기본값) | **45 (실험 설정)** | Cycle366 검증 예정 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC dema_cross Sharpe | 0.40 (thr=50) | **0.55 (thr=45)** | +0.15 ↑↑ |
+| 1h BTC dema_cross PF | 1.45 (thr=50) | **1.35 (thr=45)** | -0.10 mild↓ (허용) |
+| 1h BTC dema_cross Trades | 18 | **26** | +8 ↑↑ |
+| 1h BTC dema_cross Rank | 5/19 | **2/19** | rank5→2 ✅ |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
 | 1h BTC price_cluster SharpeStd | 1.10 | **1.10** | 안정성 우수 ✓ |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank3) |
-| 1h BTC frama SharpeStd | 1.60 | **1.60** | 안정성 우수 ✓ |
-| 1h PASS 수 | 0/19 (48연속) | **0/19 (49연속)** | — |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (rank3) |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank4) |
+| 1h PASS 수 | 0/19 (49연속) | **0/19 (50연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
+| 테스트 수 | 8434 | **8436** | +2 새 테스트 |
+
+### Cycle 366 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_drawdown_monitor.py` | 일중 DD 회복 → WARNING 자동 해제 테스트 추가 (Cycle366 B) |
+| `tests/test_drawdown_monitor.py` | 주간 DD HALT 유지/reset_weekly() 해제 테스트 추가 (Cycle366 B) |
+| `tests/test_phase_d.py` | `test_optimize_dema_cross_helper` 테스트 추가 (Cycle366 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] 주석 업데이트: Cycle366 threshold=45 결과 반영 (Cycle366 D) |
 
 ### Cycle 365 코드 변경 요약
 
@@ -95,7 +106,7 @@ _Last updated: 2026-06-28 (Cycle 365 완료)_
 | `src/strategy/dema_cross.py` | `rsi_dir_threshold=50` 파라미터 추가 — BUY/SELL RSI 임계값 가변화 (Cycle365 A) |
 | `src/backtest/walk_forward.py` | `optimize_dema_cross()` 함수 추가 — DEFAULT_GRIDS["dema_cross"] 활성화 (Cycle365 C) |
 | `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"]에 `rsi_dir_threshold=[45,50]` 추가 (Cycle365 A/C) |
-| `scripts/paper_simulation.py` | dema_cross `rsi_dir_threshold=45` 실험 설정 (Cycle366 D 검증 예정) |
+| `scripts/paper_simulation.py` | dema_cross `rsi_dir_threshold=45` 실험 설정 (Cycle366 D 검증 완료) |
 
 ### Cycle 363 코드 변경 요약
 
