@@ -138,6 +138,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   slow=15→PF1.45 / slow=20→PF1.35 / slow=25→top5탈락: 간격 확장은 과도한 필터링
     #   결론: slow=20 고정. dema_cross slow 탐색 완료 (15/20/25 전부 검증).
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 45},
+    # Cycle368 F(리서치): roc_ma_cross ma_period=5 실험 → 대폭 악화 확정 → 기본값(ma=3) 유지
+    #   배경: Cycle367 ma=3 기준 Sharpe=0.34, PF=1.22 (rank2)
+    #   ma=5 결과: Sharpe=-0.91, PF=1.00, Trades=34, rank15 (신호 지연으로 진입/청산 타이밍 악화)
+    #   결론: ma=5는 과도한 스무딩 → 크로스 신호 지연 → 수익 기회 놓침. ma=3 고정 확정.
+    #   roc_ma_cross PF 개선 방향: ma 조정 X, roc_period 또는 진입 조건 재검토 필요
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
