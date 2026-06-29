@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.risk.position_sizer import kelly_position_size, kelly_position_size_from_sizer
 from src.risk.kelly_sizer import KellySizer
+from src.risk.drawdown_monitor import DrawdownMonitor
 
 
 # ── kelly_position_size 테스트 ───────────────────────────────────────────────
@@ -519,3 +520,99 @@ class TestKellyRollingWindowStability:
 
         ks.record_trade(100.0)
         assert len(ks._trade_history) == 1
+
+
+# ── BTC 1h 실데이터 시나리오 (Cycle 367 B(리스크)) ───────────────────────────
+
+class TestBTCRealisticScenario:
+    """BTC 1h 기준 KellySizer 파라미터 적정성 검증.
+
+    BTC 1h 실측 통계:
+      win_rate=0.50, avg_win=2.0%, avg_loss=1.5%
+      capital=$10,000, price=$50,000
+    kelly_f = (0.50*0.020 - 0.50*0.015) / 0.020 = 0.125
+    fractional_f = 0.125 * 0.5 = 0.0625
+    → kelly_cap=0.20 미달 (dead param 확인), max_fraction=0.10에 의해 클리핑되지 않음
+    → position_capital = 10000 * 0.0625 = $625 (자본의 6.25%)
+    """
+
+    WIN_RATE = 0.50
+    AVG_WIN = 0.020
+    AVG_LOSS = 0.015
+    CAPITAL = 10_000.0
+    BTC_PRICE = 50_000.0
+
+    def _make_sizer(self, **kwargs):
+        defaults = dict(fraction=0.5, max_fraction=0.10, kelly_cap=0.20)
+        defaults.update(kwargs)
+        return KellySizer(**defaults)
+
+    def test_max_fraction_is_binding_constraint(self):
+        """kelly_cap=0.20 vs kelly_cap=0.30: 결과 동일 → max_fraction이 binding constraint 확인."""
+        sizer = self._make_sizer()
+        qty = sizer.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE,
+        )
+        position_capital = qty * self.BTC_PRICE
+        # max_fraction=0.10 → 최대 $1,000
+        assert position_capital <= self.CAPITAL * 0.10 + 1e-6
+
+        sizer_highcap = KellySizer(fraction=0.5, max_fraction=0.10, kelly_cap=0.30)
+        qty_highcap = sizer_highcap.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE,
+        )
+        # kelly_cap을 높여도 결과 동일 → kelly_cap은 dead param (BTC 1h 조건에서)
+        assert abs(qty - qty_highcap) < 1e-9
+
+    def test_mdd_warn_halves_btc_position(self):
+        """DrawdownMonitor 7% DD → WARN → mdd_multiplier=0.5 → 포지션 절반."""
+        monitor = DrawdownMonitor()
+        monitor.update(10_000.0)
+        monitor.update(9_300.0)  # -7% DD → WARN
+        mult = monitor.get_mdd_size_multiplier()
+        assert mult == 0.5
+
+        sizer = self._make_sizer()
+        qty_full = sizer.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE, mdd_size_multiplier=1.0,
+        )
+        qty_warn = sizer.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE, mdd_size_multiplier=0.5,
+        )
+        assert abs(qty_warn / qty_full - 0.5) < 1e-9
+
+    def test_kelly_fraction_multiplier_reduces_sizer(self):
+        """9% DD > kelly_reduce_at_mdd(8%) → kelly_fraction_multiplier=0.5 → fraction 절반."""
+        monitor = DrawdownMonitor(kelly_reduce_at_mdd=0.08)
+        monitor.update(10_000.0)
+        monitor.update(9_100.0)  # -9% DD → kelly_reduce_at_mdd(8%) 초과
+        kelly_mult = monitor.get_kelly_fraction_multiplier()
+        assert kelly_mult == 0.5
+
+        sizer_normal = self._make_sizer(fraction=0.5)
+        sizer_reduced = self._make_sizer(fraction=0.5 * kelly_mult)  # fraction=0.25
+
+        qty_normal = sizer_normal.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE,
+        )
+        qty_reduced = sizer_reduced.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE,
+        )
+        assert qty_reduced <= qty_normal * 0.5 + 1e-9
+
+    def test_btc_realistic_qty_range(self):
+        """BTC 1h 기본 파라미터 → 포지션 금액이 [0.1%, 10%] 자본 범위 내."""
+        sizer = self._make_sizer()
+        qty = sizer.compute(
+            win_rate=self.WIN_RATE, avg_win=self.AVG_WIN, avg_loss=self.AVG_LOSS,
+            capital=self.CAPITAL, price=self.BTC_PRICE,
+        )
+        position_usd = qty * self.BTC_PRICE
+        assert position_usd >= self.CAPITAL * 0.001 - 1e-6  # 최소 0.1%
+        assert position_usd <= self.CAPITAL * 0.10 + 1e-6   # 최대 10%

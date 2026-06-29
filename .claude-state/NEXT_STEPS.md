@@ -1,51 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-06-29 (Cycle 366 완료)_
+_Last updated: 2026-06-29 (Cycle 367 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 366
+### 이번 세션 완료 사이클: 367
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 364 | D+E+F | dema_cross fast=7 역효과 확정(PF1.45→1.00, Sharpe0.40→-0.69)→fast=8 복원, optimize_frama atr_period 버그 수정, PaperConnector 슬리피지 단위 명문화 |
-| 365 | A+C+F | fast=8 복원 확인(Sharpe=0.40, PF=1.45, Trades=18), rsi_dir_threshold 파라미터화(45/50), optimize_dema_cross() 함수 추가(DEFAULT_GRIDS 활성화) |
-| 366 | B+D+F | DrawdownMonitor 시나리오 테스트(88→90 테스트), threshold=45 확인(Sharpe0.40→0.55, Trades18→26, PF1.45→1.35), slow=25 사전 분석(33.1/60d) |
+| 365 | A+C+F | fast=8 복원 확인(Sharpe=0.40, PF=1.45, Trades=18), rsi_dir_threshold 파라미터화(45/50), optimize_dema_cross() 함수 추가 |
+| 366 | B+D+F | DrawdownMonitor 시나리오 테스트(88→90 테스트), threshold=45 확인(Sharpe0.40→0.55, Trades18→26, PF1.45→1.35) |
+| 367 | B+D+F | KellySizer BTC 시나리오 테스트(38→42), slow=25 실험→탈락 확정→slow=20 복원, roc_ma_cross 신호 분석 |
 
-### 🎯 Cycle 367 작업 방향 (367 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 368 작업 방향 (368 mod 5 = 3 → E(실행) + A(품질) + F(리서치))
 
-#### B(리스크): KellySizer 현황 점검
+#### E(실행): PaperConnector 슬리피지 모델 점검
 
-- Cycle362 B에서 kelly_cap > max_fraction 시 debug 로그 추가 완료
-- **작업**: KellySizer 실데이터 시나리오 테스트 (BTC 1h 기준 파라미터 적정성 검증)
-  - kelly_fraction, max_fraction 파라미터 실효성 확인
-  - DrawdownMonitor kelly_fraction_multiplier 연동 동작 검증
+- BTC 1h 슬리피지 분류: NORMAL (0.5~3%), SOL synthetic: HIGH(39%) — 과도한 페널티 가능성
+- **작업**: PaperConnector 슬리피지 계산 로직 검토
+  - `use_tiered_slippage=False` vs True 차이 분석 (Cycle359 E 파라미터 추가 후 미검증)
+  - BTC/SOL 슬리피지 실효 영향 확인 (paper_sim trades 수에 영향 있는지)
 
-#### D(ML): dema_cross slow=25 실험 검토
+#### A(품질): 테스트 커버리지 점검
 
-- **배경**: Cycle366 D(ML)에서 threshold=45 → Sharpe 0.55, PF 1.35, rank2 확정
-  - slow=25+thr=45 신호 33.1/60d (충분), 현재 PF 1.35 < 목표 1.50
-  - slow=25가 DEMA 간격 확장 → 더 강한 추세 신호 → PF 회복 가능성?
-- **작업**:
-  - paper_simulation.py에서 slow=25 실험 설정 (fast=8, slow=25, thr=45)
-  - paper_sim 실행 후 PF 변화 관찰 (slow=20/thr=45의 1.35 대비)
-  - slow=25가 PF 1.35→1.40+ 달성 여부 확인
-  - 악화 시: roc_ma_cross PF=1.22 개선 탐색 전환
+- **배경**: 현재 42 Kelly tests, 8436 total tests
+- **작업**: 미커버 영역 탐색 (walk_forward, paper_connector, circuit_breaker)
+  - `optimize_dema_cross()` 함수 엣지케이스 테스트 (빈 DataFrame, 단일 윈도우 등)
+  - `PaperConnector.execute_order()` 슬리피지 시나리오 테스트
 
-#### F(리서치): roc_ma_cross PF 개선 가능성 탐색
+#### F(리서치): roc_ma_cross PF 개선 — ma_period=5 실험
 
-- **배경**: roc_ma_cross rank3, Sharpe=0.34, PF=1.22 — 이미 안정적이나 PF 부족
-  - ema_span 또는 roc_period 조정으로 PF 1.22→1.30+ 가능한지 분석
-  - NEXT_STEPS: dema_cross 실험 한계 도달 시 대안 전략 개선 검토
-- **탐색**: 신호 빈도 분석 (현재 36/60d avg) + PF 방향 추정
+- **배경**: Cycle367 분석 — roc_ma_cross rank2 (Sh=0.34), ma=3: 42.6/60d 원시/36/60d 필터후
+  - ma=5: 36.8/60d 예상 (더 스무딩, 거짓 크로스오버 감소 → PF 개선 가능)
+  - DEFAULT_GRIDS["roc_ma_cross"] = roc_period=[10,12,15], ma_period=[3,5,7] 이미 포함
+- **작업**: paper_simulation.py에 roc_ma_cross ma_period=5 실험 (현재 ma=3)
+  - paper_sim 실행 후 PF/Sharpe/trades 변화 관찰
+  - PF 1.22→1.30+ 달성 여부 확인
 
-### ⚠️ 주의 사항 (Cycle 367 이후)
+### ⚠️ 주의 사항 (Cycle 368 이후)
 
+- **dema_cross slow=20 확정** (Cycle367 D): slow=15/20/25 전부 검증, slow=20이 최적
+  - fast=8, slow=20, rsi_dir_filter=True, rsi_dir_threshold=45: Sharpe=0.55, PF=1.35, rank2
+  - PF 1.35 < 목표 1.50 — dema_cross slow 방향 탐색 완료, 새 접근 필요
 - **dema_cross threshold=45 확정** (Cycle366 D): Sharpe 0.55, PF 1.35, Trades 26, rank2
-  - fast=7 패턴(PF 1.45→1.00) 아님 — PF 소폭 하락(1.45→1.35) 허용 가능
-  - Cycle367 D(ML)에서 slow=25 실험 → PF 회복 여부 확인
 - **optimize_dema_cross() 함수 추가됨** (Cycle365 C): DEFAULT_GRIDS 활성화
   - rsi_dir_threshold=[45,50] 그리드 포함 → WFO 탐색 가능
   - test_optimize_dema_cross_helper 테스트 추가됨 (Cycle366 D)
@@ -73,22 +72,28 @@ _Last updated: 2026-06-29 (Cycle 366 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 366 업데이트)
+### 핵심 메트릭 (Cycle 367 업데이트)
 
-| 지표 | Cycle 365 | Cycle 366 | 변화 |
+| 지표 | Cycle 366 | Cycle 367 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.40 (thr=50) | **0.55 (thr=45)** | +0.15 ↑↑ |
-| 1h BTC dema_cross PF | 1.45 (thr=50) | **1.35 (thr=45)** | -0.10 mild↓ (허용) |
-| 1h BTC dema_cross Trades | 18 | **26** | +8 ↑↑ |
-| 1h BTC dema_cross Rank | 5/19 | **2/19** | rank5→2 ✅ |
+| 1h BTC dema_cross Sharpe | 0.55 (thr=45) | **0.55** | 유지 (slow=20 확정) |
+| 1h BTC dema_cross PF | 1.35 | **1.35** | 유지 (slow=25 탈락 확인) |
+| 1h BTC dema_cross Trades | 26 | **26** | 유지 |
+| 1h BTC dema_cross Rank | 2/19 | **2/19** | 유지 ✅ |
 | 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
-| 1h BTC price_cluster SharpeStd | 1.10 | **1.10** | 안정성 우수 ✓ |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (rank3) |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (rank4) |
-| 1h PASS 수 | 0/19 (49연속) | **0/19 (50연속)** | — |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (rank2 with slow=25 exp) |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
+| 1h PASS 수 | 0/19 (50연속) | **0/19 (52연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| 테스트 수 | 8434 | **8436** | +2 새 테스트 |
+| 테스트 수 | 8436 | **8440** | +4 Kelly BTC 시나리오 |
+
+### Cycle 367 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_kelly_integration.py` | BTC 1h 시나리오 4개 테스트 추가 (Cycle367 B) |
+| `scripts/paper_simulation.py` | dema_cross slow=25 실험 후 slow=20 복원 + 결과 주석 (Cycle367 D) |
 
 ### Cycle 366 코드 변경 요약
 

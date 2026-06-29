@@ -1,3 +1,39 @@
+## [2026-06-29] Cycle 367 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] KellySizer BTC 1h 실데이터 시나리오 테스트**
+1. BTC 1h 기준 KellySizer 파라미터 적정성 검증 (4개 테스트 추가):
+   - `test_max_fraction_is_binding_constraint`: max_fraction=0.10이 binding constraint 확인 (kelly_cap=0.20 dead param)
+   - `test_mdd_warn_halves_btc_position`: DrawdownMonitor WARN (-7% DD) → mdd_multiplier=0.5 → 포지션 절반
+   - `test_kelly_fraction_multiplier_reduces_sizer`: kelly_reduce_at_mdd(-9% > 8%) → fraction 절반 동작
+   - `test_btc_realistic_qty_range`: BTC 1h 기본 파라미터 → position_usd ∈ [0.1%, 10%] 자본 범위 내
+   - kelly_f ≈ 0.125 → fractional_f=0.0625 (6.25% 자본) < kelly_cap=0.20 → kelly_cap 완전 사문화 확인
+   - 테스트: 38→42 passed (+4)
+
+**[D(ML)] dema_cross slow=25 실험 → 악화 확정**
+2. paper_simulation.py에서 slow=25 실험 (BTC 1h, fast=8/slow=25/thr=45):
+   - dema_cross가 top5에서 완전 탈락 (slow=20: rank2 → slow=25: top5 외)
+   - BTC rank1: price_cluster(Sh=0.87), rank2: roc_ma_cross(Sh=0.34), rank3: frama(Sh=0.24)
+   - slow=15→PF1.45 / slow=20→PF1.35 / slow=25→탈락: 간격 확장 = 과도한 필터링 확정
+   - 결론: slow=20 고정. dema_cross slow 탐색 완료 (15/20/25 전부 검증)
+3. paper_simulation.py dema_cross slow=25→20 복원 + 실험 결과 주석 추가
+
+**[F(리서치)] roc_ma_cross 분석**
+4. roc_ma_cross rank2(BTC): Sharpe=0.34, trades=36, PF 분석
+   - BUY: ROC_MA 0 상향 + ROC>0.3% + close>EMA50 + close>EMA200 (강한 필터)
+   - ma=3(현재): 42.6/60d 원시 신호, EMA50/200 필터 후 36/60d
+   - ma=5 후보: 36.8/60d (더 스무딩, PF 개선 가능성)
+   - DEFAULT_GRIDS["roc_ma_cross"]에 ma_period=[3,5,7] 이미 포함 → WFO 탐색 가능
+
+**[시뮬레이션 결과]**
+- Paper Sim (1h WF, BTC, Cycle367 slow=25): **0/19 PASS (52연속 FAIL)**
+  - BTC rank1: price_cluster (Sh=0.87), rank2: roc_ma_cross (Sh=0.34), rank3: frama (Sh=0.24)
+  - dema_cross top5 탈락 — slow=25 악화 확정
+- Bundle OOS (BTC 4h, Cycle367): **5/5 PASS** ✅ 유지
+  - cmf(Sh=2.51), order_flow_imbalance_v2(Sh=4.35), supertrend_multi(Sh=2.64), vwap_cross(Sh=2.47), value_area(Sh=N/A)
+- 테스트: **42 passed** (test_kelly_integration.py, +4)
+
+---
+
 ## [2026-06-29] Cycle 366 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor BTC 실데이터 시나리오 테스트 + 테스트 커버리지 강화**
