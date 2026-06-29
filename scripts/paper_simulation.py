@@ -142,6 +142,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
     "supertrend_multi": {"atr_threshold": 0.5},
+    # Cycle368 F(리서치): roc_ma_cross ma_period=5 실험 → 역효과 확정
+    #   ma=5: Sharpe=-0.91, PF=1.00, Trades=34, rank15 (ma=3: Sh=0.34, rank2 대비 대폭 악화)
+    #   결론: ma 스무딩 강화가 오히려 신호 지연으로 성과 붕괴 → ma=3(기본값) 유지
+    # "roc_ma_cross": {"ma_period": 5},  # 복원: 기본값(ma=3) 사용
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

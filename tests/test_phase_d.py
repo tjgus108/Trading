@@ -441,6 +441,21 @@ class TestWalkForwardOptimizer:
         assert isinstance(result, WalkForwardResult)
         assert result.strategy_name == "dema_cross"
 
+    def test_optimize_dema_cross_single_window(self):
+        """optimize_dema_cross — n_windows=1 단일 윈도우 엣지케이스 (Cycle368 A)."""
+        df = _make_df(300)
+        result = optimize_dema_cross(df, n_windows=1)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "dema_cross"
+
+    def test_optimize_dema_cross_returns_result_fields(self):
+        """optimize_dema_cross 결과에 핵심 필드 존재 (Cycle368 A)."""
+        df = _make_df(400)
+        result = optimize_dema_cross(df, n_windows=2)
+        assert hasattr(result, "strategy_name")
+        assert hasattr(result, "best_params")
+        assert hasattr(result, "avg_oos_sharpe")  # WalkForwardResult 필드명 확인
+
     def test_iter_param_combinations(self):
         """파라미터 조합 수 계산."""
         from src.strategy.ema_cross import EmaCrossStrategy

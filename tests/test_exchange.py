@@ -1061,3 +1061,62 @@ class TestPaperConnectorRoundTrip:
         assert summary["sell_count"] == 3
         # Total PnL = 200 - 100 + 400 = 500
         assert abs(summary["total_pnl"] - 500.0) < 1.0
+
+
+class TestPaperConnectorTieredSlippage:
+    """PaperConnector use_tiered_slippage 파라미터 테스트 (Cycle368 E(실행))."""
+
+    def test_tiered_false_uses_default_slippage(self):
+        """use_tiered_slippage=False이면 PaperTrader에 기본 slippage_pct 전달."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            slippage_pct=0.2, use_tiered_slippage=False,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        assert pc.paper_trader.slippage_pct == 0.2
+        assert pc.paper_trader._use_tiered_slippage is False
+
+    def test_tiered_true_propagates_to_paper_trader(self):
+        """use_tiered_slippage=True이면 PaperTrader._use_tiered_slippage=True."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            use_tiered_slippage=True,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        assert pc.paper_trader._use_tiered_slippage is True
+
+    def test_btc_tiered_slippage_lower_than_sol(self):
+        """BTC(large) vs SOL(mid) — tiered 모드에서 SOL 슬리피지가 더 크다."""
+        from src.exchange.paper_trader import SLIPPAGE_TIERS, classify_symbol_tier
+        assert SLIPPAGE_TIERS["large"] < SLIPPAGE_TIERS["mid"]
+        assert classify_symbol_tier("BTC/USDT") == "large"
+        assert classify_symbol_tier("SOL/USDT") == "mid"
+
+    def test_tiered_buy_order_succeeds_btc(self):
+        """use_tiered_slippage=True + BTC 주문 성공."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, use_tiered_slippage=True,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        result = pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        assert result["status"] == "closed"
+        assert result["filled"] == 1.0
+
+    def test_tiered_summary_key_active(self):
+        """use_tiered_slippage=True이면 summary에 tiered_slippage_active=True."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=10000.0,
+            use_tiered_slippage=True,
+        )
+        summary = pc.get_paper_summary()
+        assert summary.get("tiered_slippage_active") is True
+
+    def test_tiered_summary_key_inactive(self):
+        """use_tiered_slippage=False이면 summary에 tiered_slippage_active=False."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=10000.0,
+            use_tiered_slippage=False,
+        )
+        summary = pc.get_paper_summary()
+        assert summary.get("tiered_slippage_active") is False
