@@ -137,7 +137,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle367 D(ML): slow=25 실험 → 악화 확정 (dema_cross top5 탈락)
     #   slow=15→PF1.45 / slow=20→PF1.35 / slow=25→top5탈락: 간격 확장은 과도한 필터링
     #   결론: slow=20 고정. dema_cross slow 탐색 완료 (15/20/25 전부 검증).
-    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 45},
+    # Cycle369 D(ML): rsi_dir_threshold=40 실험 → rank1 달성 확정 (Sh0.55→0.80, Trades26→30)
+    #   thr=40: Sharpe 0.80(+0.25↑), PF 1.38(+0.03↑), Trades 30(+4↑), rank1/19
+    #   결론: RSI 임계값 완화(45→40) = 신호 빈도↑ + 품질 유지 → thr=40 확정
+    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
@@ -145,7 +148,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle368 F(리서치): roc_ma_cross ma_period=5 실험 → 역효과 확정
     #   ma=5: Sharpe=-0.91, PF=1.00, Trades=34, rank15 (ma=3: Sh=0.34, rank2 대비 대폭 악화)
     #   결론: ma 스무딩 강화가 오히려 신호 지연으로 성과 붕괴 → ma=3(기본값) 유지
-    # "roc_ma_cross": {"ma_period": 5},  # 복원: 기본값(ma=3) 사용
+    # Cycle369 F(리서치): roc_period=10 실험 → 역효과 확정
+    #   roc_period=10: Sharpe=-1.45, PF=0.88, Trades=39, rank16+ (roc_period=12: Sh=0.34, rank2 대비 대폭 악화)
+    #   결론: roc_period 단축(10)은 노이즈 증가로 성과 붕괴 → roc_period=12(기본값) 확정
+    #   다음 탐색: roc_period=15 (더 느린 ROC → 스무딩, trades 감소 가능)
+    # "roc_ma_cross": {"roc_period": 10},  # 복원: 기본값(roc_period=12) 사용
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

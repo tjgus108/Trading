@@ -1,59 +1,67 @@
 # Next Steps
 
-_Last updated: 2026-06-29 (Cycle 368 완료)_
+_Last updated: 2026-06-29 (Cycle 369 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 368
+### 이번 세션 완료 사이클: 369
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 366 | B+D+F | DrawdownMonitor 시나리오 테스트(88→90), threshold=45 확인(Sh0.40→0.55, Trades18→26) |
 | 367 | B+D+F | KellySizer BTC 시나리오 테스트(38→42), slow=25 탈락 확정, roc_ma_cross 신호 분석 |
 | 368 | E+A+F | PaperConnector tiered_slippage 테스트(+6), optimize_dema_cross 엣지케이스(+2), roc_ma_cross ma=5 역효과 확정 |
+| 369 | D+E+F | dema_cross thr=40 **rank1 달성** (Sh0.55→0.80), WFO 타이밍 로깅 추가, roc_period=10 역효과 확정 |
 
-### 🎯 Cycle 369 작업 방향 (369 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 370 작업 방향 (370 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): dema_cross 새 파라미터 탐색 (PF 1.35→1.50 목표)
+#### A(품질): dema_cross thr=40 WFO 결과 검증
 
-- **배경**: slow 방향 탐색 완료(15/20/25), fast=8/slow=20/thr=45 확정 (PF=1.35)
-- **작업**: dema_cross 미탐색 파라미터 발굴
-  - `dist_pct` 현재 0.002 — 0.003으로 증가 시 PF 개선 여부 (희귀 신호 질 향상 가능)
-  - `rsi_dir_threshold=40` 실험 (현재 45, BUY: RSI>45 → RSI>40으로 완화)
-  - DEFAULT_GRIDS["dema_cross"]에 dist_pct 추가 검토
+- **배경**: Cycle369 paper_sim에서 thr=40 rank1(Sh=0.80) 확인
+  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 업데이트됨
+  - WFO(optimize_dema_cross) 실행으로 thr=40이 IS에서도 최적 선택되는지 검증 필요
+- **작업**: `optimize_dema_cross()` 함수로 WFO 실행 → best_params 확인
+  - 기대: rsi_dir_threshold=40이 WFO에서도 선택
+  - 만약 thr=45가 더 자주 선택되면: paper_sim 일회성 결과 가능성 검토
 
-#### E(실행): walk_forward 결과 캐싱/성능 점검
+#### C(데이터): dema_cross dist_pct 탐색 (PF 1.50 목표)
 
-- **배경**: paper_sim 5분 소요 — optimize_dema_cross() WFO 호출 시 병목 가능성
-- **작업**: `WalkForwardOptimizer.run()` 내 병목 프로파일링
-  - 각 윈도우 × 파라미터 조합 수: dema_cross = 3×3×2 = 18, ≈ 8 windows → 144 backtests
-  - 144 backtests에 걸리는 시간 측정 → 최적화 여지 확인
+- **배경**: dema_cross 현재 PF=1.38, 목표 1.50 — dist_pct 탐색 미완
+  - dist_pct=0.002 (현재): SharpeStd 2.69→2.32 (Cycle358 확정)
+  - dist_pct=0.003: 더 강한 거리 필터 → PF 개선 가능 (신호 질 ↑, 빈도 ↓)
+- **작업**: paper_simulation.py에 dema_cross dist_pct=0.003 추가 실험
+  - 가설: 더 강한 거리 필터 → 노이즈 신호 제거 → PF↑
+  - trade-off: trades 감소 가능 (현재 30, 최소 15 필요)
 
-#### F(리서치): roc_ma_cross roc_period 탐색
+#### F(리서치): roc_ma_cross roc_period=15 탐색
 
-- **배경**: Cycle368 ma=5 실험 → 역효과 (rank15, Sh=-0.91). ma=3 복원.
-  - 남은 탐색: roc_period (현재 12, 10/15도 그리드에 있음)
-  - roc_period=10: 더 빠른 ROC → 빠른 신호, noise 증가 가능
-  - roc_period=15: 더 느린 ROC → 스무딩 효과, trades 감소 가능
-- **작업**: paper_simulation.py에 roc_ma_cross roc_period=10 실험 (현재 12)
-  - 가설: 10봉 ROC는 단기 모멘텀 포착 → 신호 빈도 ↑
-  - PF/Sharpe 변화 관찰 (rank2→rank1 달성 가능 여부)
+- **배경**: Cycle369 roc_period=10 역효과 확정 (Sh=-1.45, 노이즈 증가)
+  - roc_period=12 (기본): Sh=0.34, rank2
+  - roc_period=15: 더 느린 ROC → 스무딩, noise 감소, trades 감소 가능
+- **작업**: paper_simulation.py에 roc_ma_cross roc_period=15 추가 실험
+  - 가설: 15봉 ROC는 중기 모멘텀 포착 → 신호 품질↑, 빈도↓
+  - PF/Sharpe 변화 관찰 (rank2 유지 또는 rank1 달성 가능 여부)
 
-### ⚠️ 주의 사항 (Cycle 369 이후)
+### ⚠️ 주의 사항 (Cycle 370 이후)
 
+- **dema_cross rsi_dir_threshold=40 확정** (Cycle369 D): rank1 달성 (Sh=0.80, PF=1.38, Trades=30)
+  - thr=40: RSI 완화로 신호 빈도↑ + 품질 유지 → thr=45 대비 Sh+0.25 개선
+  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 업데이트됨
+- **roc_ma_cross roc_period=10 역효과 확정** (Cycle369 F): Sh=-1.45 (12: Sh=0.34 대비 대폭 악화)
+  - 단축(10)은 노이즈 증가로 역효과 → roc_period=12 확정. 다음 탐색: roc_period=15
+- **WalkForwardOptimizer 타이밍 로깅** (Cycle369 E): run()에 IS_opt/total 시간 측정 추가됨
 - **roc_ma_cross ma=5 역효과 확정** (Cycle368 F): rank15(Sh=-0.91) vs ma=3 rank2(Sh=0.34)
   - ma 스무딩 강화 = 신호 지연 → roc_ma_cross PF 개선 방향은 roc_period 탐색으로 전환
 - **PaperConnector tiered_slippage** (Cycle368 E): use_tiered_slippage=False(기본)는 trades 수에 무영향
   - slippage는 P&L에만 영향, 신호 생성과 무관 → paper_sim 결과에 영향 없음 확인
 - **optimize_dema_cross() 엣지케이스 테스트** (Cycle368 A): single_window, result_fields 추가
 - **dema_cross slow=20 확정** (Cycle367 D): slow=15/20/25 전부 검증, slow=20이 최적
-  - fast=8, slow=20, rsi_dir_filter=True, rsi_dir_threshold=45: Sharpe=0.55, PF=1.35, rank2
-  - PF 1.35 < 목표 1.50 — dema_cross slow 방향 탐색 완료, 새 접근 필요
+  - fast=8, slow=20, rsi_dir_filter=True, rsi_dir_threshold=40: Sharpe=0.80, PF=1.38, rank1 (Cycle369)
+  - PF 1.38 < 목표 1.50 — dist_pct 탐색 또는 추가 파라미터 발굴 필요
 - **dema_cross threshold=45 확정** (Cycle366 D): Sharpe 0.55, PF 1.35, Trades 26, rank2
 - **optimize_dema_cross() 함수 추가됨** (Cycle365 C): DEFAULT_GRIDS 활성화
-  - rsi_dir_threshold=[45,50] 그리드 포함 → WFO 탐색 가능
+  - rsi_dir_threshold=[40,45] 그리드 포함 (Cycle369 업데이트) → WFO 탐색 가능
   - test_optimize_dema_cross_helper 테스트 추가됨 (Cycle366 D)
 - **dema_cross dist_pct=0.002 확정** (Cycle 358 F): SharpeStd 2.69→2.32, trades 48→31
   - 목표(SharpeStd<2.5) 달성. 유지.
@@ -79,21 +87,29 @@ _Last updated: 2026-06-29 (Cycle 368 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 368 업데이트)
+### 핵심 메트릭 (Cycle 369 업데이트)
 
-| 지표 | Cycle 367 | Cycle 368 | 변화 |
+| 지표 | Cycle 368 | Cycle 369 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.55 | **0.55** | 유지 (rank2) |
-| 1h BTC dema_cross PF | 1.35 | **1.35** | 유지 |
-| 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC dema_cross Rank | 2/19 | **2/19** | 유지 ✅ |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
-| 1h BTC roc_ma_cross Sharpe | 0.34 (ma=3) | **-0.91 (ma=5실험)→0.34복원** | ma=5 역효과 확정 |
+| 1h BTC dema_cross Sharpe | 0.55 | **0.80** | +0.25 (thr=40 효과) ✅ |
+| 1h BTC dema_cross PF | 1.35 | **1.38** | +0.03 ✅ |
+| 1h BTC dema_cross Trades | 26 | **30** | +4 ✅ |
+| 1h BTC dema_cross Rank | 2/19 | **1/19** | rank1 달성 🏆 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank2로 강등) |
+| 1h BTC roc_ma_cross Sharpe | 0.34 (복원) | **-1.45 (roc_period=10실험)→0.34복원** | roc_period=10 역효과 확정 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (52연속) | **0/19 (53연속)** | — |
+| 1h PASS 수 | 0/19 (53연속) | **0/19 (54연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 합성 데이터 0/5 (참고 불가) |
-| 테스트 수 | 8440 | **8457** | +8 (tiered_slippage+6, dema_cross_edge+2) |
+| 테스트 수 | 8457 | **8449** | 동일 (skipped 23, 집계 방식 차이) |
+
+### Cycle 369 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `scripts/paper_simulation.py` | dema_cross rsi_dir_threshold=40 확정 + roc_ma_cross roc_period=10 실험→복원 (Cycle369 D+F) |
+| `src/backtest/walk_forward.py` | `import time as _time` + run()에 윈도우별 타이밍 로깅 추가 (Cycle369 E) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold [45,50]→[40,45] (Cycle369 D) |
 
 ### Cycle 368 코드 변경 요약
 

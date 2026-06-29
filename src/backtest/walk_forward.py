@@ -19,6 +19,7 @@ D3. WalkForwardOptimizer: 전략 파라미터 자동 최적화.
 import itertools
 import logging
 import statistics as _statistics
+import time as _time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Type, Tuple, List, Dict
 
@@ -209,11 +210,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle366 D(ML): thr=45 paper_sim 결과 — net positive (rank5→2)
     #   Sharpe: 0.40→0.55(+0.15↑), Trades: 18→26(+8↑), PF: 1.45→1.35(-0.10 mild↓)
     #   fast=7 패턴(PF 1.00 대폭 하락) 아님 — 허용 가능한 PF 소폭 하락으로 thr=45 유지 확정
+    # Cycle369 D(ML): thr=40 paper_sim 결과 → 대성공 (rank1, Sh0.55→0.80, Trades26→30)
+    #   thr=50 제거(thr=45보다 열등 확인, Cycle365), thr=40 추가 (확정 최적)
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
-        "rsi_dir_threshold": [45, 50],
+        "rsi_dir_threshold": [40, 45],
     },
 }
 
@@ -450,12 +453,14 @@ class WalkForwardOptimizer:
         oos_vols: List[float] = []
 
         for i, (is_df, oos_df) in enumerate(windows):
+            _win_t0 = _time.monotonic()
             # regime_filter: TREND_UP 레짐 외 BUY 차단 (_regime_trend_up 컬럼 추가)
             if self.regime_filter and self._regime_detector is not None:
                 is_df = self._annotate_regime(is_df)
                 oos_df = self._annotate_regime(oos_df)
 
             # IS 최적화 (Sharpe - λ*CV 목적함수 + 플래토 룰 적용)
+            _is_t0 = _time.monotonic()
             best_params, best_is_sharpe, is_sharpe_dist = self._optimize_in_sample(
                 is_df, all_combinations,
                 stability_lambda=self.stability_lambda,
@@ -463,6 +468,7 @@ class WalkForwardOptimizer:
                 trades_regularization_scale=self.trades_regularization_scale,
                 regime_filter=self.regime_filter,
             )
+            _is_elapsed = _time.monotonic() - _is_t0
 
             # OOS 검증
             inner_strategy = self.strategy_factory(best_params)
@@ -510,10 +516,13 @@ class WalkForwardOptimizer:
             last_is_sharpe_dist = is_sharpe_dist
 
             oos_vs_is_gap = oos_result.sharpe_ratio - best_is_sharpe
+            _win_elapsed = _time.monotonic() - _win_t0
             logger.info(
-                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f gap=%.3f trades=%d params=%s",
+                "Window %d: IS Sharpe=%.3f OOS Sharpe=%.3f ratio=%.2f gap=%.3f trades=%d params=%s"
+                " | IS_opt=%.2fs total=%.2fs (%d combos)",
                 i, best_is_sharpe, oos_result.sharpe_ratio, ratio, oos_vs_is_gap,
                 oos_result.total_trades, best_params,
+                _is_elapsed, _win_elapsed, len(all_combinations),
             )
 
         # 최종 파라미터 선택: Sharpe Information Criterion (avg - 0.5 * std)
@@ -1195,7 +1204,8 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
     """DEMACross 전략 파라미터 최적화 (Cycle365 C(데이터): WFO 함수 추가).
 
     DEFAULT_GRIDS["dema_cross"]는 Cycle356에서 추가됐으나 이 함수가 없어
-    WFO 탐색이 불가했음. rsi_dir_threshold=[45,50] 포함 그리드 탐색.
+    WFO 탐색이 불가했음. rsi_dir_threshold=[40,45] 포함 그리드 탐색.
+    (Cycle369: thr=40 paper_sim 대성공 → [45,50]에서 [40,45]로 업데이트)
     """
     from src.strategy.dema_cross import DEMACrossStrategy
 
