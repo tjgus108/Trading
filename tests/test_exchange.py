@@ -1061,3 +1061,56 @@ class TestPaperConnectorRoundTrip:
         assert summary["sell_count"] == 3
         # Total PnL = 200 - 100 + 400 = 500
         assert abs(summary["total_pnl"] - 500.0) < 1.0
+
+
+# Cycle368 E(실행): 티어드 슬리피지 검증
+# =============================================================
+
+class TestPaperConnectorTieredSlippage:
+    """Cycle368 E: use_tiered_slippage=True 동작 검증.
+
+    BTC(large=0.05%) vs SOL(mid=0.2%) 슬리피지 티어 차이.
+    BTC paper_sim은 tiered=False와 동일, SOL은 4x 높은 슬리피지.
+    """
+
+    def test_btc_classified_as_large(self):
+        """BTC/USDT → large 티어 분류 확인."""
+        from src.exchange.paper_trader import classify_symbol_tier
+        assert classify_symbol_tier("BTC/USDT") == "large"
+        assert classify_symbol_tier("ETH/USDT") == "large"
+
+    def test_sol_classified_as_mid(self):
+        """SOL/USDT → mid 티어 분류 확인."""
+        from src.exchange.paper_trader import classify_symbol_tier
+        assert classify_symbol_tier("SOL/USDT") == "mid"
+
+    def test_sol_tiered_slippage_4x_btc(self):
+        """SOL mid 슬리피지(0.2%) = BTC large(0.05%) × 4."""
+        from src.exchange.paper_trader import SLIPPAGE_TIERS
+        assert SLIPPAGE_TIERS["large"] == 0.05
+        assert SLIPPAGE_TIERS["mid"] == 0.20
+        assert SLIPPAGE_TIERS["mid"] / SLIPPAGE_TIERS["large"] == 4.0
+
+    def test_tiered_flag_passed_to_paper_trader(self):
+        """use_tiered_slippage=True가 PaperTrader에 전달됨."""
+        pc = PaperConnector(
+            symbol="SOL/USDT", initial_balance=100000.0,
+            use_tiered_slippage=True,
+        )
+        assert pc.paper_trader._use_tiered_slippage is True
+
+    def test_tiered_false_is_default(self):
+        """기본값 use_tiered_slippage=False 확인."""
+        pc = PaperConnector(symbol="BTC/USDT")
+        assert pc.paper_trader._use_tiered_slippage is False
+
+    def test_btc_tiered_order_succeeds(self):
+        """BTC tiered=True로 주문 체결 확인 (large=flat, 동일 동작)."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=100000.0,
+            fee_rate=0.0, partial_fill_prob=0.0, timeout_prob=0.0,
+            use_tiered_slippage=True,
+        )
+        result = pc.create_order("BTC/USDT", "buy", 1.0, price=50000.0)
+        assert result["status"] == "closed"
+        assert result["filled"] == 1.0

@@ -441,6 +441,20 @@ class TestWalkForwardOptimizer:
         assert isinstance(result, WalkForwardResult)
         assert result.strategy_name == "dema_cross"
 
+    def test_optimize_dema_cross_empty_df(self):
+        """Cycle368 A(품질): 빈 DataFrame → is_stable=False, 예외 없음."""
+        df = pd.DataFrame()
+        result = optimize_dema_cross(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert not result.is_stable
+
+    def test_optimize_dema_cross_insufficient_data(self):
+        """Cycle368 A(품질): 데이터 부족(50행) → is_stable=False."""
+        df = _make_df(50)
+        result = optimize_dema_cross(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert not result.is_stable
+
     def test_iter_param_combinations(self):
         """파라미터 조합 수 계산."""
         from src.strategy.ema_cross import EmaCrossStrategy

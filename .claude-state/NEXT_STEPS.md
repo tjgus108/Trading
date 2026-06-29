@@ -1,43 +1,44 @@
 # Next Steps
 
-_Last updated: 2026-06-29 (Cycle 367 완료)_
+_Last updated: 2026-06-29 (Cycle 368 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 367
+### 이번 세션 완료 사이클: 368
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 365 | A+C+F | fast=8 복원 확인(Sharpe=0.40, PF=1.45, Trades=18), rsi_dir_threshold 파라미터화(45/50), optimize_dema_cross() 함수 추가 |
 | 366 | B+D+F | DrawdownMonitor 시나리오 테스트(88→90 테스트), threshold=45 확인(Sharpe0.40→0.55, Trades18→26, PF1.45→1.35) |
 | 367 | B+D+F | KellySizer BTC 시나리오 테스트(38→42), slow=25 실험→탈락 확정→slow=20 복원, roc_ma_cross 신호 분석 |
+| 368 | E+A+F | 티어드 슬리피지 분석(BTC=flat, SOL=4x), dema_cross 엣지 테스트, ma=5 역효과 확정(Sh 0.34→-0.91) |
 
-### 🎯 Cycle 368 작업 방향 (368 mod 5 = 3 → E(실행) + A(품질) + F(리서치))
+### 🎯 Cycle 369 작업 방향 (369 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### E(실행): PaperConnector 슬리피지 모델 점검
+#### D(ML): roc_ma_cross 개선 방향 재탐색
 
-- BTC 1h 슬리피지 분류: NORMAL (0.5~3%), SOL synthetic: HIGH(39%) — 과도한 페널티 가능성
-- **작업**: PaperConnector 슬리피지 계산 로직 검토
-  - `use_tiered_slippage=False` vs True 차이 분석 (Cycle359 E 파라미터 추가 후 미검증)
-  - BTC/SOL 슬리피지 실효 영향 확인 (paper_sim trades 수에 영향 있는지)
+- **배경**: Cycle368 ma=5 역효과 확정 (rank15, Sh=-0.91)
+  - ma=3 복원: rank2, Sh=0.34, PF=1.22, Trades=36
+  - ma 조정은 더 이상 옵션 아님 (ma=3 최적 확정)
+- **작업**: roc_period 조정 탐색 (현재 roc_period=12)
+  - roc_period=10 실험: 더 민감한 모멘텀 신호, 거래 빈도 증가 기대
+  - 신호 필터 재검토: EMA50/200 조건이 신호를 너무 제한하는지 분석
+  - DEFAULT_GRIDS["roc_ma_cross"]: roc_period=[10,12,15], ma_period=[3,5,7] → roc_period=10 집중
 
-#### A(품질): 테스트 커버리지 점검
+#### E(실행): PaperConnector 부분체결 시나리오 테스트
 
-- **배경**: 현재 42 Kelly tests, 8436 total tests
-- **작업**: 미커버 영역 탐색 (walk_forward, paper_connector, circuit_breaker)
-  - `optimize_dema_cross()` 함수 엣지케이스 테스트 (빈 DataFrame, 단일 윈도우 등)
-  - `PaperConnector.execute_order()` 슬리피지 시나리오 테스트
+- **배경**: Cycle368 E에서 티어드 슬리피지 분석 완료. partial_fill 시나리오 미커버.
+- **작업**: `test_exchange.py`에 partial_fill 시나리오 테스트 추가
+  - `partial_fill_prob=1.0`: 항상 부분체결 → filled < amount 확인
+  - 부분체결 후 balance 계산 정합성 확인 (actual_qty vs requested qty)
 
-#### F(리서치): roc_ma_cross PF 개선 — ma_period=5 실험
+#### F(리서치): roc_ma_cross roc_period=10 실험
 
-- **배경**: Cycle367 분석 — roc_ma_cross rank2 (Sh=0.34), ma=3: 42.6/60d 원시/36/60d 필터후
-  - ma=5: 36.8/60d 예상 (더 스무딩, 거짓 크로스오버 감소 → PF 개선 가능)
-  - DEFAULT_GRIDS["roc_ma_cross"] = roc_period=[10,12,15], ma_period=[3,5,7] 이미 포함
-- **작업**: paper_simulation.py에 roc_ma_cross ma_period=5 실험 (현재 ma=3)
-  - paper_sim 실행 후 PF/Sharpe/trades 변화 관찰
-  - PF 1.22→1.30+ 달성 여부 확인
+- **배경**: Cycle368 분석 — ma 조정 방향 소멸, roc_period 탐색으로 전환
+  - roc_period=10 → 더 빠른 모멘텀 감지 → trade 빈도 + PF 개선 가능
+- **작업**: paper_simulation.py에 roc_ma_cross roc_period=10 실험
+  - BTC 1h: 현재 Sh=0.34, PF=1.22, Trades=36 → 개선 여부 관찰
 
 ### ⚠️ 주의 사항 (Cycle 368 이후)
 
@@ -72,21 +73,29 @@ _Last updated: 2026-06-29 (Cycle 367 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 367 업데이트)
+### 핵심 메트릭 (Cycle 368 업데이트)
 
-| 지표 | Cycle 366 | Cycle 367 | 변화 |
+| 지표 | Cycle 367 | Cycle 368 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.55 (thr=45) | **0.55** | 유지 (slow=20 확정) |
-| 1h BTC dema_cross PF | 1.35 | **1.35** | 유지 (slow=25 탈락 확인) |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
+| 1h BTC dema_cross Sharpe | 0.55 | **0.55** | 유지 (rank2) ✅ |
+| 1h BTC dema_cross PF | 1.35 | **1.35** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
 | 1h BTC dema_cross Rank | 2/19 | **2/19** | 유지 ✅ |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank1) |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.34** | 유지 (rank2 with slow=25 exp) |
+| 1h BTC roc_ma_cross Sharpe | 0.34 (ma=3) | **-0.91 (ma=5 실험)→0.34 복원** | ma=5 역효과 확정 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (50연속) | **0/19 (52연속)** | — |
+| 1h PASS 수 | 0/19 (52연속) | **0/19 (53연속)** | — |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 ✅ |
-| 테스트 수 | 8436 | **8440** | +4 Kelly BTC 시나리오 |
+| 테스트 수 | 8440 | **8449** | +9 (E/A 티어드슬리피지+dema엣지) |
+
+### Cycle 368 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_exchange.py` | TestPaperConnectorTieredSlippage 6개 테스트 추가 (Cycle368 E) |
+| `tests/test_phase_d.py` | optimize_dema_cross 엣지케이스 2개 테스트 추가 (Cycle368 A) |
+| `scripts/paper_simulation.py` | roc_ma_cross ma=5 실험 → 역효과 확정 → ma=3 복원(주석 유지) (Cycle368 F) |
 
 ### Cycle 367 코드 변경 요약
 
