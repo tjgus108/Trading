@@ -33,6 +33,7 @@ class DEMACrossStrategy(BaseStrategy):
         dist_pct_min: float = 0.002,
         ema_slope_min_buy: float = 0.0,
         macd_hist_filter: bool = False,
+        bb_width_min_filter: float = 0.0,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -69,6 +70,12 @@ class DEMACrossStrategy(BaseStrategy):
         # 배경: ema_slope 실패 원인(cross 직후 slope≈0) → MACD hist는 cross 이전부터 누적된 모멘텀
         # 가설: RANGING(47.3%) 구간의 역방향 cross를 MACD hist 불일치로 차단 → PF↑
         self.macd_hist_filter = macd_hist_filter
+        # Cycle374 D(ML): BB width squeeze 필터 — 저변동성(squeeze) 구간 cross 차단
+        # bb_width = (bb_upper - bb_lower) / sma20 = 상대 변동성 지표
+        # BB squeeze(폭 수축) 구간 cross → false breakout 가능성 높음
+        # BTC 1h 분포: mean=0.0645, p25=0.0410 → 0.04(23% 차단) 실험 임계값
+        # bb_width_min_filter=0.0: 비활성 (기본값), >0: squeeze 구간 차단
+        self.bb_width_min_filter = bb_width_min_filter
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -173,6 +180,23 @@ class DEMACrossStrategy(BaseStrategy):
                         ),
                         invalidation="",
                     )
+
+        # Cycle374 D(ML): BB width squeeze 필터 — 저변동성 구간 cross 차단
+        if self.bb_width_min_filter > 0.0 and "bb_width" in df.columns:
+            bb_width_val = float(df["bb_width"].iloc[idx])
+            if bb_width_val == bb_width_val and bb_width_val < self.bb_width_min_filter:
+                return Signal(
+                    action=Action.HOLD,
+                    confidence=Confidence.MEDIUM,
+                    strategy=self.name,
+                    entry_price=close_price,
+                    reasoning=(
+                        f"BB squeeze 차단: bb_width={bb_width_val:.4f} "
+                        f"< min={self.bb_width_min_filter:.4f}. "
+                        f"저변동성 구간 false breakout 가능성."
+                    ),
+                    invalidation="",
+                )
 
         # 거리 필터 (1%→0.5%→0.1%→0.2%: Cycle358 F(리서치) — SharpeStd=2.69 불안정)
         # BTC 1h fast=8/slow=20: 48 trades, Sharpe=0.47, SharpeStd=2.69 (std>2.5 위험 수준)

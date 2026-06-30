@@ -233,6 +233,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   0.0=비활성(기존), 0.0003=중간 임계값(Cycle346 분석 기반)
     # Cycle373 F(리서치): macd_hist_filter 추가 — BUY/SELL 시 MACD hist 방향 일치 요구
     #   가설: RANGING 구간의 역방향 cross를 hist 불일치로 차단 → PF 1.38→1.50 목표
+    # Cycle374 D(ML): bb_width_min_filter 추가 — BB squeeze 구간 cross 차단
+    #   BTC 1h bb_width 분포: mean=0.0645, p25=0.041 → 0.0(비활성)/0.04(23% 차단) 실험
+    #   가설: BB squeeze(폭 수축) 구간 cross → false breakout → PF 개선 기대
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
@@ -240,6 +243,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "rsi_dir_threshold": [40, 45],
         "ema_slope_min_buy": [0.0, 0.0003],
         "macd_hist_filter": [False, True],
+        "bb_width_min_filter": [0.0, 0.04],
     },
 }
 
@@ -1243,6 +1247,7 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
             dist_pct_min=params.get("dist_pct_min", 0.002),
             ema_slope_min_buy=params.get("ema_slope_min_buy", 0.0),
             macd_hist_filter=params.get("macd_hist_filter", False),
+            bb_width_min_filter=params.get("bb_width_min_filter", 0.0),
         )
 
     opt = WalkForwardOptimizer(

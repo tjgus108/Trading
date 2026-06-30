@@ -156,8 +156,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   BTC 1h: Sharpe=0.80, PF=1.38, Trades=30 — 기존과 동일 (필터 무효)
     #   이유: DEMA fast cross up 시 MACD hist는 이미 양수 (두 지표 상관관계 높음)
     #   결론: macd_hist_filter 탐색 종료. 기본값(False) 유지.
-    #   다음 방향: stop-loss 개선(avg_win/loss 비율) 또는 BB width 변동성 필터 재실험
-    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
+    # Cycle374 D(ML): bb_width_min_filter=0.04 실험 — BB squeeze 구간 cross 차단
+    #   BTC 1h bb_width 분포: mean=0.0645, p25=0.041 → 0.04(하위 23%) 임계값
+    #   가설: BB squeeze(낮은 변동성) 구간의 DEMA cross → false breakout → 차단 시 PF↑
+    "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
     #   Bundle OOS도 atr_threshold=0.5 사용하며 PASS → 동일 값으로 일치
