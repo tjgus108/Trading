@@ -1,55 +1,59 @@
 # Next Steps
 
-_Last updated: 2026-06-29 (Cycle 369 완료)_
+_Last updated: 2026-06-30 (Cycle 370 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 369
+### 이번 세션 완료 사이클: 370
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 367 | B+D+F | KellySizer BTC 시나리오 테스트(38→42), slow=25 탈락 확정, roc_ma_cross 신호 분석 |
 | 368 | E+A+F | PaperConnector tiered_slippage 테스트(+6), optimize_dema_cross 엣지케이스(+2), roc_ma_cross ma=5 역효과 확정 |
 | 369 | D+E+F | dema_cross thr=40 **rank1 달성** (Sh0.55→0.80), WFO 타이밍 로깅 추가, roc_period=10 역효과 확정 |
+| 370 | A+C+F | WFO 검증→thr=40 일회성 가능성, dist_pct_min 파라미터화, roc_period=15 역효과 확정 |
 
-### 🎯 Cycle 370 작업 방향 (370 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 371 작업 방향 (371 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): dema_cross thr=40 WFO 결과 검증
+#### B(리스크): dema_cross thr=40 vs thr=45 추가 검증
 
-- **배경**: Cycle369 paper_sim에서 thr=40 rank1(Sh=0.80) 확인
-  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 업데이트됨
-  - WFO(optimize_dema_cross) 실행으로 thr=40이 IS에서도 최적 선택되는지 검증 필요
-- **작업**: `optimize_dema_cross()` 함수로 WFO 실행 → best_params 확인
-  - 기대: rsi_dir_threshold=40이 WFO에서도 선택
-  - 만약 thr=45가 더 자주 선택되면: paper_sim 일회성 결과 가능성 검토
+- **배경**: Cycle370 A(품질) WFO에서 thr=40 한 번도 선택 안 됨 (thr=45 일관 선택)
+  - WFO best_params: thr=45 (3/3 윈도우), paper_sim은 thr=40이 Sh=0.80으로 rank1
+  - 저거래 (6/7/20 trades) → WFO 신뢰도 낮음. paper_sim 일회성 가능성 미확정
+- **작업**: paper_simulation.py에 dema_cross thr=45 재실험 (Cycle369 thr=40과 비교)
+  - thr=45 결과 (Cycle366): Sh=0.55, Trades=26, rank2
+  - 기대: thr=40이 일관성 있게 thr=45보다 우수한지 재확인
+  - 만약 thr=45가 더 안정적이면: thr=45로 복원 검토
 
-#### C(데이터): dema_cross dist_pct 탐색 (PF 1.50 목표)
+#### D(ML): frama 파라미터 탐색 (Sh=0.24 개선 목표)
 
-- **배경**: dema_cross 현재 PF=1.38, 목표 1.50 — dist_pct 탐색 미완
-  - dist_pct=0.002 (현재): SharpeStd 2.69→2.32 (Cycle358 확정)
-  - dist_pct=0.003: 더 강한 거리 필터 → PF 개선 가능 (신호 질 ↑, 빈도 ↓)
-- **작업**: paper_simulation.py에 dema_cross dist_pct=0.003 추가 실험
-  - 가설: 더 강한 거리 필터 → 노이즈 신호 제거 → PF↑
-  - trade-off: trades 감소 가능 (현재 30, 최소 15 필요)
+- **배경**: frama rank2(Sh=0.24, Cycle370) — price_cluster 뒤를 잇는 2위 전략
+  - frama 현재 DEFAULT_GRIDS["frama"] atr_period=[10,14,18] 추가됨 (Cycle363)
+  - 아직 atr_period 탐색 실험 미완
+- **작업**: paper_simulation.py에 frama atr_period=10 실험 (현재 기본값=14)
+  - 가설: 짧은 ATR 기간 → 변동성 필터 민감도↑ → 신호 타이밍 개선 가능
 
-#### F(리서치): roc_ma_cross roc_period=15 탐색
+#### F(리서치): dema_cross 다음 개선 방향 리서치
 
-- **배경**: Cycle369 roc_period=10 역효과 확정 (Sh=-1.45, 노이즈 증가)
-  - roc_period=12 (기본): Sh=0.34, rank2
-  - roc_period=15: 더 느린 ROC → 스무딩, noise 감소, trades 감소 가능
-- **작업**: paper_simulation.py에 roc_ma_cross roc_period=15 추가 실험
-  - 가설: 15봉 ROC는 중기 모멘텀 포착 → 신호 품질↑, 빈도↓
-  - PF/Sharpe 변화 관찰 (rank2 유지 또는 rank1 달성 가능 여부)
+- **배경**: dema_cross 현재 파라미터 탐색 현황:
+  - fast=8, slow=20 확정, rsi_dir_filter=True, thr=40 (WFO 불지지), dist_pct_min=0.002 확정
+  - PF=1.38 < 목표 1.50 — 추가 개선 필요
+- **작업**: dema_cross 진입 타이밍 분석
+  - RSI 조건 외 추가 필터 가능성 검토 (EMA slope, 볼린저밴드 확장 등)
+  - 또는 thr=40 재확인 실험으로 방향성 결정
 
-### ⚠️ 주의 사항 (Cycle 370 이후)
+### ⚠️ 주의 사항 (Cycle 371 이후)
 
-- **dema_cross rsi_dir_threshold=40 확정** (Cycle369 D): rank1 달성 (Sh=0.80, PF=1.38, Trades=30)
-  - thr=40: RSI 완화로 신호 빈도↑ + 품질 유지 → thr=45 대비 Sh+0.25 개선
-  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 업데이트됨
+- **dema_cross rsi_dir_threshold=40 — WFO 불지지** (Cycle370 A): WFO 3/3 윈도우 thr=45 선택
+  - paper_sim Sh=0.80(rank1)은 일회성 가능성 — Cycle371에서 thr=45 재실험으로 재검증 권장
+  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 유지 (WFO 탐색 지속)
+- **dema_cross dist_pct_min=0.003 역효과 확정** (Cycle370 C): Sh=-0.35, Trades=15 (0.002 대비 절반 감소)
+  - dist_pct_min 탐색 완료 — 0.002 유지 확정. dist_pct 방향 탐색 종료
+- **roc_ma_cross roc_period 탐색 완료** (Cycle370 F): 10(Sh=-1.45), 12(Sh=0.34 최적), 15(Sh=-0.33)
+  - roc_period=12 최적 확정. roc_period 탐색 종료
+  - roc_ma_cross 다음 개선 방향: 현재 확정 (ma=3, roc=12, 기본값)
 - **roc_ma_cross roc_period=10 역효과 확정** (Cycle369 F): Sh=-1.45 (12: Sh=0.34 대비 대폭 악화)
-  - 단축(10)은 노이즈 증가로 역효과 → roc_period=12 확정. 다음 탐색: roc_period=15
 - **WalkForwardOptimizer 타이밍 로깅** (Cycle369 E): run()에 IS_opt/total 시간 측정 추가됨
 - **roc_ma_cross ma=5 역효과 확정** (Cycle368 F): rank15(Sh=-0.91) vs ma=3 rank2(Sh=0.34)
   - ma 스무딩 강화 = 신호 지연 → roc_ma_cross PF 개선 방향은 roc_period 탐색으로 전환
@@ -87,21 +91,28 @@ _Last updated: 2026-06-29 (Cycle 369 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 369 업데이트)
+### 핵심 메트릭 (Cycle 370 업데이트)
 
-| 지표 | Cycle 368 | Cycle 369 | 변화 |
+| 지표 | Cycle 369 | Cycle 370 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.55 | **0.80** | +0.25 (thr=40 효과) ✅ |
-| 1h BTC dema_cross PF | 1.35 | **1.38** | +0.03 ✅ |
-| 1h BTC dema_cross Trades | 26 | **30** | +4 ✅ |
-| 1h BTC dema_cross Rank | 2/19 | **1/19** | rank1 달성 🏆 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 (rank2로 강등) |
-| 1h BTC roc_ma_cross Sharpe | 0.34 (복원) | **-1.45 (roc_period=10실험)→0.34복원** | roc_period=10 역효과 확정 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (53연속) | **0/19 (54연속)** | — |
-| Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 합성 데이터 0/5 (참고 불가) |
-| 테스트 수 | 8457 | **8449** | 동일 (skipped 23, 집계 방식 차이) |
+| 1h BTC dema_cross Sharpe | 0.80 (thr=40) | **-0.35 (dist=0.003 실험)→복원** | 실험 역효과, 0.002 복원 |
+| 1h BTC dema_cross Trades | 30 | **15 (dist=0.003)→30 복원** | 절반 감소 역효과 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
+| 1h BTC roc_ma_cross Sharpe | 0.34 복원 | **-0.33 (roc=15 실험)→복원** | 실험 역효과, roc=12 확정 |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | rank2 유지 |
+| 1h PASS 수 | 0/19 (54연속) | **0/19 (55연속)** | — |
+| Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
+| 테스트 수 | 8449 | **8449** | 동일 (dema tests 34 PASS) |
+
+### Cycle 370 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/dema_cross.py` | `dist_pct_min=0.002` 파라미터 추가 (Cycle370 C) |
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory에 dist_pct_min 전달 (Cycle370 C) |
+| `src/backtest/walk_forward.py` | Cycle370 A/C/F WFO 결과 주석 업데이트 |
+| `scripts/paper_simulation.py` | dist_pct_min=0.003 실험→복원 + roc_period=15 실험→복원 (Cycle370 C+F) |
 
 ### Cycle 369 코드 변경 요약
 

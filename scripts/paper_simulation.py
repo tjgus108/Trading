@@ -140,6 +140,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle369 D(ML): rsi_dir_threshold=40 실험 → rank1 달성 확정 (Sh0.55→0.80, Trades26→30)
     #   thr=40: Sharpe 0.80(+0.25↑), PF 1.38(+0.03↑), Trades 30(+4↑), rank1/19
     #   결론: RSI 임계값 완화(45→40) = 신호 빈도↑ + 품질 유지 → thr=40 확정
+    # Cycle370 C(데이터): dist_pct_min=0.003 실험 → 역효과 확정
+    #   dist_pct_min=0.003: Sharpe=-0.35, PF=1.08, Trades=15, rank15 (0.002: Sh=0.80, Trades=30, rank1 대비 대폭 악화)
+    #   결론: 더 강한 거리 필터(0.3%)는 cross 빈도를 절반으로 줄여 통계 부족 → 역효과. 0.002 유지 확정
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
@@ -151,8 +154,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle369 F(리서치): roc_period=10 실험 → 역효과 확정
     #   roc_period=10: Sharpe=-1.45, PF=0.88, Trades=39, rank16+ (roc_period=12: Sh=0.34, rank2 대비 대폭 악화)
     #   결론: roc_period 단축(10)은 노이즈 증가로 성과 붕괴 → roc_period=12(기본값) 확정
-    #   다음 탐색: roc_period=15 (더 느린 ROC → 스무딩, trades 감소 가능)
-    # "roc_ma_cross": {"roc_period": 10},  # 복원: 기본값(roc_period=12) 사용
+    # Cycle370 F(리서치): roc_period=15 실험 → 역효과 확정
+    #   roc_period=15: Sharpe=-0.33, PF=1.05, Trades=34, rank4 (roc_period=12: Sh=0.34, rank2 대비 악화)
+    #   결론: roc_period 확장(15)도 성과 하락 → roc_period=12 최적 확정. ROC 탐색 방향 종료
+    # "roc_ma_cross": {"roc_period": 15},  # 복원: 기본값(roc_period=12) 사용
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

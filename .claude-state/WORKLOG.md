@@ -1,3 +1,44 @@
+## [2026-06-30] Cycle 370 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] dema_cross thr=40 WFO 검증 — thr=45 선택됨, paper_sim 일회성 가능성**
+1. `optimize_dema_cross(df, n_windows=3)` 실행 (BTC 1h CSV 12000행)
+   - best_params: `{fast=12, slow=25, rsi_dir_filter=False, rsi_dir_threshold=45}`
+   - 3개 윈도우 모두 thr=45 선택 (thr=40 한 번도 선택 안 됨)
+   - is_stable=False, oos_sharpe_std=2.6152 (trades 6/7/20 → 저거래 신뢰도 낮음)
+   - 결론: Cycle369 paper_sim thr=40 rank1(Sh=0.80)은 WFO로 지지 안 됨 → **일회성 가능성**
+
+**[C(데이터)] dema_cross dist_pct_min=0.003 실험 → 역효과 확정**
+2. `DEMACrossStrategy`에 `dist_pct_min` 파라미터 추가 (기본=0.002 유지)
+   - dist_pct_min=0.003 실험: Sh=-0.35, PF=1.08, Trades=15, rank15
+   - 비교: dist_pct_min=0.002: Sh=0.80, Trades=30 (Cycle369)
+   - Trades 절반 감소 → 통계 부족 → 역효과 확정. 0.002 유지 확정
+3. `optimize_dema_cross()` factory에 `dist_pct_min` 파라미터 전달 추가
+
+**[F(리서치)] roc_ma_cross roc_period=15 실험 → 역효과 확정**
+4. PAPER_SIM_STRATEGY_PARAMS에 `"roc_ma_cross": {"roc_period": 15}` 실험:
+   - 결과: Sh=-0.33, PF=1.05, Trades=34, rank4 (roc_period=12: Sh=0.34 대비 악화)
+   - roc_period 탐색 완료 (10: Sh=-1.45, 12: Sh=0.34 최적, 15: Sh=-0.33)
+   - 결론: roc_period=12 최적 확정, 탐색 종료. 기본값 복원
+
+**[시뮬레이션 결과]**
+- Paper Sim (1h WF, BTC, Cycle370 실험): **0/19 PASS (55연속 FAIL)**
+  - rank1: **price_cluster** (Sh=0.87, PF=1.20, Trades=41)
+  - rank2: frama (Sh=0.24)
+  - dema_cross rank15 (dist_pct_min=0.003 실험 → 역효과, Trades=15, Sh=-0.35)
+  - roc_ma_cross rank4 (roc_period=15 실험 → Sh=-0.33 역효과)
+- Bundle OOS: **5/5 PASS** 유지 (실데이터 기준, 변화 없음)
+
+**[코드 변경]**
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/dema_cross.py` | `dist_pct_min=0.002` 파라미터 추가 (기본=0.002, 탐색용) |
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory에 dist_pct_min 전달 추가 |
+| `src/backtest/walk_forward.py` | Cycle370 A/C/F 결과 주석 업데이트 |
+| `scripts/paper_simulation.py` | dist_pct_min=0.003 실험→복원 + roc_period=15 실험→복원 |
+
+---
+
 ## [2026-06-29] Cycle 369 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] dema_cross rsi_dir_threshold=40 실험 → rank1 달성 확정**
@@ -7918,6 +7959,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-29 20:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 00:09 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

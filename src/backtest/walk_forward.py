@@ -189,6 +189,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # roc_period: ROC 계산 lookback (현재 12 고정) → 1h 노이즈 감안 짧게 [10,12,15]
     # ma_period: ROC 스무딩 MA 윈도우 (현재 3 고정) → 1h에서 3봉=3h 너무 짧음 [3,5,7]
     # Cycle361 F: EMA200 조건 정리(ema50 체크 제거), rsi_val dead code 제거
+    # Cycle370 F(리서치): roc_period 탐색 완료 (10/12/15 전부 검증)
+    #   10: Sh=-1.45 (역효과 Cycle369), 12: Sh=0.34 (최적), 15: Sh=-0.33 (역효과 Cycle370)
+    #   결론: roc_period=12 최적 확정. roc_period 탐색 방향 종료
     "roc_ma_cross": {
         "roc_period": [10, 12, 15],
         "ma_period": [3, 5, 7],
@@ -212,6 +215,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   fast=7 패턴(PF 1.00 대폭 하락) 아님 — 허용 가능한 PF 소폭 하락으로 thr=45 유지 확정
     # Cycle369 D(ML): thr=40 paper_sim 결과 → 대성공 (rank1, Sh0.55→0.80, Trades26→30)
     #   thr=50 제거(thr=45보다 열등 확인, Cycle365), thr=40 추가 (확정 최적)
+    # Cycle370 A(품질): optimize_dema_cross WFO 실행 → best_params={fast=12,slow=25,rsi_dir_filter=False,thr=45}
+    #   thr=40: WFO 3개 윈도우 모두 선택 안 됨 (thr=45 일관 선택) → paper_sim Sh=0.80은 일회성 가능성
+    #   is_stable=False, oos_sharpe_std=2.6152, trades 6/7/20 (저거래 신뢰도 낮음)
+    #   결론: thr=40 paper_sim rank1은 WFO로 지지 안 됨 — 추가 사이클에서 재검증 권장
+    # Cycle370 C(데이터): dist_pct_min=0.003 실험 → 역효과 확정
+    #   Sh=-0.35, Trades=15 (0.002: Sh=0.80, Trades=30 대비 절반 감소) → 0.002 유지 확정
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
@@ -1215,6 +1224,7 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
             slow=params.get("slow", 20),
             rsi_dir_filter=params.get("rsi_dir_filter", False),
             rsi_dir_threshold=params.get("rsi_dir_threshold", 50),
+            dist_pct_min=params.get("dist_pct_min", 0.002),
         )
 
     opt = WalkForwardOptimizer(

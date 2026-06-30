@@ -30,6 +30,7 @@ class DEMACrossStrategy(BaseStrategy):
         atr_vol_min_pct: float = 0.0,
         rsi_dir_filter: bool = False,
         rsi_dir_threshold: int = 50,
+        dist_pct_min: float = 0.002,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -50,6 +51,10 @@ class DEMACrossStrategy(BaseStrategy):
         #   fast=8/slow=25/thr=45 → 16.5/60d (항상 min_trades=15 초과)
         self.rsi_dir_filter = rsi_dir_filter
         self.rsi_dir_threshold = rsi_dir_threshold
+        # Cycle370 C(데이터): DEMA 거리 필터 파라미터화 — dist_pct_min 탐색 (PF 1.50 목표)
+        # 0.002(기본=Cycle358 확정): SharpeStd 2.69→2.32, trades 48→30
+        # 0.003: 더 강한 거리 필터 → 노이즈 신호 제거 → PF↑ 기대 (trades↓ trade-off)
+        self.dist_pct_min = dist_pct_min
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -158,14 +163,15 @@ class DEMACrossStrategy(BaseStrategy):
         # 거리 필터 (1%→0.5%→0.1%→0.2%: Cycle358 F(리서치) — SharpeStd=2.69 불안정)
         # BTC 1h fast=8/slow=20: 48 trades, Sharpe=0.47, SharpeStd=2.69 (std>2.5 위험 수준)
         # 0.001→0.002: 매우 약한 cross(gap<0.2%) 차단으로 noise 감소 → 30~40 trades 예상, Sharpe 안정 기대
-        if dist_pct < 0.002:
+        # Cycle370 C(데이터): dist_pct_min 파라미터화 (기본=0.002 유지, 0.003 실험 가능)
+        if dist_pct < self.dist_pct_min:
             return Signal(
                 action=Action.HOLD,
                 confidence=Confidence.MEDIUM,
                 strategy=self.name,
                 entry_price=close_price,
                 reasoning=(
-                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < 0.2% "
+                    f"DEMA 거리 미달: {dist_pct*100:.3f}% < {self.dist_pct_min*100:.1f}% "
                     f"(FAST={df_now:.4f}, SLOW={ds_now:.4f})"
                 ),
                 invalidation="",
