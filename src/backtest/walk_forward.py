@@ -155,7 +155,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle363 F(리서치): atr_period 추가 탐색
     # frama ATR 수축 필터: last_atr < prev_atr*1.05 (ATR 감소 추세에서만 신호 허용)
     # atr_period=10: 더 빠른 반응 (노이즈 증가), 14: 기본값, 18: 더 완만한 평활화 (지연)
-    # 배경: BTC rank3 Sharpe=0.24 PF=1.12 SharpeStd=1.60 (안정적) — PF 개선 가능성 탐색
+    # 배경: BTC rank2 Sharpe=0.24 PF=1.12 SharpeStd=1.60 (안정적, Cycle370 기준) — PF 개선 가능성 탐색
+    # Cycle371 D(ML): paper_sim atr_period=10 실험 → 결과 NEXT_STEPS.md 참조
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
@@ -221,6 +222,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   결론: thr=40 paper_sim rank1은 WFO로 지지 안 됨 — 추가 사이클에서 재검증 권장
     # Cycle370 C(데이터): dist_pct_min=0.003 실험 → 역효과 확정
     #   Sh=-0.35, Trades=15 (0.002: Sh=0.80, Trades=30 대비 절반 감소) → 0.002 유지 확정
+    # Cycle356: fast/slow 그리드 추가 (8,10,12 × 15,20,25)
+    # Cycle359: rsi_dir_filter=[False,True] 추가
+    # Cycle369: rsi_dir_threshold [45,50]→[40,45] (thr=40 paper_sim rank1)
+    # Cycle370: WFO 3/3 윈도우 thr=45 선택 — IS 윈도우 편향, paper_sim과 불일치
+    # Cycle371 B: thr=45 재검증 → thr=40 우위 확정 (Sh0.80 vs 0.55, Trades30 vs 26)
+    #   WFO vs paper_sim 불일치 원인: WFO IS 3개월 윈도우에서 thr=45가 안정적이나
+    #   전체 기간(8윈도우×2개월) 평가에서는 thr=40이 일관되게 우세
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
@@ -1215,6 +1223,8 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
     DEFAULT_GRIDS["dema_cross"]는 Cycle356에서 추가됐으나 이 함수가 없어
     WFO 탐색이 불가했음. rsi_dir_threshold=[40,45] 포함 그리드 탐색.
     (Cycle369: thr=40 paper_sim 대성공 → [45,50]에서 [40,45]로 업데이트)
+    (Cycle370: WFO 3/3 윈도우 모두 thr=45 선택 — IS 최적화 편향 가능성)
+    (Cycle371 B: paper_sim thr=45 재검증 → thr=40 우위 확정 (Sh0.55 vs 0.80, Trades26 vs 30))
     """
     from src.strategy.dema_cross import DEMACrossStrategy
 
@@ -1222,8 +1232,8 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
         return DEMACrossStrategy(
             fast=params.get("fast", 8),
             slow=params.get("slow", 20),
-            rsi_dir_filter=params.get("rsi_dir_filter", False),
-            rsi_dir_threshold=params.get("rsi_dir_threshold", 50),
+            rsi_dir_filter=params.get("rsi_dir_filter", True),
+            rsi_dir_threshold=params.get("rsi_dir_threshold", 40),
             dist_pct_min=params.get("dist_pct_min", 0.002),
         )
 

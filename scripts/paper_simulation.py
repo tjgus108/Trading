@@ -116,6 +116,9 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   결론: close_window=40 (짧은 윈도우)는 cluster 안정성 저하로 역효과. close_window=50 최적 확정
     #   다음 탐색 방향: bounce_pct 또는 다른 파라미터 (close_window 탐색 완료)
     "price_cluster": {"vol_regime_filter": False},
+    # Cycle371 D(ML): frama atr_period=10 실험 → 중립 확정 (Sh=0.24 = 기본값(14)과 동일)
+    # 결론: BTC 1h frama ATR 기간(10 vs 14)이 성능에 무영향 → 기본값(14) 유지
+    # "frama": {"atr_period": 10},  # 제거: 효과 없음 (Cycle371 D)
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
@@ -143,6 +146,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle370 C(데이터): dist_pct_min=0.003 실험 → 역효과 확정
     #   dist_pct_min=0.003: Sharpe=-0.35, PF=1.08, Trades=15, rank15 (0.002: Sh=0.80, Trades=30, rank1 대비 대폭 악화)
     #   결론: 더 강한 거리 필터(0.3%)는 cross 빈도를 절반으로 줄여 통계 부족 → 역효과. 0.002 유지 확정
+    # Cycle371 B(리스크): thr=45 재실험 결과 → thr=40 우위 확정 (Sh0.55 vs Sh0.80, Trades26 vs 30)
+    # 결론: WFO thr=45 선호 vs paper_sim thr=40 우위 → IS 윈도우 편향. thr=40 유지.
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단

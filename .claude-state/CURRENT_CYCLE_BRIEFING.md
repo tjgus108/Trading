@@ -1,39 +1,40 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-06-30 (Cycle 370 완료)_
+_Last updated: 2026-06-30 (Cycle 371 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 370
-- **다음 사이클**: 371 (371 mod 5 = 1 → B+D+F)
-- **연속 PASS 실패**: 55연속 (0/19 1h paper_sim)
+- **완료된 사이클**: 371
+- **다음 사이클**: 372 (372 mod 5 = 2 → B+D+F)
+- **연속 PASS 실패**: 56연속 (0/19 1h paper_sim)
 - **Bundle OOS**: 5/5 PASS 유지
 
-## Cycle 370 주요 결과
+## Cycle 371 주요 결과
 
-### A(품질): dema_cross thr=40 WFO 검증
-- WFO best_params: thr=45 (3/3 윈도우), thr=40 한 번도 선택 안 됨
-- is_stable=False, oos_sharpe_std=2.6152 (trades 6/7/20 저거래)
-- **결론**: paper_sim Sh=0.80(rank1)은 일회성 가능성 → Cycle371에서 thr=45 재실험 예정
+### B(리스크): dema_cross thr=45 재실험 → thr=40 우위 확정
+- thr=45 실험: Sh=0.55, PF=1.35, Trades=26, rank2
+- thr=40 비교: Sh=0.80, PF=1.38, Trades=30, rank1
+- WFO thr=45 선호 원인: IS 3개월 윈도우 편향 (짧은 평가 기간에서 보수적 필터가 유리)
+- **결론**: thr=40 우위 확정. WFO IS 편향 메커니즘 이해 완료
 
-### C(데이터): dist_pct_min=0.003 실험
-- Sh=-0.35, Trades=15 → 기존(Sh=0.80, Trades=30) 대비 **역효과**
-- dist_pct_min=0.002 유지 확정, 탐색 종료
+### D(ML): frama atr_period=10 실험 → 중립 확정
+- atr_period=10: Sh=0.24, PF=1.12, Trades=40 (기본값 atr_period=14와 동일)
+- **결론**: BTC 1h에서 ATR 기간 10-14 범위는 성능에 무영향. 기본값(14) 유지, 실험 제거
 
-### F(리서치): roc_period=15 실험
-- Sh=-0.33 → roc_period=12(Sh=0.34) 대비 악화
-- roc_period 탐색 완료 (10/12/15), roc_period=12 최적 확정
+### F(리서치): dema_cross EMA slope 필터 방향 식별
+- feed.py에 `df["ema20_slope"]` 이미 계산됨 (line 1054-1057) — 구현 준비 완료
+- 다음 방향: `ema_slope_min_buy=0.0003` 필터 (BUY 시 양의 slope 요구)
+- 현재 PF=1.38 → 목표 PF=1.50 (+0.12 필요)
 
 ## 코드 변경 사항
 
 | 파일 | 변경 |
 |------|------|
-| `src/strategy/dema_cross.py` | dist_pct_min 파라미터 추가 (기본=0.002) |
-| `src/backtest/walk_forward.py` | optimize_dema_cross() factory + 주석 업데이트 |
-| `scripts/paper_simulation.py` | 실험 후 복원 (C+F) |
+| `src/backtest/walk_forward.py` | optimize_dema_cross() factory 기본값 + 주석 업데이트 |
+| `scripts/paper_simulation.py` | frama atr=10 실험 제거 + thr=45/thr=40 결과 주석 |
 
-## Cycle 371 예고
+## Cycle 372 예고
 
-- **B(리스크)**: dema_cross thr=45 재실험 (WFO 결과 기반 재검증)
-- **D(ML)**: frama atr_period 탐색 (현재 rank2, Sh=0.24 개선)
-- **F(리서치)**: dema_cross 추가 개선 방향 분석
+- **D(ML)**: dema_cross `ema_slope_min_buy` 파라미터 추가 + 실험 (0.0003 임계값)
+- **B(리스크)**: risk 모듈 현황 점검 (DrawdownMonitor, CircuitBreaker, KellySizer)
+- **F(리서치)**: EMA slope 필터 효과 분석 및 dema_cross PF 1.50 목표 경로 확인

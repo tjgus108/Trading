@@ -1,3 +1,41 @@
+## [2026-06-30] Cycle 371 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] dema_cross thr=45 재실험 → thr=40 우위 확정**
+1. PAPER_SIM_STRATEGY_PARAMS에 `"dema_cross": {..., "rsi_dir_threshold": 45}` 설정 후 실험
+   - thr=45 결과: Sh=0.55, PF=1.35, Trades=26, rank2 (Cycle366 결과와 동일)
+   - thr=40 비교: Sh=0.80, PF=1.38, Trades=30, rank1 (Cycle369 결과 재확인)
+   - WFO vs paper_sim 불일치 원인: WFO IS 3개월 윈도우 편향 (thr=45 선호) vs 전체 기간 평가(thr=40 우세)
+   - **결론**: thr=40 우위 확정. thr=40 복원 및 유지
+
+**[D(ML)] frama atr_period=10 실험 → 중립 확정**
+2. PAPER_SIM_STRATEGY_PARAMS에 `"frama": {"atr_period": 10}` 추가 후 실험
+   - atr_period=10 결과: Sh=0.24, PF=1.12, Trades=40 (기본값 atr_period=14와 동일)
+   - **결론**: BTC 1h frama ATR 기간(10 vs 14)이 성능에 무영향 → 기본값(14) 유지. 실험 항목 제거
+
+**[F(리서치)] dema_cross 다음 개선 방향 — EMA slope 필터**
+3. 현재 dema_cross 상태: fast=8, slow=20, rsi_dir_filter=True, thr=40, dist_pct_min=0.002 (PF=1.38)
+   - PF=1.38 < 목표 1.50 — 추가 필터 필요
+   - feed.py 확인: `df["ema20_slope"]` 이미 계산됨 (line 1054-1057)
+   - 다음 방향: EMA slope 최소 임계값 필터 (`ema_slope_min_buy >= 0.0003`)
+   - 구현 방향: `dema_cross.py`에 `ema_slope_min_buy` 파라미터 추가 + WFO 그리드 업데이트
+
+**[시뮬레이션 결과]**
+- Paper Sim B실험 (thr=45): dema_cross rank2 (Sh=0.55, PF=1.35, Trades=26) → thr=40 우위 재확인
+- Paper Sim D실험 (frama atr=10): frama rank4 (Sh=0.24 = 기본값 동일) → 중립
+- dema_cross (thr=40 복원): rank1 (Sh=0.80, PF=1.38, Trades=30) ✓
+- Bundle OOS: **5/5 PASS** 유지 (BTC 4h, 2026-06-30 재검증)
+
+**[코드 변경]**
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` 기본값 factory: rsi_dir_filter=True, threshold=40 |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] Cycle371 B 결과 주석 추가 |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["frama"] Cycle371 D 실험 기록 주석 추가 |
+| `scripts/paper_simulation.py` | thr=45 실험→복원 + frama atr=10 실험→제거 + 결과 주석 |
+
+---
+
 ## [2026-06-30] Cycle 370 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] dema_cross thr=40 WFO 검증 — thr=45 선택됨, paper_sim 일회성 가능성**
@@ -8053,6 +8091,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-30 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 05:13 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

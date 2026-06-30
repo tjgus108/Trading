@@ -1,53 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-06-30 (Cycle 370 완료)_
+_Last updated: 2026-06-30 (Cycle 371 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 370
+### 이번 세션 완료 사이클: 371
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 368 | E+A+F | PaperConnector tiered_slippage 테스트(+6), optimize_dema_cross 엣지케이스(+2), roc_ma_cross ma=5 역효과 확정 |
 | 369 | D+E+F | dema_cross thr=40 **rank1 달성** (Sh0.55→0.80), WFO 타이밍 로깅 추가, roc_period=10 역효과 확정 |
 | 370 | A+C+F | WFO 검증→thr=40 일회성 가능성, dist_pct_min 파라미터화, roc_period=15 역효과 확정 |
+| 371 | B+D+F | thr=40 **우위 확정** (Sh0.80 vs 0.55), frama atr=10 중립, EMA slope 필터 방향 식별 |
 
-### 🎯 Cycle 371 작업 방향 (371 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 372 작업 방향 (372 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): dema_cross thr=40 vs thr=45 추가 검증
+#### D(ML): dema_cross EMA slope 필터 실험
 
-- **배경**: Cycle370 A(품질) WFO에서 thr=40 한 번도 선택 안 됨 (thr=45 일관 선택)
-  - WFO best_params: thr=45 (3/3 윈도우), paper_sim은 thr=40이 Sh=0.80으로 rank1
-  - 저거래 (6/7/20 trades) → WFO 신뢰도 낮음. paper_sim 일회성 가능성 미확정
-- **작업**: paper_simulation.py에 dema_cross thr=45 재실험 (Cycle369 thr=40과 비교)
-  - thr=45 결과 (Cycle366): Sh=0.55, Trades=26, rank2
-  - 기대: thr=40이 일관성 있게 thr=45보다 우수한지 재확인
-  - 만약 thr=45가 더 안정적이면: thr=45로 복원 검토
+- **배경**: Cycle371 F(리서치)에서 식별 — feed.py line 1054에 `df["ema20_slope"]` 이미 계산됨
+  - PF=1.38 < 목표 1.50 — EMA slope 필터로 진입 타이밍 개선 가능성 높음
+  - NEXT_STEPS 분석: ema_slope_min_buy=0.0 (54.7% BUY pass) → 0.0005 (44.3%) → 0.001 (34.5%, RANGING 과도차단)
+- **작업**: `src/strategy/dema_cross.py`에 `ema_slope_min_buy` 파라미터 추가
+  - 추가 방법: BUY 시그널 시 `ema20_slope >= ema_slope_min_buy` 조건 추가
+  - paper_simulation.py 실험: `"ema_slope_min_buy": 0.0003` (중간 임계값)
+  - DEFAULT_GRIDS["dema_cross"]에 `ema_slope_min_buy=[0.0, 0.0003]` 추가
 
-#### D(ML): frama 파라미터 탐색 (Sh=0.24 개선 목표)
+#### B(리스크): risk 모듈 현황 점검
 
-- **배경**: frama rank2(Sh=0.24, Cycle370) — price_cluster 뒤를 잇는 2위 전략
-  - frama 현재 DEFAULT_GRIDS["frama"] atr_period=[10,14,18] 추가됨 (Cycle363)
-  - 아직 atr_period 탐색 실험 미완
-- **작업**: paper_simulation.py에 frama atr_period=10 실험 (현재 기본값=14)
-  - 가설: 짧은 ATR 기간 → 변동성 필터 민감도↑ → 신호 타이밍 개선 가능
+- **배경**: B(리스크) 카테고리 연속 dema_cross 파라미터 실험 → 순수 리스크 모듈 점검 필요
+- **작업**: `src/risk/` 모듈 현황 파악
+  - DrawdownMonitor, CircuitBreaker 최근 이슈 없음 여부 확인
+  - KellySizer 파라미터 현황 확인 (dead param 이후 변경 여부)
 
-#### F(리서치): dema_cross 다음 개선 방향 리서치
+#### F(리서치): dema_cross EMA slope 효과 분석
 
-- **배경**: dema_cross 현재 파라미터 탐색 현황:
-  - fast=8, slow=20 확정, rsi_dir_filter=True, thr=40 (WFO 불지지), dist_pct_min=0.002 확정
-  - PF=1.38 < 목표 1.50 — 추가 개선 필요
-- **작업**: dema_cross 진입 타이밍 분석
-  - RSI 조건 외 추가 필터 가능성 검토 (EMA slope, 볼린저밴드 확장 등)
-  - 또는 thr=40 재확인 실험으로 방향성 결정
+- **배경**: EMA slope 필터 구현 후 효과 분석
+  - 가설: 양의 EMA slope에서만 BUY → 추세 방향 맞춰 진입 → PF 개선
+  - 위험: RANGING 레짐 BUY 차단 과도 → trades 감소 가능성
+- **작업**: 실험 결과 분석 및 다음 dema_cross 개선 방향 결정
 
-### ⚠️ 주의 사항 (Cycle 371 이후)
+### ⚠️ 주의 사항 (Cycle 372 이후)
 
-- **dema_cross rsi_dir_threshold=40 — WFO 불지지** (Cycle370 A): WFO 3/3 윈도우 thr=45 선택
-  - paper_sim Sh=0.80(rank1)은 일회성 가능성 — Cycle371에서 thr=45 재실험으로 재검증 권장
-  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 유지 (WFO 탐색 지속)
+- **dema_cross thr=40 우위 확정** (Cycle371 B): thr=45 재검증에서도 thr=40(Sh=0.80) > thr=45(Sh=0.55)
+  - WFO IS 편향 확정: WFO 3개월 윈도우에서 thr=45 선호 vs 전체 기간 평가 thr=40 우세
+  - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 유지 (WFO 그리드 탐색 지속)
 - **dema_cross dist_pct_min=0.003 역효과 확정** (Cycle370 C): Sh=-0.35, Trades=15 (0.002 대비 절반 감소)
   - dist_pct_min 탐색 완료 — 0.002 유지 확정. dist_pct 방향 탐색 종료
 - **roc_ma_cross roc_period 탐색 완료** (Cycle370 F): 10(Sh=-1.45), 12(Sh=0.34 최적), 15(Sh=-0.33)
@@ -91,19 +88,27 @@ _Last updated: 2026-06-30 (Cycle 370 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 370 업데이트)
+### 핵심 메트릭 (Cycle 371 업데이트)
 
-| 지표 | Cycle 369 | Cycle 370 | 변화 |
+| 지표 | Cycle 370 | Cycle 371 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.80 (thr=40) | **-0.35 (dist=0.003 실험)→복원** | 실험 역효과, 0.002 복원 |
-| 1h BTC dema_cross Trades | 30 | **15 (dist=0.003)→30 복원** | 절반 감소 역효과 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
-| 1h BTC roc_ma_cross Sharpe | 0.34 복원 | **-0.33 (roc=15 실험)→복원** | 실험 역효과, roc=12 확정 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | rank2 유지 |
-| 1h PASS 수 | 0/19 (54연속) | **0/19 (55연속)** | — |
+| 1h BTC dema_cross Sharpe | -0.35 (실험)→0.80 복원 | **0.80 (thr=40 확정)** | thr=40 우위 재확인 |
+| 1h BTC dema_cross Trades | 15 (실험)→30 복원 | **30 (thr=40)** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 (D실험 복원 후) |
+| 1h BTC frama Sharpe | 0.24 | **0.24 (atr=10 중립 확정)** | atr=14 기본값 유지 |
+| 1h PASS 수 | 0/19 (55연속) | **0/19 (56연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8449 | **8449** | 동일 (dema tests 34 PASS) |
+| 테스트 수 | 8449 | **8449** | 동일 |
+
+### Cycle 371 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory 기본값: rsi_dir_filter=True, threshold=40 (Cycle371 B) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] Cycle371 B 결과 주석 (Cycle371 B) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["frama"] Cycle371 D 실험 기록 주석 (Cycle371 D) |
+| `scripts/paper_simulation.py` | thr=45 실험→복원 + frama atr=10 실험→제거 (Cycle371 B+D) |
 
 ### Cycle 370 코드 변경 요약
 
