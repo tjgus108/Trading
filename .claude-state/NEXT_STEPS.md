@@ -1,46 +1,44 @@
 # Next Steps
 
-_Last updated: 2026-06-30 (Cycle 371 완료)_
+_Last updated: 2026-06-30 (Cycle 372 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 371
+### 이번 세션 완료 사이클: 372
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 369 | D+E+F | dema_cross thr=40 **rank1 달성** (Sh0.55→0.80), WFO 타이밍 로깅 추가, roc_period=10 역효과 확정 |
 | 370 | A+C+F | WFO 검증→thr=40 일회성 가능성, dist_pct_min 파라미터화, roc_period=15 역효과 확정 |
 | 371 | B+D+F | thr=40 **우위 확정** (Sh0.80 vs 0.55), frama atr=10 중립, EMA slope 필터 방향 식별 |
+| 372 | B+D+F | risk 모듈 현황 점검 이상 없음, ema_slope_min_buy=0.0003 **역효과 확정** (Sh0.80→0.21), 방향 종료 |
 
-### 🎯 Cycle 372 작업 방향 (372 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 373 작업 방향 (373 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### D(ML): dema_cross EMA slope 필터 실험
+#### C(데이터): dema_cross 다음 개선 방향 탐색
 
-- **배경**: Cycle371 F(리서치)에서 식별 — feed.py line 1054에 `df["ema20_slope"]` 이미 계산됨
-  - PF=1.38 < 목표 1.50 — EMA slope 필터로 진입 타이밍 개선 가능성 높음
-  - NEXT_STEPS 분석: ema_slope_min_buy=0.0 (54.7% BUY pass) → 0.0005 (44.3%) → 0.001 (34.5%, RANGING 과도차단)
-- **작업**: `src/strategy/dema_cross.py`에 `ema_slope_min_buy` 파라미터 추가
-  - 추가 방법: BUY 시그널 시 `ema20_slope >= ema_slope_min_buy` 조건 추가
-  - paper_simulation.py 실험: `"ema_slope_min_buy": 0.0003` (중간 임계값)
-  - DEFAULT_GRIDS["dema_cross"]에 `ema_slope_min_buy=[0.0, 0.0003]` 추가
+- **배경**: Cycle372 F에서 EMA slope 방향 종료 → PF=1.38 < 목표 1.50 달성 위한 새 방향 필요
+  - 종료된 방향: rsi_dir_threshold(369), dist_pct_min(370), ema_slope_min_buy(372)
+  - 미탐색: avg_win/avg_loss 비율 개선 (stop-loss 조정), signal 품질 개선 (다른 필터)
+- **작업**: `src/data/feed.py` 확인 — dema_cross에 활용 가능한 추가 피처 파악
+  - 후보: `atr14`, `bb_width` (변동성 기반), `cci20`, `macd_hist` (다른 momentum)
+  - 방향: 저변동성(ATR 낮은) 구간 cross 차단 — atr_vol_min_pct는 BTC에서 dead param이었으나 더 높은 임계값 재실험 가능성
 
-#### B(리스크): risk 모듈 현황 점검
+#### B(리스크): DrawdownMonitor transition_cushion 동작 검증
 
-- **배경**: B(리스크) 카테고리 연속 dema_cross 파라미터 실험 → 순수 리스크 모듈 점검 필요
-- **작업**: `src/risk/` 모듈 현황 파악
-  - DrawdownMonitor, CircuitBreaker 최근 이슈 없음 여부 확인
-  - KellySizer 파라미터 현황 확인 (dead param 이후 변경 여부)
+- **배경**: Cycle357에서 `transition_cushion_enabled`, `transition_cushion_threshold` 필드 추가됨
+  - from_dict()에서 복원되는지 실제 테스트 없음
+- **작업**: `tests/test_drawdown_monitor.py`에 transition_cushion 직렬화/역직렬화 테스트 추가
 
-#### F(리서치): dema_cross EMA slope 효과 분석
+#### F(리서치): dema_cross 다음 실험 방향 결정
 
-- **배경**: EMA slope 필터 구현 후 효과 분석
-  - 가설: 양의 EMA slope에서만 BUY → 추세 방향 맞춰 진입 → PF 개선
-  - 위험: RANGING 레짐 BUY 차단 과도 → trades 감소 가능성
-- **작업**: 실험 결과 분석 및 다음 dema_cross 개선 방향 결정
+- **배경**: Cycle372 결과 분석 — ema_slope 실패 이유 심층 분석
+  - cross 이후 slope이 아직 0에 가까움 → slope 필터가 실제 cross와 타이밍 어긋남
+  - RANGING(47.3% 구간)에서 cross 빈도가 높음 → RANGING에서의 cross 성능 분석
+- **작업**: 다음 실험 방향 결정 및 paper_simulation.py 실험 설정
 
-### ⚠️ 주의 사항 (Cycle 372 이후)
+### ⚠️ 주의 사항 (Cycle 373 이후)
 
 - **dema_cross thr=40 우위 확정** (Cycle371 B): thr=45 재검증에서도 thr=40(Sh=0.80) > thr=45(Sh=0.55)
   - WFO IS 편향 확정: WFO 3개월 윈도우에서 thr=45 선호 vs 전체 기간 평가 thr=40 우세
@@ -88,18 +86,27 @@ _Last updated: 2026-06-30 (Cycle 371 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 371 업데이트)
+### 핵심 메트릭 (Cycle 372 업데이트)
 
-| 지표 | Cycle 370 | Cycle 371 | 변화 |
+| 지표 | Cycle 371 | Cycle 372 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | -0.35 (실험)→0.80 복원 | **0.80 (thr=40 확정)** | thr=40 우위 재확인 |
-| 1h BTC dema_cross Trades | 15 (실험)→30 복원 | **30 (thr=40)** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 (D실험 복원 후) |
-| 1h BTC frama Sharpe | 0.24 | **0.24 (atr=10 중립 확정)** | atr=14 기본값 유지 |
-| 1h PASS 수 | 0/19 (55연속) | **0/19 (56연속)** | — |
+| 1h BTC dema_cross Sharpe | 0.80 (thr=40 확정) | **0.80 (ema_slope 실험→복원)** | 역효과 확정 후 복원 |
+| 1h BTC dema_cross Trades | 30 (thr=40) | **30 (복원)** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
+| 1h BTC frama Sharpe | 0.24 (atr=10 중립) | **0.24** | 유지 |
+| 1h PASS 수 | 0/19 (56연속) | **0/19 (57연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
 | 테스트 수 | 8449 | **8449** | 동일 |
+
+### Cycle 372 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/dema_cross.py` | `ema_slope_min_buy=0.0` 파라미터 추가 + BUY 필터 로직 (Cycle372 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"]에 `ema_slope_min_buy=[0.0, 0.0003]` 추가 (Cycle372 D) |
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory에 `ema_slope_min_buy` 전달 (Cycle372 D) |
+| `scripts/paper_simulation.py` | ema_slope_min_buy=0.0003 실험 후 복원 (역효과 확정, Cycle372 F) |
 
 ### Cycle 371 코드 변경 요약
 

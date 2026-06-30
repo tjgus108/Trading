@@ -229,11 +229,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle371 B: thr=45 재검증 → thr=40 우위 확정 (Sh0.80 vs 0.55, Trades30 vs 26)
     #   WFO vs paper_sim 불일치 원인: WFO IS 3개월 윈도우에서 thr=45가 안정적이나
     #   전체 기간(8윈도우×2개월) 평가에서는 thr=40이 일관되게 우세
+    # Cycle372 D(ML): ema_slope_min_buy 추가 — BUY시 EMA20 상승추세 확인 필터
+    #   0.0=비활성(기존), 0.0003=중간 임계값(Cycle346 분석 기반)
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
         "rsi_dir_filter": [False, True],
         "rsi_dir_threshold": [40, 45],
+        "ema_slope_min_buy": [0.0, 0.0003],
     },
 }
 
@@ -1235,6 +1238,7 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
             rsi_dir_filter=params.get("rsi_dir_filter", True),
             rsi_dir_threshold=params.get("rsi_dir_threshold", 40),
             dist_pct_min=params.get("dist_pct_min", 0.002),
+            ema_slope_min_buy=params.get("ema_slope_min_buy", 0.0),
         )
 
     opt = WalkForwardOptimizer(

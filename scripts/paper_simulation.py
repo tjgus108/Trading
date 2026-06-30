@@ -148,6 +148,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   결론: 더 강한 거리 필터(0.3%)는 cross 빈도를 절반으로 줄여 통계 부족 → 역효과. 0.002 유지 확정
     # Cycle371 B(리스크): thr=45 재실험 결과 → thr=40 우위 확정 (Sh0.55 vs Sh0.80, Trades26 vs 30)
     # 결론: WFO thr=45 선호 vs paper_sim thr=40 우위 → IS 윈도우 편향. thr=40 유지.
+    # Cycle372 D(ML): ema_slope_min_buy=0.0003 실험 → 역효과 확정
+    #   Sh=0.80→0.21(대폭 하락), PF=1.38→1.30(-0.08 하락), Trades=30→26(-4 감소), rank3→rank3
+    #   역효과 이유: RANGING 47.3% 구간에서 BUY 과도 차단 → 유효 cross 이벤트 놓침
+    #   결론: ema_slope_min_buy 방향 탐색 종료. 기본값(0.0=비활성) 유지.
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단

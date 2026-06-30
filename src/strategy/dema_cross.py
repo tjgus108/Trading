@@ -31,6 +31,7 @@ class DEMACrossStrategy(BaseStrategy):
         rsi_dir_filter: bool = False,
         rsi_dir_threshold: int = 50,
         dist_pct_min: float = 0.002,
+        ema_slope_min_buy: float = 0.0,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -55,6 +56,12 @@ class DEMACrossStrategy(BaseStrategy):
         # 0.002(기본=Cycle358 확정): SharpeStd 2.69→2.32, trades 48→30
         # 0.003: 더 강한 거리 필터 → 노이즈 신호 제거 → PF↑ 기대 (trades↓ trade-off)
         self.dist_pct_min = dist_pct_min
+        # Cycle372 D(ML): EMA20 slope BUY 진입 필터 — 상승추세에서만 BUY 허용
+        # BUY 시 ema20_slope >= ema_slope_min_buy (0.0=비활성, 0.0003=중간 임계값)
+        # 근거: feed.py에서 ema20_slope = ema20.diff()/ema20 이미 계산됨
+        # 가설: BTC PF=1.38 < 1.50 목표 — 양의 기울기 구간 BUY로 추세 방향 맞춤 → PF↑
+        # 위험: RANGING 구간 BUY 44.3% 차단(0.0005) → trades 감소 가능성
+        self.ema_slope_min_buy = ema_slope_min_buy
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -182,6 +189,22 @@ class DEMACrossStrategy(BaseStrategy):
         entry = float(self._last(df)["close"])
 
         if cross_up:
+            # Cycle372 D(ML): EMA20 slope 필터 — 상승추세에서만 BUY
+            if self.ema_slope_min_buy > 0.0 and "ema20_slope" in df.columns:
+                ema_slope_val = float(df["ema20_slope"].iloc[idx])
+                if ema_slope_val == ema_slope_val and ema_slope_val < self.ema_slope_min_buy:
+                    return Signal(
+                        action=Action.HOLD,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry,
+                        reasoning=(
+                            f"DEMA 상향 크로스 있으나 EMA slope 미달 "
+                            f"(slope={ema_slope_val:.5f} < {self.ema_slope_min_buy:.5f}). "
+                            f"상승추세 미확인."
+                        ),
+                        invalidation="",
+                    )
             # ✅ BUY 시 RSI < 65 (과매수 회피, Cycle357 D: 70→65 noise 감소)
             if rsi_val > 65:
                 return Signal(

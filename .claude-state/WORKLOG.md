@@ -1,3 +1,44 @@
+## [2026-06-30] Cycle 372 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] risk 모듈 현황 점검**
+1. DrawdownMonitor: to_dict/from_dict 5개 필드 정상, cooldown_active 주석 명확화 (Cycle357~358)
+2. CircuitBreaker: rapid_decline_pct/window/cooldown 파라미터 BTC 1h 실데이터 기반 주석 완비 (Cycle363)
+3. KellySizer: kelly_cap > max_fraction 시 debug 로그 추가됨, dead param 명시 (Cycle362)
+4. **결론**: 3개 모듈 모두 현재 이슈 없음. 추가 변경 불필요.
+
+**[D(ML)] dema_cross ema_slope_min_buy=0.0003 실험 → 역효과 확정**
+5. `dema_cross.py`에 `ema_slope_min_buy` 파라미터 추가 구현
+   - BUY 시 `ema20_slope >= ema_slope_min_buy` 조건 추가 (feed.py에 이미 계산됨)
+   - 기본값 0.0 (비활성), 실험값 0.0003 (중간 임계값)
+   - 실험 결과: Sh=0.80→0.21 (대폭 하락), PF=1.38→1.30, Trades=30→26, rank1→rank3
+   - 역효과 이유: RANGING 47.3% 구간에서 BUY 과도 차단 → 유효 cross 이벤트 놓침
+   - **결론**: ema_slope_min_buy 방향 탐색 종료. 기본값(0.0=비활성) 유지. 코드 보존(다른 심볼용)
+
+**[F(리서치)] EMA slope 필터 효과 분석**
+6. ema_slope_min_buy=0.0003 실험 분석:
+   - BTC RANGING 47.3% → EMA20 slope ≈ 0 → 0.0003 임계값이 RANGING BUY 대부분 차단
+   - 이전 분석(Cycle372 B/D 적용 전): thr=40에서 54.7% BUY pass → 0.0003으로 ~44.3%로 감소
+   - trades 30→26 감소 + Sharpe 0.80→0.21 → 차단된 신호가 오히려 유효 신호였음
+   - 가설 반증: 양의 EMA slope이 반드시 유리한 진입 조건 아님 (cross 이후 slope이 아직 0에 가까울 수 있음)
+   - **다음 탐색 방향**: dist_pct_min 또는 수익/손실 비율(avg_win/avg_loss) 개선 방향 탐색
+
+**[시뮬레이션 결과]**
+- Paper Sim (ema_slope 실험): dema_cross rank3 (Sh=0.21, PF=1.30, Trades=26) → 역효과 확정 → 복원
+- Paper Sim (복원 후): dema_cross (Sh=0.80, PF=1.38, Trades=30) rank1 유지 예상
+- Bundle OOS: **5/5 PASS** 유지 (BTC 4h, 2026-06-30 재검증)
+- 테스트: **8449 passed**, 23 skipped ✓
+
+**[코드 변경]**
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/dema_cross.py` | `ema_slope_min_buy=0.0` 파라미터 추가 + BUY 필터 로직 (Cycle372 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"]에 `ema_slope_min_buy=[0.0, 0.0003]` 추가 (Cycle372 D) |
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory에 `ema_slope_min_buy` 전달 추가 (Cycle372 D) |
+| `scripts/paper_simulation.py` | ema_slope_min_buy=0.0003 실험 후 제거 (역효과 확정, Cycle372 F) |
+
+---
+
 ## [2026-06-30] Cycle 371 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] dema_cross thr=45 재실험 → thr=40 우위 확정**
@@ -8185,6 +8226,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-30 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-06-30 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 10:08 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-06-30 10:08 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
