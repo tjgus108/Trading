@@ -1,42 +1,47 @@
 # Next Steps
 
-_Last updated: 2026-06-30 (Cycle 372 완료)_
+_Last updated: 2026-06-30 (Cycle 373 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 372
+### 이번 세션 완료 사이클: 373
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 370 | A+C+F | WFO 검증→thr=40 일회성 가능성, dist_pct_min 파라미터화, roc_period=15 역효과 확정 |
 | 371 | B+D+F | thr=40 **우위 확정** (Sh0.80 vs 0.55), frama atr=10 중립, EMA slope 필터 방향 식별 |
 | 372 | B+D+F | risk 모듈 현황 점검 이상 없음, ema_slope_min_buy=0.0003 **역효과 확정** (Sh0.80→0.21), 방향 종료 |
+| 373 | C+B+F | bb_width/macd_hist 피처 추가, transition_cushion 테스트 4개, macd_hist_filter **dead param 확정** |
 
-### 🎯 Cycle 373 작업 방향 (373 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 374 작업 방향 (374 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): dema_cross 다음 개선 방향 탐색
+#### D(ML): dema_cross BB width squeeze 필터 실험
 
-- **배경**: Cycle372 F에서 EMA slope 방향 종료 → PF=1.38 < 목표 1.50 달성 위한 새 방향 필요
-  - 종료된 방향: rsi_dir_threshold(369), dist_pct_min(370), ema_slope_min_buy(372)
-  - 미탐색: avg_win/avg_loss 비율 개선 (stop-loss 조정), signal 품질 개선 (다른 필터)
-- **작업**: `src/data/feed.py` 확인 — dema_cross에 활용 가능한 추가 피처 파악
-  - 후보: `atr14`, `bb_width` (변동성 기반), `cci20`, `macd_hist` (다른 momentum)
-  - 방향: 저변동성(ATR 낮은) 구간 cross 차단 — atr_vol_min_pct는 BTC에서 dead param이었으나 더 높은 임계값 재실험 가능성
+- **배경**: Cycle373 F에서 macd_hist_filter dead param 확정 → MACD와 DEMA cross는 상관관계 높아 독립 필터 불가
+  - 종료된 방향: rsi_dir_threshold(369), dist_pct_min(370), ema_slope_min_buy(372), macd_hist_filter(373)
+  - 미탐색: **BB width squeeze 필터** (bb_width < threshold → low-vol cross 차단)
+- **bb_width 특성**: (bb_upper - bb_lower) / sma20 = 상대 변동성 지표
+  - ATR ratio와 다름: ATR은 절대 변동성(BTC에서 항상 1.49%+), BB width는 SMA20 대비 상대 폭
+  - BB squeeze(폭 수축) 구간 cross → false breakout 가능성 높음
+- **작업**: `bb_width_min_filter` 파라미터를 `dema_cross.py`에 추가
+  - BTC 1h bb_width 분포 분석 후 적절한 임계값 설정 (예: 0.04 = 4%)
+  - paper_simulation.py 실험 설정
 
-#### B(리스크): DrawdownMonitor transition_cushion 동작 검증
+#### E(실행): macd_hist/bb_width 열 PaperConnector 접근 확인
 
-- **배경**: Cycle357에서 `transition_cushion_enabled`, `transition_cushion_threshold` 필드 추가됨
-  - from_dict()에서 복원되는지 실제 테스트 없음
-- **작업**: `tests/test_drawdown_monitor.py`에 transition_cushion 직렬화/역직렬화 테스트 추가
+- **배경**: Cycle373에서 enrich_indicators()에 macd_hist/bb_width 추가됨
+  - PaperConnector가 실시간 데이터를 받을 때 이 열들이 포함되는지 확인 필요
+- **작업**: `src/exchange/paper_connector.py` 확인 — 실시간 데이터 흐름에서 indicator 계산 체인 검토
 
-#### F(리서치): dema_cross 다음 실험 방향 결정
+#### F(리서치): dema_cross stop-loss 개선 방향 탐색
 
-- **배경**: Cycle372 결과 분석 — ema_slope 실패 이유 심층 분석
-  - cross 이후 slope이 아직 0에 가까움 → slope 필터가 실제 cross와 타이밍 어긋남
-  - RANGING(47.3% 구간)에서 cross 빈도가 높음 → RANGING에서의 cross 성능 분석
-- **작업**: 다음 실험 방향 결정 및 paper_simulation.py 실험 설정
+- **배경**: 모든 momentum/volatility 필터(rsi_dir, dist_pct, ema_slope, macd_hist) 탐색 완료/종료
+  - **마지막 미탐색 방향**: avg_win/avg_loss 비율 개선 → PF 1.38→1.50 달성 가능성
+  - 현재 PF=1.38: avg_win 수익이 avg_loss 손실보다 38% 많음
+  - 목표 PF=1.50: avg_win/avg_loss 비율 개선 필요
+- **작업**: 현재 백테스트에서 avg_win/avg_loss 실제 값 분석 → stop-loss 조정 방향 도출
+  - max_hold_candles 조정 또는 trailing stop 추가 가능성 검토
 
 ### ⚠️ 주의 사항 (Cycle 373 이후)
 
@@ -86,18 +91,30 @@ _Last updated: 2026-06-30 (Cycle 372 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 372 업데이트)
+### 핵심 메트릭 (Cycle 373 업데이트)
 
-| 지표 | Cycle 371 | Cycle 372 | 변화 |
+| 지표 | Cycle 372 | Cycle 373 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.80 (thr=40 확정) | **0.80 (ema_slope 실험→복원)** | 역효과 확정 후 복원 |
-| 1h BTC dema_cross Trades | 30 (thr=40) | **30 (복원)** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
-| 1h BTC frama Sharpe | 0.24 (atr=10 중립) | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (56연속) | **0/19 (57연속)** | — |
+| 1h BTC dema_cross Sharpe | 0.80 (복원) | **0.80 (macd_hist 실험→dead param→복원)** | 역효과 확정 후 복원 |
+| 1h BTC dema_cross Trades | 30 (복원) | **30 (복원)** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank2 유지 |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
+| 1h PASS 수 | 0/19 (57연속) | **0/19 (58연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8449 | **8449** | 동일 |
+| 테스트 수 | 8449 | **8453 (+4)** | transition_cushion 테스트 4개 추가 |
+
+### Cycle 373 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/data/feed.py` | compute_indicators()에 `macd_hist` = macd-signal, `bb_width` = (bb_upper-bb_lower)/sma20 추가 (Cycle373 C) |
+| `scripts/paper_simulation.py` | enrich_indicators()에 `macd_hist`, `bb_width` 동기화 추가 (Cycle373 C, feed.py 누락 버그 수정) |
+| `src/strategy/dema_cross.py` | `macd_hist_filter=False` 파라미터 추가 + generate() BUY/SELL 필터 로직 (Cycle373 F) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"]에 `macd_hist_filter=[False,True]` 추가 (Cycle373 F) |
+| `src/backtest/walk_forward.py` | `optimize_dema_cross()` factory에 `macd_hist_filter` 전달 (Cycle373 F) |
+| `scripts/paper_simulation.py` | macd_hist_filter=True 실험 → dead param 확정 → 복원 (Cycle373 F) |
+| `tests/test_drawdown_monitor.py` | transition_cushion 직렬화/역직렬화 테스트 4개 추가 (Cycle373 B) |
 
 ### Cycle 372 코드 변경 요약
 

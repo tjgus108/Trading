@@ -1,42 +1,47 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-06-30 (Cycle 372 완료)_
+_Last updated: 2026-06-30 (Cycle 373 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 372
-- **다음 사이클**: 373 (373 mod 5 = 3 → C+B+F)
-- **연속 PASS 실패**: 57연속 (0/19 1h paper_sim)
+- **완료된 사이클**: 373
+- **다음 사이클**: 374 (374 mod 5 = 4 → D+E+F)
+- **연속 PASS 실패**: 58연속 (0/19 1h paper_sim)
 - **Bundle OOS**: 5/5 PASS 유지
 
-## Cycle 372 주요 결과
+## Cycle 373 주요 결과
 
-### B(리스크): risk 모듈 현황 점검 — 이상 없음
-- DrawdownMonitor: to_dict/from_dict 정상, cooldown_active 주석 완비 (Cycle357~358)
-- CircuitBreaker: rapid_decline BTC 1h 실데이터 기반 파라미터 주석 완비 (Cycle363)
-- KellySizer: dead param debug 로그 추가됨 (Cycle362)
-- **결론**: 3개 모듈 모두 현재 이슈 없음
+### C(데이터): feed.py 피처 추가 + enrich_indicators 동기화
+- `bb_width` = (bb_upper - bb_lower) / sma20 추가 (BB 폭 비율, squeeze 탐지)
+- `macd_hist` = macd - macd_signal 추가 (MACD 히스토그램, 모멘텀 강도/방향)
+- `scripts/paper_simulation.py` enrich_indicators()에도 동기화 (누락 버그 수정)
 
-### D(ML): dema_cross ema_slope_min_buy=0.0003 실험 → 역효과 확정
-- 실험 결과: Sh=0.80→0.21 (대폭 하락), PF=1.38→1.30, Trades=30→26
-- 역효과 이유: RANGING 47.3% 구간에서 BUY 과도 차단 → 유효 cross 이벤트 놓침
-- **결론**: ema_slope_min_buy 방향 탐색 종료. 기본값(0.0) 유지. 코드는 보존 (다른 심볼용)
+### B(리스크): transition_cushion 직렬화/역직렬화 테스트 4개 추가
+- `test_transition_cushion_to_dict_includes_fields`
+- `test_transition_cushion_from_dict_roundtrip`
+- `test_transition_cushion_multiplier_after_restore` (< threshold → 0.5, >= → 1.0)
+- `test_transition_cushion_disabled_default_after_restore` (항상 1.0)
+- 결과: 8453 passed (+4)
 
-### F(리서치): EMA slope 실패 원인 분석
-- cross 직후 EMA20 slope이 아직 0에 가까움 → 진입 직후 slope 측정은 타이밍 어긋남
-- RANGING(47.3%)에서 cross가 많음 → slope 필터가 유리한 RANGING cross도 차단
-- **다음 탐색 방향**: feed.py 추가 피처 파악 (atr 기반 변동성 조건 등)
+### F(리서치): macd_hist_filter dead param 확정
+- dema_cross에 `macd_hist_filter` 파라미터 추가 구현
+- 실험 결과: Sh=0.80, PF=1.38, Trades=30 → **기존과 동일** → dead param
+- 원인: DEMA cross (fast=8/slow=20)와 MACD hist 높은 상관관계 → cross 시점에 hist이미 같은 방향
+- **결론**: macd_hist_filter 탐색 종료. 코드 보존 (다른 전략용), 기본값 False
 
 ## 코드 변경 사항
 
 | 파일 | 변경 |
 |------|------|
-| `src/strategy/dema_cross.py` | `ema_slope_min_buy` 파라미터 추가 (Cycle372 D) |
-| `src/backtest/walk_forward.py` | DEFAULT_GRIDS + optimize_dema_cross() ema_slope 추가 |
-| `scripts/paper_simulation.py` | ema_slope_min_buy 실험 후 복원 |
+| `src/data/feed.py` | `macd_hist`, `bb_width` 추가 (C) |
+| `scripts/paper_simulation.py` | enrich_indicators에 `macd_hist`, `bb_width` 추가 + 실험 후 복원 (C+F) |
+| `src/strategy/dema_cross.py` | `macd_hist_filter=False` 파라미터 + 필터 로직 (F) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS + factory에 `macd_hist_filter` 추가 (F) |
+| `tests/test_drawdown_monitor.py` | transition_cushion 테스트 4개 추가 (B) |
 
-## Cycle 373 예고
+## Cycle 374 예고 (374 mod 5 = 4 → D+E+F)
 
-- **C(데이터)**: feed.py 추가 피처 파악 → dema_cross 새 필터 방향 탐색
-- **B(리스크)**: DrawdownMonitor transition_cushion 직렬화 테스트 추가
-- **F(리서치)**: RANGING 구간 dema_cross 성능 분석 → 다음 실험 방향 결정
+- **D(ML)**: dema_cross BB width squeeze 필터 실험 (`bb_width_min` threshold)
+  - BTC 1h bb_width 분포 분석 → threshold 설정 → paper_sim 실험
+- **E(실행)**: macd_hist/bb_width 열 PaperConnector 데이터 흐름 확인
+- **F(리서치)**: avg_win/avg_loss 비율 분석 → stop-loss 개선 방향 탐색

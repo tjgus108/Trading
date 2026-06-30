@@ -32,6 +32,7 @@ class DEMACrossStrategy(BaseStrategy):
         rsi_dir_threshold: int = 50,
         dist_pct_min: float = 0.002,
         ema_slope_min_buy: float = 0.0,
+        macd_hist_filter: bool = False,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -60,8 +61,14 @@ class DEMACrossStrategy(BaseStrategy):
         # BUY 시 ema20_slope >= ema_slope_min_buy (0.0=비활성, 0.0003=중간 임계값)
         # 근거: feed.py에서 ema20_slope = ema20.diff()/ema20 이미 계산됨
         # 가설: BTC PF=1.38 < 1.50 목표 — 양의 기울기 구간 BUY로 추세 방향 맞춤 → PF↑
-        # 위험: RANGING 구간 BUY 44.3% 차단(0.0005) → trades 감소 가능성
+        # 역효과 확정 (Cycle372 F): ema_slope_min_buy=0.0003 → Sh=0.21 (0.0=0.80 대비 급락)
+        # 원인: DEMA cross 직후 EMA slope ≈0 → 크로스와 타이밍 어긋남
         self.ema_slope_min_buy = ema_slope_min_buy
+        # Cycle373 F(리서치): MACD histogram 방향 확인 필터
+        # BUY 시 macd_hist >= 0, SELL 시 macd_hist <= 0 — 모멘텀 방향이 크로스와 일치할 때만 진입
+        # 배경: ema_slope 실패 원인(cross 직후 slope≈0) → MACD hist는 cross 이전부터 누적된 모멘텀
+        # 가설: RANGING(47.3%) 구간의 역방향 cross를 MACD hist 불일치로 차단 → PF↑
+        self.macd_hist_filter = macd_hist_filter
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -189,6 +196,22 @@ class DEMACrossStrategy(BaseStrategy):
         entry = float(self._last(df)["close"])
 
         if cross_up:
+            # Cycle373 F(리서치): MACD histogram 방향 확인 필터
+            if self.macd_hist_filter and "macd_hist" in df.columns:
+                macd_hist_val = float(df["macd_hist"].iloc[idx])
+                if macd_hist_val == macd_hist_val and macd_hist_val < 0:
+                    return Signal(
+                        action=Action.HOLD,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry,
+                        reasoning=(
+                            f"DEMA 상향 크로스 있으나 MACD hist 역방향 "
+                            f"(macd_hist={macd_hist_val:.4f} < 0). "
+                            f"모멘텀 불일치."
+                        ),
+                        invalidation="",
+                    )
             # Cycle372 D(ML): EMA20 slope 필터 — 상승추세에서만 BUY
             if self.ema_slope_min_buy > 0.0 and "ema20_slope" in df.columns:
                 ema_slope_val = float(df["ema20_slope"].iloc[idx])
@@ -247,6 +270,22 @@ class DEMACrossStrategy(BaseStrategy):
             )
 
         if cross_down:
+            # Cycle373 F(리서치): MACD histogram 방향 확인 필터
+            if self.macd_hist_filter and "macd_hist" in df.columns:
+                macd_hist_val = float(df["macd_hist"].iloc[idx])
+                if macd_hist_val == macd_hist_val and macd_hist_val > 0:
+                    return Signal(
+                        action=Action.HOLD,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry,
+                        reasoning=(
+                            f"DEMA 하향 크로스 있으나 MACD hist 역방향 "
+                            f"(macd_hist={macd_hist_val:.4f} > 0). "
+                            f"모멘텀 불일치."
+                        ),
+                        invalidation="",
+                    )
             # ✅ SELL 시 RSI > 30 (과매도 회피)
             if rsi_val < 30:
                 return Signal(

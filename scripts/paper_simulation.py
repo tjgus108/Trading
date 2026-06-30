@@ -152,6 +152,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Sh=0.80→0.21(대폭 하락), PF=1.38→1.30(-0.08 하락), Trades=30→26(-4 감소), rank3→rank3
     #   역효과 이유: RANGING 47.3% 구간에서 BUY 과도 차단 → 유효 cross 이벤트 놓침
     #   결론: ema_slope_min_buy 방향 탐색 종료. 기본값(0.0=비활성) 유지.
+    # Cycle373 F(리서치): macd_hist_filter=True 실험 → dead param 확정
+    #   BTC 1h: Sharpe=0.80, PF=1.38, Trades=30 — 기존과 동일 (필터 무효)
+    #   이유: DEMA fast cross up 시 MACD hist는 이미 양수 (두 지표 상관관계 높음)
+    #   결론: macd_hist_filter 탐색 종료. 기본값(False) 유지.
+    #   다음 방향: stop-loss 개선(avg_win/loss 비율) 또는 BB width 변동성 필터 재실험
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
@@ -382,6 +387,10 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # MACD
     df["macd"] = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
     df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+    df["macd_hist"] = df["macd"] - df["macd_signal"]  # Cycle373 F: feed.py 동기화
+
+    # BB Width (Cycle373 C: feed.py 동기화)
+    df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["sma20"].replace(0, float("nan"))
 
     # Donchian 20
     df["donchian_high"] = high.shift(1).rolling(20, min_periods=1).max()

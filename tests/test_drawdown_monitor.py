@@ -1179,3 +1179,50 @@ def test_weekly_dd_halt_persists_while_dd_exceeds_limit():
     status3 = m.update(9300)
     assert status3.halted is False, "reset_weekly() 후 HALT 해제"
     assert status3.alert_level == AlertLevel.NONE
+
+
+# ── transition_cushion 직렬화/역직렬화 (Cycle357 B 추가, Cycle373 B 검증) ─────
+
+def test_transition_cushion_to_dict_includes_fields():
+    """transition_cushion 두 필드가 to_dict()에 포함된다."""
+    m = DrawdownMonitor(
+        transition_cushion_enabled=True,
+        transition_cushion_threshold=0.65,
+    )
+    d = m.to_dict()
+    assert d["transition_cushion_enabled"] is True
+    assert abs(d["transition_cushion_threshold"] - 0.65) < 1e-9
+
+
+def test_transition_cushion_from_dict_roundtrip():
+    """from_dict()로 transition_cushion 필드가 정확히 복원된다."""
+    m = DrawdownMonitor(
+        transition_cushion_enabled=True,
+        transition_cushion_threshold=0.65,
+    )
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.transition_cushion_enabled is True
+    assert abs(m2.transition_cushion_threshold - 0.65) < 1e-9
+
+
+def test_transition_cushion_multiplier_after_restore():
+    """복원된 인스턴스에서 get_transition_cushion_multiplier()가 정상 동작한다."""
+    m = DrawdownMonitor(
+        transition_cushion_enabled=True,
+        transition_cushion_threshold=0.70,
+    )
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    # confidence < threshold → 0.5x 감쇠
+    assert m2.get_transition_cushion_multiplier(0.50) == 0.5
+    # confidence >= threshold → 1.0
+    assert m2.get_transition_cushion_multiplier(0.90) == 1.0
+
+
+def test_transition_cushion_disabled_default_after_restore():
+    """기본값 transition_cushion_enabled=False: from_dict() 복원 후 항상 1.0 반환."""
+    m = DrawdownMonitor()  # transition_cushion_enabled=False 기본값
+    m2 = DrawdownMonitor.from_dict(m.to_dict())
+    assert m2.transition_cushion_enabled is False
+    assert m2.get_transition_cushion_multiplier(0.0) == 1.0
+    assert m2.get_transition_cushion_multiplier(0.5) == 1.0
+    assert m2.get_transition_cushion_multiplier(1.0) == 1.0

@@ -1087,6 +1087,11 @@ class DataFeed:
         # MACD
         df["macd"] = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
         df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+        # MACD Histogram: 모멘텀 강도 및 방향 확인 (dema_cross 신호 확인용)
+        df["macd_hist"] = df["macd"] - df["macd_signal"]
+
+        # BB Width: (bb_upper - bb_lower) / sma20 — 변동성 수축/확장 탐지 (BB squeeze)
+        df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["sma20"].replace(0, np.nan)
 
         # VWAP (rolling session)
         typical = (high + low + close) / 3
