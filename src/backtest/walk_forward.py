@@ -236,6 +236,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle374 D(ML): bb_width_min_filter 추가 — BB squeeze 구간 cross 차단
     #   BTC 1h bb_width 분포: mean=0.0645, p25=0.041 → 0.0(비활성)/0.04(23% 차단) 실험
     #   가설: BB squeeze(폭 수축) 구간 cross → false breakout → PF 개선 기대
+    # Cycle377 D(ML): ema200_filter 추가 — 약세장 롱 진입 차단
+    #   배경: W1/W5 PASS = BTC 강세장(EMA200 위), W2/W3/W4 FAIL = 하락/횡보 가능성
+    #   가설: close > ema200 필터 → 약세장 롱 진입 차단 → W2/W3/W4 손실 회피 → PF↑
     "dema_cross": {
         "fast": [8, 10, 12],
         "slow": [15, 20, 25],
@@ -244,6 +247,7 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "ema_slope_min_buy": [0.0, 0.0003],
         "macd_hist_filter": [False, True],
         "bb_width_min_filter": [0.0, 0.04],
+        "ema200_filter": [False, True],
     },
 }
 
@@ -1248,6 +1252,7 @@ def optimize_dema_cross(df: pd.DataFrame, n_windows: int = 3,
             ema_slope_min_buy=params.get("ema_slope_min_buy", 0.0),
             macd_hist_filter=params.get("macd_hist_filter", False),
             bb_width_min_filter=params.get("bb_width_min_filter", 0.0),
+            ema200_filter=params.get("ema200_filter", False),
         )
 
     opt = WalkForwardOptimizer(

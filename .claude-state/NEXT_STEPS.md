@@ -1,63 +1,65 @@
 # Next Steps
 
-_Last updated: 2026-07-01 (Cycle 376 완료)_
+_Last updated: 2026-07-01 (Cycle 377 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 376
+### 이번 세션 완료 사이클: 377
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 374 | D+E+F | bb_width_min_filter=0.04 **mild positive** (Sh0.80→0.85, PF유지), SL=1.2 방향 발굴 |
 | 375 | A+C+F | bb_width 테스트 4개 추가, bb_width=0.05 **dead param**, SL=1.2 **역효과 확정** |
 | 376 | B+D+F | kelly_sizer 중복 버그 수정, rsi_thr=35 **dead param**, W1/W5 PASS=강세 레짐 분석 |
+| 377 | B+D+F | ema200 피처 추가(feed.py), ema200_filter=True **dead param** 확정, dema_cross 탐색 완전 종료 |
 
-### 🎯 Cycle 377 작업 방향 (377 mod 5 = 2 → E(실행) + A(품질) + F(리서치))
+### 🎯 Cycle 378 작업 방향 (378 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### E(실행): BacktestEngine 실행 품질 점검
+#### C(데이터): price_cluster 또는 roc_ma_cross 개선 탐색
 
-- **배경**: W3 윈도우 Sh=-3.27 (2023년 하락/횡보 레짐) — 극단적 손실 원인 분석 필요
-  - BacktestEngine 슬리피지 / max_hold 상호작용 검토
-  - dema_cross가 횡보장에서 과도한 손실을 내는 메커니즘 파악
-- **작업**: `src/backtest/engine.py` 혹은 `scripts/paper_simulation.py` 실행 로직 검토
+- **배경**: dema_cross 모든 탐색 방향 소진 (PF=1.38 → 목표 1.50 gap=0.12 달성 불가 확정)
+  - 현재 1h BTC rank1: price_cluster (Sh=0.87, PF 미확인)
+  - 현재 1h BTC rank2: roc_ma_cross (Sh=0.34, 개선 잠재력 있음)
+- **작업 옵션**:
+  1. **price_cluster**: n_bins, close_window 외 새 파라미터 발굴 (예: momentum_window, min_cluster_size)
+  2. **roc_ma_cross**: roc_period=12 확정 이후 추가 파라미터 (예: signal smoothing, volume filter)
+  3. `scripts/paper_simulation.py`에서 rank1-5 전략 중 PF가 1.50 미만인 전략 선정
 
-#### A(품질): EMA200 필터 구현 실험 (dema_cross)
+#### B(리스크): KellySizer/DrawdownMonitor 파라미터 세밀화
 
-- **배경**: Cycle376 F에서 PASS 윈도우=BTC 강세 레짐 확인 → EMA200 BUY 필터 유망
-  - W1/W5 PASS 기간(2023 여름, 2024 초): BTC가 EMA200 위에서 상승 중인 강세장
-  - W2/W3/W4 FAIL 기간: BTC가 EMA200 아래 또는 EMA200 하향 돌파 구간 가능성
-  - **EMA200 필터**: BUY 신호 시 close > EMA200 조건 추가 → 약세장 롱 진입 차단
-- **작업**:
-  1. `src/data/feed.py`에 ema200 피처 추가 (ema200 = EMA(close, 200))
-  2. `src/strategy/dema_cross.py`에 `ema200_filter=False` 파라미터 + BUY 조건 추가
-  3. `scripts/paper_simulation.py` ema200_filter=True 실험 → 결과 비교
-  4. PASS 조건 달성 여부 확인 (Sh≥1.0, PF≥1.5, Trades≥15, 4/8 이상 윈도우)
+- **배경**: dema_cross PF=1.38 → 현재 Kelly 설정과 포지션 사이징 재검토
+  - KellySizer Bayesian 수축 계수 검토 (shrinkage_factor 기본값 vs dema_cross 실전 적합성)
+  - DrawdownMonitor 일간/주간 DD 한도가 BTC 1h 변동성에 적합한지 검토
+- **작업**: `src/risk/kelly_sizer.py` shrinkage_factor 분석, `src/risk/drawdown_monitor.py` DD 임계값 검토
 
-#### F(리서치): dema_cross 장세 레짐별 성과 분석 심화
+#### F(리서치): 1h paper_sim PASS 전략 부재 원인 분석 (62연속)
 
-- **배경**: PASS 조건 = BTC 강세장, FAIL = 하락/횡보 — 선택적 활성화 전략 필요
-  - EMA200 필터 외: ADX 강세 필터? BTC 도미넌스? 레짐 매칭?
-  - W6 근접 실패(Sh=1.82, mc_p_value=0.194): Trades=23 → 24+ 필요 시 어떤 조건이 유리?
-  - W7 근접 실패(Sh=0.93): 진입 조건 완화 vs 청산 최적화 중 어느 쪽?
-- **검토**: EMA200 필터 실험 결과 + 각 윈도우 시장 레짐 분석
+- **배경**: 62연속 0/19 PASS — 모든 전략이 consistency ≥ 50% 미달
+  - rank1 price_cluster Sh=0.87도 consistency 미달
+  - 문제: 개별 전략 파라미터 한계인지 vs WF 설계 자체 문제(train/test 비율, 윈도우 수)인지
+- **검토**: `src/backtest/walk_forward.py` consistency 계산 로직, mc_p_value 임계값(0.05) 타당성
 
-### ⚠️ 주의 사항 (Cycle 376 이후)
+### ⚠️ 주의 사항 (Cycle 377 이후)
 
+- **ema200_filter dead param 확정** (Cycle377 D): ema200_filter=True → Sh=0.56(-34%), PF=1.34, Trades=22
+  - dema_cross ema200_filter 탐색 완전 종료. default=False 유지
+  - 원인: 2023초 BTC 회복 구간(EMA200 미만) 수익 신호 차단 + 200봉 워밍업 감소
+- **dema_cross 탐색 완전 종료** (Cycle377 F): 모든 방향 소진
+  - fast=8, slow=20, rsi_dir_filter=True, rsi_dir_threshold=40, bb_width_min_filter=0.04, dist_pct_min=0.002
+  - 탐색 완료: ema_slope, macd_hist, bb_width, SL=1.2, TP, slow=25, fast=7, rsi_thr=35, ema200_filter
+  - **결론**: PF=1.38 → 목표 1.50 (gap=0.12) 달성 불가. dema_cross 최적화 종료
+  - 향후: dema_cross 설정 고정 (변경 금지). 다른 전략 개선으로 전환
+- **ema200 피처 추가됨** (Cycle377 D): `src/data/feed.py` `_add_indicators()` + `scripts/paper_simulation.py` `enrich_indicators()`
+  - 향후 다른 전략의 EMA200 필터 활용 가능 (인프라 보존)
 - **rsi_dir_threshold 탐색 완전 종료** (Cycle376 D): 35(dead), 40(최적), 45(worse) 모두 검증
   - thr=40 확정 불변. 추가 rsi_dir_threshold 실험 금지
 - **kelly_sizer.py MIN_TRADES_FOR_KELLY 중복 제거** (Cycle376 B): line 609 제거, line 451 유지
-- **dema_cross PASS 경로**: EMA200 BUY 필터가 유일하게 남은 미탐색 방향
-  - feed.py ema200 피처 추가 필요 (현재 ema50까지만 있음)
 - **bb_width_min_filter=0.04 확정** (Cycle374 D, Cycle375 C 재확인): Sharpe=0.85, Trades=26
   - 0.05 실험: 동일 결과 (dead param) → 0.04 유지 확정. bb_width_min_filter 탐색 완전 종료
 - **atr_multiplier_sl=1.2 역효과 확정** (Cycle375 F): PF 1.38→1.34(-0.17 WF context)
   - 전체 데이터셋 긍정적 결과(PF+5%)와 WF 컨텍스트 역효과 불일치 → SL=1.5 유지 확정
   - SL/TP 방향 탐색 종료 (SL: 1.5 확정, TP: 3.5 확정 from earlier cycles)
-- **dema_cross 미완 PF 목표**: PF=1.38 → 목표 1.50 (gap=0.12)
-  - 탐색 종료 방향: ema_slope, macd_hist, bb_width, SL=1.2, TP 조정, slow=25, fast=7, rsi_thr=35
-  - **유일 미탐색 방향**: EMA200 BUY 필터 (Cycle377 A)
 - **dema_cross thr=40 우위 확정** (Cycle371 B): thr=45 재검증에서도 thr=40(Sh=0.85) > thr=45(Sh=0.55)
   - WFO IS 편향 확정: WFO 3개월 윈도우에서 thr=45 선호 vs 전체 기간 평가 thr=40 우세
   - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 유지 (WFO 그리드 탐색 지속)
@@ -104,19 +106,29 @@ _Last updated: 2026-07-01 (Cycle 376 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 376 업데이트)
+### 핵심 메트릭 (Cycle 377 업데이트)
 
-| 지표 | Cycle 375 | Cycle 376 | 변화 |
+| 지표 | Cycle 376 | Cycle 377 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (thr=40 확정) |
+| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (ema200 복원) |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank2 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (60연속) | **0/19 (61연속)** | — |
+| 1h PASS 수 | 0/19 (61연속) | **0/19 (62연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8457 | **8457** | 유지 (버그 수정만, 신규 테스트 없음) |
+| 테스트 수 | 8457 | **8457** | 유지 (23 skipped) |
+
+### Cycle 377 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/data/feed.py` | `_add_indicators()`에 `ema200` EMA(close,200) 추가 (Cycle377 D) |
+| `scripts/paper_simulation.py` | `enrich_indicators()`에 `ema200` 동기화 추가 (Cycle377 D) |
+| `src/strategy/dema_cross.py` | `ema200_filter=False` 파라미터 + BUY 차단 로직 추가 (Cycle377 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"]에 `ema200_filter=[False,True]` 추가 (Cycle377 D) |
+| `scripts/paper_simulation.py` | ema200_filter=True 실험 → dead param → 복원 + 결과 주석 (Cycle377 D) |
 
 ### Cycle 376 코드 변경 요약
 
@@ -371,7 +383,7 @@ _Last updated: 2026-07-01 (Cycle 376 완료)_
 - `cmf: {"buy_thresh": 0.10}`
 - `supertrend_multi: {"atr_threshold": 0.5}` ← Cycle 352 B 추가
 - `price_cluster: {"vol_regime_filter": False}` ← Cycle 358 C 확정 (bounce_pct=0.020 악화 확인→기본값 0.010)
-- `dema_cross: {"fast": 8, "slow": 20}` ← **Cycle 356 D 추가** (3 trades → 50 trades!)
+- `dema_cross: {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04}` ← **Cycle 377 확정** (ema200_filter dead param 확정, 탐색 종료)
 
 ### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
 - `set()` ← 빈 집합 (레짐 필터 비활성화)

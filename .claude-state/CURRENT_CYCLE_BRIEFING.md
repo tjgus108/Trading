@@ -1,43 +1,47 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-01 (Cycle 376 완료)_
+_Last updated: 2026-07-01 (Cycle 377 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 376
-- **다음 사이클**: 377 (377 mod 5 = 2 → E+A+F)
-- **연속 PASS 실패**: 61연속 (0/19 1h paper_sim)
+- **완료된 사이클**: 377
+- **다음 사이클**: 378 (378 mod 5 = 3 → C+B+F)
+- **연속 PASS 실패**: 62연속 (0/19 1h paper_sim)
 - **Bundle OOS**: 5/5 PASS 유지
 
-## Cycle 376 주요 결과
+## Cycle 377 주요 결과
 
-### B(리스크): DrawdownMonitor + KellySizer 검토 + 버그 수정
-- DrawdownMonitor cooldown(1h/4h) → dema_cross 평균 1.8일/거래 간격 대비 적절. 변경 불필요
-- KellySizer Half-Kelly=6.9% < max_fraction=10% → Kelly binding, 현 설정 적절
-- **버그 수정**: `src/risk/kelly_sizer.py` `MIN_TRADES_FOR_KELLY: int = 10` 중복 정의 제거 (line 609)
-  - 152개 Kelly 테스트 통과 ✓
+### B(리스크): 인프라 재검토
+- DrawdownMonitor 직렬화 검토: Cycle357 이후 안정적. 변경 불필요
+- KellySizer Half-Kelly=6.9% < max_fraction=10% → 현 설정 유지
+- circuit_breaker.py 파라미터: BTC 1h 실증 기반 설정 유지
 
-### D(ML): rsi_dir_threshold=35 실험
-- 기존 thr=40 → thr=35 실험: Sharpe=0.41, Trades=28 (vs thr=40: Sh=0.85, Trades=26)
-- **결과**: Sharpe -52%, Trades +2 → **dead param 확정**. thr=40 복원
-- rsi_dir_threshold 탐색 완전 종료 (35/40/45/50 전부 검증됨)
+### D(ML): EMA200 BUY 필터 실험 → dead param 확정
+- `src/data/feed.py` `_add_indicators()`: ema200 피처 추가 (인프라)
+- `scripts/paper_simulation.py` `enrich_indicators()`: ema200 동기화 (feed.py 미러)
+- `src/strategy/dema_cross.py`: `ema200_filter=False` 파라미터 + close < ema200 → HOLD 로직
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["dema_cross"]에 `ema200_filter=[False,True]` 추가
+- **실험 결과**: ema200_filter=True → Sh=0.56(-34%), PF=1.34, Trades=22 (vs 기존 Sh=0.85, PF=1.38, T=26)
+- **원인 분석**: 2023초 BTC EMA200 미만 회복 구간 진입 차단 + 200봉 워밍업 필요
+- **결론**: **dead param 확정**. ema200_filter=False 복원. dema_cross 탐색 완전 종료
 
-### F(리서치): dema_cross WF 윈도우별 PASS/FAIL 분석
-- W1/W5 PASS (Sh≈2.95): BTC 강세장 기간 (2023 여름, 2024 초)
-- W6 근접 (Sh=1.82, PF=1.53): mc_p_value=0.194 실패 (Trades=23, 통계 유의성 부족)
-- W7 근접 (Sh=0.93): 0.07 부족
-- W3 최악 (Sh=-3.27): 2023 하락/횡보 레짐
-- **핵심 결론**: PASS = BTC 강세 레짐. EMA200 BUY 필터가 다음 탐색 방향
+### F(리서치): dema_cross 탐색 완전 종료 선언
+- 모든 파라미터 방향 소진: fast/slow, rsi_dir_filter, rsi_dir_threshold, bb_width_min_filter,
+  dist_pct_min, ema_slope, macd_hist, SL, TP, ema200_filter
+- **결론**: PF=1.38 → 목표 1.50 (gap=0.12) 달성 불가. dema_cross 최적화 완전 종료
+- 향후: price_cluster 또는 roc_ma_cross 개선 전략으로 전환
 
 ## 코드 변경 사항
 
 | 파일 | 변경 |
 |------|------|
-| `src/risk/kelly_sizer.py` | `MIN_TRADES_FOR_KELLY` 중복 제거 (B) |
-| `scripts/paper_simulation.py` | rsi_thr=35 실험 → 복원 + 결과 주석 (D) |
+| `src/data/feed.py` | ema200 피처 추가 (D) |
+| `scripts/paper_simulation.py` | ema200 동기화 + ema200_filter 실험→복원+주석 (D) |
+| `src/strategy/dema_cross.py` | ema200_filter=False 파라미터 + 필터 로직 (D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] ema200_filter=[False,True] 추가 (D) |
 
-## Cycle 377 예고 (377 mod 5 = 2 → E+A+F)
+## Cycle 378 예고 (378 mod 5 = 3 → C+B+F)
 
-- **E(실행)**: BacktestEngine 실행 품질 점검 (W3 극단 손실 원인 분석)
-- **A(품질)**: EMA200 BUY 필터 구현 실험 (feed.py + dema_cross.py + paper_sim)
-- **F(리서치)**: dema_cross 장세 레짐별 성과 분석 심화
+- **C(데이터)**: price_cluster 또는 roc_ma_cross 새 파라미터 탐색 (dema_cross 종료 후 전략 전환)
+- **B(리스크)**: KellySizer Bayesian shrinkage 계수 세밀화 분석
+- **F(리서치)**: 62연속 PASS 부재 원인 분석 (WF 설계 vs 전략 파라미터 한계)

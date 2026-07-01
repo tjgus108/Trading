@@ -34,6 +34,7 @@ class DEMACrossStrategy(BaseStrategy):
         ema_slope_min_buy: float = 0.0,
         macd_hist_filter: bool = False,
         bb_width_min_filter: float = 0.0,
+        ema200_filter: bool = False,
     ) -> None:
         self.fast = fast
         self.slow = slow
@@ -76,6 +77,11 @@ class DEMACrossStrategy(BaseStrategy):
         # BTC 1h 분포: mean=0.0645, p25=0.0410 → 0.04(23% 차단) 실험 임계값
         # bb_width_min_filter=0.0: 비활성 (기본값), >0: squeeze 구간 차단
         self.bb_width_min_filter = bb_width_min_filter
+        # Cycle377 D(ML): EMA200 BUY 필터 — 약세장 롱 진입 차단
+        # BUY 신호 시 close > ema200 조건 추가 → EMA200 아래에서 롱 진입 금지
+        # 배경: W1/W5 PASS = BTC 강세장(EMA200 위), W2/W3/W4 FAIL = 하락/횡보 가능성
+        # ema200_filter=True: BUY 시 close > ema200 필수 / False: 기존 동작 유지 (기본값)
+        self.ema200_filter = ema200_filter
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if df is None or len(df) < 35:
@@ -278,6 +284,21 @@ class DEMACrossStrategy(BaseStrategy):
                     ),
                     invalidation="",
                 )
+            # Cycle377 D(ML): EMA200 BUY 필터 — 약세장 롱 진입 차단
+            if self.ema200_filter and "ema200" in df.columns:
+                ema200_val = float(df["ema200"].iloc[idx])
+                if ema200_val == ema200_val and close_price < ema200_val:
+                    return Signal(
+                        action=Action.HOLD,
+                        confidence=Confidence.MEDIUM,
+                        strategy=self.name,
+                        entry_price=entry,
+                        reasoning=(
+                            f"EMA200 필터: close={close_price:.2f} < ema200={ema200_val:.2f}. "
+                            f"약세장 롱 진입 차단."
+                        ),
+                        invalidation="",
+                    )
 
             return Signal(
                 action=Action.BUY,

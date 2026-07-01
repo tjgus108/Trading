@@ -165,6 +165,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   결론: 0.05로 상향해도 필터링 증가 없음 → 0.04 유지 확정. bb_width_min_filter 탐색 종료
     # Cycle376 D(ML): rsi_dir_threshold=35 실험 → dead param (Sh=0.41, Trades=28 vs thr=40: Sh=0.85, Trades=26)
     #   완화 시 신호 품질 저하 (Sharpe -52%), 거래 증가 미미 (+2). thr=40 유지 확정
+    # Cycle377 D(ML): ema200_filter=True 실험 → 역효과 확정 (Sh=0.85→0.56(-34%), PF=1.38→1.34, Trades=26→22)
+    #   가설: close>ema200 BUY 필터 → W2/W3/W4 약세장 롱 차단 → PASS 달성 기대
+    #   역효과 이유: 2023 초 BTC EMA200 아래에서 회복 구간 BUY가 수익성 있었으나 모두 차단됨
+    #   BTC 1h 데이터(2023-01~2024-05): 초기 200봉 EMA 워밍업 + 2023 초 회복기 BUY 차단 → trades 감소
+    #   결론: ema200_filter 탐색 종료. 기본값(False) 유지.
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
@@ -375,6 +380,7 @@ def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # EMA / SMA
     df["ema20"] = close.ewm(span=20, adjust=False).mean()
     df["ema50"] = close.ewm(span=50, adjust=False).mean()
+    df["ema200"] = close.ewm(span=200, adjust=False).mean()  # Cycle377 D: feed.py 동기화
     df["ema20_slope"] = df["ema20"].diff() / df["ema20"]  # feed.py._add_indicators() 동기화
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()

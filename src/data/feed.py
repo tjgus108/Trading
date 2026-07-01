@@ -1053,6 +1053,7 @@ class DataFeed:
         # EMA
         df["ema20"] = close.ewm(span=20, adjust=False).mean()
         df["ema50"] = close.ewm(span=50, adjust=False).mean()
+        df["ema200"] = close.ewm(span=200, adjust=False).mean()
         # EMA slope: 단위 시간당 상대 변화율 (NarrowRange ema_slope 필터용)
         df["ema20_slope"] = df["ema20"].diff() / df["ema20"]
 
