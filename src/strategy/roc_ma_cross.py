@@ -25,9 +25,11 @@ _ROC_MIN_ABS = 0.3
 class ROCMACrossStrategy(BaseStrategy):
     name = "roc_ma_cross"
 
-    def __init__(self, roc_period: int = 12, ma_period: int = 3):
+    def __init__(self, roc_period: int = 12, ma_period: int = 3, volume_filter: bool = False, vol_ratio_min: float = 1.5):
         self.roc_period = roc_period
         self.ma_period = ma_period
+        self.volume_filter = volume_filter
+        self.vol_ratio_min = vol_ratio_min
         self._min_rows = max(roc_period + ma_period, 20)
 
     def generate(self, df: pd.DataFrame) -> Signal:
@@ -80,6 +82,14 @@ class ROCMACrossStrategy(BaseStrategy):
         cross_above = roc_ma_prev < 0 and roc_ma_now >= 0
         cross_below = roc_ma_prev > 0 and roc_ma_now <= 0
 
+        # volume_filter: 거래량이 최근 평균 대비 vol_ratio_min 배 이상일 때만 신호 허용
+        volume_ok = True
+        if self.volume_filter and "volume_sma20" in df.columns:
+            vol_now = float(df["volume"].iloc[idx])
+            vol_sma = float(df["volume_sma20"].iloc[idx])
+            if not pd.isna(vol_sma) and vol_sma > 0:
+                volume_ok = (vol_now / vol_sma) >= self.vol_ratio_min
+
         if not pd.isna(roc_std_now) and roc_std_now > 0:
             conf_high = abs(roc_now) > roc_std_now * _STD_MULT
         else:
@@ -87,12 +97,14 @@ class ROCMACrossStrategy(BaseStrategy):
 
         conf = Confidence.HIGH if conf_high else Confidence.MEDIUM
 
-        # BUY: ROC_MA 상향 + ROC>0.3% + close > EMA50 + (EMA200 확인 or 없음)
+        # BUY: ROC_MA 상향 + ROC>0.3% + close > EMA50 + (EMA200 확인 or 없음) + volume_ok
         # Cycle 329: RSI 필터 제거 (Cycle 328 분석: BTC 1h에서 RSI<70 차단 0건)
+        # Cycle 379 D(ML): volume_filter — 거래량 급증 시에만 신호 허용
         if (cross_above and
             abs(roc_now) > _ROC_MIN_ABS and roc_now > 0 and
             close > ema50 and
-            (ema200 is None or close > ema200)):
+            (ema200 is None or close > ema200) and
+            volume_ok):
 
             return Signal(
                 action=Action.BUY,
@@ -109,12 +121,14 @@ class ROCMACrossStrategy(BaseStrategy):
                 bear_case="단순 조정 후 재하락 가능",
             )
 
-        # SELL: ROC_MA 하향 + ROC<-0.3% + close < EMA50 + (EMA200 확인 or 없음)
+        # SELL: ROC_MA 하향 + ROC<-0.3% + close < EMA50 + (EMA200 확인 or 없음) + volume_ok
         # Cycle 329: RSI 필터 제거 (대칭적으로)
+        # Cycle 379 D(ML): volume_filter — 거래량 급증 시에만 신호 허용
         if (cross_below and
             abs(roc_now) > _ROC_MIN_ABS and roc_now < 0 and
             close < ema50 and
-            (ema200 is None or close < ema200)):
+            (ema200 is None or close < ema200) and
+            volume_ok):
 
             return Signal(
                 action=Action.SELL,

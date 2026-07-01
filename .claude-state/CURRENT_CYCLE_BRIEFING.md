@@ -1,53 +1,57 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-01 (Cycle 378 완료)_
+_Last updated: 2026-07-01 (Cycle 379 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 378
-- **다음 사이클**: 379 (379 mod 5 = 4 → D+E+F)
-- **연속 PASS 실패**: 63연속 (0/19 1h paper_sim)
+- **완료된 사이클**: 379
+- **다음 사이클**: 380 (380 mod 5 = 0 → A+C+F)
+- **연속 PASS 실패**: 64연속 (0/19 1h paper_sim)
 - **Bundle OOS**: 5/5 PASS 유지
 
-## Cycle 378 주요 결과
+## Cycle 379 주요 결과
 
-### C(데이터): high_conf_only dead param 확정
-- `src/strategy/price_cluster.py`: `high_conf_only=False` 파라미터 + MEDIUM confidence 억제 로직 추가
-- 실험 결과: Sh=0.60(-0.05 악화), PF=1.15(-0.03 악화), Trades=36(-6), Consistency=0/8(-1)
-- W6 PASS 윈도우(PF=2.01) → FAIL(PF=1.48 < 1.5): 가장 좋은 윈도우에서도 악화
-- **결론**: HIGH/MEDIUM confidence 분류가 bounce 수익성 예측 불가. dead param 확정.
+### D(ML): roc_ma_cross volume_filter 파라미터 추가
+- `src/strategy/roc_ma_cross.py`: `volume_filter=False`, `vol_ratio_min=1.5` 파라미터 추가
+  - 거래량 > volume_sma20 * 1.5 일 때만 BUY/SELL 신호 허용
+- 실험 결과: **Sharpe=0.72(+0.38↑), PF=1.68(+0.68↑, 목표 1.5 달성!), Trades=10(<15 FAIL)**
+- **핵심 발견**: volume_filter 개념 유효! PF 목표 달성했으나 임계값 1.5가 너무 공격적
+- vol_ratio_min=1.5: trades 36→10 (73% 감소), PF 목표 달성, Sharpe↑
+- **다음 방향**: vol_ratio_min=1.2 시도 (Cycle380 A)
 
-### B(리스크): MIN_TRADES_FOR_KELLY 10→15
-- `src/risk/kelly_sizer.py`: `MIN_TRADES_FOR_KELLY = 10` → `15`
-- 근거: paper_sim min_trades=15 기준과 정렬 — n<15이면 backtest FAIL이지만 Kelly는 더 관대했던 불일치 해소
-- 영향: trades=10~14 전략은 win_rate가 50%로 더 강하게 수축됨 (shrink_factor 0.40~0.48)
-- dema_cross(26 trades), price_cluster(41 trades) — 현행 전략 영향 없음
+### E(실행): 슬리피지 모델 검증
+- BTC 1h HL ratio mean=1.496%, p25=0.915%
+- 실제 BTC/USDT 스프레드: ~0.01-0.03% (유동성 충분)
+- 현재 slippage_pct=0.05%/leg = 0.10% round-trip → **보수적/적정 (2-3배 과대 설정)**
+- adaptive_slippage=True ATR 레짐 자동 조정 이미 최적
+- **결론**: 슬리피지 설정 변경 불필요. 주석 추가로 근거 문서화.
 
-### F(리서치): 63연속 PASS 실패 구조적 원인 확정
-- PF=1.5 목표는 1h BTC 전략의 구조적 상한선
-- 수수료 드래그: 0.11% × 26 평균 거래 = 2.86% 누적 비용
-- dema_cross: avg PF=1.38 (gap=0.12), price_cluster: avg PF=1.20 (gap=0.30)
-- MC_P_THRESHOLD=0.10 이미 완화됨 (Cycle296에서 0.05→0.10)
-- WF 설계(50% pass_ratio, 8 window) 자체는 병목이 아님
+### F(리서치): price_cluster min_cluster_strength_ratio dead param 확정
+- `src/strategy/price_cluster.py`: `min_cluster_strength_ratio=0.0` 파라미터 추가
+- 실험 결과: ratio=0.30 → **Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)**
+- **결론**: 클러스터 강도 비율이 bounce 품질 예측 불가. dead param 확정.
+- 다음 price_cluster 방향: `confirmation_bars` 탐색 (Cycle380 C)
 
 ## 시뮬레이션 결과
 
 | 시뮬 | 결과 |
 |------|------|
-| paper_sim (1h BTC) | 0/19 PASS (63연속 실패) — dema_cross Sh=0.85, PF=1.38 |
+| paper_sim (1h BTC) | 0/19 PASS (64연속 실패) — dema_cross Sh=0.85, PF=1.38, Trades=26 |
 | bundle_oos (4h BTC) | 5/5 PASS 유지 — cmf, ofi_v2, supertrend_multi, vwap_cross, value_area |
 
 ## 코드 변경 사항
 
 | 파일 | 변경 |
 |------|------|
-| `src/strategy/price_cluster.py` | `high_conf_only=False` 파라미터 + 필터 로직 (C) |
-| `src/backtest/walk_forward.py` | dead param 주석 + 그리드에서 high_conf_only 제거 (C) |
-| `src/risk/kelly_sizer.py` | `MIN_TRADES_FOR_KELLY` 10→15 (B) |
-| `scripts/paper_simulation.py` | high_conf_only 실험 문서화 주석 (C) |
+| `src/strategy/roc_ma_cross.py` | `volume_filter` + `vol_ratio_min` 파라미터 + 신호 필터 로직 (D) |
+| `src/strategy/price_cluster.py` | `min_cluster_strength_ratio` 파라미터 + 필터 로직 (F) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["roc_ma_cross"] `volume_filter=[False,True]` + 주석 (D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["price_cluster"] dead param 주석 (F) |
+| `src/backtest/walk_forward.py` | `optimize_roc_ma_cross()` factory에 `volume_filter` 전달 (D) |
+| `scripts/paper_simulation.py` | 슬리피지 검증 주석 + 실험 결과 문서화 (D+E+F) |
 
-## Cycle 379 예고 (379 mod 5 = 4 → D+E+F)
+## Cycle 380 예고 (380 mod 5 = 0 → A+C+F)
 
-- **D(ML)**: roc_ma_cross `volume_filter` 파라미터 탐색
-- **E(실행)**: PaperConnector slippage 검증 (실제 슬리피지 vs 가정 0.05%)
-- **F(리서치)**: price_cluster PF 개선 — `min_cluster_strength_ratio` 또는 `confirmation_bars` 탐색
+- **A(품질)**: roc_ma_cross vol_ratio_min=1.2 실험 — trades ≥ 15 + PF ≥ 1.5 동시 만족 탐색
+- **C(데이터)**: price_cluster `confirmation_bars` 파라미터 탐색 — bounce 후 N봉 확인 진입
+- **F(리서치)**: roc_ma_cross volume_filter 임계값 시퀀스 분석 (1.2→1.5→2.0)

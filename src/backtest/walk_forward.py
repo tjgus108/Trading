@@ -182,6 +182,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # 실험 결과: Sh=0.60(-0.05), PF=1.15(-0.03), Consistency=0/8(-1) — 모두 악화
     # W6 PASS 윈도우: PF 2.01→1.48 (PF 문턱 실패) → HIGH/MEDIUM 분류가 bounce 품질 예측 불가
     # high_conf_only 탐색 종료. 기본값(False) 유지. WFO 그리드에서 제거.
+    # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 → dead param 확정 (paper_sim 검증)
+    #   0.30 실험: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)
+    #   결론: 클러스터 강도 비율이 bounce 품질 예측 불가. min_cluster_strength_ratio 탐색 종료.
+    #   파라미터 코드는 유지(향후 활용 가능성), WFO 그리드에서 제거.
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
@@ -197,9 +201,16 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle370 F(리서치): roc_period 탐색 완료 (10/12/15 전부 검증)
     #   10: Sh=-1.45 (역효과 Cycle369), 12: Sh=0.34 (최적), 15: Sh=-0.33 (역효과 Cycle370)
     #   결론: roc_period=12 최적 확정. roc_period 탐색 방향 종료
+    # Cycle379 D(ML): volume_filter=[False,True] 추가 — 거래량 급증(>1.5×SMA20) 시만 신호 허용
+    #   가설: ROC_MA cross + 거래량 급증 = 강한 모멘텀 확인 → 오신호 감소, PF↑
+    # Cycle379 D(ML) paper_sim 결과: volume_filter=True, vol_ratio_min=1.5
+    #   Sharpe=0.72(+0.38↑), PF=1.68(+0.68↑, 목표 1.5 달성!), Trades=10(<15 FAIL)
+    #   결론: volume_filter 개념 유효(PF↑) — 임계값 1.5가 너무 공격적, trades 부족
+    #   다음 방향: vol_ratio_min=1.2 시도 (trades 증가 기대하며 PF 유지 탐색)
     "roc_ma_cross": {
         "roc_period": [10, 12, 15],
         "ma_period": [3, 5, 7],
+        "volume_filter": [False, True],
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)
@@ -1278,6 +1289,7 @@ def optimize_roc_ma_cross(df: pd.DataFrame, n_windows: int = 3,
         return ROCMACrossStrategy(
             roc_period=params.get("roc_period", 12),
             ma_period=params.get("ma_period", 3),
+            volume_filter=params.get("volume_filter", False),
         )
 
     opt = WalkForwardOptimizer(

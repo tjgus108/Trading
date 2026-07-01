@@ -191,6 +191,16 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   roc_period=15: Sharpe=-0.33, PF=1.05, Trades=34, rank4 (roc_period=12: Sh=0.34, rank2 대비 악화)
     #   결론: roc_period 확장(15)도 성과 하락 → roc_period=12 최적 확정. ROC 탐색 방향 종료
     # "roc_ma_cross": {"roc_period": 15},  # 복원: 기본값(roc_period=12) 사용
+    # Cycle379 D(ML): volume_filter=True 실험 결과 (2026-07-01)
+    #   volume_filter=True, vol_ratio_min=1.5: Sharpe=0.72(+0.38), PF=1.68(excellent), Trades=10(<15 fail)
+    #   PF 1.68 > 1.5 목표 달성! 하지만 Trades=10이 15 최소 기준 미달 → FAIL
+    #   결론: volume_filter 개념은 유효(PF↑), 하지만 1.5× 임계값이 너무 공격적
+    #   다음 사이클: vol_ratio_min=1.2 시도 (더 많은 trades 허용하면서 품질 유지)
+    # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 결과 (2026-07-01)
+    #   ratio=0.30: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)
+    #   결론: dead param — 클러스터 강도 비율이 bounce 품질 예측 불가
+    #   min_cluster_strength_ratio 탐색 종료. 기본값(0.0) 유지.
+    "price_cluster": {"vol_regime_filter": False},  # min_cluster_strength_ratio 기본값(0.0) 유지
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)
@@ -1346,6 +1356,14 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
     print(f"[STRATEGIES] Loaded {len(pass_list)} strategies")
 
     _fee_rate = fee_rate_override if fee_rate_override is not None else 0.00055
+    # Cycle379 E(실행): BTC 1h 슬리피지 검증 (2026-07-01)
+    # BTC 1h 실데이터 분석: HL ratio mean=1.496%, p25=0.915%
+    # 실제 BTC/USDT 호가 스프레드: ~0.01-0.03% (Bybit orderbook depth $10M+ within 0.1%)
+    # $10k 주문 시장 충격: < 0.02% (BTC 유동성 충분)
+    # Round-trip 총 슬리피지: ~0.02-0.04% (entry+exit 합계)
+    # 현재 설정 0.05%/leg = 0.10% round-trip → 보수적/적정 (실제보다 약 2-3배 보수적)
+    # adaptive_slippage=True + ATR 레짐으로 고변동성 캔들은 자동으로 0.15%까지 상향
+    # 결론: 현재 slippage_pct=0.0005(0.05%) 설정 유지 — 변경 불필요
     _slippage = slippage_override if slippage_override is not None else 0.0005
     if fee_rate_override is not None:
         print(f"[CONFIG] fee_rate overridden: {_fee_rate} (gross alpha mode)", flush=True)

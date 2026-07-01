@@ -87,6 +87,7 @@ class PriceClusterStrategy(BaseStrategy):
         vol_atr_trend_min: float = 1.5,
         atr_bounce_factor: float = 0.0,
         high_conf_only: bool = False,
+        min_cluster_strength_ratio: float = 0.0,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -104,6 +105,9 @@ class PriceClusterStrategy(BaseStrategy):
         self.atr_bounce_factor = atr_bounce_factor
         # Cycle378 C(데이터): HIGH 신뢰도 신호만 허용 (False=기본, 기존 동작 유지)
         self.high_conf_only = high_conf_only
+        # Cycle379 F(리서치): 클러스터 강도 비율 필터 (0.0=비활성)
+        # max_count / total_count >= 비율 요구 — 지배적 클러스터만 bounce 신호 허용
+        self.min_cluster_strength_ratio = min_cluster_strength_ratio
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
         """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
@@ -201,6 +205,14 @@ class PriceClusterStrategy(BaseStrategy):
         # Cycle378 C(데이터): HIGH 신뢰도만 허용 — MEDIUM confidence 신호 억제
         if self.high_conf_only and not is_high_confidence:
             return self._hold(df, f"high_conf_only: cluster too weak (count={max_count}<{avg_count * _HIGH_CONF_FREQ_MULT:.1f}): {context}")
+
+        # Cycle379 F(리서치): 클러스터 강도 비율 필터 — max bin 지배력 요구
+        # total_count = close_window 봉의 총 개수
+        if self.min_cluster_strength_ratio > 0:
+            total_count = len(window_closes)
+            strength_ratio = max_count / total_count if total_count > 0 else 0.0
+            if strength_ratio < self.min_cluster_strength_ratio:
+                return self._hold(df, f"min_cluster_strength_ratio: {strength_ratio:.2f}<{self.min_cluster_strength_ratio} (count={max_count}/{total_count}): {context}")
 
         # Threshold 계산: cluster 경계 가격 기준 비율 (가격 스케일에 비례)
         # Cycle301 F(리서치): ATR 기반 동적 bounce_pct (atr_bounce_factor > 0 시 활성)

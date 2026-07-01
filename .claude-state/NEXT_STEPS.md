@@ -1,49 +1,58 @@
 # Next Steps
 
-_Last updated: 2026-07-01 (Cycle 378 완료)_
+_Last updated: 2026-07-01 (Cycle 379 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 378
+### 이번 세션 완료 사이클: 379
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 376 | B+D+F | kelly_sizer 중복 버그 수정, rsi_thr=35 **dead param**, W1/W5 PASS=강세 레짐 분석 |
 | 377 | B+D+F | ema200 피처 추가(feed.py), ema200_filter=True **dead param** 확정, dema_cross 탐색 완전 종료 |
 | 378 | C+B+F | high_conf_only **dead param** 확정, MIN_TRADES_FOR_KELLY 10→15, 63연속 FAIL 구조적 원인 확정 |
+| 379 | D+E+F | volume_filter 추가(roc_ma_cross), PF=1.68 달성(trades 부족), 슬리피지 검증, min_cluster_strength_ratio dead param |
 
-### 🎯 Cycle 379 작업 방향 (379 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 380 작업 방향 (380 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): roc_ma_cross 추가 파라미터 탐색
+#### A(품질): roc_ma_cross vol_ratio_min 최적화
 
-- **배경**: roc_ma_cross rank2-3 (Sh=0.34, PF=1.22, Trades=36, 2/8 consistency)
-  - roc_period=12 확정, ma=3 확정 → 다른 파라미터 발굴 필요
-  - 현재 NEXT 탐색 후보: **volume_filter** (거래량 급증 시에만 ROC 신호 허용)
-  - 또는 **rsi_filter** (RSI 과매수/과매도 회피: BUY시 RSI<70, SELL시 RSI>30)
+- **배경**: volume_filter=True + vol_ratio_min=1.5 → PF=1.68(목표 달성!), Trades=10(<15 실패)
+  - 임계값 1.5는 너무 공격적 (거래 36개→10개로 73% 감소)
+  - vol_ratio_min=1.2 시도: 거래 ~15-20개 기대, PF 유지 탐색
+  - 또는 vol_ratio_min=1.3 중간값 탐색
 - **작업**:
-  1. roc_ma_cross 코드 확인: `src/strategy/roc_ma_cross.py`
-  2. volume_filter 파라미터 추가 (vol_ratio > 1.5 시에만 신호): PF 개선 기대
-  3. `src/backtest/walk_forward.py` DEFAULT_GRIDS["roc_ma_cross"]에 추가
+  1. `scripts/paper_simulation.py`에 `"roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2}` 실험
+  2. trades 수 확인 (≥15 필수), PF 유지 여부 확인
 
-#### E(실행): Paper Trading 모드 점검
+#### C(데이터): price_cluster confirmation_bars 탐색
 
-- **배경**: paper_simulation.py의 slippage/fee 설정 점검
-  - 현재: fee=0.055%/leg (0.11% round-trip), slippage=0.05%
-  - 2024년 Bybit 실제 taker fee: 0.055% (정확)
-  - BTC 1h 실거래 슬리피지 vs 0.05% 설정 적합성 검토
-- **작업**: PaperConnector 슬리피지 설정 vs 실제 BTC 1h 스프레드 비교
+- **배경**: min_cluster_strength_ratio dead param 확정 (Cycle379 F)
+  - 다음 탐색 방향: **confirmation_bars** — cluster_low 복귀 후 N봉 추가 확인 후 진입
+  - 가설: 복귀 신호 + N봉 hold 확인 → 오신호 감소, PF↑
+  - 주의: confirmation_bars > 0이면 entries 지연 → trades 감소 위험
+- **작업**:
+  1. `src/strategy/price_cluster.py`에 `confirmation_bars=0` 파라미터 추가
+  2. bounce BUY/SELL 신호 후 N봉 확인 로직 구현
+  3. paper_sim 실험: confirmation_bars=1, 2
 
-#### F(리서치): price_cluster PF 개선 새 방향 탐색
+#### F(리서치): roc_ma_cross vol_ratio_min 시퀀스 분석
 
-- **배경**: high_conf_only dead param (Cycle378 C), price_cluster PF=1.20 (gap=0.30)
-  - 다음 탐색 방향: **min_cluster_strength_ratio** — 최고 bin이 전체의 X% 이상일 때만 신호
-  - 또는 **confirmation_bars** — 현재봉에서 cluster_low 복귀 후 N봉 확인 후 진입
-  - roc_ma_cross volume_filter와 병행 탐색
-- **분석**: price_cluster PASS 윈도우(W6: PF=2.01) vs FAIL 윈도우(W1: PF=0.88) 특성 비교
+- **배경**: volume_filter 개념 검증됨. 다음은 최적 임계값 탐색
+  - 1.2: 더 많은 trades 허용 (기대 15-20개)
+  - 1.5: PF=1.68 달성 but trades=10 부족
+  - 2.0: 더 선택적 — trades 더 적고 PF 더 높을 수 있음
+  - 적정 균형점: min_trades ≥ 15 + PF ≥ 1.5 동시 만족 탐색
 
-### ⚠️ 주의 사항 (Cycle 377 이후)
+### ⚠️ 주의 사항 (Cycle 379 이후)
+
+- **roc_ma_cross volume_filter 결과** (Cycle379 D): vol_ratio_min=1.5 → PF=1.68(목표 달성!), Trades=10(<15 fail)
+  - 개념 유효. 다음: vol_ratio_min=1.2 시도 (Cycle380 A 작업)
+- **min_cluster_strength_ratio dead param 확정** (Cycle379 F): ratio=0.30 → Sh=0.72(-0.15), PF=1.18(동일)
+  - 파라미터 코드는 유지, WFO 그리드에서 제거됨. min_cluster_strength_ratio 탐색 종료
+- **슬리피지 모델 검증됨** (Cycle379 E): 0.05%/leg 보수적/적정 (실제 BTC 스프레드 0.01-0.03%)
+  - adaptive_slippage=True + ATR 레짐 자동 조정. 슬리피지 설정 변경 불필요
 
 - **ema200_filter dead param 확정** (Cycle377 D): ema200_filter=True → Sh=0.56(-34%), PF=1.34, Trades=22
   - dema_cross ema200_filter 탐색 완전 종료. default=False 유지
@@ -109,19 +118,31 @@ _Last updated: 2026-07-01 (Cycle 378 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 377 업데이트)
+### 핵심 메트릭 (Cycle 379 업데이트)
 
-| 지표 | Cycle 376 | Cycle 377 | 변화 |
+| 지표 | Cycle 378 | Cycle 379 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (ema200 복원) |
+| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank1 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.72** | 실험(-0.15, 복원) |
+| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.72** | 실험(+0.38, 복원) |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (61연속) | **0/19 (62연속)** | — |
+| 1h PASS 수 | 0/19 (63연속) | **0/19 (64연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
 | 테스트 수 | 8457 | **8457** | 유지 (23 skipped) |
+
+### Cycle 379 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/strategy/roc_ma_cross.py` | `volume_filter=False`, `vol_ratio_min=1.5` 파라미터 추가 + 신호 필터 로직 (Cycle379 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["roc_ma_cross"]에 `volume_filter=[False,True]` 추가 + 실험 결과 주석 (Cycle379 D) |
+| `src/backtest/walk_forward.py` | `optimize_roc_ma_cross()` factory에 `volume_filter` 전달 추가 (Cycle379 D) |
+| `src/strategy/price_cluster.py` | `min_cluster_strength_ratio=0.0` 파라미터 추가 + 필터 로직 (Cycle379 F) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["price_cluster"] dead param 주석 (min_cluster_strength_ratio) (Cycle379 F) |
+| `scripts/paper_simulation.py` | 슬리피지 검증 주석 추가 + 두 실험 결과 문서화 후 기본값 복원 (Cycle379 D+E+F) |
 
 ### Cycle 377 코드 변경 요약
 
