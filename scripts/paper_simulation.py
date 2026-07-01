@@ -163,6 +163,8 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle375 C(데이터): bb_width_min_filter=0.05 실험 → dead param (Sh=0.86, Trades=23 동일)
     #   bb_width 분포 p25=0.041 → 0.04~0.05 구간에 추가 cross 이벤트가 없어서 차이 없음
     #   결론: 0.05로 상향해도 필터링 증가 없음 → 0.04 유지 확정. bb_width_min_filter 탐색 종료
+    # Cycle376 D(ML): rsi_dir_threshold=35 실험 → dead param (Sh=0.41, Trades=28 vs thr=40: Sh=0.85, Trades=26)
+    #   완화 시 신호 품질 저하 (Sharpe -52%), 거래 증가 미미 (+2). thr=40 유지 확정
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단

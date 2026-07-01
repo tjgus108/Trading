@@ -605,9 +605,6 @@ class KellySizer:
             regime=regime,
         )
 
-    # 최소 거래 수: 이보다 적으면 Kelly 추정이 통계적으로 불안정
-    MIN_TRADES_FOR_KELLY: int = 10
-
     # 레짐 → Kelly fraction 스케일 팩터
     # detect_regime() 반환값("bull","bear","crisis") 별칭도 포함
     _REGIME_SCALE: dict = {

@@ -1,56 +1,63 @@
 # Next Steps
 
-_Last updated: 2026-07-01 (Cycle 375 완료)_
+_Last updated: 2026-07-01 (Cycle 376 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 375
+### 이번 세션 완료 사이클: 376
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 373 | C+B+F | bb_width/macd_hist 피처 추가, transition_cushion 테스트, macd_hist_filter **dead param 확정** |
 | 374 | D+E+F | bb_width_min_filter=0.04 **mild positive** (Sh0.80→0.85, PF유지), SL=1.2 방향 발굴 |
 | 375 | A+C+F | bb_width 테스트 4개 추가, bb_width=0.05 **dead param**, SL=1.2 **역효과 확정** |
+| 376 | B+D+F | kelly_sizer 중복 버그 수정, rsi_thr=35 **dead param**, W1/W5 PASS=강세 레짐 분석 |
 
-### 🎯 Cycle 376 작업 방향 (376 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 377 작업 방향 (377 mod 5 = 2 → E(실행) + A(품질) + F(리서치))
 
-#### B(리스크): DrawdownMonitor / risk 모듈 점검
+#### E(실행): BacktestEngine 실행 품질 점검
 
-- **배경**: Cycle375에서 SL=1.2 역효과 확정 → 손절 방향 대신 리스크 관리 측면 검토
-  - DrawdownMonitor cooldown 로직 재검토: 현재 설정이 dema_cross에 적절한지 확인
-  - KellySizer kelly_fraction 검토: 현재 거래당 포지션 크기 최적화 여부
-- **작업**: `src/risk/drawdown_monitor.py` 및 `src/risk/kelly_sizer.py` 코드 품질 검토
+- **배경**: W3 윈도우 Sh=-3.27 (2023년 하락/횡보 레짐) — 극단적 손실 원인 분석 필요
+  - BacktestEngine 슬리피지 / max_hold 상호작용 검토
+  - dema_cross가 횡보장에서 과도한 손실을 내는 메커니즘 파악
+- **작업**: `src/backtest/engine.py` 혹은 `scripts/paper_simulation.py` 실행 로직 검토
 
-#### D(ML): dema_cross 새 파라미터 방향 탐색
+#### A(품질): EMA200 필터 구현 실험 (dema_cross)
 
-- **배경**: 현재 확정 파라미터 (fast=8, slow=20, rsi_dir_filter=True, thr=40, dist_pct=0.002, bb_width=0.04)
-  - Sharpe=0.85, PF=1.38(↑ from last Trades=26), Trades=26 — PF 목표(1.50) 여전히 미달
-  - 탐색한 방향: ema_slope(역효과), macd_hist(dead), bb_width(mild+), SL=1.2(역효과), TP(역효과)
-  - **새 방향 필요**: rsi_dir_threshold를 35로 더 완화? 또는 다른 진입 필터 탐색
-  - rsi_dir_threshold=35 실험: 현재 40에서 더 완화 → Trades 증가 가능성 (26→30+?)
-- **작업**: rsi_dir_threshold=35 실험 (paper_simulation.py에서)
+- **배경**: Cycle376 F에서 PASS 윈도우=BTC 강세 레짐 확인 → EMA200 BUY 필터 유망
+  - W1/W5 PASS 기간(2023 여름, 2024 초): BTC가 EMA200 위에서 상승 중인 강세장
+  - W2/W3/W4 FAIL 기간: BTC가 EMA200 아래 또는 EMA200 하향 돌파 구간 가능성
+  - **EMA200 필터**: BUY 신호 시 close > EMA200 조건 추가 → 약세장 롱 진입 차단
+- **작업**:
+  1. `src/data/feed.py`에 ema200 피처 추가 (ema200 = EMA(close, 200))
+  2. `src/strategy/dema_cross.py`에 `ema200_filter=False` 파라미터 + BUY 조건 추가
+  3. `scripts/paper_simulation.py` ema200_filter=True 실험 → 결과 비교
+  4. PASS 조건 달성 여부 확인 (Sh≥1.0, PF≥1.5, Trades≥15, 4/8 이상 윈도우)
 
-#### F(리서치): 1h BTC dema_cross PASS 경로 분석
+#### F(리서치): dema_cross 장세 레짐별 성과 분석 심화
 
-- **배경**: 60연속 PASS 실패 (0/19, Cycle315~375) — Sharpe 목표 1.0 미달이 주 원인
-  - dema_cross Sharpe=0.85 — 통과 기준 1.0까지 +0.15 필요
-  - 현재 WF 윈도우: 8개 중 2/8만 개별 PASS → 5/8+ 필요
-  - **분석**: WF 윈도우별로 PASS한 2개 윈도우 vs FAIL한 6개 윈도우의 차이 분석
-  - PASS 윈도우의 공통 특성(레짐, 변동성, 기간)을 파악하여 선별적 진입 조건 설계
-- **검토**: PAPER_SIMULATION_REPORT.md에서 dema_cross 윈도우별 상세 분석
+- **배경**: PASS 조건 = BTC 강세장, FAIL = 하락/횡보 — 선택적 활성화 전략 필요
+  - EMA200 필터 외: ADX 강세 필터? BTC 도미넌스? 레짐 매칭?
+  - W6 근접 실패(Sh=1.82, mc_p_value=0.194): Trades=23 → 24+ 필요 시 어떤 조건이 유리?
+  - W7 근접 실패(Sh=0.93): 진입 조건 완화 vs 청산 최적화 중 어느 쪽?
+- **검토**: EMA200 필터 실험 결과 + 각 윈도우 시장 레짐 분석
 
-### ⚠️ 주의 사항 (Cycle 375 이후)
+### ⚠️ 주의 사항 (Cycle 376 이후)
 
+- **rsi_dir_threshold 탐색 완전 종료** (Cycle376 D): 35(dead), 40(최적), 45(worse) 모두 검증
+  - thr=40 확정 불변. 추가 rsi_dir_threshold 실험 금지
+- **kelly_sizer.py MIN_TRADES_FOR_KELLY 중복 제거** (Cycle376 B): line 609 제거, line 451 유지
+- **dema_cross PASS 경로**: EMA200 BUY 필터가 유일하게 남은 미탐색 방향
+  - feed.py ema200 피처 추가 필요 (현재 ema50까지만 있음)
 - **bb_width_min_filter=0.04 확정** (Cycle374 D, Cycle375 C 재확인): Sharpe=0.85, Trades=26
   - 0.05 실험: 동일 결과 (dead param) → 0.04 유지 확정. bb_width_min_filter 탐색 완전 종료
 - **atr_multiplier_sl=1.2 역효과 확정** (Cycle375 F): PF 1.38→1.34(-0.17 WF context)
   - 전체 데이터셋 긍정적 결과(PF+5%)와 WF 컨텍스트 역효과 불일치 → SL=1.5 유지 확정
   - SL/TP 방향 탐색 종료 (SL: 1.5 확정, TP: 3.5 확정 from earlier cycles)
 - **dema_cross 미완 PF 목표**: PF=1.38 → 목표 1.50 (gap=0.12)
-  - 탐색 종료 방향: ema_slope, macd_hist, bb_width, SL=1.2, TP 조정, slow=25, fast=7
-  - 잔여 탐색 방향: rsi_dir_threshold=35 (Cycle376 D) — 신호 빈도 증가로 PF↑ 가능성
+  - 탐색 종료 방향: ema_slope, macd_hist, bb_width, SL=1.2, TP 조정, slow=25, fast=7, rsi_thr=35
+  - **유일 미탐색 방향**: EMA200 BUY 필터 (Cycle377 A)
 - **dema_cross thr=40 우위 확정** (Cycle371 B): thr=45 재검증에서도 thr=40(Sh=0.85) > thr=45(Sh=0.55)
   - WFO IS 편향 확정: WFO 3개월 윈도우에서 thr=45 선호 vs 전체 기간 평가 thr=40 우세
   - DEFAULT_GRIDS["dema_cross"] rsi_dir_threshold=[40,45] 유지 (WFO 그리드 탐색 지속)
@@ -97,19 +104,26 @@ _Last updated: 2026-07-01 (Cycle 375 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 375 업데이트)
+### 핵심 메트릭 (Cycle 376 업데이트)
 
-| 지표 | Cycle 374 | Cycle 375 | 변화 |
+| 지표 | Cycle 375 | Cycle 376 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
-| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (bb_width=0.04 확정) |
+| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (thr=40 확정) |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
 | 1h BTC price_cluster Sharpe | 0.87 | **0.87** | rank2 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (59연속) | **0/19 (60연속)** | — |
+| 1h PASS 수 | 0/19 (60연속) | **0/19 (61연속)** | — |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8453 | **8457** | +4 (bb_width_min_filter 테스트) |
+| 테스트 수 | 8457 | **8457** | 유지 (버그 수정만, 신규 테스트 없음) |
+
+### Cycle 376 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/risk/kelly_sizer.py` | `MIN_TRADES_FOR_KELLY: int = 10` 중복 정의 제거 (line 609, Cycle376 B) |
+| `scripts/paper_simulation.py` | rsi_dir_threshold=35 실험 → dead param → 40 복원 + 결과 주석 추가 (Cycle376 D) |
 
 ### Cycle 375 코드 변경 요약
 
