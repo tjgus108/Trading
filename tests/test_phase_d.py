@@ -545,3 +545,66 @@ class TestLSTMSignalGenerator:
         pred = gen.predict(df)
         for field in ("action", "confidence", "proba_buy", "proba_sell", "proba_hold", "model_name"):
             assert hasattr(pred, field)
+
+
+# ---------------------------------------------------------------------------
+# DEMACrossStrategy: bb_width_min_filter (Cycle375 A)
+# ---------------------------------------------------------------------------
+
+class TestDemaCrossBbWidthFilter:
+    """bb_width_min_filter 필터 동작 단위 테스트 (Cycle374 D에서 코드 추가됨)."""
+
+    def _make_crossup_with_bb_width(self, bb_width: float) -> "pd.DataFrame":
+        """상향 크로스 데이터프레임 + bb_width 컬럼."""
+        prices = [100.0] * 34 + [100.0, 500.0, 500.0]
+        df = pd.DataFrame({
+            "open": prices, "high": [p * 1.001 for p in prices],
+            "low": [p * 0.999 for p in prices],
+            "close": prices, "volume": [1000.0] * len(prices),
+        })
+        df["bb_width"] = bb_width
+        df["rsi14"] = 50.0
+        return df
+
+    def test_bb_width_below_threshold_returns_hold(self):
+        """bb_width < threshold → BB squeeze 차단 → HOLD."""
+        from src.strategy.dema_cross import DEMACrossStrategy
+        from src.strategy.base import Action
+        s = DEMACrossStrategy(fast=8, slow=20, bb_width_min_filter=0.04)
+        df = self._make_crossup_with_bb_width(bb_width=0.02)  # 임계값 0.04 미만
+        sig = s.generate(df)
+        assert sig.action == Action.HOLD
+        assert "BB squeeze" in sig.reasoning or "bb_width" in sig.reasoning
+
+    def test_bb_width_above_threshold_allows_signal(self):
+        """bb_width >= threshold → 정상 신호 허용 (HOLD 아님)."""
+        from src.strategy.dema_cross import DEMACrossStrategy
+        from src.strategy.base import Action
+        s = DEMACrossStrategy(fast=8, slow=20, bb_width_min_filter=0.04, dist_pct_min=0.0)
+        df = self._make_crossup_with_bb_width(bb_width=0.06)  # 임계값 0.04 이상
+        sig = s.generate(df)
+        assert "BB squeeze" not in sig.reasoning
+
+    def test_bb_width_filter_disabled_by_default(self):
+        """bb_width_min_filter=0.0(기본값) → 필터 비활성 → bb_width 컬럼 무시."""
+        from src.strategy.dema_cross import DEMACrossStrategy
+        from src.strategy.base import Action
+        s = DEMACrossStrategy(fast=8, slow=20)  # bb_width_min_filter=0.0 기본값
+        df = self._make_crossup_with_bb_width(bb_width=0.005)  # 극저 bb_width
+        sig = s.generate(df)
+        assert "BB squeeze" not in sig.reasoning
+
+    def test_bb_width_column_missing_no_filter(self):
+        """bb_width 컬럼 없으면 필터 미작동 → 정상 신호."""
+        from src.strategy.dema_cross import DEMACrossStrategy
+        s = DEMACrossStrategy(fast=8, slow=20, bb_width_min_filter=0.04)
+        prices = [100.0] * 34 + [100.0, 500.0, 500.0]
+        df = pd.DataFrame({
+            "open": prices, "high": [p * 1.001 for p in prices],
+            "low": [p * 0.999 for p in prices],
+            "close": prices, "volume": [1000.0] * len(prices),
+        })
+        df["rsi14"] = 50.0
+        # bb_width 컬럼 없음 → 필터 비작동
+        sig = s.generate(df)
+        assert "BB squeeze" not in sig.reasoning

@@ -159,6 +159,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle374 D(ML): bb_width_min_filter=0.04 실험 — BB squeeze 구간 cross 차단
     #   BTC 1h bb_width 분포: mean=0.0645, p25=0.041 → 0.04(하위 23%) 임계값
     #   가설: BB squeeze(낮은 변동성) 구간의 DEMA cross → false breakout → 차단 시 PF↑
+    # Cycle374 D(ML): bb_width_min_filter=0.04 확정 (mild positive: Sh=0.86, PF=1.51, Trades=23)
+    # Cycle375 C(데이터): bb_width_min_filter=0.05 실험 → dead param (Sh=0.86, Trades=23 동일)
+    #   bb_width 분포 p25=0.041 → 0.04~0.05 구간에 추가 cross 이벤트가 없어서 차이 없음
+    #   결론: 0.05로 상향해도 필터링 증가 없음 → 0.04 유지 확정. bb_width_min_filter 탐색 종료
     "dema_cross": {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04},
     # Cycle352 B(리스크): 4h BTC 3/8 window "no trades generated" 해결
     #   원인: atr_threshold=0.7(기본값)이 저변동성 4h window에서 모든 신호 차단
@@ -1364,6 +1368,11 @@ def run_simulation(mc_p_threshold: float = 0.10, pass_ratio: float = 0.5,
         # 4h 60일 window, max_hold=24봉(4일) → 이론 최대 15 trades, 실제 avg 8-10
         # min_trades=15는 1h 기준으로 4h에서는 구조적으로 달성 불가
         min_trades_override=8 if ACTIVE_TIMEFRAME == "4h" else 0,
+        # Cycle375 F(리서치): atr_multiplier_sl=1.2 실험 → 역효과 확정 → 기본값(1.5) 복원
+        #   전체 데이터셋 분석(Cycle374 F): PF +5%, Sharpe +25% (긍정적)
+        #   WF 컨텍스트 실험(Cycle375 F): dema_cross PF 1.51→1.34(-0.17), Sharpe 0.86→0.84(-0.02), Rank 1→3
+        #   원인: 타이트한 SL이 WF OOS 윈도우에서 유효 거래 조기 차단 → PF 악화
+        #   결론: atr_multiplier_sl=1.2 역효과 확정. SL=1.5(기본값) 유지. SL 방향 탐색 종료
     )
 
     sections = []

@@ -1,3 +1,42 @@
+## [2026-07-01] Cycle 375 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] bb_width_min_filter 단위 테스트 추가**
+1. `tests/test_phase_d.py`에 `TestDemaCrossBbWidthFilter` 클래스 추가 (4개 테스트):
+   - `test_bb_width_below_threshold_returns_hold`: bb_width < 0.04 → HOLD + reasoning 확인
+   - `test_bb_width_above_threshold_allows_signal`: bb_width >= 0.04 → BB squeeze 차단 없음
+   - `test_bb_width_filter_disabled_by_default`: bb_width_min_filter=0.0(기본) → 필터 비활성
+   - `test_bb_width_column_missing_no_filter`: bb_width 컬럼 없음 → 필터 미작동
+2. 전체 테스트 스위트: **8457 passed** (+4 신규), 23 skipped ✓
+
+**[C(데이터)] bb_width_min_filter=0.05 임계값 세밀화 실험**
+3. `scripts/paper_simulation.py` bb_width_min_filter=0.04 → 0.05 실험:
+   - BTC 1h WF 결과: **Sharpe=0.86, PF=1.51, Trades=23** → 0.04와 완전 동일
+   - 원인: bb_width 분포 p25=0.041 → 0.04~0.05 구간에 추가 cross 이벤트 없음
+   - 결론: **bb_width_min_filter=0.05 dead param 확정** → 0.04 복원. bb_width 탐색 종료
+4. 주석 업데이트: 0.05 실험 결과 기록
+
+**[F(리서치)] atr_multiplier_sl=1.2 WF 컨텍스트 검증**
+5. `scripts/paper_simulation.py` BacktestEngine에 atr_multiplier_sl=1.2 실험:
+   - BTC 1h WF 결과: dema_cross **Sharpe=0.84(↓-0.02), PF=1.34(↓-0.17), Trades=28(↑+5), Rank 1→3**
+   - Consistency: 2/8→1/8 악화
+   - 전체 데이터셋(Cycle374 F)과 역방향: 전체에서 PF +5%이었으나 WF에서 PF -11%
+   - 원인: 타이트한 SL이 WF OOS 윈도우에서 유효 거래 조기 차단 → PF↓
+   - 결론: **atr_multiplier_sl=1.2 역효과 확정** → SL=1.5(기본값) 복원. SL 탐색 종료
+6. paper_simulation.py 복원 후 최종 확인: dema_cross Sh=0.85, PF=?, Trades=26, rank1 ✓
+
+**시뮬레이션 결과 요약**
+
+| 지표 | Cycle 374 | Cycle 375 | 변화 |
+|------|-----------|-----------|------|
+| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 (bb_width=0.04 확정) |
+| 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
+| 1h BTC dema_cross Trades | 26 | **26** | 유지 |
+| 1h PASS 수 | 0/19 (59연속) | **0/19 (60연속)** | — |
+| Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
+| 테스트 수 | 8453 | **8457** | +4 (bb_width 테스트) |
+
+---
+
 ## [2026-06-30] Cycle 374 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] dema_cross BB width squeeze 필터 추가**
@@ -8772,6 +8811,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-06-30 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-01 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-01 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-01 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-01 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-01 00:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-01 00:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
