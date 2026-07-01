@@ -17,6 +17,10 @@ PriceClusterStrategy v3:
   atr_bounce_factor > 0 시: effective_bounce_pct = ATR(14)/close × factor
   고변동성 시장에서 threshold를 자동으로 확대, 저변동성 시장에서 축소
   기본값 0.0 (비활성) → 향후 실험 시 활성화
+- Cycle378 C(데이터): high_conf_only — HIGH 신뢰도 신호만 허용
+  True시: max_count < avg_count * _HIGH_CONF_FREQ_MULT이면 신호 억제
+  목표: PF 개선 (MEDIUM confidence 노이즈 제거 → 더 명확한 cluster bounce만)
+  기본값 False (기존 동작 유지)
 """
 
 from typing import Optional, Tuple
@@ -82,6 +86,7 @@ class PriceClusterStrategy(BaseStrategy):
         vol_atr_ma_period: int = 20,
         vol_atr_trend_min: float = 1.5,
         atr_bounce_factor: float = 0.0,
+        high_conf_only: bool = False,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -97,6 +102,8 @@ class PriceClusterStrategy(BaseStrategy):
         self.vol_atr_trend_min = vol_atr_trend_min
         # Cycle301 F(리서치): ATR 기반 동적 bounce_pct (0 = 비활성)
         self.atr_bounce_factor = atr_bounce_factor
+        # Cycle378 C(데이터): HIGH 신뢰도 신호만 허용 (False=기본, 기존 동작 유지)
+        self.high_conf_only = high_conf_only
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
         """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
@@ -188,8 +195,12 @@ class PriceClusterStrategy(BaseStrategy):
         )
 
         is_high_confidence = max_count >= avg_count * _HIGH_CONF_FREQ_MULT
-        
+
         confidence = Confidence.HIGH if is_high_confidence else Confidence.MEDIUM
+
+        # Cycle378 C(데이터): HIGH 신뢰도만 허용 — MEDIUM confidence 신호 억제
+        if self.high_conf_only and not is_high_confidence:
+            return self._hold(df, f"high_conf_only: cluster too weak (count={max_count}<{avg_count * _HIGH_CONF_FREQ_MULT:.1f}): {context}")
 
         # Threshold 계산: cluster 경계 가격 기준 비율 (가격 스케일에 비례)
         # Cycle301 F(리서치): ATR 기반 동적 bounce_pct (atr_bounce_factor > 0 시 활성)

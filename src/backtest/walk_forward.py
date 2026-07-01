@@ -178,6 +178,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle355 A(품질): 1.5에서 효과 없음 확인 → 1.2 추가 (더 공격적 억제 탐색)
     # Cycle356 F(리서치): 1.2에서도 효과 없음(Sharpe=0.87 유지) → 1.0 추가
     # Cycle357 F(리서치): vol_regime_filter=False 추가 — filter 비활성화 탐색 (paper_sim과 일관성)
+    # Cycle378 C(데이터): high_conf_only=[False,True] 추가 → dead param 확정 (paper_sim 검증)
+    # 실험 결과: Sh=0.60(-0.05), PF=1.15(-0.03), Consistency=0/8(-1) — 모두 악화
+    # W6 PASS 윈도우: PF 2.01→1.48 (PF 문턱 실패) → HIGH/MEDIUM 분류가 bounce 품질 예측 불가
+    # high_conf_only 탐색 종료. 기본값(False) 유지. WFO 그리드에서 제거.
     "price_cluster": {
         "bounce_pct": [0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],

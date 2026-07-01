@@ -448,7 +448,12 @@ class KellySizer:
         )
 
     # 최소 거래 수: 이보다 적으면 Kelly 추정이 통계적으로 불안정
-    MIN_TRADES_FOR_KELLY: int = 10
+    # Cycle378 B(리스크): 10→15로 상향 — paper_sim min_trades=15와 정렬
+    #   근거: trades < 15이면 backtest에서도 통계 불충분(FAIL)으로 판정하는데,
+    #   Kelly 추정에서는 더 관대한 10을 쓰는 불일치 해소.
+    #   n=10~14 trades: shrink_factor = n/(n+15) → 0.40~0.48 (50%로 약 50% 수렴)
+    #   n=15+: raw win_rate 사용 (이전과 동일)
+    MIN_TRADES_FOR_KELLY: int = 15
 
     @classmethod
     def from_trade_history(

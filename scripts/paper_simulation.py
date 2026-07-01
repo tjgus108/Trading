@@ -102,6 +102,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle310 A(품질): period=40 실험 → 역효과 (rank19, Sharpe=-2.33, trades=59) → period=20 복원
     # 결론: 1h CMF는 period 조정과 무관하게 FAIL — 4h 전용 전략으로 확정 (walk_forward 집중)
     "cmf": {"buy_thresh": 0.10},
+    # Cycle378 C(데이터): high_conf_only=True 실험 → dead param 확정
+    #   결과: Sh=0.60(-0.05 악화), PF=1.15(-0.03 악화), Trades=36(-6), Consistency=0/8(-1)
+    #   W6 PASS(PF=2.01) → FAIL(PF=1.48 < 1.5): 가장 좋은 윈도우에서 PF 문턱 실패
+    #   원인: HIGH/MEDIUM confidence 분류가 수익성 예측 불가 (cluster 빈도 ≠ bounce 품질)
+    #   결론: high_conf_only 탐색 종료. 기본값(False) 유지.
+    # "price_cluster": {"vol_regime_filter": False, "high_conf_only": True},  # Cycle378 C 실험 → 복원됨
     # Cycle354 D(ML): price_cluster vol_regime_filter=True 실험 (1.5 → 효과 없음 확인)
     # Cycle355 A(품질): vol_atr_trend_min 1.5→1.2 강화 → Sharpe=0.87, PF=1.20 (1.5와 동일)
     # Cycle356 F(리서치): 1.0 시도 → Sharpe=-0.30, 0/8 (대폭 악화) → 1.2로 복원

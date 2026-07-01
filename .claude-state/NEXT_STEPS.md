@@ -1,44 +1,47 @@
 # Next Steps
 
-_Last updated: 2026-07-01 (Cycle 377 완료)_
+_Last updated: 2026-07-01 (Cycle 378 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 377
+### 이번 세션 완료 사이클: 378
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 375 | A+C+F | bb_width 테스트 4개 추가, bb_width=0.05 **dead param**, SL=1.2 **역효과 확정** |
 | 376 | B+D+F | kelly_sizer 중복 버그 수정, rsi_thr=35 **dead param**, W1/W5 PASS=강세 레짐 분석 |
 | 377 | B+D+F | ema200 피처 추가(feed.py), ema200_filter=True **dead param** 확정, dema_cross 탐색 완전 종료 |
+| 378 | C+B+F | high_conf_only **dead param** 확정, MIN_TRADES_FOR_KELLY 10→15, 63연속 FAIL 구조적 원인 확정 |
 
-### 🎯 Cycle 378 작업 방향 (378 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 379 작업 방향 (379 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): price_cluster 또는 roc_ma_cross 개선 탐색
+#### D(ML): roc_ma_cross 추가 파라미터 탐색
 
-- **배경**: dema_cross 모든 탐색 방향 소진 (PF=1.38 → 목표 1.50 gap=0.12 달성 불가 확정)
-  - 현재 1h BTC rank1: price_cluster (Sh=0.87, PF 미확인)
-  - 현재 1h BTC rank2: roc_ma_cross (Sh=0.34, 개선 잠재력 있음)
-- **작업 옵션**:
-  1. **price_cluster**: n_bins, close_window 외 새 파라미터 발굴 (예: momentum_window, min_cluster_size)
-  2. **roc_ma_cross**: roc_period=12 확정 이후 추가 파라미터 (예: signal smoothing, volume filter)
-  3. `scripts/paper_simulation.py`에서 rank1-5 전략 중 PF가 1.50 미만인 전략 선정
+- **배경**: roc_ma_cross rank2-3 (Sh=0.34, PF=1.22, Trades=36, 2/8 consistency)
+  - roc_period=12 확정, ma=3 확정 → 다른 파라미터 발굴 필요
+  - 현재 NEXT 탐색 후보: **volume_filter** (거래량 급증 시에만 ROC 신호 허용)
+  - 또는 **rsi_filter** (RSI 과매수/과매도 회피: BUY시 RSI<70, SELL시 RSI>30)
+- **작업**:
+  1. roc_ma_cross 코드 확인: `src/strategy/roc_ma_cross.py`
+  2. volume_filter 파라미터 추가 (vol_ratio > 1.5 시에만 신호): PF 개선 기대
+  3. `src/backtest/walk_forward.py` DEFAULT_GRIDS["roc_ma_cross"]에 추가
 
-#### B(리스크): KellySizer/DrawdownMonitor 파라미터 세밀화
+#### E(실행): Paper Trading 모드 점검
 
-- **배경**: dema_cross PF=1.38 → 현재 Kelly 설정과 포지션 사이징 재검토
-  - KellySizer Bayesian 수축 계수 검토 (shrinkage_factor 기본값 vs dema_cross 실전 적합성)
-  - DrawdownMonitor 일간/주간 DD 한도가 BTC 1h 변동성에 적합한지 검토
-- **작업**: `src/risk/kelly_sizer.py` shrinkage_factor 분석, `src/risk/drawdown_monitor.py` DD 임계값 검토
+- **배경**: paper_simulation.py의 slippage/fee 설정 점검
+  - 현재: fee=0.055%/leg (0.11% round-trip), slippage=0.05%
+  - 2024년 Bybit 실제 taker fee: 0.055% (정확)
+  - BTC 1h 실거래 슬리피지 vs 0.05% 설정 적합성 검토
+- **작업**: PaperConnector 슬리피지 설정 vs 실제 BTC 1h 스프레드 비교
 
-#### F(리서치): 1h paper_sim PASS 전략 부재 원인 분석 (62연속)
+#### F(리서치): price_cluster PF 개선 새 방향 탐색
 
-- **배경**: 62연속 0/19 PASS — 모든 전략이 consistency ≥ 50% 미달
-  - rank1 price_cluster Sh=0.87도 consistency 미달
-  - 문제: 개별 전략 파라미터 한계인지 vs WF 설계 자체 문제(train/test 비율, 윈도우 수)인지
-- **검토**: `src/backtest/walk_forward.py` consistency 계산 로직, mc_p_value 임계값(0.05) 타당성
+- **배경**: high_conf_only dead param (Cycle378 C), price_cluster PF=1.20 (gap=0.30)
+  - 다음 탐색 방향: **min_cluster_strength_ratio** — 최고 bin이 전체의 X% 이상일 때만 신호
+  - 또는 **confirmation_bars** — 현재봉에서 cluster_low 복귀 후 N봉 확인 후 진입
+  - roc_ma_cross volume_filter와 병행 탐색
+- **분석**: price_cluster PASS 윈도우(W6: PF=2.01) vs FAIL 윈도우(W1: PF=0.88) 특성 비교
 
 ### ⚠️ 주의 사항 (Cycle 377 이후)
 
