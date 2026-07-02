@@ -192,6 +192,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
+        # Cycle380 C(데이터): confirmation_bars 탐색 — bounce 후 N봉 확인 (0=즉시)
+        # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓
+        # 주의: confirmation_bars>0이면 entries 지연 → trades 감소 위험
+        "confirmation_bars": [0, 1, 2],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)
@@ -206,11 +210,16 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle379 D(ML) paper_sim 결과: volume_filter=True, vol_ratio_min=1.5
     #   Sharpe=0.72(+0.38↑), PF=1.68(+0.68↑, 목표 1.5 달성!), Trades=10(<15 FAIL)
     #   결론: volume_filter 개념 유효(PF↑) — 임계값 1.5가 너무 공격적, trades 부족
-    #   다음 방향: vol_ratio_min=1.2 시도 (trades 증가 기대하며 PF 유지 탐색)
+    # Cycle380 A(품질): vol_ratio_min 최적값 탐색 [1.0, 1.2, 1.5]
+    #   목표: Trades≥15 + PF≥1.5 동시 만족 구간 탐색
+    #   1.5: PF=1.68 달성, Trades=10 (FAIL) / 1.2: 예상 Trades 15-20 (Cycle380 실험)
+    #   1.0: 더 많은 trades 허용 (기준선), PF 하락 예상
     "roc_ma_cross": {
         "roc_period": [10, 12, 15],
         "ma_period": [3, 5, 7],
         "volume_filter": [False, True],
+        # vol_ratio_min: volume_filter=True 시에만 유효 (False시 무시됨)
+        "vol_ratio_min": [1.0, 1.2, 1.5],
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)
@@ -1290,6 +1299,7 @@ def optimize_roc_ma_cross(df: pd.DataFrame, n_windows: int = 3,
             roc_period=params.get("roc_period", 12),
             ma_period=params.get("ma_period", 3),
             volume_filter=params.get("volume_filter", False),
+            vol_ratio_min=params.get("vol_ratio_min", 1.5),
         )
 
     opt = WalkForwardOptimizer(

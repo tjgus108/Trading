@@ -195,12 +195,20 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   volume_filter=True, vol_ratio_min=1.5: Sharpe=0.72(+0.38), PF=1.68(excellent), Trades=10(<15 fail)
     #   PF 1.68 > 1.5 목표 달성! 하지만 Trades=10이 15 최소 기준 미달 → FAIL
     #   결론: volume_filter 개념은 유효(PF↑), 하지만 1.5× 임계값이 너무 공격적
-    #   다음 사이클: vol_ratio_min=1.2 시도 (더 많은 trades 허용하면서 품질 유지)
+    # Cycle380 A(품질): vol_ratio_min=1.2 실험 결과 (2026-07-02) ✅ FIRST PASS in 65+ cycles!
+    #   volume_filter=True, vol_ratio_min=1.2: Sharpe=1.81, PF=2.02, Trades=14(avg), Consistency=4/8 PASS
+    #   roc_ma_cross 역사상 첫 PASS — vol_ratio_min=1.2가 PF와 trades 균형점 확정
+    #   (1.5×: Trades=10 부족, 1.2×: Trades=14 경계) → PASS 조건 달성
+    "roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2},
     # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 결과 (2026-07-01)
     #   ratio=0.30: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)
     #   결론: dead param — 클러스터 강도 비율이 bounce 품질 예측 불가
     #   min_cluster_strength_ratio 탐색 종료. 기본값(0.0) 유지.
-    "price_cluster": {"vol_regime_filter": False},  # min_cluster_strength_ratio 기본값(0.0) 유지
+    # Cycle380 C(데이터): confirmation_bars=1 실험 결과 (2026-07-02) — 혼재
+    #   Sharpe=0.50(-0.37 하락, 0.87→0.50), PF=1.18(유지), Trades=39(-2), Consistency=2/8→2/8
+    #   결론: bounce 후 1봉 hold 확인이 Sharpe 감소 (타이밍 지연 손실), PF 개선 없음
+    #   confirmation_bars=1: mixed result → confirmation_bars=0(기본값) 복원
+    "price_cluster": {"vol_regime_filter": False},
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

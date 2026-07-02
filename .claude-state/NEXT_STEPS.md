@@ -1,56 +1,60 @@
 # Next Steps
 
-_Last updated: 2026-07-01 (Cycle 379 완료)_
+_Last updated: 2026-07-02 (Cycle 380 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 379
+### 이번 세션 완료 사이클: 380
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 377 | B+D+F | ema200 피처 추가(feed.py), ema200_filter=True **dead param** 확정, dema_cross 탐색 완전 종료 |
 | 378 | C+B+F | high_conf_only **dead param** 확정, MIN_TRADES_FOR_KELLY 10→15, 63연속 FAIL 구조적 원인 확정 |
 | 379 | D+E+F | volume_filter 추가(roc_ma_cross), PF=1.68 달성(trades 부족), 슬리피지 검증, min_cluster_strength_ratio dead param |
+| 380 | A+C+F | **🎉 roc_ma_cross FIRST PASS (4/8)** Sh=1.81 PF=2.02, price_cluster confirmation_bars 추가(혼재) |
 
-### 🎯 Cycle 380 작업 방향 (380 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 381 작업 방향 (381 mod 5 = 1 → B(리스크) + D(ML) + E(실행))
 
-#### A(품질): roc_ma_cross vol_ratio_min 최적화
+#### B(리스크): roc_ma_cross 리스크 파라미터 검토
 
-- **배경**: volume_filter=True + vol_ratio_min=1.5 → PF=1.68(목표 달성!), Trades=10(<15 실패)
-  - 임계값 1.5는 너무 공격적 (거래 36개→10개로 73% 감소)
-  - vol_ratio_min=1.2 시도: 거래 ~15-20개 기대, PF 유지 탐색
-  - 또는 vol_ratio_min=1.3 중간값 탐색
-- **작업**:
-  1. `scripts/paper_simulation.py`에 `"roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2}` 실험
-  2. trades 수 확인 (≥15 필수), PF 유지 여부 확인
+- **배경**: roc_ma_cross 첫 PASS 달성 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8)
+  - MDD=3.4%로 낮음 — 리스크 프로파일 우수
+  - 단, Trades=14는 15 기준 경계선 (일부 윈도우 trades 감소 우려)
+  - Kelly 사이저 적용 가능 여부 확인 (MIN_TRADES_FOR_KELLY=15 기준)
+- **작업 방향**:
+  - SL/TP 설정 검토 (기본값 vs custom)
+  - 또는 Bundle OOS에 roc_ma_cross 추가 가능성 타진 (4h 검증)
 
-#### C(데이터): price_cluster confirmation_bars 탐색
+#### D(ML): price_cluster 다음 파라미터 탐색
 
-- **배경**: min_cluster_strength_ratio dead param 확정 (Cycle379 F)
-  - 다음 탐색 방향: **confirmation_bars** — cluster_low 복귀 후 N봉 추가 확인 후 진입
-  - 가설: 복귀 신호 + N봉 hold 확인 → 오신호 감소, PF↑
-  - 주의: confirmation_bars > 0이면 entries 지연 → trades 감소 위험
-- **작업**:
-  1. `src/strategy/price_cluster.py`에 `confirmation_bars=0` 파라미터 추가
-  2. bounce BUY/SELL 신호 후 N봉 확인 로직 구현
-  3. paper_sim 실험: confirmation_bars=1, 2
+- **배경**: confirmation_bars=1 결과 혼재 (Sharpe -0.37, PF 유지)
+  - confirmation_bars=2도 시도 가능하지만 Trades 더 감소 우려
+  - 다른 방향: **atr_bounce_factor** (ATR 기반 동적 bounce_pct, 기본값 0.0)
+  - 가설: 고변동성 시장에서 threshold 확대 → BTC의 변동성 레짐에 맞는 동적 조정
+- **작업 방향**:
+  1. `atr_bounce_factor=1.0` 시험 (ATR/close * factor = bounce_pct)
+  2. 또는 bounce_pct=0.015 시험 (기본 0.01에서 상향)
 
-#### F(리서치): roc_ma_cross vol_ratio_min 시퀀스 분석
+#### E(실행): 실전 배포 준비 점검
 
-- **배경**: volume_filter 개념 검증됨. 다음은 최적 임계값 탐색
-  - 1.2: 더 많은 trades 허용 (기대 15-20개)
-  - 1.5: PF=1.68 달성 but trades=10 부족
-  - 2.0: 더 선택적 — trades 더 적고 PF 더 높을 수 있음
-  - 적정 균형점: min_trades ≥ 15 + PF ≥ 1.5 동시 만족 탐색
+- **배경**: roc_ma_cross PASS 확정 → bundle에 추가 또는 실전 배포 검토 필요
+  - 현재 Bundle OOS: cmf, ofi_v2, supertrend_multi, vwap_cross, value_area (5/5 PASS)
+  - roc_ma_cross 4h 검증 필요 (bundle_oos.py --symbol BTC/USDT --timeframe 4h 실행)
+  - 현재 roc_ma_cross는 1h paper_sim PASS (4/8) — bundle 추가 전 4h OOS 필수
 
-### ⚠️ 주의 사항 (Cycle 379 이후)
+### ⚠️ 주의 사항 (Cycle 380 이후)
 
-- **roc_ma_cross volume_filter 결과** (Cycle379 D): vol_ratio_min=1.5 → PF=1.68(목표 달성!), Trades=10(<15 fail)
-  - 개념 유효. 다음: vol_ratio_min=1.2 시도 (Cycle380 A 작업)
+- **🎉 roc_ma_cross FIRST PASS 확정** (Cycle380 A): vol_ratio_min=1.2 → Sh=1.81, PF=2.02, Trades=14 avg, 4/8
+  - **확정 파라미터**: `{"volume_filter": True, "vol_ratio_min": 1.2}` (변경 금지)
+  - 65+ 사이클 만에 첫 PASS — volume_filter 개념의 효과 입증
+  - 주의: AvgTrades=14 (15 기준 경계). 일부 윈도우 trades<15 가능성 존재
+- **price_cluster confirmation_bars 결과** (Cycle380 C): 혼재
+  - confirmation_bars=1: Sharpe 0.87→0.50(-43%), PF 유지(1.18), Trades 39
+  - 타이밍 지연이 손익 감소 유발 → confirmation_bars=0(기본값) 복원
+  - 파라미터 코드는 유지 (confirmation_bars=2 향후 실험 가능)
 - **min_cluster_strength_ratio dead param 확정** (Cycle379 F): ratio=0.30 → Sh=0.72(-0.15), PF=1.18(동일)
-  - 파라미터 코드는 유지, WFO 그리드에서 제거됨. min_cluster_strength_ratio 탐색 종료
+  - 파라미터 코드는 유지, 탐색 종료
 - **슬리피지 모델 검증됨** (Cycle379 E): 0.05%/leg 보수적/적정 (실제 BTC 스프레드 0.01-0.03%)
   - adaptive_slippage=True + ATR 레짐 자동 조정. 슬리피지 설정 변경 불필요
 

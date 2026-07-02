@@ -21,6 +21,10 @@ PriceClusterStrategy v3:
   True시: max_count < avg_count * _HIGH_CONF_FREQ_MULT이면 신호 억제
   목표: PF 개선 (MEDIUM confidence 노이즈 제거 → 더 명확한 cluster bounce만)
   기본값 False (기존 동작 유지)
+- Cycle380 C(데이터): confirmation_bars — bounce 후 N봉 추가 확인 후 진입
+  0=즉시 진입 (기존), N>0: bounce 신호 후 N봉 동안 cluster_low/high 유지 확인
+  목표: 오신호 감소 (false bounce 차단) → PF↑, Trades↓
+  기본값 0 (기존 동작 유지)
 """
 
 from typing import Optional, Tuple
@@ -88,6 +92,7 @@ class PriceClusterStrategy(BaseStrategy):
         atr_bounce_factor: float = 0.0,
         high_conf_only: bool = False,
         min_cluster_strength_ratio: float = 0.0,
+        confirmation_bars: int = 0,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -108,6 +113,8 @@ class PriceClusterStrategy(BaseStrategy):
         # Cycle379 F(리서치): 클러스터 강도 비율 필터 (0.0=비활성)
         # max_count / total_count >= 비율 요구 — 지배적 클러스터만 bounce 신호 허용
         self.min_cluster_strength_ratio = min_cluster_strength_ratio
+        # Cycle380 C(데이터): bounce 후 N봉 추가 확인 (0=즉시, N>0=N봉 hold 확인)
+        self.confirmation_bars = confirmation_bars
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
         """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
@@ -223,31 +230,67 @@ class PriceClusterStrategy(BaseStrategy):
             effective_bounce_pct = self.bounce_pct
         threshold = max(cluster_low * effective_bounce_pct, 0.001)
 
-        # BUY: 이전 봉이 cluster_low 아래 (threshold 내), 현재 봉이 cluster_low 이상
-        if (prev_close < cluster_low and 
-            prev_close >= cluster_low - threshold and 
-            curr_close >= cluster_low):
+        # Cycle380 C(데이터): confirmation_bars — bounce 후 N봉 확인
+        # n=0: 기존 동작 (bounce 즉시 신호)
+        # n>0: bounce가 n봉 전에 발생했고 그 이후 n봉 모두 cluster 경계 유지 시 신호
+        n = self.confirmation_bars
+        # confirmation_bars > 0이면 최소 n+2봉 데이터 필요
+        if n > 0 and len(completed) < n + 2:
+            return self._hold(df, f"confirmation_bars={n}: not enough data ({len(completed)}<{n+2})")
+
+        if n == 0:
+            bounce_prev = prev_close
+            bounce_curr = curr_close
+        else:
+            # n봉 전 bounce 발생 여부 확인
+            bounce_prev = float(completed.iloc[-(2 + n)]["close"])
+            bounce_curr = float(completed.iloc[-(1 + n)]["close"])
+            # 이후 n봉 (completed.iloc[-n:]) 모두 cluster 경계 유지 확인
+            confirm_closes = completed["close"].iloc[-n:]
+            confirmed_buy = all(float(c) >= cluster_low for c in confirm_closes)
+            confirmed_sell = all(float(c) <= cluster_high for c in confirm_closes)
+
+        # BUY: bounce_prev가 cluster_low 아래 (threshold 내), bounce_curr가 cluster_low 이상
+        if n == 0:
+            buy_cond = (bounce_prev < cluster_low and
+                        bounce_prev >= cluster_low - threshold and
+                        bounce_curr >= cluster_low)
+        else:
+            buy_cond = (bounce_prev < cluster_low and
+                        bounce_prev >= cluster_low - threshold and
+                        bounce_curr >= cluster_low and
+                        confirmed_buy)
+
+        if buy_cond:
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=curr_close,
-                reasoning=f"Cluster bounce BUY: {context}",
+                reasoning=f"Cluster bounce BUY (confirm={n}b): {context}",
                 invalidation=f"close < cluster_low={cluster_low:.4f}",
                 bull_case=f"Price cluster 하단 반등, {context}",
                 bear_case=f"Cluster 하향 이탈 지속 시 하락",
             )
 
-        # SELL: 이전 봉이 cluster_high 위 (threshold 내), 현재 봉이 cluster_high 이하
-        if (prev_close > cluster_high and 
-            prev_close <= cluster_high + threshold and 
-            curr_close <= cluster_high):
+        # SELL: bounce_prev가 cluster_high 위 (threshold 내), bounce_curr가 cluster_high 이하
+        if n == 0:
+            sell_cond = (bounce_prev > cluster_high and
+                         bounce_prev <= cluster_high + threshold and
+                         bounce_curr <= cluster_high)
+        else:
+            sell_cond = (bounce_prev > cluster_high and
+                         bounce_prev <= cluster_high + threshold and
+                         bounce_curr <= cluster_high and
+                         confirmed_sell)
+
+        if sell_cond:
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,
                 strategy=self.name,
                 entry_price=curr_close,
-                reasoning=f"Cluster rejection SELL: {context}",
+                reasoning=f"Cluster rejection SELL (confirm={n}b): {context}",
                 invalidation=f"close > cluster_high={cluster_high:.4f}",
                 bull_case=f"Cluster 상향 재돌파 시 상승",
                 bear_case=f"Price cluster 상단 저항, {context}",
