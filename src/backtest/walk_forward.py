@@ -196,6 +196,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓
         # 주의: confirmation_bars>0이면 entries 지연 → trades 감소 위험
         "confirmation_bars": [0, 1, 2],
+        # Cycle381 D(ML): atr_bounce_factor 탐색 — ATR 기반 동적 bounce_pct
+        # paper_sim 결과: factor=1.0 → Sharpe=1.17(+0.30), PF=1.25(+0.05), Consistency=1/8(-1)
+        # Sharpe 개선되나 Consistency 악화 → 개인 윈도우 효과는 있음(WFO 탐색 가치 존재)
+        # 0.0=비활성(기본), 1.0=ATR/close×1.0≈1.49%(BTC), 2.0=약 3% threshold(고변동성 강화)
+        "atr_bounce_factor": [0.0, 1.0],
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)

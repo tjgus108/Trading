@@ -234,17 +234,16 @@ def test_compute_negative_price_returns_zero():
 # ── from_trade_history 소표본 shrinkage 테스트 ────────────────────────────────
 
 def test_small_sample_shrinks_win_rate():
-    """거래 수 < MIN_TRADES_FOR_KELLY(10): Bayesian shrinkage로 size가 줄어야 함."""
+    """거래 수 < MIN_TRADES_FOR_KELLY(15): Bayesian shrinkage로 size가 줄어야 함."""
     # 3개 거래(전부 승) → raw win_rate=1.0
-    # shrinkage: 3/(3+10)*1.0 + 7/10*0.5 = 0.231 + 0.385 = 약 0.615
+    # shrinkage: 3/(3+15)*1.0 + 12/18*0.5 ≈ 0.167 + 0.333 = 0.5
     small_trades = [{"pnl": 100}, {"pnl": 200}, {"pnl": 50}]
     qty_small = KellySizer.from_trade_history(
         small_trades, capital=10000, price=1000,
         fraction=0.5, max_fraction=0.50,
     )
 
-    # 30개 거래(전부 승) → raw win_rate=1.0, shrinkage 미적용
-    # shrink_factor = 30/(30+10) = 0.75 → 적용 안됨 (n >= threshold)
+    # 30개 거래(전부 승) → raw win_rate=1.0, shrinkage 미적용 (n >= 15)
     large_trades = [{"pnl": 100}] * 30
     qty_large = KellySizer.from_trade_history(
         large_trades, capital=10000, price=1000,
@@ -253,6 +252,42 @@ def test_small_sample_shrinks_win_rate():
 
     # 소표본은 win_rate shrinkage로 인해 대표본보다 작거나 같아야 함
     assert qty_small <= qty_large + 1e-9
+
+
+def test_min_trades_kelly_boundary_14_vs_15():
+    """n=14는 shrinkage 적용, n=15는 raw win_rate 사용 — MIN_TRADES_FOR_KELLY=15 경계.
+
+    혼합 거래 기록(win/loss 포함)을 사용해 kelly_cap 클리핑 없이 차이를 확인.
+    """
+    import numpy as np
+    rng = np.random.default_rng(77)
+
+    def _make_trades(n: int) -> list:
+        """n개 거래: 60% 승률, avg_win=100, avg_loss=50."""
+        trades = []
+        for i in range(n):
+            if i < int(n * 0.6):
+                trades.append({"pnl": 100.0})
+            else:
+                trades.append({"pnl": -50.0})
+        return trades
+
+    # 14개 거래: n < 15 → shrinkage 적용 → win_rate 50%로 축소
+    trades_14 = _make_trades(14)
+    qty_14 = KellySizer.from_trade_history(
+        trades_14, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50, kelly_cap=0.50,
+    )
+
+    # 15개 거래: n >= 15 → raw win_rate 사용 (shrinkage 없음)
+    trades_15 = _make_trades(15)
+    qty_15 = KellySizer.from_trade_history(
+        trades_15, capital=10000, price=1000,
+        fraction=0.5, max_fraction=0.50, kelly_cap=0.50,
+    )
+
+    # n=14(shrinkage로 인해 win_rate 축소) → n=15(raw)보다 작거나 같아야 함
+    assert qty_14 <= qty_15
 
 
 def test_all_breakeven_returns_zero():

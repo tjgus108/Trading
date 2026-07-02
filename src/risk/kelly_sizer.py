@@ -475,7 +475,7 @@ class KellySizer:
     ) -> float:
         """거래 기록으로부터 win_rate / avg_win / avg_loss 자동 계산 후 compute() 호출.
 
-        소표본 방어: 거래 수가 min_trades(기본 MIN_TRADES_FOR_KELLY=10) 미만이면
+        소표본 방어: 거래 수가 min_trades(기본 MIN_TRADES_FOR_KELLY=15) 미만이면
         win_rate를 50%로 축소(Bayesian shrinkage)하여 과적합 방지.
         거래 기록이 비어있거나 모든 pnl이 0이면 0.0 반환.
 

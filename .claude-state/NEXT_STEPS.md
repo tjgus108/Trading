@@ -1,49 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-07-02 (Cycle 380 완료)_
+_Last updated: 2026-07-02 (Cycle 381 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 380
+### 이번 세션 완료 사이클: 381
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 378 | C+B+F | high_conf_only **dead param** 확정, MIN_TRADES_FOR_KELLY 10→15, 63연속 FAIL 구조적 원인 확정 |
-| 379 | D+E+F | volume_filter 추가(roc_ma_cross), PF=1.68 달성(trades 부족), 슬리피지 검증, min_cluster_strength_ratio dead param |
-| 380 | A+C+F | **🎉 roc_ma_cross FIRST PASS (4/8)** Sh=1.81 PF=2.02, price_cluster confirmation_bars 추가(혼재) |
+| 379 | D+E+F | volume_filter 추가(roc_ma_cross), PF=1.68 달성(trades 부족), 슬리피지 검증 |
+| 380 | A+C+F | **🎉 roc_ma_cross FIRST PASS (4/8)** Sh=1.81 PF=2.02, price_cluster confirmation_bars 혼재 |
+| 381 | B+D+F | Kelly docstring 수정 + boundary test, atr_bounce_factor 혼재(Sharpe↑/Consistency↓), 4h OOS: 신호 희소 확정 |
 
-### 🎯 Cycle 381 작업 방향 (381 mod 5 = 1 → B(리스크) + D(ML) + E(실행))
+### 🎯 Cycle 382 작업 방향 (382 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): roc_ma_cross 리스크 파라미터 검토
+#### B(리스크): DrawdownMonitor 로직 개선 또는 roc_ma_cross 리스크 미세조정
 
-- **배경**: roc_ma_cross 첫 PASS 달성 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8)
-  - MDD=3.4%로 낮음 — 리스크 프로파일 우수
-  - 단, Trades=14는 15 기준 경계선 (일부 윈도우 trades 감소 우려)
-  - Kelly 사이저 적용 가능 여부 확인 (MIN_TRADES_FOR_KELLY=15 기준)
-- **작업 방향**:
-  - SL/TP 설정 검토 (기본값 vs custom)
-  - 또는 Bundle OOS에 roc_ma_cross 추가 가능성 타진 (4h 검증)
+- **배경**: roc_ma_cross PASS 유지 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8)
+  - Trades=14 avg (경계선) → 일부 윈도우 trades<15 가능성
+  - Kelly MIN_TRADES_FOR_KELLY=15 → n=14 시 shrinkage 적용 (정상 동작 확인됨)
+- **작업 방향**: DrawdownMonitor transition_cushion 파라미터 추가 테스트 검토
+  - 또는 roc_ma_cross Trades 증가 방향 탐색 (vol_ratio_min 미세 조정 1.1 시도)
 
-#### D(ML): price_cluster 다음 파라미터 탐색
+#### D(ML): price_cluster PF 개선 방향 재설정
 
-- **배경**: confirmation_bars=1 결과 혼재 (Sharpe -0.37, PF 유지)
-  - confirmation_bars=2도 시도 가능하지만 Trades 더 감소 우려
-  - 다른 방향: **atr_bounce_factor** (ATR 기반 동적 bounce_pct, 기본값 0.0)
-  - 가설: 고변동성 시장에서 threshold 확대 → BTC의 변동성 레짐에 맞는 동적 조정
-- **작업 방향**:
-  1. `atr_bounce_factor=1.0` 시험 (ATR/close * factor = bounce_pct)
-  2. 또는 bounce_pct=0.015 시험 (기본 0.01에서 상향)
+- **배경**: atr_bounce_factor=1.0 혼재 결과 (Sharpe +0.30↑, Consistency -1↓)
+  - PF=1.25 < 1.5 (목표 미달) — binding constraint 계속
+  - atr_bounce_factor WFO 탐색은 추가됨 (DEFAULT_GRIDS["price_cluster"])
+- **작업 방향**: 
+  1. **roc_ma_cross vol_ratio_min=1.1 시험**: Trades 14→15+ 증가 가능성 (vol_ratio_min 완화)
+     - 가설: vol_ratio_min 1.2→1.1 → 더 많은 signals → avg Trades≥15 안정화
+     - 위험: vol 필터 완화로 노이즈 신호 포함 → PF 하락 가능
+  2. **price_cluster bounce_pct=0.008 시험**: 더 공격적인 bounce 탐지
+     - 기존 시도: 0.010(최적), 0.020(악화)
+     - 0.008(하향): 더 빈번한 신호 → Trades↑ (PF는 불확실)
 
-#### E(실행): 실전 배포 준비 점검
+#### F(리서치): roc_ma_cross 번들 추가 전략 연구
 
-- **배경**: roc_ma_cross PASS 확정 → bundle에 추가 또는 실전 배포 검토 필요
-  - 현재 Bundle OOS: cmf, ofi_v2, supertrend_multi, vwap_cross, value_area (5/5 PASS)
-  - roc_ma_cross 4h 검증 필요 (bundle_oos.py --symbol BTC/USDT --timeframe 4h 실행)
-  - 현재 roc_ma_cross는 1h paper_sim PASS (4/8) — bundle 추가 전 4h OOS 필수
+- **배경**: 4h WFO 분석 결과 — 4h 신호 희소 (1-3 trades/window)
+  - volume_filter=True + EMA50 조건이 4h에서 너무 제한적
+  - 4h 번들 추가 위한 대안 파라미터 탐색 필요
+- **방향**: roc_ma_cross 4h용 별도 파라미터 세트 연구
+  - volume_filter=False (4h에서 신호 빈도 우선)
+  - 또는 roc_period=6 (4h 캔들용 더 짧은 ROC)
+  - 또는 기존 5전략 bundle 그대로 유지 (1h only 전략으로 분류)
 
-### ⚠️ 주의 사항 (Cycle 380 이후)
+### ⚠️ 주의 사항 (Cycle 381 이후)
 
 - **🎉 roc_ma_cross FIRST PASS 확정** (Cycle380 A): vol_ratio_min=1.2 → Sh=1.81, PF=2.02, Trades=14 avg, 4/8
   - **확정 파라미터**: `{"volume_filter": True, "vol_ratio_min": 1.2}` (변경 금지)

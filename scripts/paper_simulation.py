@@ -208,6 +208,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Sharpe=0.50(-0.37 하락, 0.87→0.50), PF=1.18(유지), Trades=39(-2), Consistency=2/8→2/8
     #   결론: bounce 후 1봉 hold 확인이 Sharpe 감소 (타이밍 지연 손실), PF 개선 없음
     #   confirmation_bars=1: mixed result → confirmation_bars=0(기본값) 복원
+    # Cycle381 D(ML): atr_bounce_factor=1.0 실험 결과 (2026-07-02) — 혼재
+    #   atr_bounce_factor=1.0: Sharpe=1.17(+0.30↑), PF=1.25(+0.05↑), Trades=44, Consistency=1/8(-1)
+    #   Sharpe avg 개선(0.87→1.17)이나 Consistency 악화(2/8→1/8) → FAIL 유지
+    #   binding constraint: PF 1.25 < 1.5 (이전 1.20보다 약간 개선되었으나 미달)
+    #   결론: atr_bounce_factor Sharpe↑이나 일관성↓ → 탐색 방향 재고 필요. 기본값(0.0) 복원
     "price_cluster": {"vol_regime_filter": False},
 }
 
