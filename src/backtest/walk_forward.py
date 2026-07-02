@@ -187,7 +187,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   결론: 클러스터 강도 비율이 bounce 품질 예측 불가. min_cluster_strength_ratio 탐색 종료.
     #   파라미터 코드는 유지(향후 활용 가능성), WFO 그리드에서 제거.
     "price_cluster": {
-        "bounce_pct": [0.010, 0.020, 0.025],
+        # Cycle382 D(ML): bounce_pct=0.008 추가 — 더 민감한 bounce 탐지 (Trades↑ 가설)
+        #   기존 최소값 0.010 → 0.008 하향: 더 빈번한 신호 가능성 (PF 효과 불확실)
+        "bounce_pct": [0.008, 0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],

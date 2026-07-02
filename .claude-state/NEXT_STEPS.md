@@ -1,57 +1,58 @@
 # Next Steps
 
-_Last updated: 2026-07-02 (Cycle 381 완료)_
+_Last updated: 2026-07-02 (Cycle 382 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 381
+### 이번 세션 완료 사이클: 382
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 379 | D+E+F | volume_filter 추가(roc_ma_cross), PF=1.68 달성(trades 부족), 슬리피지 검증 |
 | 380 | A+C+F | **🎉 roc_ma_cross FIRST PASS (4/8)** Sh=1.81 PF=2.02, price_cluster confirmation_bars 혼재 |
 | 381 | B+D+F | Kelly docstring 수정 + boundary test, atr_bounce_factor 혼재(Sharpe↑/Consistency↓), 4h OOS: 신호 희소 확정 |
+| 382 | B+D+F | vol_ratio_min=1.1 FAIL(Consist 4/8→2/8), bounce_pct=0.008 DEFAULT_GRIDS 추가, 4h 1h-only 최종 확정 |
 
-### 🎯 Cycle 382 작업 방향 (382 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 383 작업 방향 (383 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 로직 개선 또는 roc_ma_cross 리스크 미세조정
+#### C(데이터): price_cluster bounce_pct=0.008 paper_sim 테스트
 
-- **배경**: roc_ma_cross PASS 유지 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8)
-  - Trades=14 avg (경계선) → 일부 윈도우 trades<15 가능성
-  - Kelly MIN_TRADES_FOR_KELLY=15 → n=14 시 shrinkage 적용 (정상 동작 확인됨)
-- **작업 방향**: DrawdownMonitor transition_cushion 파라미터 추가 테스트 검토
-  - 또는 roc_ma_cross Trades 증가 방향 탐색 (vol_ratio_min 미세 조정 1.1 시도)
+- **배경**: DEFAULT_GRIDS에 bounce_pct=0.008 추가됨 (Cycle382 D)
+  - 기존 최솟값 0.010 → 0.008 하향: 더 민감한 bounce 탐지 (신호 빈도↑)
+  - 현재 price_cluster: Sharpe=0.87, PF=1.20, Trades=41, Consistency=1/8 FAIL
+  - binding constraint: PF=1.20 < 1.5
+- **작업 방향**: paper_sim에서 bounce_pct=0.008 직접 테스트
+  - `"price_cluster": {"bounce_pct": 0.008, "vol_regime_filter": False}` 로 실험
+  - 가설: 더 빈번한 신호 → 더 많은 trades, PF 효과 불확실
 
-#### D(ML): price_cluster PF 개선 방향 재설정
+#### B(리스크): DrawdownMonitor transition_cushion 파라미터 검토
 
-- **배경**: atr_bounce_factor=1.0 혼재 결과 (Sharpe +0.30↑, Consistency -1↓)
-  - PF=1.25 < 1.5 (목표 미달) — binding constraint 계속
-  - atr_bounce_factor WFO 탐색은 추가됨 (DEFAULT_GRIDS["price_cluster"])
-- **작업 방향**: 
-  1. **roc_ma_cross vol_ratio_min=1.1 시험**: Trades 14→15+ 증가 가능성 (vol_ratio_min 완화)
-     - 가설: vol_ratio_min 1.2→1.1 → 더 많은 signals → avg Trades≥15 안정화
-     - 위험: vol 필터 완화로 노이즈 신호 포함 → PF 하락 가능
-  2. **price_cluster bounce_pct=0.008 시험**: 더 공격적인 bounce 탐지
-     - 기존 시도: 0.010(최적), 0.020(악화)
-     - 0.008(하향): 더 빈번한 신호 → Trades↑ (PF는 불확실)
+- **배경**: vol_ratio_min 탐색 완료 (1.0/1.1/1.2/1.5 모두 검증, 1.2 최적 확정)
+  - roc_ma_cross PASS 유지 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8) — vol_ratio_min=1.2 고정
+  - 다음 개선 방향: 리스크 관리 로직 자체 개선
+- **작업 방향**: DrawdownMonitor `transition_cushion` 파라미터 역할 분석
+  - 현재 DrawdownMonitor 로직 검토: transition_cushion이 있다면 그 효과
+  - 또는 roc_ma_cross win-rate 개선 방향 연구 (개별 신호 품질 관점)
 
-#### F(리서치): roc_ma_cross 번들 추가 전략 연구
+#### F(리서치): roc_ma_cross 1h PASS 안정화 연구
 
-- **배경**: 4h WFO 분석 결과 — 4h 신호 희소 (1-3 trades/window)
-  - volume_filter=True + EMA50 조건이 4h에서 너무 제한적
-  - 4h 번들 추가 위한 대안 파라미터 탐색 필요
-- **방향**: roc_ma_cross 4h용 별도 파라미터 세트 연구
-  - volume_filter=False (4h에서 신호 빈도 우선)
-  - 또는 roc_period=6 (4h 캔들용 더 짧은 ROC)
-  - 또는 기존 5전략 bundle 그대로 유지 (1h only 전략으로 분류)
+- **배경**: roc_ma_cross PASS: 4/8 windows (50% 경계선)
+  - 현재 FAIL 원인: 일부 windows에서 Sharpe<1.0 또는 PF<1.5
+  - vol_ratio_min 탐색 완전 종료 (1.0, 1.1, 1.2, 1.5 모두 검증)
+- **방향**: roc_ma_cross 신호 품질 분석
+  - 어떤 market regime에서 PASS vs FAIL? (윈도우별 분석)
+  - EMA200 조건 역할: close > EMA200 제거 시 signal 증가? (탐색 여지)
+  - 또는 roc_ma_cross 4h 재연구: roc_period=6 + volume_filter=False
 
-### ⚠️ 주의 사항 (Cycle 381 이후)
+### ⚠️ 주의 사항 (Cycle 382 이후)
 
 - **🎉 roc_ma_cross FIRST PASS 확정** (Cycle380 A): vol_ratio_min=1.2 → Sh=1.81, PF=2.02, Trades=14 avg, 4/8
   - **확정 파라미터**: `{"volume_filter": True, "vol_ratio_min": 1.2}` (변경 금지)
   - 65+ 사이클 만에 첫 PASS — volume_filter 개념의 효과 입증
+  - **vol_ratio_min 탐색 완전 종료** (Cycle382 B): 1.0/1.1/1.2/1.5 모두 검증
+    - 1.1 실험: Sh=1.51, Consist=2/8 → 역효과 (노이즈↑ PF↓)
+    - **1.2 최종 최적값 확정. 추가 vol_ratio_min 실험 금지**
   - 주의: AvgTrades=14 (15 기준 경계). 일부 윈도우 trades<15 가능성 존재
 - **price_cluster confirmation_bars 결과** (Cycle380 C): 혼재
   - confirmation_bars=1: Sharpe 0.87→0.50(-43%), PF 유지(1.18), Trades 39

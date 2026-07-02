@@ -1,54 +1,53 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-02 (Cycle 381 완료)_
+_Last updated: 2026-07-02 (Cycle 382 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 381
-- **다음 사이클**: 382 (382 mod 5 = 2 → B+D+F)
-- **1h paper_sim PASS**: 1/19 (roc_ma_cross 유지 — Sh=1.81, PF=2.02, Trades=14 avg)
+- **완료된 사이클**: 382
+- **다음 사이클**: 383 (383 mod 5 = 3 → C+B+F)
+- **1h paper_sim PASS**: 1/19 (roc_ma_cross 유지 — vol_ratio_min=1.2 복원)
 - **Bundle OOS**: 5/5 PASS 유지
 
-## Cycle 381 주요 결과
+## Cycle 382 주요 결과
 
-### B(리스크): KellySizer MIN_TRADES_FOR_KELLY=15 경계 테스트
-- `src/risk/kelly_sizer.py`: docstring 버그 수정 — MIN_TRADES_FOR_KELLY=10 → 15
-  - 클래스 상수(line 456)는 이미 15 — docstring만 잘못 표기됨
-- `tests/test_kelly_integration.py`: 경계 테스트 추가
-  - `test_min_trades_kelly_boundary_14_vs_15`: n=14 shrinkage 적용, n=15 raw win_rate
-  - qty_14 ≤ qty_15 검증 (소표본 방어 정상 동작 확인)
+### B(리스크): vol_ratio_min=1.1 실험 — FAIL, 1.2 최종 확정
+- `scripts/paper_simulation.py`: `vol_ratio_min=1.1` 실험 → 역효과 확정
+  - BTC 결과: Sharpe=1.51(-0.30↓), PF=1.87(-0.15↓), Trades=16(+2↑), Consistency=2/8(-2↓)
+  - FAIL 원인: `sharpe 0.32 < 1.0 (x1), profit_factor 1.11 < 1.5 (x1)` — 노이즈 신호 포함
+  - vol_ratio_min 탐색 완전 종료: 1.0, 1.1, 1.2, 1.5 모두 검증 → 1.2 최적 확정
+- paper_sim 파라미터 복원: `vol_ratio_min=1.2` (PASS 재확인)
 
-### D(ML): price_cluster atr_bounce_factor=1.0 실험 — 혼재 결과
-- `scripts/paper_simulation.py`: `atr_bounce_factor=1.0` 실험
-- 실험 결과: **Sharpe=1.17(+0.30↑), PF=1.25(+0.05↑), Trades=44, Consistency=1/8(-1)**
-  - Sharpe avg 개선(0.87→1.17)이나 Consistency 악화(2/8→1/8) → FAIL 유지
-  - Binding constraint: PF 1.25 < 1.5
-- **결론**: 기본값(0.0) 복원. atr_bounce_factor WFO 탐색은 DEFAULT_GRIDS에 추가 유지
+### D(ML): price_cluster bounce_pct=0.008 DEFAULT_GRIDS 추가
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["price_cluster"]["bounce_pct"]에 0.008 추가
+  - 기존: [0.010, 0.020, 0.025] → 신규: [0.008, 0.010, 0.020, 0.025]
+  - WFO 탐색에서 더 민감한 bounce 탐지 옵션 추가 (IS 구간 실험 가능)
 
-### F(리서치): roc_ma_cross 4h OOS 검증 — 신호 희소 확정
-- 4h WFO 분석 (BTC 4h CSV 리샘플링): **1-3 trades/window** (min_trades=8 미달)
-- volume_filter=True + EMA50 조건이 4h에서 너무 제한적
-- **결론**: roc_ma_cross 4h 번들 추가 불가. 1h only 전략으로 분류
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["price_cluster"] atr_bounce_factor=[0.0, 1.0] 추가
+### F(리서치): roc_ma_cross 4h 분석 — 1h only 최종 확정
+- 4h OOS 구조 분석 (RollingOOSValidator: oos=360 4h봉 = 2개월):
+  - 1h: 1440봉 test window → avg 14-16 trades
+  - 4h: 360봉 (동일 2개월) → 예상 3-7 trades (volume_filter 유무 무관)
+  - **결론: roc_ma_cross 4h 번들 추가 구조적으로 불가**
+  - 근본 원인: 2개월 4h window에서 ROC + EMA50/200 조건 동시 충족 횟수 < 8
+  - roc_ma_cross 1h only 전략 최종 분류 (변경 불필요)
 
 ## 시뮬레이션 결과
 
 | 시뮬 | 결과 |
 |------|------|
-| paper_sim (1h BTC) | **1/19 PASS** (roc_ma_cross Sh=1.81, PF=2.02, Trades=14 avg, 4/8) |
-| bundle_oos (4h BTC) | 5/5 PASS 유지 — cmf, ofi_v2, supertrend_multi, vwap_cross, value_area |
+| paper_sim (1h BTC, vol=1.1 실험) | **0/19 FAIL** (roc_ma_cross Sh=1.51, PF=1.87, Trades=16, Consist=2/8) |
+| paper_sim (1h BTC, vol=1.2 복원) | **1/19 PASS** (roc_ma_cross Sh=1.81, PF=2.02, Trades=14 avg, 4/8) |
+| bundle_oos (4h BTC, CSV) | **5/5 PASS 유지** — cmf, ofi_v2, supertrend_multi, vwap_cross, value_area |
 
 ## 코드 변경 사항
 
 | 파일 | 변경 |
 |------|------|
-| `src/risk/kelly_sizer.py` | docstring 수정: MIN_TRADES_FOR_KELLY=10 → 15 (B) |
-| `tests/test_kelly_integration.py` | boundary test 추가: qty_14 ≤ qty_15 (B) |
-| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["price_cluster"] atr_bounce_factor=[0.0, 1.0] (D) |
-| `scripts/paper_simulation.py` | atr_bounce_factor=1.0 실험 결과 주석 + 기본값 복원 (D) |
+| `scripts/paper_simulation.py` | vol_ratio_min=1.1 실험 + 결과 주석 + 1.2 복원 (B) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["price_cluster"]["bounce_pct"] 0.008 추가 (D) |
 
-## Cycle 382 예고 (382 mod 5 = 2 → B+D+F)
+## Cycle 383 예고 (383 mod 5 = 3 → C+B+F)
 
-- **B(리스크)**: DrawdownMonitor transition_cushion 파라미터 검토 또는 roc_ma_cross Trades 증가 (vol_ratio_min=1.1)
-- **D(ML)**: price_cluster bounce_pct=0.008 실험 (Trades↑ 가설) 또는 roc_ma_cross vol_ratio_min=1.1
-- **F(리서치)**: roc_ma_cross 4h용 별도 파라미터 세트 연구 (volume_filter=False, roc_period=6)
+- **C(데이터)**: price_cluster bounce_pct=0.008 paper_sim 직접 테스트 (WFO 탐색 보완)
+- **B(리스크)**: DrawdownMonitor transition_cushion 파라미터 검토 또는 roc_ma_cross 신호 품질 분석
+- **F(리서치)**: roc_ma_cross PASS 4/8 → 더 안정적인 5/8+ PASS 조건 연구

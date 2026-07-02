@@ -1,3 +1,40 @@
+## [2026-07-02] Cycle 382 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] roc_ma_cross vol_ratio_min=1.1 실험 — FAIL (1.2 최적 확정)**
+1. `scripts/paper_simulation.py`: `vol_ratio_min=1.1` 실험 (Trades 14→15+ 증가 가설)
+   - 결과: **Sharpe=1.51(-0.30↓), PF=1.87(-0.15↓), Trades=16(+2↑), Consistency=2/8(-2↓)**
+   - Trades 증가 목적 달성(14→16)이나 노이즈 신호 포함으로 Sharpe/일관성 급락
+   - Consistency 4/8→2/8: PASS 기준(4/8) 완전 미달
+   - 결론: **vol_ratio_min=1.1 역효과 확정. vol_ratio_min=1.2 최적값 최종 확정. 탐색 완료.**
+   - paper_sim 파라미터: vol_ratio_min=1.2로 복원 (PASS 유지)
+
+**[D(ML)] price_cluster bounce_pct=0.008 DEFAULT_GRIDS 추가**
+2. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["price_cluster"]["bounce_pct"]에 `0.008` 추가
+   - 기존: [0.010, 0.020, 0.025] → 신규: [0.008, 0.010, 0.020, 0.025]
+   - 가설: 더 민감한 bounce 탐지(0.008) → 신호 빈도↑, PF 효과 불확실
+   - WFO 그리드 탐색으로 향후 IS 구간 최적화에서 검증 예정
+
+**[F(리서치)] roc_ma_cross 4h 분석 — 1h only 분류 최종 확정**
+3. 4h OOS 구조 분석 (RollingOOSValidator: is=1080봉, oos=360봉 = 2개월):
+   - 1h paper_sim: 1440봉 test window에서 avg 14-16 trades
+   - 4h 환산: 360봉 (동일 2개월) → 예상 3-4 trades/window (1/4 scale)
+   - volume_filter=False 가정시도: EMA50/200 + ROC조건 유지 → 예상 5-7 trades
+   - min_oos_trades=3(supertrend) or 5(others) 기준에서 통계 불충분
+   - **결론: roc_ma_cross 4h 추가 불가. volume_filter 없이도 2개월 window에서 신호 부족**
+   - Bundle OOS (5/5 PASS 유지) → 기존 구성 유지, roc_ma_cross 1h only 최종 분류
+
+**시뮬레이션 결과 요약**
+
+| 지표 | Cycle 381 | Cycle 382 | 변화 |
+|------|-----------|-----------|------|
+| 1h BTC roc_ma_cross Sharpe | 1.81 (1.2×) | **1.51 (1.1×실험)** | -0.30↓ 실험 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **2/8 FAIL** | -2↓ (복원) |
+| 1h PASS 수 | 1/19 (roc_ma_cross 1.2×) | **0/19** (1.1× 실험 시) | 실험 FAIL |
+| 1h PASS 수 (복원 후) | 1/19 | **1/19 (vol_ratio_min=1.2 복원)** | 유지 |
+| Bundle OOS PASS | 5/5 | **5/5** | 유지 |
+
+---
+
 ## [2026-07-02] Cycle 381 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] KellySizer 문서 수정 + MIN_TRADES_FOR_KELLY=15 경계 테스트 추가**

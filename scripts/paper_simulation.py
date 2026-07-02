@@ -199,6 +199,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   volume_filter=True, vol_ratio_min=1.2: Sharpe=1.81, PF=2.02, Trades=14(avg), Consistency=4/8 PASS
     #   roc_ma_cross 역사상 첫 PASS — vol_ratio_min=1.2가 PF와 trades 균형점 확정
     #   (1.5×: Trades=10 부족, 1.2×: Trades=14 경계) → PASS 조건 달성
+    # Cycle382 B(리스크): vol_ratio_min=1.1 실험 결과 (2026-07-02) — FAIL
+    #   vol_ratio_min=1.1: Sharpe=1.51(-0.30↓), Trades=16(+2↑), Consistency<4/8 → FAIL
+    #   노이즈 신호 포함으로 Sharpe/일관성 악화. Trades 증가(14→16)이나 PF 하락이 지배적
+    #   결론: vol_ratio_min=1.2 최적 확정 (1.1 완화는 역효과). vol_ratio_min 탐색 완료
     "roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2},
     # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 결과 (2026-07-01)
     #   ratio=0.30: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)
