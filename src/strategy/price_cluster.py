@@ -93,6 +93,9 @@ class PriceClusterStrategy(BaseStrategy):
         high_conf_only: bool = False,
         min_cluster_strength_ratio: float = 0.0,
         confirmation_bars: int = 0,
+        rsi_oversold_filter: bool = False,
+        rsi_buy_max: float = 40.0,
+        rsi_sell_min: float = 60.0,
         **kwargs,
     ):
         self.bounce_pct = bounce_pct
@@ -115,6 +118,12 @@ class PriceClusterStrategy(BaseStrategy):
         self.min_cluster_strength_ratio = min_cluster_strength_ratio
         # Cycle380 C(데이터): bounce 후 N봉 추가 확인 (0=즉시, N>0=N봉 hold 확인)
         self.confirmation_bars = confirmation_bars
+        # Cycle384 D(ML): RSI 과매도/과매수 확인 필터 (False=기본, 기존 동작 유지)
+        # BUY: RSI14 < rsi_buy_max(40) — 과매도 구간에서 bounce 신호만 허용
+        # SELL: RSI14 > rsi_sell_min(60) — 과매수 구간에서 rejection 신호만 허용
+        self.rsi_oversold_filter = rsi_oversold_filter
+        self.rsi_buy_max = rsi_buy_max
+        self.rsi_sell_min = rsi_sell_min
 
     def _atr_ratio(self, df: pd.DataFrame) -> float:
         """ATR(vol_atr_period) / close 비율. 절대적 변동성 레짐 판별용."""
@@ -261,7 +270,16 @@ class PriceClusterStrategy(BaseStrategy):
                         bounce_curr >= cluster_low and
                         confirmed_buy)
 
+        # Cycle384 D(ML): RSI 과매도/과매수 확인 필터
+        rsi_val = None
+        if self.rsi_oversold_filter and "rsi14" in df.columns:
+            _rsi = float(last["rsi14"])
+            if not pd.isna(_rsi):
+                rsi_val = _rsi
+
         if buy_cond:
+            if rsi_val is not None and rsi_val >= self.rsi_buy_max:
+                return self._hold(df, f"rsi_oversold_filter: RSI={rsi_val:.1f}>={self.rsi_buy_max} (not oversold): {context}")
             return Signal(
                 action=Action.BUY,
                 confidence=confidence,
@@ -285,6 +303,8 @@ class PriceClusterStrategy(BaseStrategy):
                          confirmed_sell)
 
         if sell_cond:
+            if rsi_val is not None and rsi_val <= self.rsi_sell_min:
+                return self._hold(df, f"rsi_oversold_filter: RSI={rsi_val:.1f}<={self.rsi_sell_min} (not overbought): {context}")
             return Signal(
                 action=Action.SELL,
                 confidence=confidence,

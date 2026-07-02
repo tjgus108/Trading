@@ -203,6 +203,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   vol_ratio_min=1.1: Sharpe=1.51(-0.30↓), Trades=16(+2↑), Consistency<4/8 → FAIL
     #   노이즈 신호 포함으로 Sharpe/일관성 악화. Trades 증가(14→16)이나 PF 하락이 지배적
     #   결론: vol_ratio_min=1.2 최적 확정 (1.1 완화는 역효과). vol_ratio_min 탐색 완료
+    # Cycle384 F(리서치): roc_min_abs=0.4 실험 결과 (2026-07-02) — dead param (역효과)
+    #   roc_min_abs=0.4: Sharpe=1.75(-0.06↓), PF=1.97(-0.05↓), Trades=14(유지), Consistency=2/8(4/8→2/8 FAIL!)
+    #   치명적 결과: 0.4% 강화 → PASS 4/8→2/8 (Consistency 절반 붕괴)
+    #   원인: 일부 윈도우에서 Trades가 borderline(14~15), 0.4%로 차단 시 Trades<15 또는 Sharpe<1.0 전락
+    #   결론: roc_min_abs=0.3 최적 확정. 0.4 강화는 역효과 확정. roc_min_abs 탐색 종료.
+    #   WFO 그리드: [0.3]으로 고정 (0.4 dead param)
     "roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2},
     # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 결과 (2026-07-01)
     #   ratio=0.30: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)
@@ -222,6 +228,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Sharpe avg 큰 개선(0.87→1.21)이나 Consistency 및 PF 불변 → FAIL 유지
     #   binding constraint: PF=1.27 < 1.5 (1.20 대비 소폭 개선이나 목표 미달)
     #   결론: bounce_pct=0.008 방향 맞으나(Sharpe↑) PF 돌파 불충분 → 기본값(0.010) 복원
+    # Cycle384 D(ML): rsi_oversold_filter=True 실험 결과 (2026-07-02) — dead param (완전 실패)
+    #   rsi_oversold_filter=True: BTC Sharpe=-0.52, PF=0.00, Trades=0, Consistency=0/8
+    #   결론: RSI<40 조건이 price_cluster bounce 타이밍과 맞지 않음 — cluster bounce 시 RSI는 대부분 40-60
+    #   cluster 경계 near-miss가 RSI 중립 구간(40-60)에서 발생 → RSI<40 필터가 모든 신호 차단
+    #   rsi_oversold_filter 탐색 종료. 기본값(False) 유지. price_cluster 새 방향 필요.
     "price_cluster": {"vol_regime_filter": False},
 }
 

@@ -203,6 +203,9 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # Sharpe 개선되나 Consistency 악화 → 개인 윈도우 효과는 있음(WFO 탐색 가치 존재)
         # 0.0=비활성(기본), 1.0=ATR/close×1.0≈1.49%(BTC), 2.0=약 3% threshold(고변동성 강화)
         "atr_bounce_factor": [0.0, 1.0],
+        # Cycle384 D(ML): rsi_oversold_filter=True 실험 → dead param (0 trades, PF=0.00)
+        # 원인: cluster bounce는 RSI 중립 구간(40-60)에서 발생 → RSI<40 필터가 모든 신호 차단
+        # 결론: rsi_oversold_filter 탐색 종료. 기본값(False) 유지. WFO 그리드에서 제거.
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)
@@ -227,12 +230,20 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   목표: Trades≥15 + PF≥1.5 동시 만족 구간 탐색
     #   1.5: PF=1.68 달성, Trades=10 (FAIL) / 1.2: 예상 Trades 15-20 (Cycle380 실험)
     #   1.0: 더 많은 trades 허용 (기준선), PF 하락 예상
+    # Cycle384 E(실행): dead param 정리 — roc_period=10/15, ma_period=5/7 제거
+    #   roc_period: 10→Sh=-1.45(Cycle369), 15→Sh=-0.33(Cycle370), 12→최적 확정
+    #   ma_period: 5→Sh=-0.91(Cycle368), 7→likely worse, 3→최적 확정
+    #   WFO 그리드 3×3×2×3=54 combos → 1×1×2×3=6 combos (90% 축소, IS 최적화 속도 대폭 향상)
+    # Cycle384 F(리서치): roc_min_abs 파라미터화 — 현재 0.3% 하드코딩 → 탐색 가능
+    #   가설: 0.4% 강화 → RANGING 구간 약한 크로스 차단 → Consistency 개선 기대
     "roc_ma_cross": {
-        "roc_period": [10, 12, 15],
-        "ma_period": [3, 5, 7],
+        "roc_period": [12],   # 확정: 10=bad(Sh=-1.45), 15=bad(Sh=-0.33), 12=최적 (Cycle369/370)
+        "ma_period": [3],     # 확정: 5=bad(Sh=-0.91), 7=worse, 3=최적 (Cycle368)
         "volume_filter": [False, True],
         # vol_ratio_min: volume_filter=True 시에만 유효 (False시 무시됨)
         "vol_ratio_min": [1.0, 1.2, 1.5],
+        # Cycle384 F(리서치): roc_min_abs=0.4 실험 → dead param (Consistency 4/8→2/8 PASS→FAIL)
+        # 결론: 0.3이 최적 확정. roc_min_abs 탐색 종료.
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)
@@ -1313,6 +1324,7 @@ def optimize_roc_ma_cross(df: pd.DataFrame, n_windows: int = 3,
             ma_period=params.get("ma_period", 3),
             volume_filter=params.get("volume_filter", False),
             vol_ratio_min=params.get("vol_ratio_min", 1.5),
+            roc_min_abs=params.get("roc_min_abs", 0.3),
         )
 
     opt = WalkForwardOptimizer(

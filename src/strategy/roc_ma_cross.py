@@ -19,17 +19,19 @@ from .base import Action, BaseStrategy, Confidence, Signal
 
 _STD_PERIOD = 20
 _STD_MULT = 2.0
-_ROC_MIN_ABS = 0.3
+_ROC_MIN_ABS_DEFAULT = 0.3
 
 
 class ROCMACrossStrategy(BaseStrategy):
     name = "roc_ma_cross"
 
-    def __init__(self, roc_period: int = 12, ma_period: int = 3, volume_filter: bool = False, vol_ratio_min: float = 1.5):
+    def __init__(self, roc_period: int = 12, ma_period: int = 3, volume_filter: bool = False,
+                 vol_ratio_min: float = 1.5, roc_min_abs: float = _ROC_MIN_ABS_DEFAULT):
         self.roc_period = roc_period
         self.ma_period = ma_period
         self.volume_filter = volume_filter
         self.vol_ratio_min = vol_ratio_min
+        self.roc_min_abs = roc_min_abs
         self._min_rows = max(roc_period + ma_period, 20)
 
     def generate(self, df: pd.DataFrame) -> Signal:
@@ -101,7 +103,7 @@ class ROCMACrossStrategy(BaseStrategy):
         # Cycle 329: RSI 필터 제거 (Cycle 328 분석: BTC 1h에서 RSI<70 차단 0건)
         # Cycle 379 D(ML): volume_filter — 거래량 급증 시에만 신호 허용
         if (cross_above and
-            abs(roc_now) > _ROC_MIN_ABS and roc_now > 0 and
+            abs(roc_now) > self.roc_min_abs and roc_now > 0 and
             close > ema50 and
             (ema200 is None or close > ema200) and
             volume_ok):
@@ -112,7 +114,7 @@ class ROCMACrossStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 상향 크로스 (ROC>{_ROC_MIN_ABS}%): "
+                    f"ROC_MA 0 상향 크로스 (ROC>{self.roc_min_abs}%): "
                     f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
                     f"ROC={roc_now:.2f}%, close={close:.4f} > EMA50={ema50:.4f}"
                 ),
@@ -125,7 +127,7 @@ class ROCMACrossStrategy(BaseStrategy):
         # Cycle 329: RSI 필터 제거 (대칭적으로)
         # Cycle 379 D(ML): volume_filter — 거래량 급증 시에만 신호 허용
         if (cross_below and
-            abs(roc_now) > _ROC_MIN_ABS and roc_now < 0 and
+            abs(roc_now) > self.roc_min_abs and roc_now < 0 and
             close < ema50 and
             (ema200 is None or close < ema200) and
             volume_ok):
@@ -136,7 +138,7 @@ class ROCMACrossStrategy(BaseStrategy):
                 strategy=self.name,
                 entry_price=close,
                 reasoning=(
-                    f"ROC_MA 0 하향 크로스 (ROC<-{_ROC_MIN_ABS}%): "
+                    f"ROC_MA 0 하향 크로스 (ROC<-{self.roc_min_abs}%): "
                     f"ROC_MA={roc_ma_prev:.2f} → {roc_ma_now:.2f}, "
                     f"ROC={roc_now:.2f}%, close={close:.4f} < EMA50={ema50:.4f}"
                 ),
@@ -152,7 +154,7 @@ class ROCMACrossStrategy(BaseStrategy):
             entry_price=close,
             reasoning=(
                 f"ROC_MA 크로스 없음 또는 조건 미충족: "
-                f"ROC_MA={roc_ma_now:.2f}, ROC={roc_now:.2f}% (need >{_ROC_MIN_ABS}%), "
+                f"ROC_MA={roc_ma_now:.2f}, ROC={roc_now:.2f}% (need >{self.roc_min_abs}%), "
                 f"close={close:.4f}, EMA50={ema50:.4f}"
             ),
             invalidation="",

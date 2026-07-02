@@ -1,51 +1,67 @@
 # Next Steps
 
-_Last updated: 2026-07-02 (Cycle 383 완료)_
+_Last updated: 2026-07-02 (Cycle 384 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 383
+### 이번 세션 완료 사이클: 384
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 381 | B+D+F | Kelly docstring 수정 + boundary test, atr_bounce_factor 혼재(Sharpe↑/Consistency↓), 4h OOS: 신호 희소 확정 |
 | 382 | B+D+F | vol_ratio_min=1.1 FAIL(Consist 4/8→2/8), bounce_pct=0.008 DEFAULT_GRIDS 추가, 4h 1h-only 최종 확정 |
 | 383 | C+B+F | bounce_pct=0.008 혼재(Sharpe+0.34 개선, PF 미달 FAIL), transition_cushion None-test추가, EMA200 유지 확정 |
+| 384 | D+E+F | roc_ma_cross grid 축소(54→6 combos), rsi_oversold_filter dead param(0 trades), roc_min_abs=0.4 dead param(Consistency 붕괴) |
 
-### 🎯 Cycle 384 작업 방향 (384 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 385 작업 방향 (385 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): price_cluster PF 개선 방향 탐색
+#### A(품질): price_cluster 코드 품질 및 테스트 보강
 
-- **배경**: bounce_pct=0.008 실험 (Cycle383 C): Sharpe 0.87→1.21(+0.34) 개선, PF 1.20→1.27(+0.07)
-  - PF binding constraint: 1.27 < 1.5 (gap=0.23)
-  - Trades=38 (충분), Consistency=1/8 (구조적 문제)
-- **작업 방향**: price_cluster PF 개선을 위한 다음 탐색
-  - WFO에서 bounce_pct=0.008 + vol_regime_filter=False 조합 탐색 결과 검토
-  - 또는 price_cluster Consistency 문제 근본 원인 분석 (왜 1/8인가?)
-  - n_bins/close_window 이외의 새 파라미터 방향 검토
+- **배경**: price_cluster Consistency=1/8으로 구조적 문제 지속
+  - RSI 필터(Cycle384 D) dead param 확정: cluster bounce는 RSI 중립(40-60) 구간에서 발생
+  - 기존 탐색 방향 소진: high_conf_only, min_cluster_strength_ratio, confirmation_bars 모두 dead param
+- **작업 방향**: price_cluster 새 파라미터 방향 검토
+  - `n_bins=4` WFO 탐색: 더 넓은 bin으로 cluster 안정성↑ (5보다 변동 적음)
+  - `cluster_persistence` 아이디어: 최빈 bin이 N봉 이상 동일 bin인 경우만 bounce 허용
+  - 또는 QA 관점: rsi_oversold_filter 코드 유지 여부, 파라미터 정리 테스트
 
-#### E(실행): Walk-Forward 타이밍 최적화 분석
+#### C(데이터): roc_ma_cross FAIL 윈도우 분석
 
-- **배경**: roc_ma_cross PASS 4/8에서 Trades=14 avg (15 기준 경계)
-  - 일부 윈도우에서 trades<15 가능성 → Trades 증가 방향 필요
-  - 또는 walk_forward.py IS 최적화 속도 개선 (timing 로깅 데이터 활용)
-- **작업 방향**: WFO IS 최적화에서 불필요한 그리드 조합 제거
-  - DEFAULT_GRIDS["roc_ma_cross"] dead param 정리 (roc_period=10/15, ma_period=5/7 제거 검토)
-  - IS 최적화 속도 개선 → 더 많은 윈도우 테스트 가능
+- **배경**: roc_ma_cross PASS=4/8 (경계), FAIL 윈도우 특성 분석 필요
+  - FAIL 윈도우: W2(Aug-Oct 2023), W3(Sep-Nov 2023), W4(Oct-Dec 2023) = BTC 횡보/약세
+  - roc_min_abs탐색종료 (0.3 최적, 0.4 역효과 Cycle384)
+  - EMA200탐색종료, vol_ratio_min탐색종료, roc_period탐색종료, ma_period탐색종료
+- **작업 방향**: FAIL 윈도우 데이터 분석으로 새 방향 발굴
+  - BTC 1h 실데이터에서 W2/W3/W4 구간 ROC_MA 크로스 신호 품질 직접 분석
+  - 해당 구간의 volume_ratio(vol/vol_sma) 분포 확인
+  - 신호 품질 낮은 이유 특정 → 다음 파라미터 방향 도출
 
-#### F(리서치): roc_ma_cross Consistency 개선 방향 연구
+#### F(리서치): roc_ma_cross SL/TP 또는 레짐 필터 탐색
 
 - **배경**: roc_ma_cross PASS 4/8 (50% 경계, Cycle380 달성)
-  - EMA200 제거 탐색 종료 (Cycle383): 차단 신호 품질 낮음 확정
-  - vol_ratio_min 탐색 종료 (Cycle382): 1.2 최적 확정
-- **방향**: Consistency 개선을 위한 새로운 각도
-  - FAIL 윈도우 특성 분석: W2(Aug-Oct 2023), W3(Sep-Nov 2023), W4(Oct-Dec 2023)은 BTC 횡보/약세 구간
-  - 레짐 기반 접근: RANGING/BEAR 구간에서 roc_ma_cross 신호 차단 여부 검토
-  - 또는 roc_ma_cross SL/TP 파라미터 탐색 (현재 atr_multiplier_sl=1.5, TP=3.5 고정)
+  - 남은 탐색 방향: SL/TP 또는 레짐 필터
+  - FAIL 윈도우가 횡보/약세 → RANGING 레짐 신호 억제 가능성
+- **방향**: 
+  - **SL/TP**: atr_multiplier_sl/tp 파라미터 추가 (현재 BacktestEngine 기본값 사용)
+    - 더 좁은 SL(1.2) 또는 더 좁은 TP(2.5)로 개별 거래 손실 제한 → MDD↓, PF↑?
+  - **레짐 필터**: ATR 기반 레짐 필터 (RANGING → 신호 억제)
+    - roc_ma_cross는 모멘텀 전략 → ATR/ATR_MA > 1.0 (trending) 시만 신호 허용
+    - 단, 기존 Cycle339 레짐 실험 역효과(신호 70% 차단) 참고 → 경계 설정 중요
 
-### ⚠️ 주의 사항 (Cycle 382 이후)
+### ⚠️ 주의 사항 (Cycle 384 이후)
+
+- **roc_min_abs 탐색 종료** (Cycle384 F): 0.3 최적 확정
+  - 0.4 실험: Consistency 4/8→2/8 (PASS→FAIL!) 치명적 역효과
+  - 원인: borderline Trades(avg=14) 일부 윈도우가 0.4 차단으로 Trades<15 전락
+  - **roc_min_abs=0.3 확정 불변. 추가 탐색 금지**
+- **price_cluster rsi_oversold_filter dead param** (Cycle384 D): 0 trades, PF=0.00
+  - RSI<40 조건이 cluster bounce 타이밍과 구조적으로 맞지 않음
+  - cluster bounce는 RSI 중립(40-60)에서 발생 — RSI 추가 탐색 방향 종료
+  - 파라미터 코드 유지 (가능성은 남겨둠), WFO 그리드에서 제거됨
+- **roc_ma_cross grid 대폭 축소** (Cycle384 E): 54→6 combos (88% 감소)
+  - roc_period=12, ma_period=3 단일값 확정 (탐색 완료)
+  - volume_filter=[False,True], vol_ratio_min=[1.0,1.2,1.5] 유지
 
 - **🎉 roc_ma_cross FIRST PASS 확정** (Cycle380 A): vol_ratio_min=1.2 → Sh=1.81, PF=2.02, Trades=14 avg, 4/8
   - **확정 파라미터**: `{"volume_filter": True, "vol_ratio_min": 1.2}` (변경 금지)
@@ -127,21 +143,32 @@ _Last updated: 2026-07-02 (Cycle 383 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 383 업데이트)
+### 핵심 메트릭 (Cycle 384 업데이트)
 
-| 지표 | Cycle 382 | Cycle 383 | 변화 |
+| 지표 | Cycle 383 | Cycle 384 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** (0.008 실험→복원) | 유지 |
-| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
-| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** (RSI 실험→복원) | 유지 |
+| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** (복원) | 유지 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** (복원) | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
-| Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8458 | **8459** | +1 (B test 추가) |
+| Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
+| 테스트 수 | 8459 | **8459** | 변화없음 |
+
+### Cycle 384 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["roc_ma_cross"] roc_period=[10,12,15]→[12], ma_period=[3,5,7]→[3] dead param 정리 (Cycle384 E) |
+| `src/backtest/walk_forward.py` | optimize_roc_ma_cross() factory에 roc_min_abs 전달 추가 (Cycle384 F) |
+| `src/strategy/roc_ma_cross.py` | _ROC_MIN_ABS 하드코딩→roc_min_abs 파라미터화 (기본값 0.3, Cycle384 F) |
+| `src/strategy/price_cluster.py` | rsi_oversold_filter, rsi_buy_max, rsi_sell_min 파라미터 추가 (코드 유지, dead param, Cycle384 D) |
+| `scripts/paper_simulation.py` | rsi_oversold_filter=True 실험→dead param→복원 + 결과 주석 (Cycle384 D) |
+| `scripts/paper_simulation.py` | roc_min_abs=0.4 실험→dead param→복원 + 결과 주석 (Cycle384 F) |
 
 ### Cycle 379 코드 변경 요약
 
@@ -408,7 +435,7 @@ _Last updated: 2026-07-02 (Cycle 383 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 358 업데이트)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 384 업데이트)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}` ← 1h paper_sim에서 제외됨
 - `relative_volume: {"rvol_buy_sell": 1.2}`
