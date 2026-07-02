@@ -1,49 +1,49 @@
 # Next Steps
 
-_Last updated: 2026-07-02 (Cycle 382 완료)_
+_Last updated: 2026-07-02 (Cycle 383 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 382
+### 이번 세션 완료 사이클: 383
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 380 | A+C+F | **🎉 roc_ma_cross FIRST PASS (4/8)** Sh=1.81 PF=2.02, price_cluster confirmation_bars 혼재 |
 | 381 | B+D+F | Kelly docstring 수정 + boundary test, atr_bounce_factor 혼재(Sharpe↑/Consistency↓), 4h OOS: 신호 희소 확정 |
 | 382 | B+D+F | vol_ratio_min=1.1 FAIL(Consist 4/8→2/8), bounce_pct=0.008 DEFAULT_GRIDS 추가, 4h 1h-only 최종 확정 |
+| 383 | C+B+F | bounce_pct=0.008 혼재(Sharpe+0.34 개선, PF 미달 FAIL), transition_cushion None-test추가, EMA200 유지 확정 |
 
-### 🎯 Cycle 383 작업 방향 (383 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 384 작업 방향 (384 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): price_cluster bounce_pct=0.008 paper_sim 테스트
+#### D(ML): price_cluster PF 개선 방향 탐색
 
-- **배경**: DEFAULT_GRIDS에 bounce_pct=0.008 추가됨 (Cycle382 D)
-  - 기존 최솟값 0.010 → 0.008 하향: 더 민감한 bounce 탐지 (신호 빈도↑)
-  - 현재 price_cluster: Sharpe=0.87, PF=1.20, Trades=41, Consistency=1/8 FAIL
-  - binding constraint: PF=1.20 < 1.5
-- **작업 방향**: paper_sim에서 bounce_pct=0.008 직접 테스트
-  - `"price_cluster": {"bounce_pct": 0.008, "vol_regime_filter": False}` 로 실험
-  - 가설: 더 빈번한 신호 → 더 많은 trades, PF 효과 불확실
+- **배경**: bounce_pct=0.008 실험 (Cycle383 C): Sharpe 0.87→1.21(+0.34) 개선, PF 1.20→1.27(+0.07)
+  - PF binding constraint: 1.27 < 1.5 (gap=0.23)
+  - Trades=38 (충분), Consistency=1/8 (구조적 문제)
+- **작업 방향**: price_cluster PF 개선을 위한 다음 탐색
+  - WFO에서 bounce_pct=0.008 + vol_regime_filter=False 조합 탐색 결과 검토
+  - 또는 price_cluster Consistency 문제 근본 원인 분석 (왜 1/8인가?)
+  - n_bins/close_window 이외의 새 파라미터 방향 검토
 
-#### B(리스크): DrawdownMonitor transition_cushion 파라미터 검토
+#### E(실행): Walk-Forward 타이밍 최적화 분석
 
-- **배경**: vol_ratio_min 탐색 완료 (1.0/1.1/1.2/1.5 모두 검증, 1.2 최적 확정)
-  - roc_ma_cross PASS 유지 (Sh=1.81, PF=2.02, Trades=14 avg, 4/8) — vol_ratio_min=1.2 고정
-  - 다음 개선 방향: 리스크 관리 로직 자체 개선
-- **작업 방향**: DrawdownMonitor `transition_cushion` 파라미터 역할 분석
-  - 현재 DrawdownMonitor 로직 검토: transition_cushion이 있다면 그 효과
-  - 또는 roc_ma_cross win-rate 개선 방향 연구 (개별 신호 품질 관점)
+- **배경**: roc_ma_cross PASS 4/8에서 Trades=14 avg (15 기준 경계)
+  - 일부 윈도우에서 trades<15 가능성 → Trades 증가 방향 필요
+  - 또는 walk_forward.py IS 최적화 속도 개선 (timing 로깅 데이터 활용)
+- **작업 방향**: WFO IS 최적화에서 불필요한 그리드 조합 제거
+  - DEFAULT_GRIDS["roc_ma_cross"] dead param 정리 (roc_period=10/15, ma_period=5/7 제거 검토)
+  - IS 최적화 속도 개선 → 더 많은 윈도우 테스트 가능
 
-#### F(리서치): roc_ma_cross 1h PASS 안정화 연구
+#### F(리서치): roc_ma_cross Consistency 개선 방향 연구
 
-- **배경**: roc_ma_cross PASS: 4/8 windows (50% 경계선)
-  - 현재 FAIL 원인: 일부 windows에서 Sharpe<1.0 또는 PF<1.5
-  - vol_ratio_min 탐색 완전 종료 (1.0, 1.1, 1.2, 1.5 모두 검증)
-- **방향**: roc_ma_cross 신호 품질 분석
-  - 어떤 market regime에서 PASS vs FAIL? (윈도우별 분석)
-  - EMA200 조건 역할: close > EMA200 제거 시 signal 증가? (탐색 여지)
-  - 또는 roc_ma_cross 4h 재연구: roc_period=6 + volume_filter=False
+- **배경**: roc_ma_cross PASS 4/8 (50% 경계, Cycle380 달성)
+  - EMA200 제거 탐색 종료 (Cycle383): 차단 신호 품질 낮음 확정
+  - vol_ratio_min 탐색 종료 (Cycle382): 1.2 최적 확정
+- **방향**: Consistency 개선을 위한 새로운 각도
+  - FAIL 윈도우 특성 분석: W2(Aug-Oct 2023), W3(Sep-Nov 2023), W4(Oct-Dec 2023)은 BTC 횡보/약세 구간
+  - 레짐 기반 접근: RANGING/BEAR 구간에서 roc_ma_cross 신호 차단 여부 검토
+  - 또는 roc_ma_cross SL/TP 파라미터 탐색 (현재 atr_multiplier_sl=1.5, TP=3.5 고정)
 
 ### ⚠️ 주의 사항 (Cycle 382 이후)
 
@@ -127,20 +127,21 @@ _Last updated: 2026-07-02 (Cycle 382 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 379 업데이트)
+### 핵심 메트릭 (Cycle 383 업데이트)
 
-| 지표 | Cycle 378 | Cycle 379 | 변화 |
+| 지표 | Cycle 382 | Cycle 383 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.72** | 실험(-0.15, 복원) |
-| 1h BTC roc_ma_cross Sharpe | 0.34 | **0.72** | 실험(+0.38, 복원) |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** (0.008 실험→복원) | 유지 |
+| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 0/19 (63연속) | **0/19 (64연속)** | — |
+| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 (실데이터) | **5/5 (실데이터 유지)** | 변화 없음 |
-| 테스트 수 | 8457 | **8457** | 유지 (23 skipped) |
+| 테스트 수 | 8458 | **8459** | +1 (B test 추가) |
 
 ### Cycle 379 코드 변경 요약
 

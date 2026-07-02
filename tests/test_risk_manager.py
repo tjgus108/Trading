@@ -1431,6 +1431,31 @@ def test_regime_confidence_high_no_change():
     assert result_with.position_size == pytest.approx(result_without.position_size, rel=1e-4)
 
 
+def test_regime_confidence_none_skips_cushion():
+    """regime_confidence=None → transition cushion 건너뜀, position_size 변화 없음 (Cycle383 B).
+
+    manager.py L594: `if regime_confidence is not None` 가드가 올바르게 동작해야 한다.
+    transition_cushion_enabled=True이더라도 confidence 값이 없으면 포지션 미감소.
+    """
+    from src.risk.drawdown_monitor import DrawdownMonitor
+
+    dm = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    rm_with = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5, drawdown_monitor=dm)
+    rm_without = RiskManager(risk_per_trade=0.01, atr_multiplier_sl=1.5)
+
+    result_with = rm_with.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0, regime_confidence=None,
+    )
+    result_without = rm_without.evaluate(
+        action="BUY", entry_price=100.0, atr=1.0,
+        account_balance=10_000.0,
+    )
+
+    assert result_with.status == RiskStatus.APPROVED
+    assert result_with.position_size == pytest.approx(result_without.position_size, rel=1e-4)
+
+
 # ── should_kill_strategy 레짐별 배수 테스트 (Cycle 313 B) ─────────────────
 
 class TestShouldKillStrategyRegime:

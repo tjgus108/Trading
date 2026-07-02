@@ -212,6 +212,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle370 F(리서치): roc_period 탐색 완료 (10/12/15 전부 검증)
     #   10: Sh=-1.45 (역효과 Cycle369), 12: Sh=0.34 (최적), 15: Sh=-0.33 (역효과 Cycle370)
     #   결론: roc_period=12 최적 확정. roc_period 탐색 방향 종료
+    # Cycle383 F(리서치): EMA200 필터 제거 효과 분석 (BTC 1h 실데이터 검증)
+    #   현재 신호(EMA200 통과): 76개, 24h fwd return +0.329%, Win rate 60.5%
+    #   EMA200 차단 신호(제거 시 추가): 13개, 24h fwd return -0.540%, Win rate 30.8%
+    #   결론: EMA200 차단 신호 품질 매우 낮음(음수 fwd return) → EMA200 필터 유지 확정
+    #   EMA200 아래 BUY 신호(close < EMA200) = 하락 추세 역행 → PASS 불기여
+    #   roc_ma_cross PASS 안정화: EMA200 방향 탐색 종료 (EMA200 제거 금지)
     # Cycle379 D(ML): volume_filter=[False,True] 추가 — 거래량 급증(>1.5×SMA20) 시만 신호 허용
     #   가설: ROC_MA cross + 거래량 급증 = 강한 모멘텀 확인 → 오신호 감소, PF↑
     # Cycle379 D(ML) paper_sim 결과: volume_filter=True, vol_ratio_min=1.5

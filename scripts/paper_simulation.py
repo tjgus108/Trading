@@ -217,6 +217,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Sharpe avg 개선(0.87→1.17)이나 Consistency 악화(2/8→1/8) → FAIL 유지
     #   binding constraint: PF 1.25 < 1.5 (이전 1.20보다 약간 개선되었으나 미달)
     #   결론: atr_bounce_factor Sharpe↑이나 일관성↓ → 탐색 방향 재고 필요. 기본값(0.0) 복원
+    # Cycle383 C(데이터): bounce_pct=0.008 실험 결과 (2026-07-02) — 혼재
+    #   bounce_pct=0.008: BTC Sharpe=1.21(+0.34↑), PF=1.27(+0.07↑), Trades=38(-3↓), Consistency=1/8(유지)
+    #   Sharpe avg 큰 개선(0.87→1.21)이나 Consistency 및 PF 불변 → FAIL 유지
+    #   binding constraint: PF=1.27 < 1.5 (1.20 대비 소폭 개선이나 목표 미달)
+    #   결론: bounce_pct=0.008 방향 맞으나(Sharpe↑) PF 돌파 불충분 → 기본값(0.010) 복원
     "price_cluster": {"vol_regime_filter": False},
 }
 
