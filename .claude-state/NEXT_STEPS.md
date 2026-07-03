@@ -1,48 +1,57 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 386 완료)_
+_Last updated: 2026-07-03 (Cycle 387 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 386
+### 이번 세션 완료 사이클: 387
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 384 | D+E+F | roc_ma_cross grid 축소(54→6 combos), rsi_oversold_filter dead param(0 trades), roc_min_abs=0.4 dead param(Consistency 붕괴) |
-| 385 | A+C+F | n_bins=4 테스트 추가, FAIL 윈도우 분석(vol_ratio 0.89-0.97 낮음), atr_expand_filter dead param(Consist 4/8→2/8) |
+| 385 | A+C+F | n_bins=4 테스트 추가, FAIL 윈도우 분석(vol_ratio 0.89-0.97 낮음), atr_expand_filter dead param |
 | 386 | B+D+F | set_atr_state/set_sharpe_decay 테스트 16개(110개 총), n_bins WFO(4=5=6 동등), roc_ma_cross IS-선택 vol_ratio_min=1.2 edge 재확인 |
+| 387 | C+E+F | bounce_pct=0.006 실험(Sh=0.77 FAIL, PF<1.5/MDD>20% binding), connector is_halted 테스트 4개(30개 총), roc_ma_cross SL/TP 전 조합 FAIL |
 
-### 🎯 Cycle 387 작업 방향 (387 mod 5 = 2 → C(데이터) + E(실행) + F(리서치))
+### 🎯 Cycle 388 작업 방향 (388 mod 5 = 3 → A(품질) + B(리스크) + F(리서치))
 
-#### C(데이터): price_cluster trade frequency 개선 탐색
+#### A(품질): BacktestEngine 또는 paper_trader 테스트 추가
 
-- **배경**: Cycle386 D(ML) WFO 분석 — n_bins=4/5/6 모두 OOS trades=4-11 (구조적 문제)
-  - bounce_pct={0.008, 0.01}에서 모두 FAIL (Trades<15)
-  - n_bins는 trade frequency에 무영향 확정 → n_bins 방향 종료
-- **작업 방향**: bounce_pct=0.006 실험 (paper_sim 직접 실행)
-  - 근거: bounce_pct 낮을수록 신호 빈도 증가 (더 작은 bounce에서도 신호)
-  - 위험: bounce 품질 저하 → noise↑ PF↓ 가능성
-  - 비교: bounce_pct=0.008(Sh=1.21, PF=1.27, Trades=38) vs 0.006 예상
-  - 목표: Sh≥1.0, PF≥1.5, Trades≥15, Consistency≥2/8
+- **배경**: connector 테스트 강화 완료(Cycle387 E). A(품질) 카테고리 차례
+- **작업 방향**: `src/backtest/engine.py` 또는 `src/exchange/paper_trader.py` 미커버 기능 확인
+  - BacktestEngine `min_hold_bars`, `consec_loss_scale_threshold` 등 Cycle298/331 기능 테스트
+  - 누락된 엣지 케이스 추가
 
-#### E(실행): 실행 코드 점검
+#### B(리스크): KellySizer 또는 CircuitBreaker 단위 테스트
 
-- **배경**: E 카테고리 미실행 (Cycle384 E는 roc_ma_cross grid 축소였음)
-- **작업 방향**: `src/exchange/` 코드 품질 점검
-  - 슬리피지 계산 로직 확인
-  - 주문 타임아웃 / 재시도 로직 단위 테스트 추가
+- **배경**: DrawdownMonitor 커버리지 완성(Cycle386 B, 110개). 다음은 KellySizer/CircuitBreaker
+- **작업 방향**: `tests/test_kelly_sizer*.py` 또는 `tests/test_circuit_breaker.py` 검토
+  - KellySizer MIN_TRADES_FOR_KELLY=15, Bayesian shrinkage, regime scaling 경계값 테스트
+  - 혹은 CircuitBreaker 이상 감지 로직 테스트
 
-#### F(리서치): roc_ma_cross SL/TP 실험
+#### F(리서치): price_cluster vol_regime_filter=True 실험
 
-- **핵심 제약**: roc_ma_cross에 추가 signal filter 절대 금지 (Trades=14 경계)
-  - 탐색 종료: vol_ratio_min(1.0/1.1/1.2/1.5), roc_min_abs(0.3/0.4), ATR expand filter
-  - IS-선택 분석(Cycle386 F): vol_ratio_min=1.2 edge 재확인 → 파라미터 변경 불가
-- **새 방향**: BacktestEngine SL/TP 파라미터 실험
-  - `atr_multiplier_sl=1.2` 전역 적용 (현재 기본값 확인 필요)
-  - Trades에 무영향 → Sharpe/PF/MDD 변화 관찰
-  - 주의: Cycle375 dema_cross SL=1.2 역효과 (전역 변경 한계) 교훈 기억
+- **배경**: Cycle387 C bounce_pct 탐색 한계 — bounce_pct=0.006이 최고 Sh=0.77(FAIL)
+  - 전체 데이터 결과: PF<1.5(1.17), MDD>20%(28.7%) 동시 개선 불가
+- **작업 방향**: `vol_regime_filter=True` 실험 (고변동성 기간 신호 억제)
+  - 현재: vol_regime_filter=False (기본값)
+  - 근거: ATR 기반 high-volatility 레짐에서 신호 차단 → noise↓, MDD↓, PF↑ 기대
+  - 비교: bounce_pct=0.006/0.008 × vol_regime_filter=False/True × vol_atr_trend_min=1.0/1.2
+  - 주의: Trades↓ 가능성 (paper_sim avg=41 trades로 여유 있음)
+
+### ⚠️ 주의 사항 (Cycle 388 이후)
+
+- **bounce_pct 탐색 한계 도달** (Cycle387 C): bounce_pct=0.006이 최고(Sh=0.77) — PASS 불가
+  - PF<1.5(1.17)와 MDD>20%(28.7%) 동시 binding constraint
+  - 다음 C/D 방향: vol_regime_filter=True (고변동성 제거 → PF↑, MDD↓ 기대)
+- **roc_ma_cross SL/TP 탐색 종료** (Cycle387 F): 전 조합 FAIL
+  - sl=1.2가 최고 Sh(0.28), sl=2.0이 유일 MDD<20%(19.8%) 달성
+  - 전체 데이터셋 Sh=-0.17 (baseline) — regime-dependent 전략 한계 확인
+  - roc_ma_cross paper_sim PASS(Sh=1.81)는 최근 favorable period 한정
+  - roc_ma_cross 파라미터 변경 탐색 종료. 현 파라미터(vol_ratio_min=1.2) 유지
+- **connector is_halted 테스트 완료** (Cycle387 E): 30개 테스트
+  - is_halted 임계값(5회), create_order 거부, success 시 리셋 완전 커버리지
 
 ### ⚠️ 주의 사항 (Cycle 387 이후)
 
@@ -52,12 +61,11 @@ _Last updated: 2026-07-03 (Cycle 386 완료)_
 - **n_bins 방향 탐색 종료** (Cycle386 D): n_bins=4/5/6 IS 선택 빈도 동일(3/3/2)
   - WFO compact(14일 OOS)에서 OOS trades=4-11 → 구조적 Trades<15 제약
   - n_bins는 trade frequency에 무영향 → n_bins 탐색 종료
-  - price_cluster 개선 방향: bounce_pct 하향(0.006) → trade frequency 증가
+  - price_cluster 개선 방향: bounce_pct 하향 한계 → vol_regime_filter 방향으로 전환
 - **roc_ma_cross IS-선택 분석 완료** (Cycle386 F): vol_ratio_min=1.2 edge 재확인
-  - IS optimizer 선택: volume_filter=False 5/8 (빈도 높음) vs vol_ratio_min=1.2 3/8
+  - IS optimizer 선택: volume_filter=False 5/8 vs vol_ratio_min=1.2 3/8
   - vol_ratio_min=1.2 선택 시 IS Sharpe 더 높음(3.11, 1.55) → real edge 확인
   - WFO compact 결과로 확정 파라미터(vol_ratio_min=1.2) 변경 불가
-  - 다음 F 방향: SL/TP 실험 (Trades 무영향, BacktestEngine atr_multiplier_sl/tp)
 
 ### ⚠️ 주의 사항 (Cycle 384 이후)
 

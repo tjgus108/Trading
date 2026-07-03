@@ -1,3 +1,48 @@
+## [2026-07-03] Cycle 387 — C(데이터) + E(실행) + F(리서치)
+
+**[C(데이터)] price_cluster bounce_pct=0.006 실험**
+1. BacktestEngine으로 bounce_pct=0.006/0.007/0.008/0.010 전체 BTC 1h 데이터 비교
+   - bounce_pct=0.006: Sh=0.77, PF=1.17, Tr=311, MDD=28.7% [FAIL]
+   - bounce_pct=0.007: Sh=0.56, PF=1.13, Tr=322, MDD=27.1% [FAIL]
+   - bounce_pct=0.008: Sh=0.53, PF=1.11, Tr=342, MDD=25.7% [FAIL]
+   - bounce_pct=0.010: Sh=0.28, PF=1.06, Tr=368, MDD=30.5% [FAIL]
+   - **핵심 발견**: bounce_pct 낮을수록 Sh↑, Tr↓ — 방향 맞음. 그러나 PF<1.5(binding)와 MDD>20%(binding) 극복 불가
+   - bounce_pct=0.006이 최고 Sh(0.77)이나 PASS 기준(Sh≥1.0, PF≥1.5, MDD≤20%) 모두 미달
+   - **결론**: bounce_pct 하향 탐색 한계 도달. 다음 방향: vol_regime_filter=True로 고변동성 제거 실험 (PF↑, MDD↓ 경로)
+
+**[E(실행)] connector.py 코드 점검 + is_halted 테스트 추가**
+2. src/exchange/connector.py 코드 리뷰
+   - _call_with_deadline, _timed_call, _retry 로직 검토: 구조 양호
+   - is_halted / _consecutive_failures 리셋 로직 확인
+   - create_order 내 is_halted 체크 및 success 시 리셋 확인
+3. `tests/test_connector.py`: 4개 테스트 추가 (26→30개) — Cycle387 E(실행)
+   - test_is_halted_false_below_threshold: 연속 실패 4회면 is_halted=False
+   - test_is_halted_true_at_threshold: 연속 실패 5회면 is_halted=True
+   - test_create_order_raises_when_halted: halted 상태서 create_order RuntimeError
+   - test_consecutive_failures_reset_on_successful_order: 성공 시 _consecutive_failures=0 리셋
+
+**[F(리서치)] roc_ma_cross SL/TP 파라미터 실험**
+4. BacktestEngine atr_multiplier_sl/tp 파라미터 스윕 (전체 BTC 1h 데이터)
+   - sl=1.5 tp=3.5 (baseline): Sh=-0.17, PF=0.99, Tr=309, MDD=23.1% [FAIL] sl_hits=182, tp_hits=72
+   - sl=1.2 tp=3.5: Sh=0.28, PF=1.08, Tr=319, MDD=22.2% [FAIL]
+   - sl=1.5 tp=3.0: Sh=-0.38, PF=0.96, Tr=310, MDD=21.9% [FAIL]
+   - sl=1.2 tp=3.0: Sh=-0.10, PF=1.01, Tr=321, MDD=22.9% [FAIL]
+   - sl=1.0 tp=2.5: Sh=-0.31, PF=0.98, Tr=336, MDD=25.4% [FAIL]
+   - sl=2.0 tp=4.0: Sh=-0.27, PF=0.97, Tr=288, MDD=19.8% [FAIL] sl_hits=144, tp_hits=53
+   - **핵심 발견**: SL/TP 조정으로 roc_ma_cross PASS 불가능. 전체 데이터셋 Sh<0 (regime-dependent 전략)
+   - sl=1.2가 Sh 약간 개선(0.28), sl=2.0이 MDD<20% 유일 달성(19.8%)
+   - **결론**: SL/TP 방향 탐색 종료. roc_ma_cross는 paper_sim(최근 favorable period)에서만 PASS — 전략 자체 한계 확인. 다음 F 방향: roc_ma_cross PASS 기간 시장 분석
+
+**시뮬레이션 결과 요약**
+
+| 지표 | Cycle 386 | Cycle 387 | 변화 |
+|------|-----------|-----------|------|
+| paper_sim roc_ma_cross Sharpe | 1.81 | **1.81** (유지 — 재실행 타임아웃) | — |
+| paper_sim roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | — |
+| test_connector 테스트 수 | 26개 | **30개** (+4) | +4 |
+
+---
+
 ## [2026-07-03] Cycle 386 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor set_atr_state / set_sharpe_decay 단위 테스트 추가**

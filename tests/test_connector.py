@@ -446,3 +446,40 @@ def test_pipeline_timeout_returns_error():
 
     assert result.status == "ERROR"
     assert "did not complete" in result.error
+
+
+# ── Cycle387 E(실행): is_halted + 연속실패 리셋 테스트 ───────────────────────
+
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
+def test_is_halted_false_below_threshold():
+    """연속 실패 횟수가 임계값 미만이면 is_halted=False."""
+    conn = _make_connector()
+    conn._consecutive_failures = 4
+    assert conn.is_halted is False
+
+
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
+def test_is_halted_true_at_threshold():
+    """연속 실패 횟수가 _max_consecutive_failures(5)에 도달하면 is_halted=True."""
+    conn = _make_connector()
+    conn._consecutive_failures = 5
+    assert conn.is_halted is True
+
+
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
+def test_create_order_raises_when_halted():
+    """is_halted=True 상태에서 create_order는 RuntimeError 발생."""
+    conn = _make_connector()
+    conn._consecutive_failures = conn._max_consecutive_failures
+    with pytest.raises(RuntimeError, match="halted"):
+        conn.create_order("BTC/USDT", "buy", 0.01)
+
+
+@pytest.mark.skipif(not HAS_CCXT, reason="ccxt not installed")
+def test_consecutive_failures_reset_on_successful_order():
+    """create_order 성공 시 _consecutive_failures가 0으로 리셋된다."""
+    conn = _make_connector()
+    conn._consecutive_failures = 3
+    conn._exchange.create_market_order.return_value = {"id": "x", "status": "open"}
+    conn.create_order("BTC/USDT", "buy", 0.01)
+    assert conn._consecutive_failures == 0

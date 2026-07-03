@@ -1,15 +1,15 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-07-03T00:45:31.466716Z_
+_Generated: 2026-07-03T01:25:32.019223Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-07-03T00:51:47.597923Z_
+_Generated: 2026-07-03T01:31:40.793881Z_
 _Symbol: BTC/USDT_
-_Data Source: CSV BTC/USDT 1h (/home/user/Trading/data/historical)_
+_Data Source: CSV fallback BTC/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
 _Walk-Forward: 8개 윈도우 (train=5040, test=1440 candles [1h])_
 _Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_
@@ -185,9 +185,9 @@ _adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-07-03T00:57:25.036010Z_
+_Generated: 2026-07-03T01:37:20.473778Z_
 _Symbol: ETH/USDT_
-_Data Source: CSV ETH/USDT 1h (/home/user/Trading/data/historical)_
+_Data Source: CSV fallback ETH/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
 _Walk-Forward: 8개 윈도우 (train=5040, test=1440 candles [1h])_
 _Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_
@@ -363,9 +363,9 @@ _adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-07-03T01:02:44.365185Z_
+_Generated: 2026-07-03T01:42:42.684655Z_
 _Symbol: SOL/USDT_
-_Data Source: CSV SOL/USDT 1h (/home/user/Trading/data/historical)_
+_Data Source: CSV fallback SOL/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
 _Walk-Forward: 8개 윈도우 (train=5040, test=1440 candles [1h])_
 _Initial Balance: $10,000 USDT | Fee: 0.055%/leg (0.11% round-trip) | Slippage: 0.05%_
