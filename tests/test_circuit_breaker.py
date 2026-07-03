@@ -762,4 +762,73 @@ def test_rapid_decline_and_atr_surge_combined():
     )
     # rapid_decline이 ATR surge보다 우선 처리되어 triggered=True
     assert result["triggered"] is True
-    assert "급속" in result["reason"]
+
+
+# ── max_daily_trades 경계값 테스트 (Cycle391 B) ──────────────────
+def test_max_daily_trades_at_limit_blocks():
+    """일일 거래 횟수가 정확히 한계에 도달하면 차단."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        max_daily_trades=3,
+    )
+    for _ in range(3):
+        cb.record_trade_result(is_loss=False)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is True
+    assert "거래 횟수" in result["reason"]
+    assert result["size_multiplier"] == 0.0
+
+
+def test_max_daily_trades_one_below_does_not_block():
+    """일일 거래 횟수가 한계 -1이면 차단하지 않음."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        max_daily_trades=3,
+    )
+    for _ in range(2):
+        cb.record_trade_result(is_loss=False)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False
+
+
+def test_max_daily_trades_reset_by_reset_daily():
+    """reset_daily() 호출 시 daily_trade_count가 0으로 초기화되어 차단 해제."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        max_daily_trades=2,
+    )
+    for _ in range(2):
+        cb.record_trade_result(is_loss=False)
+    result_before = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result_before["triggered"] is True
+
+    cb.reset_daily(daily_start_balance=10000)
+    assert cb.daily_trade_count == 0
+    result_after = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result_after["triggered"] is False
+
+
+def test_max_daily_trades_zero_means_unlimited():
+    """max_daily_trades=0(기본값)이면 거래 횟수에 관계없이 차단하지 않음."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        max_daily_trades=0,
+    )
+    for _ in range(100):
+        cb.record_trade_result(is_loss=False)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False

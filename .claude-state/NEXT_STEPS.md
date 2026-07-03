@@ -1,46 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 390 완료)_
+_Last updated: 2026-07-03 (Cycle 391 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 390
+### 이번 세션 완료 사이클: 391
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 388 | A+B+F | consec_loss_scale 테스트 5개, KellySizer Bayesian shrinkage 테스트 4개(+9 총계 8491), **vol_regime_filter=T+bp=0.006 PASS 발견** (최근 100일 한정) |
 | 389 | D+E+F | price_cluster filter=T+bp=0.006 WFO전체: Sh=0.95(+0.08)/PF=1.33(+0.13)/Tr=34/2/8 FAIL, load_state 5개 테스트(총계 8496), Bundle OOS 5/5 유지 |
 | 390 | A+C+F | optimize_roc_ma_cross+volume_filter 5개 테스트(8497), bounce_pct=0.004 dead param(Sh=0.66↓,PF=1.27↓,Tr=27↓), **bounce_pct 탐색 완전 종료** |
+| 391 | B+D+F | max_daily_trades/HIGH_VOL 레짐 6개 테스트(8507), **vol_atr_trend_min=1.0 dead param**(Sh=-0.93↓,Tr=22↓), 올바른 완화방향=1.5 상향 확인 |
 
-### 🎯 Cycle 391 작업 방향 (391 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 392 작업 방향 (392 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): risk 모듈 엣지케이스 테스트
+#### B(리스크): risk 모듈 추가 엣지케이스 테스트
 
-- **배경**: 테스트 총계 8497개 (Cycle390 +5). 다음 커버리지 개선 영역
+- **배경**: 테스트 총계 8507개 (Cycle391 +10)
+- **완료된 커버리지**: max_daily_trades 경계값, HIGH_VOL daily_limit, RANGING macro cooldown
 - **작업 방향**: `src/risk/circuit_breaker.py` 또는 `src/risk/drawdown_monitor.py` 미커버 기능
-  - CircuitBreaker: recovery_window 또는 cooldown_bars 경계값 테스트
-  - DrawdownMonitor: weekly_reset 또는 _update_regime 로직 테스트
+  - CircuitBreaker: `reset_daily()` 시 연속손실/cooldown 상태 미초기화 확인
+  - DrawdownMonitor: `should_kill_strategy()` 또는 `trailing_stop_signal()` 경계값 테스트
 
-#### D(ML): price_cluster 새 개선 방향 탐색
+#### D(ML): price_cluster vol_atr_trend_min=1.5 상향 실험
 
-- **배경**: bounce_pct 탐색 완전 종료 (0.006 최적 확정)
-  - 현재 best: vol_regime_filter=True+bounce_pct=0.006 → Sh=0.95, PF=1.33 (목표 PF=1.5, gap=0.17)
-  - bounce_pct 방향 소진 → 새 파라미터 필요
-- **작업 방향 선택지**:
-  - `close_window` 상향 탐색: 60→70 (더 긴 기간 클러스터 사용, 신호 안정성↑?)
-  - `vol_atr_trend_min` 탐색: 현재 1.2, 0.8→1.0 시도 (필터 완화 → Trades↑)
-  - **권장**: vol_atr_trend_min=1.0 실험 (현재 1.2가 Tr=34 억제, 완화 시 Tr=40+ 기대)
-  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.0}`
+- **배경**: vol_atr_trend_min 방향 확인 (Cycle391 F)
+  - 코드 로직: ATR/ATR_MA > vol_atr_trend_min 시 신호 차단
+  - 낮은 임계값(1.0) → 더 강한 필터링 → 더 적은 거래 (dead param 확정)
+  - **올바른 완화 방향**: 임계값 상향(1.5+) → 덜 필터링 → 더 많은 거래
+- **실험 설정**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.5}`
+  - 기대: Tr=34→38+ (1.2보다 더 많은 신호 통과), Sh/PF 유지 또는 소폭 하락
 
-#### F(리서치): price_cluster FAIL 윈도우 패턴 분석
+#### F(리서치): price_cluster vol_atr_trend_min=1.5 vs 1.2 비교
 
-- **배경**: Cycle390 C 결과 — bounce_pct 탐색 종료, 새 방향 식별 필요
-  - 어떤 period에서 FAIL이 집중되는가?
-  - FAIL 원인: Sharpe<1.0 vs PF<1.5 vs Trades<15 vs MDD>20% 각 비율
-  - vol_atr_trend_min이 신호를 얼마나 억제하는지 확인 (filter=True의 실질 효과)
-  - 분석 결과로 vol_atr_trend_min 탐색 방향 결정
+- **배경**: 1.5 실험 결과 기반 분석
+  - 어느 윈도우에서 추가 거래가 발생하는가?
+  - 1.5에서 통과 신호가 trend 구간의 노이즈인가, 아니면 유효한 cluster bounce인가?
+  - FAIL 원인: 1.2(PF<1.5 주원인) vs 1.5(PF 개선 or 저하?)
+  - 분석 결과로 다음 상향 실험(2.0) 또는 종료 결정
+
+### ⚠️ 주의 사항 (Cycle 392 이후)
+
+- **vol_atr_trend_min=1.0 dead param 확정** (Cycle391 D): 하향 방향 종료
+  - 1.0: Sh=-0.93(↓-1.88), PF=0.91(↓-0.42), Tr=22(↓-12), 0/8 FAIL — 더 강한 필터링=더 적은 거래
+  - **올바른 완화 방향**: 상향(1.5+) → 덜 필터링 → 더 많은 거래 (Cycle392 D 실험 예정)
+  - **현재 최적**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
+  - 추가 실험: vol_atr_trend_min=1.5 상향 (filter 완화, Tr=38+ 기대)
 
 ### ⚠️ 주의 사항 (Cycle 391 이후)
 
@@ -48,7 +55,7 @@ _Last updated: 2026-07-03 (Cycle 390 완료)_
   - 0.010(Tr=41,Sh=0.87,PF=1.20) → 0.008(38,1.21,1.27) → 0.006(34,0.95,1.33) → 0.004(27,0.66,1.27) 패턴 확인
   - bounce_pct=0.004 dead param: Sh↓-0.29, PF↓-0.06, Tr↓-7 → 하향은 entry zone 축소 → 신호 감소
   - **현재 최적**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
-  - 다음 탐색: vol_atr_trend_min 완화(1.2→1.0) 또는 close_window 상향(50→60)
+  - ~~다음 탐색: vol_atr_trend_min 완화(1.2→1.0) 또는 close_window 상향(50→60)~~ (1.0 dead param 확정, 1.5 상향 탐색)
 
 - **price_cluster vol_regime_filter=True+bounce_pct=0.006 전체 WFO 결과** (Cycle389 D):
   - Sh=0.95, PF=1.33, Tr=34, Consistency=2/8 → FAIL
@@ -189,23 +196,32 @@ _Last updated: 2026-07-03 (Cycle 390 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 390 업데이트)
+### 핵심 메트릭 (Cycle 391 업데이트)
 
-| 지표 | Cycle 389 | Cycle 390 | 변화 |
+| 지표 | Cycle 390 | Cycle 391 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.95(filter=T+bp=0.006) | **0.66**(bp=0.004 실험 FAIL→복원) | 복원 0.006 |
-| 1h BTC price_cluster PF | 1.33(filter=T+bp=0.006) | **1.27**(bp=0.004) → 복원 1.33 | bp=0.006 유지 |
-| 1h BTC price_cluster Trades | 34 | **27**(bp=0.004) → 복원 34 | bp=0.006 복원 |
+| 1h BTC price_cluster Sharpe | 0.95(filter=T+bp=0.006) | **-0.93**(1.0실험)→복원 0.95 | 1.0 dead param, 1.2 복원 |
+| 1h BTC price_cluster PF | 1.33 | **0.91**(1.0실험)→복원 1.33 | 1.2 복원 |
+| 1h BTC price_cluster Trades | 34 | **22**(1.0실험)→복원 34 | 1.2 복원 |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8496개 | **8497개** (+1) | +5 추가, 집계 차이 |
+| 테스트 수 | 8497개 | **8507개** (+10) | +6 추가, 집계 차이 4 |
+
+### Cycle 391 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_circuit_breaker.py` | max_daily_trades 경계값 4개 테스트 추가 (Cycle391 B): at_limit, one_below, reset_daily, zero_unlimited |
+| `tests/test_drawdown_monitor.py` | set_regime HIGH_VOL + set_ranging_macro_neutral 2개 테스트 추가 (Cycle391 B) |
+| `scripts/paper_simulation.py` | vol_atr_trend_min 1.2→1.0 실험→dead param 확정→1.2 복원 + 결과 주석 (Cycle391 D) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS price_cluster vol_atr_trend_min=1.0 실험 결과 주석 (Cycle391 D+F) |
 
 ### Cycle 390 코드 변경 요약
 
