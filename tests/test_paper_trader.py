@@ -1958,3 +1958,66 @@ def test_save_state_equity_history_truncated():
     assert len(pt.account.equity_history) == 600
     state = pt.save_state()
     assert len(state["equity_history"]) == 500  # 최근 500개만
+
+
+# ── load_state 스키마 검증 테스트 (Cycle 389 E) ─────────────────────
+
+def test_load_state_invalid_initial_balance_raises():
+    """initial_balance가 음수이면 ValueError."""
+    pt = PaperTrader(initial_balance=10000.0)
+    with pytest.raises(ValueError, match="invalid initial_balance"):
+        pt.load_state({"initial_balance": -500.0, "balance": 10000.0})
+
+
+def test_load_state_invalid_balance_string_raises():
+    """balance가 문자열이면 ValueError."""
+    pt = PaperTrader(initial_balance=10000.0)
+    with pytest.raises(ValueError, match="invalid balance"):
+        pt.load_state({"initial_balance": 10000.0, "balance": "bad"})
+
+
+def test_load_state_positions_avg_entry_mismatch_union():
+    """positions와 avg_entry 심볼 불일치 시 합집합으로 복구."""
+    pt = PaperTrader(initial_balance=10000.0)
+    state = {
+        "initial_balance": 10000.0,
+        "balance": 9000.0,
+        "positions": {"BTC/USDT": 0.1},
+        "avg_entry": {"BTC/USDT": 50000.0, "ETH/USDT": 2000.0},
+        "total_pnl": -100.0,
+        "equity_history": [],
+    }
+    pt.load_state(state)
+    # 합집합: BTC/USDT + ETH/USDT 모두 존재
+    assert "BTC/USDT" in pt.account.positions
+    assert "ETH/USDT" in pt.account.positions
+    # ETH/USDT는 positions에 없으므로 0.0
+    assert pt.account.positions["ETH/USDT"] == 0.0
+
+
+def test_load_state_restores_kelly_adjustments():
+    """save/load 라운드트립에서 kelly_adjustments 복원."""
+    pt1 = PaperTrader(initial_balance=10000.0)
+    pt1._kelly_adjustments = 7
+    pt1._vol_targeting_adjustments = 3
+    state = pt1.save_state()
+    pt2 = PaperTrader(initial_balance=10000.0)
+    pt2.load_state(state)
+    assert pt2._kelly_adjustments == 7
+    assert pt2._vol_targeting_adjustments == 3
+
+
+def test_load_state_schema_version_gt1_no_raise():
+    """schema_version > 1은 경고만 발생하고 ValueError를 발생시키지 않음."""
+    pt = PaperTrader(initial_balance=10000.0)
+    state = {
+        "schema_version": 99,
+        "initial_balance": 10000.0,
+        "balance": 8000.0,
+        "positions": {},
+        "avg_entry": {},
+        "total_pnl": -2000.0,
+        "equity_history": [],
+    }
+    pt.load_state(state)  # should not raise
+    assert pt.account.balance == 8000.0

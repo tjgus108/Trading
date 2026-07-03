@@ -239,7 +239,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   결론: RSI<40 조건이 price_cluster bounce 타이밍과 맞지 않음 — cluster bounce 시 RSI는 대부분 40-60
     #   cluster 경계 near-miss가 RSI 중립 구간(40-60)에서 발생 → RSI<40 필터가 모든 신호 차단
     #   rsi_oversold_filter 탐색 종료. 기본값(False) 유지. price_cluster 새 방향 필요.
-    "price_cluster": {"vol_regime_filter": False},
+    # Cycle388 F(리서치): vol_regime_filter=True + bounce_pct=0.006 최근 100일 PASS 발견
+    #   Sh=2.10, PF=1.52, Tr=51 — 전체 WFO 검증 필요 (Cycle389 D 실험)
+    #   이전 filter=True 실험(Cycle354-357): bounce_pct=0.010, PF=1.20 FAIL
+    #   신규 조합: bounce_pct=0.006 + filter=True — 미시험. 더 잦은 신호로 PF 개선 기대
+    "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

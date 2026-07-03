@@ -1,53 +1,56 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 388 완료)_
+_Last updated: 2026-07-03 (Cycle 389 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 388
+### 이번 세션 완료 사이클: 389
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 386 | B+D+F | set_atr_state/set_sharpe_decay 테스트 16개(110개 총), n_bins WFO(4=5=6 동등), roc_ma_cross IS-선택 vol_ratio_min=1.2 edge 재확인 |
 | 387 | C+E+F | bounce_pct=0.006 실험(Sh=0.77 FAIL, PF<1.5/MDD>20% binding), connector is_halted 테스트 4개(30개 총), roc_ma_cross SL/TP 전 조합 FAIL |
 | 388 | A+B+F | consec_loss_scale 테스트 5개, KellySizer Bayesian shrinkage 테스트 4개(+9 총계 8491), **vol_regime_filter=T+bp=0.006 PASS 발견** (최근 100일 한정) |
+| 389 | D+E+F | price_cluster filter=T+bp=0.006 WFO전체: Sh=0.95(+0.08)/PF=1.33(+0.13)/Tr=34/2/8 FAIL, load_state 5개 테스트(총계 8496), Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 389 작업 방향 (389 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 390 작업 방향 (390 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): price_cluster vol_regime_filter=True+bounce_pct=0.006 WFO 전체 검증
+#### A(품질): 테스트 커버리지 향상
 
-- **배경**: Cycle388 F 발견 — vol_regime_filter=True + bounce_pct=0.006 최근 100일에서 PASS (Sh=2.10, PF=1.52)
-  - 이전 실험들은 bounce_pct=0.010+filter=True 조합 (PF=1.20 FAIL)
-  - **신규 조합**: bounce_pct=0.006 + filter=True — 미시험 조합
-- **작업 방향**: `paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS price_cluster 업데이트 + 실행
-  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}`
-  - 결과에 따라: PASS 확인 시 확정; FAIL 시 bounce_pct 조정(0.008 etc.) 또는 복원
+- **배경**: 테스트 총계 8496개 (Cycle389 +5). 다음 커버리지 개선 영역
+- **작업 방향**: `src/backtest/` 또는 `src/risk/` 미커버 기능 테스트
+  - BacktestEngine 엣지케이스 또는 WalkForwardOptimizer 파라미터 전달 테스트
 
-#### E(실행): paper_trader 또는 connector 추가 테스트
+#### C(데이터): price_cluster bounce_pct=0.004 또는 0.005 실험
 
-- **배경**: connector 테스트 30개 완료(Cycle387). 다음은 PaperTrader 또는 실행 로직
-- **작업 방향**: `src/exchange/paper_trader.py` 미커버 기능 확인
-  - PaperTrader slippage 적용, position tracking 테스트
+- **배경**: Cycle389 D 결과 — vol_regime_filter=True + bounce_pct=0.006 → PF=1.33 (목표 1.5, gap=0.17)
+  - 방향 유효: 전략 Sharpe/PF 모두 개선
+  - bounce_pct 하향이 trade frequency 증가 → PF 개선 가능성
+  - bounce_pct=0.006: Tr=34. 0.004 또는 0.005 → Tr=40-50 기대
+- **작업 방향**: paper_simulation.py price_cluster 파라미터 변경
+  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.004, "vol_atr_trend_min": 1.2}`
+  - 결과 따라: 개선 시 0.003까지 탐색; 역효과 시 0.005 시도
 
-#### F(리서치): price_cluster vol_regime_filter WFO 결과 분석 → 다음 방향 도출
+#### F(리서치): price_cluster PF 개선 경로 분석
 
-- **배경**: Cycle388 F 발견이 유효한지 WFO 8개 윈도우로 검증 필요
-  - 최근 100일 favorable period 가능성 존재 (roc_ma_cross도 최근 favorable)
-  - WFO consistency ≥ 4/8이면 확정, < 4/8이면 방향 종료
+- **배경**: PF binding constraint (1.33 → 목표 1.5, gap=0.17)
+  - bounce_pct 하향: 신호 빈도↑ → 평균 손익 희석? 또는 더 정밀한 신호?
+  - filter=True가 이미 vol_regime 필터 적용 → 과도 완화 위험성 체크 필요
+  - 각 윈도우별 FAIL 원인 패턴 확인 (특정 period에 집중?)
 
-### ⚠️ 주의 사항 (Cycle 389 이후)
+### ⚠️ 주의 사항 (Cycle 390 이후)
 
+- **price_cluster vol_regime_filter=True+bounce_pct=0.006 전체 WFO 결과** (Cycle389 D):
+  - Sh=0.95, PF=1.33, Tr=34, Consistency=2/8 → FAIL
+  - baseline(filter=F, bp=0.010) 대비 Sh+0.08, PF+0.13 — 방향 유효
+  - 다음 실험: bounce_pct=0.004 (현재값은 `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}`)
+- **PaperTrader load_state 스키마 검증 테스트 완료** (Cycle389 E):
+  - invalid balance/initial_balance, positions mismatch, kelly 복원, schema_version > 1 모두 검증
 - **vol_regime_filter=True+bounce_pct=0.006 PASS 발견** (Cycle388 F): 최근 100일 한정
-  - Sh=2.10, PF=1.52, Tr=51 — PF 기준(1.5) 간신히 통과
-  - 전체 WFO 검증 필수: Cycle389 D에서 paper_simulation.py 실행
-  - 이전 filter=True 실험들 (Cycle354-357)은 bounce_pct=0.010에서 PF=1.20 FAIL
-  - **신규 조합(bp=0.006+filter=T)은 미검증 — 유망 방향**
+  - Cycle389 D에서 전체 WFO로 확인 — favorable period 효과 확인됨
 - **consec_loss_scale_threshold 테스트 완료** (Cycle388 A): BacktestEngine 2단계 스케일링 커버리지
-  - loss_scale_half_count(0.75x) / loss_scale_full_count(0.50x) 직접 검증
 - **KellySizer Bayesian shrinkage 경계값 테스트 완료** (Cycle388 B): MIN_TRADES_FOR_KELLY=15
-  - n<15: shrinkage ON, n≥15: raw win_rate 직접 사용 확인
 
 ### ⚠️ 주의 사항 (Cycle 388 이후)
 
@@ -178,21 +181,30 @@ _Last updated: 2026-07-03 (Cycle 388 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 388 업데이트)
+### 핵심 메트릭 (Cycle 389 업데이트)
 
-| 지표 | Cycle 387 | Cycle 388 | 변화 |
+| 지표 | Cycle 388 | Cycle 389 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.95** (filter=T+bp=0.006) | +0.08 |
+| 1h BTC price_cluster PF | 1.20 | **1.33** (filter=T+bp=0.006) | +0.13 |
+| 1h BTC price_cluster Trades | ~41 | **34** | 감소 |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8482개 | **8491개** (+9) | +9 |
+| 테스트 수 | 8491개 | **8496개** (+5) | +5 |
+
+### Cycle 389 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `scripts/paper_simulation.py` | price_cluster 파라미터 업데이트: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (Cycle389 D) |
+| `tests/test_paper_trader.py` | load_state 스키마 검증 5개 테스트 추가 (Cycle389 E): invalid balance, mismatch union, kelly 복원, schema_v99 |
 
 ### Cycle 388 코드 변경 요약
 
@@ -486,7 +498,7 @@ _Last updated: 2026-07-03 (Cycle 388 완료)_
 - `vwap_cross: {"min_oos_trades": 3, "is_negative_regime_max": -2.0, "bear_oos_max": 1.0}` ← 고정
 - `value_area: {"regime_transition_is_min": 2.0, "min_oos_trades": 5, "is_negative_regime_max": -1.4}` ← 유지
 
-### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 384 업데이트)
+### PAPER_SIM_STRATEGY_PARAMS 현재 설정 (Cycle 389 업데이트)
 - `value_area: {"vol_filter_mult": 0.5}` (1h paper_sim에서 제외됨)
 - `wick_reversal: {"min_volatility": 0.001, "vol_mult": 0.6}` ← 1h paper_sim에서 제외됨
 - `relative_volume: {"rvol_buy_sell": 1.2}`
@@ -494,7 +506,7 @@ _Last updated: 2026-07-03 (Cycle 388 완료)_
 - `order_flow_imbalance_v2: {"trend_span": 20}` ← Cycle 337 D(ML) 복원
 - `cmf: {"buy_thresh": 0.10}`
 - `supertrend_multi: {"atr_threshold": 0.5}` ← Cycle 352 B 추가
-- `price_cluster: {"vol_regime_filter": False}` ← Cycle 358 C 확정 (bounce_pct=0.020 악화 확인→기본값 0.010)
+- `price_cluster: {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` ← Cycle 389 D 실험 (전체 WFO: Sh=0.95, PF=1.33, Tr=34, 2/8 FAIL)
 - `dema_cross: {"fast": 8, "slow": 20, "rsi_dir_filter": True, "rsi_dir_threshold": 40, "bb_width_min_filter": 0.04}` ← **Cycle 377 확정** (ema200_filter dead param 확정, 탐색 종료)
 
 ### PAPER_SIM_REGIME_FILTER 현재 설정 (Cycle 339 롤백 유지)
