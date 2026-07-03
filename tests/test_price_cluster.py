@@ -185,3 +185,43 @@ class TestPriceClusterStrategy:
         df = _make_df(n=n, close_prices=closes)
         sig = self.strategy.generate(df)
         assert isinstance(sig, Signal)
+
+    # 17. Cycle385 A(품질): n_bins=4 전략 유효성 (DEFAULT_GRIDS에 포함된 탐색값)
+    # n_bins=4는 n_bins=5보다 넓은 bin → cluster 안정성↑, noise↓ 가설 (WFO로 검증 중)
+    def test_n_bins_4_returns_valid_signal(self):
+        """n_bins=4 설정 시 Signal 객체 반환 및 필드 완전성 확인"""
+        strategy4 = PriceClusterStrategy(n_bins=4)
+        df = _make_df(n=60)
+        sig = strategy4.generate(df)
+        assert isinstance(sig, Signal)
+        assert sig.action in (Action.BUY, Action.SELL, Action.HOLD)
+        assert isinstance(sig.entry_price, float)
+        assert sig.strategy == "price_cluster"
+
+    # 18. Cycle385 A(품질): n_bins=4 vs n_bins=5 — 다른 bin 경계 확인
+    def test_n_bins_4_wider_bins_than_5(self):
+        """n_bins=4이 n_bins=5보다 bin_width가 넓음 (price_range / n_bins)"""
+        closes = pd.Series([100.0 + i * 0.2 for i in range(50)])  # 100~110 균등 분포
+        price_range = float(closes.max() - closes.min())
+        low4, high4, _, _, _ = _find_cluster(closes, n_bins=4)
+        low5, high5, _, _, _ = _find_cluster(closes, n_bins=5)
+        bin_width4 = high4 - low4
+        bin_width5 = high5 - low5
+        assert bin_width4 > bin_width5, (
+            f"n_bins=4 bin_width({bin_width4:.4f}) should be > n_bins=5({bin_width5:.4f})"
+        )
+        expected_width4 = price_range / 4
+        expected_width5 = price_range / 5
+        assert abs(bin_width4 - expected_width4) < 1e-9
+        assert abs(bin_width5 - expected_width5) < 1e-9
+
+    # 19. Cycle385 A(품질): rsi_oversold_filter dead param 행동 문서화
+    # Cycle384 D: rsi_oversold_filter=True → 0 trades (PF=0.00) 확인됨
+    # cluster bounce는 RSI 중립(40-60)에서 발생 — RSI<40 필터가 모든 신호 차단
+    def test_rsi_oversold_filter_accepts_neutral_rsi_data(self):
+        """rsi_oversold_filter=False(기본값)는 rsi 컬럼 없어도 정상 동작"""
+        strategy = PriceClusterStrategy(rsi_oversold_filter=False)
+        df = _make_cluster_bounce_df()
+        sig = strategy.generate(df)
+        assert isinstance(sig, Signal)
+        assert sig.action in (Action.BUY, Action.SELL, Action.HOLD)

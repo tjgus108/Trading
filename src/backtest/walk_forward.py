@@ -244,6 +244,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "vol_ratio_min": [1.0, 1.2, 1.5],
         # Cycle384 F(리서치): roc_min_abs=0.4 실험 → dead param (Consistency 4/8→2/8 PASS→FAIL)
         # 결론: 0.3이 최적 확정. roc_min_abs 탐색 종료.
+        # Cycle385 C(데이터): FAIL 윈도우(W2/W3/W4) 실데이터 분석 결과
+        #   FAIL windows: vol_ratio at signals mean=0.89-0.97 (PASS windows: 1.14-1.19)
+        #   vol>=1.2 통과 신호 수: W3=14, W4=14 (Trades<15 기준 미달이 FAIL 핵심 원인)
+        #   binding constraint: vol_ratio_min=1.2 필터가 FAIL 윈도우에서 1-2개 신호를 과도 차단
+        #   W4 24h fwd return(vol-filtered) +2.10% — 신호 품질 자체는 양호, trades 부족이 문제
+        #   결론: vol_ratio_min 하향(1.1) 역효과(Cycle382) 이미 확인. 새 방향 탐색 필요.
+        #   → ATR expand filter 탐색 (Cycle385 F): dead param 확정 (Consistency 4/8→2/8 역효과)
+        #   교훈: roc_ma_cross는 추가 signal filter 금지 — Trades=14 경계선에서 어떤 추가 필터도 역효과
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)

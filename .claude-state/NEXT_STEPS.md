@@ -1,53 +1,50 @@
 # Next Steps
 
-_Last updated: 2026-07-02 (Cycle 384 완료)_
+_Last updated: 2026-07-03 (Cycle 385 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 384
+### 이번 세션 완료 사이클: 385
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 382 | B+D+F | vol_ratio_min=1.1 FAIL(Consist 4/8→2/8), bounce_pct=0.008 DEFAULT_GRIDS 추가, 4h 1h-only 최종 확정 |
 | 383 | C+B+F | bounce_pct=0.008 혼재(Sharpe+0.34 개선, PF 미달 FAIL), transition_cushion None-test추가, EMA200 유지 확정 |
 | 384 | D+E+F | roc_ma_cross grid 축소(54→6 combos), rsi_oversold_filter dead param(0 trades), roc_min_abs=0.4 dead param(Consistency 붕괴) |
+| 385 | A+C+F | n_bins=4 테스트 추가, FAIL 윈도우 분석(vol_ratio 0.89-0.97 낮음), atr_expand_filter dead param(Consist 4/8→2/8) |
 
-### 🎯 Cycle 385 작업 방향 (385 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 386 작업 방향 (386 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): price_cluster 코드 품질 및 테스트 보강
+#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 개선
 
-- **배경**: price_cluster Consistency=1/8으로 구조적 문제 지속
-  - RSI 필터(Cycle384 D) dead param 확정: cluster bounce는 RSI 중립(40-60) 구간에서 발생
-  - 기존 탐색 방향 소진: high_conf_only, min_cluster_strength_ratio, confirmation_bars 모두 dead param
-- **작업 방향**: price_cluster 새 파라미터 방향 검토
-  - `n_bins=4` WFO 탐색: 더 넓은 bin으로 cluster 안정성↑ (5보다 변동 적음)
-  - `cluster_persistence` 아이디어: 최빈 bin이 N봉 이상 동일 bin인 경우만 bounce 허용
-  - 또는 QA 관점: rsi_oversold_filter 코드 유지 여부, 파라미터 정리 테스트
+- **배경**: Cycle385 핵심 발견 — roc_ma_cross는 추가 signal filter가 모두 역효과 (Trades=14 경계선)
+  - ATR expand filter, roc_min_abs, vol_ratio_min 등 모든 필터 탐색 종료
+  - 리스크 관점: 거래당 손실 제한으로 Sharpe 개선 가능성
+- **작업 방향**: DrawdownMonitor/kelly_sizer 코드 품질 점검
+  - kelly_sizer MIN_TRADES_FOR_KELLY 관련 로직 재검토 (Cycle376 B 중복 제거 이후)
+  - CircuitBreaker 한계 체크 코드 단위 테스트 추가
 
-#### C(데이터): roc_ma_cross FAIL 윈도우 분석
+#### D(ML): price_cluster n_bins=4 WFO 탐색 결과 분석
 
-- **배경**: roc_ma_cross PASS=4/8 (경계), FAIL 윈도우 특성 분석 필요
-  - FAIL 윈도우: W2(Aug-Oct 2023), W3(Sep-Nov 2023), W4(Oct-Dec 2023) = BTC 횡보/약세
-  - roc_min_abs탐색종료 (0.3 최적, 0.4 역효과 Cycle384)
-  - EMA200탐색종료, vol_ratio_min탐색종료, roc_period탐색종료, ma_period탐색종료
-- **작업 방향**: FAIL 윈도우 데이터 분석으로 새 방향 발굴
-  - BTC 1h 실데이터에서 W2/W3/W4 구간 ROC_MA 크로스 신호 품질 직접 분석
-  - 해당 구간의 volume_ratio(vol/vol_sma) 분포 확인
-  - 신호 품질 낮은 이유 특정 → 다음 파라미터 방향 도출
+- **배경**: Cycle385 A에서 n_bins=4 테스트 추가 완료, WFO 탐색 그리드에 이미 포함
+  - DEFAULT_GRIDS["price_cluster"]["n_bins"] = [4, 5, 6]
+  - n_bins=4가 실제 WFO에서 어떤 결과를 보이는지 분석 필요
+- **작업 방향**: WFO 최적 결과에서 n_bins=4 vs n_bins=5 비교
+  - `python3 -c "from src.backtest.walk_forward import optimize_price_cluster; ..."` 로 직접 WFO 실행
+  - n_bins=4 results: Sharpe, PF, Consistency 비교
 
-#### F(리서치): roc_ma_cross SL/TP 또는 레짐 필터 탐색
+#### F(리서치): roc_ma_cross 새 방향 탐색
 
-- **배경**: roc_ma_cross PASS 4/8 (50% 경계, Cycle380 달성)
-  - 남은 탐색 방향: SL/TP 또는 레짐 필터
-  - FAIL 윈도우가 횡보/약세 → RANGING 레짐 신호 억제 가능성
-- **방향**: 
-  - **SL/TP**: atr_multiplier_sl/tp 파라미터 추가 (현재 BacktestEngine 기본값 사용)
-    - 더 좁은 SL(1.2) 또는 더 좁은 TP(2.5)로 개별 거래 손실 제한 → MDD↓, PF↑?
-  - **레짐 필터**: ATR 기반 레짐 필터 (RANGING → 신호 억제)
-    - roc_ma_cross는 모멘텀 전략 → ATR/ATR_MA > 1.0 (trending) 시만 신호 허용
-    - 단, 기존 Cycle339 레짐 실험 역효과(신호 70% 차단) 참고 → 경계 설정 중요
+- **핵심 제약**: Cycle385 확정 — roc_ma_cross에 추가 signal filter 절대 금지
+  - 탐색 종료: vol_ratio_min(1.0/1.1/1.2/1.5), roc_min_abs(0.3/0.4), ATR expand filter, roc_period, ma_period, EMA200
+  - 모든 방향이 Trades=14 경계선에서 역효과 또는 dead param
+- **남은 방향**: 
+  - **SL/TP**: BacktestEngine atr_multiplier_sl=1.2 (전역) 또는 atr_multiplier_tp=2.5 실험
+    - Trades에 영향 없음 → Sharpe/PF 개선 가능성 (MDD 감소 경로)
+    - 주의: Cycle375에서 dema_cross SL=1.2 역효과 확인 (전역 변경의 한계)
+  - **완전히 다른 접근**: WFO 최적화에서 roc_ma_cross가 선택하는 best params 분석
+    - IS 최적 파라미터 분포 → 특정 vol/roc 조합이 반복적으로 선택되는지 확인
 
 ### ⚠️ 주의 사항 (Cycle 384 이후)
 
@@ -62,6 +59,14 @@ _Last updated: 2026-07-02 (Cycle 384 완료)_
 - **roc_ma_cross grid 대폭 축소** (Cycle384 E): 54→6 combos (88% 감소)
   - roc_period=12, ma_period=3 단일값 확정 (탐색 완료)
   - volume_filter=[False,True], vol_ratio_min=[1.0,1.2,1.5] 유지
+- **roc_ma_cross atr_expand_filter dead param 확정** (Cycle385 F): 역효과
+  - atr_expand_filter=True: Sh=1.43(↓-0.38), PF=1.84(↓-0.18), Consistency=2/8(4/8→FAIL!)
+  - 핵심 교훈: roc_ma_cross는 추가 signal filter 절대 금지 — Trades=14 최소 기준 경계
+  - 파라미터 코드는 유지 (atr_expand_filter=False 기본값), paper_sim 복원 완료
+- **FAIL 윈도우 분석 완료** (Cycle385 C): vol_ratio at signals mean=0.89-0.97 (PASS: 1.14-1.19)
+  - W3/W4 vol>=1.2 통과 신호: 14건 (Trades<15 경계)
+  - 신호 품질은 양호(W4 24h fwd ret +2.10%), Trades 부족이 FAIL 원인
+  - 남은 방향: SL/TP 실험 (Trades에 무영향, Sharpe/PF 개선 가능) 또는 WFO best params 분석
 
 - **🎉 roc_ma_cross FIRST PASS 확정** (Cycle380 A): vol_ratio_min=1.2 → Sh=1.81, PF=2.02, Trades=14 avg, 4/8
   - **확정 파라미터**: `{"volume_filter": True, "vol_ratio_min": 1.2}` (변경 금지)
@@ -143,21 +148,30 @@ _Last updated: 2026-07-02 (Cycle 384 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 384 업데이트)
+### 핵심 메트릭 (Cycle 385 업데이트)
 
-| 지표 | Cycle 383 | Cycle 384 | 변화 |
+| 지표 | Cycle 384 | Cycle 385 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.87 | **0.87** (RSI 실험→복원) | 유지 |
-| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** (복원) | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** (ATR filter 실험→복원) | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** (복원) | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
+| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** (atr_expand dead param) | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8459 | **8459** | 변화없음 |
+| 테스트 수 | 8459 | **8462** (+3 price_cluster 테스트) | +3 |
+
+### Cycle 385 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_price_cluster.py` | n_bins=4 유효성, bin_width 수학 검증, rsi_oversold dead param 문서화 테스트 추가 (Cycle385 A) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["roc_ma_cross"] FAIL 윈도우 분석 주석 + ATR filter dead param 기록 (Cycle385 C/F) |
+| `src/strategy/roc_ma_cross.py` | atr_expand_filter=False, atr_expand_min=0.8 파라미터 추가 + BUY/SELL 조건 atr_ok 포함 (Cycle385 F) |
+| `scripts/paper_simulation.py` | atr_expand_filter=True 실험→dead param 확정→복원 + 결과 주석 (Cycle385 F) |
 
 ### Cycle 384 코드 변경 요약
 

@@ -209,6 +209,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   원인: 일부 윈도우에서 Trades가 borderline(14~15), 0.4%로 차단 시 Trades<15 또는 Sharpe<1.0 전락
     #   결론: roc_min_abs=0.3 최적 확정. 0.4 강화는 역효과 확정. roc_min_abs 탐색 종료.
     #   WFO 그리드: [0.3]으로 고정 (0.4 dead param)
+    #   WFO 그리드: [0.3]으로 고정 (0.4 dead param) [이미 위 주석에서 처리됨]
+    # Cycle385 F(리서치): atr_expand_filter=True 실험 → dead param 확정 (역효과)
+    #   결과: Sharpe=1.43(↓-0.38), PF=1.84(↓-0.18), Trades=14(유지), Consistency=2/8(4/8→2/8 FAIL!)
+    #   원인: ATR 필터가 추가 신호 차단 → 이미 경계선(14 trades)에서 일부 윈도우 PASS→FAIL 전락
+    #   핵심 교훈: roc_ma_cross는 추가 signal filter 금지 (Trades=14 최소 기준 경계)
+    #   새 방향 필요: signal 확장(SL/TP 최적화?) 또는 완전히 다른 접근 검토
     "roc_ma_cross": {"volume_filter": True, "vol_ratio_min": 1.2},
     # Cycle379 F(리서치): min_cluster_strength_ratio=0.30 실험 결과 (2026-07-01)
     #   ratio=0.30: Sharpe=0.72(-0.15 악화), PF=1.18(유사), Trades=35(-6)

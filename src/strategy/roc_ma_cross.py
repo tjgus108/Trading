@@ -26,12 +26,19 @@ class ROCMACrossStrategy(BaseStrategy):
     name = "roc_ma_cross"
 
     def __init__(self, roc_period: int = 12, ma_period: int = 3, volume_filter: bool = False,
-                 vol_ratio_min: float = 1.5, roc_min_abs: float = _ROC_MIN_ABS_DEFAULT):
+                 vol_ratio_min: float = 1.5, roc_min_abs: float = _ROC_MIN_ABS_DEFAULT,
+                 atr_expand_filter: bool = False, atr_expand_min: float = 0.8):
         self.roc_period = roc_period
         self.ma_period = ma_period
         self.volume_filter = volume_filter
         self.vol_ratio_min = vol_ratio_min
         self.roc_min_abs = roc_min_abs
+        # Cycle385 F(리서치): ATR expand filter — 변동성 수축 구간 신호 억제
+        # ATR(14)/ATR_MA(20) < atr_expand_min 시 신호 억제 (심각한 변동성 수축 = 모멘텀 약화)
+        # 가설: 저거래량+변동성수축 조합 신호가 FAIL 윈도우 Sharpe 저하 원인
+        # 기본값 False (기존 동작 유지)
+        self.atr_expand_filter = atr_expand_filter
+        self.atr_expand_min = atr_expand_min
         self._min_rows = max(roc_period + ma_period, 20)
 
     def generate(self, df: pd.DataFrame) -> Signal:
@@ -92,6 +99,25 @@ class ROCMACrossStrategy(BaseStrategy):
             if not pd.isna(vol_sma) and vol_sma > 0:
                 volume_ok = (vol_now / vol_sma) >= self.vol_ratio_min
 
+        # Cycle385 F(리서치): ATR expand filter — 변동성 수축 구간 신호 억제
+        atr_ok = True
+        if self.atr_expand_filter and len(df) >= 35:
+            high = df["high"].astype(float)
+            low = df["low"].astype(float)
+            close_s = df["close"].astype(float)
+            prev_close = close_s.shift(1)
+            tr = pd.concat([
+                high - low,
+                (high - prev_close).abs(),
+                (low - prev_close).abs(),
+            ], axis=1).max(axis=1)
+            atr14 = tr.rolling(14, min_periods=14).mean()
+            atr_ma20 = atr14.rolling(20, min_periods=20).mean()
+            atr_val = float(atr14.iloc[idx])
+            atr_ma_val = float(atr_ma20.iloc[idx])
+            if not (pd.isna(atr_val) or pd.isna(atr_ma_val) or atr_ma_val <= 0):
+                atr_ok = (atr_val / atr_ma_val) >= self.atr_expand_min
+
         if not pd.isna(roc_std_now) and roc_std_now > 0:
             conf_high = abs(roc_now) > roc_std_now * _STD_MULT
         else:
@@ -106,7 +132,7 @@ class ROCMACrossStrategy(BaseStrategy):
             abs(roc_now) > self.roc_min_abs and roc_now > 0 and
             close > ema50 and
             (ema200 is None or close > ema200) and
-            volume_ok):
+            volume_ok and atr_ok):
 
             return Signal(
                 action=Action.BUY,
@@ -130,7 +156,7 @@ class ROCMACrossStrategy(BaseStrategy):
             abs(roc_now) > self.roc_min_abs and roc_now < 0 and
             close < ema50 and
             (ema200 is None or close < ema200) and
-            volume_ok):
+            volume_ok and atr_ok):
 
             return Signal(
                 action=Action.SELL,

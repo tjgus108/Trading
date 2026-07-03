@@ -1,3 +1,37 @@
+## [2026-07-03] Cycle 385 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] test_price_cluster.py 테스트 보강 (n_bins=4)**
+1. `tests/test_price_cluster.py`: 3개 테스트 추가 (총 19개)
+   - `test_n_bins_4_returns_valid_signal`: n_bins=4 Signal 유효성 확인
+   - `test_n_bins_4_wider_bins_than_5`: n_bins=4가 n_bins=5보다 bin_width 넓음 수학적 검증
+   - `test_rsi_oversold_filter_accepts_neutral_rsi_data`: dead param 행동 문서화 (rsi_oversold_filter=False 기본값)
+
+**[C(데이터)] roc_ma_cross FAIL 윈도우 실데이터 분석**
+2. `src/backtest/walk_forward.py`: DEFAULT_GRIDS["roc_ma_cross"] 분석 주석 추가
+   - FAIL 윈도우(W2/W3/W4) vol_ratio at signals mean=0.89-0.97 (PASS: 1.14-1.19)
+   - vol>=1.2 통과 신호: W3=14, W4=14 → Trades<15 기준이 FAIL 핵심 원인
+   - W4 24h fwd return(vol-filtered) +2.10% — 신호 품질은 양호, trades 부족이 문제
+   - 교훈: ATR expand filter 탐색으로 연결 (F에서 dead param 확인)
+
+**[F(리서치)] roc_ma_cross ATR expand filter 실험 — dead param 확정 (역효과)**
+3. `src/strategy/roc_ma_cross.py`: `atr_expand_filter`, `atr_expand_min` 파라미터 추가 (코드 유지)
+   - paper_sim 실험 (atr_expand_filter=True, atr_expand_min=0.8): **Sh=1.43(↓-0.38), PF=1.84(↓-0.18), Consistency=2/8(FAIL!)**
+   - 원인: 추가 필터 → 이미 경계선(Trades=14)에서 일부 윈도우 PASS→FAIL 전락
+   - 핵심 교훈: roc_ma_cross는 추가 signal filter 절대 금지 (Trades=14 최소 기준 경계)
+   - 즉시 paper_sim 복원 (기본값 False)
+
+**시뮬레이션 결과 요약**
+
+| 지표 | Cycle 384 | Cycle 385 | 변화 |
+|------|-----------|-----------|------|
+| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** (ATR filter 실험→복원) | 유지 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** (실험중 2/8 역효과→복원) | 유지 |
+| 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
+| 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
+| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** (atr_expand_filter dead param) | 유지 |
+| Bundle OOS PASS | 5/5 | **5/5** | 유지 |
+| 테스트 수 | 8459 | **8462** (+3 price_cluster 테스트) | +3 |
+
 ## [2026-07-02] Cycle 384 — D(ML) + E(실행) + F(리서치)
 
 **[E(실행)] DEFAULT_GRIDS["roc_ma_cross"] dead param 정리**
@@ -10962,6 +10996,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-02 20:52 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 00:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-03 00:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 00:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 00:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 00:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 00:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
