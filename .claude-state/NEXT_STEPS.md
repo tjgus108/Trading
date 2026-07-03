@@ -1,50 +1,63 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 385 완료)_
+_Last updated: 2026-07-03 (Cycle 386 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 385
+### 이번 세션 완료 사이클: 386
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 383 | C+B+F | bounce_pct=0.008 혼재(Sharpe+0.34 개선, PF 미달 FAIL), transition_cushion None-test추가, EMA200 유지 확정 |
 | 384 | D+E+F | roc_ma_cross grid 축소(54→6 combos), rsi_oversold_filter dead param(0 trades), roc_min_abs=0.4 dead param(Consistency 붕괴) |
 | 385 | A+C+F | n_bins=4 테스트 추가, FAIL 윈도우 분석(vol_ratio 0.89-0.97 낮음), atr_expand_filter dead param(Consist 4/8→2/8) |
+| 386 | B+D+F | set_atr_state/set_sharpe_decay 테스트 16개(110개 총), n_bins WFO(4=5=6 동등), roc_ma_cross IS-선택 vol_ratio_min=1.2 edge 재확인 |
 
-### 🎯 Cycle 386 작업 방향 (386 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 387 작업 방향 (387 mod 5 = 2 → C(데이터) + E(실행) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 개선
+#### C(데이터): price_cluster trade frequency 개선 탐색
 
-- **배경**: Cycle385 핵심 발견 — roc_ma_cross는 추가 signal filter가 모두 역효과 (Trades=14 경계선)
-  - ATR expand filter, roc_min_abs, vol_ratio_min 등 모든 필터 탐색 종료
-  - 리스크 관점: 거래당 손실 제한으로 Sharpe 개선 가능성
-- **작업 방향**: DrawdownMonitor/kelly_sizer 코드 품질 점검
-  - kelly_sizer MIN_TRADES_FOR_KELLY 관련 로직 재검토 (Cycle376 B 중복 제거 이후)
-  - CircuitBreaker 한계 체크 코드 단위 테스트 추가
+- **배경**: Cycle386 D(ML) WFO 분석 — n_bins=4/5/6 모두 OOS trades=4-11 (구조적 문제)
+  - bounce_pct={0.008, 0.01}에서 모두 FAIL (Trades<15)
+  - n_bins는 trade frequency에 무영향 확정 → n_bins 방향 종료
+- **작업 방향**: bounce_pct=0.006 실험 (paper_sim 직접 실행)
+  - 근거: bounce_pct 낮을수록 신호 빈도 증가 (더 작은 bounce에서도 신호)
+  - 위험: bounce 품질 저하 → noise↑ PF↓ 가능성
+  - 비교: bounce_pct=0.008(Sh=1.21, PF=1.27, Trades=38) vs 0.006 예상
+  - 목표: Sh≥1.0, PF≥1.5, Trades≥15, Consistency≥2/8
 
-#### D(ML): price_cluster n_bins=4 WFO 탐색 결과 분석
+#### E(실행): 실행 코드 점검
 
-- **배경**: Cycle385 A에서 n_bins=4 테스트 추가 완료, WFO 탐색 그리드에 이미 포함
-  - DEFAULT_GRIDS["price_cluster"]["n_bins"] = [4, 5, 6]
-  - n_bins=4가 실제 WFO에서 어떤 결과를 보이는지 분석 필요
-- **작업 방향**: WFO 최적 결과에서 n_bins=4 vs n_bins=5 비교
-  - `python3 -c "from src.backtest.walk_forward import optimize_price_cluster; ..."` 로 직접 WFO 실행
-  - n_bins=4 results: Sharpe, PF, Consistency 비교
+- **배경**: E 카테고리 미실행 (Cycle384 E는 roc_ma_cross grid 축소였음)
+- **작업 방향**: `src/exchange/` 코드 품질 점검
+  - 슬리피지 계산 로직 확인
+  - 주문 타임아웃 / 재시도 로직 단위 테스트 추가
 
-#### F(리서치): roc_ma_cross 새 방향 탐색
+#### F(리서치): roc_ma_cross SL/TP 실험
 
-- **핵심 제약**: Cycle385 확정 — roc_ma_cross에 추가 signal filter 절대 금지
-  - 탐색 종료: vol_ratio_min(1.0/1.1/1.2/1.5), roc_min_abs(0.3/0.4), ATR expand filter, roc_period, ma_period, EMA200
-  - 모든 방향이 Trades=14 경계선에서 역효과 또는 dead param
-- **남은 방향**: 
-  - **SL/TP**: BacktestEngine atr_multiplier_sl=1.2 (전역) 또는 atr_multiplier_tp=2.5 실험
-    - Trades에 영향 없음 → Sharpe/PF 개선 가능성 (MDD 감소 경로)
-    - 주의: Cycle375에서 dema_cross SL=1.2 역효과 확인 (전역 변경의 한계)
-  - **완전히 다른 접근**: WFO 최적화에서 roc_ma_cross가 선택하는 best params 분석
-    - IS 최적 파라미터 분포 → 특정 vol/roc 조합이 반복적으로 선택되는지 확인
+- **핵심 제약**: roc_ma_cross에 추가 signal filter 절대 금지 (Trades=14 경계)
+  - 탐색 종료: vol_ratio_min(1.0/1.1/1.2/1.5), roc_min_abs(0.3/0.4), ATR expand filter
+  - IS-선택 분석(Cycle386 F): vol_ratio_min=1.2 edge 재확인 → 파라미터 변경 불가
+- **새 방향**: BacktestEngine SL/TP 파라미터 실험
+  - `atr_multiplier_sl=1.2` 전역 적용 (현재 기본값 확인 필요)
+  - Trades에 무영향 → Sharpe/PF/MDD 변화 관찰
+  - 주의: Cycle375 dema_cross SL=1.2 역효과 (전역 변경 한계) 교훈 기억
+
+### ⚠️ 주의 사항 (Cycle 387 이후)
+
+- **DrawdownMonitor set_atr_state/set_sharpe_decay 테스트 완료** (Cycle386 B)
+  - 110개 테스트 (94→110, +16개)
+  - ATR 변동성 필터 + Sharpe decay 필터 완전 커버리지 완료
+- **n_bins 방향 탐색 종료** (Cycle386 D): n_bins=4/5/6 IS 선택 빈도 동일(3/3/2)
+  - WFO compact(14일 OOS)에서 OOS trades=4-11 → 구조적 Trades<15 제약
+  - n_bins는 trade frequency에 무영향 → n_bins 탐색 종료
+  - price_cluster 개선 방향: bounce_pct 하향(0.006) → trade frequency 증가
+- **roc_ma_cross IS-선택 분석 완료** (Cycle386 F): vol_ratio_min=1.2 edge 재확인
+  - IS optimizer 선택: volume_filter=False 5/8 (빈도 높음) vs vol_ratio_min=1.2 3/8
+  - vol_ratio_min=1.2 선택 시 IS Sharpe 더 높음(3.11, 1.55) → real edge 확인
+  - WFO compact 결과로 확정 파라미터(vol_ratio_min=1.2) 변경 불가
+  - 다음 F 방향: SL/TP 실험 (Trades 무영향, BacktestEngine atr_multiplier_sl/tp)
 
 ### ⚠️ 주의 사항 (Cycle 384 이후)
 

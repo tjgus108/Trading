@@ -1226,3 +1226,120 @@ def test_transition_cushion_disabled_default_after_restore():
     assert m2.get_transition_cushion_multiplier(0.0) == 1.0
     assert m2.get_transition_cushion_multiplier(0.5) == 1.0
     assert m2.get_transition_cushion_multiplier(1.0) == 1.0
+
+
+# ── set_atr_state / ATR 변동성 필터 ─────────────────────────────
+
+class TestAtrVolFilter:
+    """Cycle386 B(리스크): set_atr_state + atr_vol_multiplier 단위 테스트."""
+
+    def test_normal_atr_returns_1x(self):
+        """ATR이 ATR_MA의 1.5배 미만이면 atr_vol_multiplier=1.0."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=100.0, atr_ma=100.0, threshold=1.5)
+        assert m.get_atr_vol_multiplier() == 1.0
+
+    def test_elevated_atr_returns_05x(self):
+        """ATR이 ATR_MA의 1.5배 이상이면 atr_vol_multiplier=0.5."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=160.0, atr_ma=100.0, threshold=1.5)
+        assert m.get_atr_vol_multiplier() == 0.5
+
+    def test_exact_threshold_triggers(self):
+        """ATR/ATR_MA == threshold(경계값)이면 elevated로 판정 (>=)."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=150.0, atr_ma=100.0, threshold=1.5)
+        assert m.get_atr_vol_multiplier() == 0.5
+
+    def test_zero_atr_ma_resets_to_normal(self):
+        """atr_ma=0이면 elevated 불가 — 1.0 반환."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=999.0, atr_ma=0.0, threshold=1.5)
+        assert m.get_atr_vol_multiplier() == 1.0
+
+    def test_atr_pct_absolute_trigger(self):
+        """atr_pct > atr_pct_threshold이면 상대 배수 무관하게 elevated."""
+        m = DrawdownMonitor()
+        # atr/atr_ma = 1.1 (threshold=1.5 미만이지만 atr_pct가 임계값 초과)
+        m.set_atr_state(atr=110.0, atr_ma=100.0, threshold=1.5,
+                        atr_pct=0.07, atr_pct_threshold=0.06)
+        assert m.get_atr_vol_multiplier() == 0.5
+
+    def test_atr_pct_below_threshold_no_trigger(self):
+        """atr_pct <= atr_pct_threshold이면 절댓값 경로 미작동."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=110.0, atr_ma=100.0, threshold=1.5,
+                        atr_pct=0.05, atr_pct_threshold=0.06)
+        assert m.get_atr_vol_multiplier() == 1.0
+
+    def test_atr_elevated_reduces_get_size_multiplier(self):
+        """ATR elevated 시 get_size_multiplier()도 min()으로 0.5 적용."""
+        m = DrawdownMonitor()
+        m.update(10000)  # peak=10000, no MDD
+        m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+        assert m.get_size_multiplier() == 0.5
+
+    def test_atr_status_field_reflects_multiplier(self):
+        """DrawdownStatus.atr_vol_multiplier 필드가 set_atr_state 결과와 일치."""
+        m = DrawdownMonitor()
+        m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+        status = m.update(10000)
+        assert status.atr_vol_multiplier == 0.5
+
+
+# ── set_sharpe_decay / Sharpe decay 필터 ────────────────────────
+
+class TestSharpDecayFilter:
+    """Cycle386 B(리스크): set_sharpe_decay + sharpe_decay_multiplier 단위 테스트."""
+
+    def test_normal_sharpe_returns_1x(self):
+        """OOS/IS 비율이 threshold 이상이면 sharpe_decay_multiplier=1.0."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 1.0
+
+    def test_decayed_sharpe_returns_05x(self):
+        """OOS/IS 비율이 threshold 미만이면 sharpe_decay_multiplier=0.5."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.3, historical_sharpe=1.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 0.5
+
+    def test_historical_sharpe_zero_no_decay(self):
+        """IS Sharpe=0이면 decay 판정 불가 → 1.0."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=-0.5, historical_sharpe=0.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 1.0
+
+    def test_historical_sharpe_negative_no_decay(self):
+        """IS Sharpe 음수이면 decay 판정 불가 → 1.0."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.1, historical_sharpe=-1.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 1.0
+
+    def test_exact_threshold_no_decay(self):
+        """OOS/IS 비율 == threshold이면 decay 아님 (< threshold 조건)."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.5, historical_sharpe=1.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 1.0
+
+    def test_sharpe_decay_reduces_size_multiplier(self):
+        """Sharpe decay 시 get_size_multiplier()도 min()으로 0.5 적용."""
+        m = DrawdownMonitor()
+        m.update(10000)
+        m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+        assert m.get_size_multiplier() == 0.5
+
+    def test_sharpe_decay_status_field(self):
+        """DrawdownStatus.sharpe_decay_multiplier 필드가 정확히 반영."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.1, historical_sharpe=1.0, threshold=0.50)
+        status = m.update(10000)
+        assert status.sharpe_decay_multiplier == 0.5
+
+    def test_sharpe_decay_serialization(self):
+        """to_dict/from_dict 후 sharpe_decay_multiplier 상태 보존."""
+        m = DrawdownMonitor()
+        m.set_sharpe_decay(recent_sharpe=0.1, historical_sharpe=1.0, threshold=0.50)
+        assert m.get_sharpe_decay_multiplier() == 0.5
+        m2 = DrawdownMonitor.from_dict(m.to_dict())
+        assert m2.get_sharpe_decay_multiplier() == 0.5

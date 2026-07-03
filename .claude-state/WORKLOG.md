@@ -1,3 +1,37 @@
+## [2026-07-03] Cycle 386 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor set_atr_state / set_sharpe_decay 단위 테스트 추가**
+1. `tests/test_drawdown_monitor.py`: 16개 테스트 추가 (총 110개)
+   - `TestAtrVolFilter` (8개): set_atr_state 기본 동작, elevated/normal, 경계값, zero atr_ma, atr_pct 절댓값 경로, get_size_multiplier 연동, DrawdownStatus 필드 반영
+   - `TestSharpDecayFilter` (8개): set_sharpe_decay 기본 동작, decay/normal, historical=0/음수, 경계값, get_size_multiplier 연동, status 필드, to_dict/from_dict 직렬화
+
+**[D(ML)] price_cluster n_bins=4 WFO 비교 분석**
+2. WalkForwardOptimizer로 n_bins=4/5/6 × bounce_pct=0.008/0.01 WFO 실행 (n_windows=8, is_ratio=0.778)
+   - 전체 결과: 8/8 FAIL (OOS trades 4-11 → Trades<15 구조적 제약)
+   - IS 선택 빈도: n_bins=4 = 3/8, n_bins=5 = 3/8, n_bins=6 = 2/8 (통계적 차이 없음)
+   - OOS Sharpe: 고분산(-15.52~8.92), 소표본(4-11 trades)으로 의미 없음
+   - **핵심 발견**: WFO compact window(333봉 OOS ≈ 14일)가 paper_sim(1440봉 ≈ 60일)보다 훨씬 짧아 trades 부족. n_bins는 trade frequency에 영향 없음
+   - **결론**: n_bins=4/5/6 IS 선택 빈도 동일. 구조적 제약은 bounce_pct(trade frequency) — n_bins 방향 종료
+
+**[F(리서치)] roc_ma_cross WFO IS-선택 파라미터 패턴 분석**
+3. WalkForwardOptimizer로 roc_ma_cross WFO IS 선택 분포 분석
+   - IS 선택 빈도: volume_filter=False(no filter) 5/8, vol_ratio_min=1.2 3/8
+   - IS 선택 시 Sharpe: no filter=0.00(5/5 windows), vol_ratio_min=1.2=0.19/3.11/1.55(더 높음)
+   - **핵심 발견**: IS optimizer가 vol_ratio_min=1.2 선택 시 더 높은 IS Sharpe(3.11) 달성 → 해당 윈도우에서 vol filter가 실제 edge 존재 확인
+   - WFO overall best_params: volume_filter=False (IS 빈도 기반) → paper_sim PASS 결과와 불일치
+   - **결론**: WFO compact window로는 vol_ratio_min 구분 불가 (14-day OOS, trades<15). 확정 파라미터(vol_ratio_min=1.2) 유지. 다음 방향: SL/TP 실험 (Trades 무영향)
+
+**시뮬레이션 결과 요약**
+
+| 지표 | Cycle 385 | Cycle 386 | 변화 |
+|------|-----------|-----------|------|
+| paper_sim roc_ma_cross Sharpe | 1.81 | **1.81** (유지) | — |
+| paper_sim roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** (유지) | — |
+| bundle_oos | 5/5 PASS | N/A (합성 데이터 — 거래소 연결 불가) | — |
+| test_drawdown_monitor 테스트 수 | 94개 | **110개** (+16) | +16 |
+
+---
+
 ## [2026-07-03] Cycle 385 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] test_price_cluster.py 테스트 보강 (n_bins=4)**
