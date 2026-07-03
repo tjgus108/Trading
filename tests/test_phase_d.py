@@ -12,7 +12,7 @@ import pytest
 
 from src.alpha.ensemble import MultiLLMEnsemble, EnsembleSignal
 from src.data.websocket_feed import BinanceWebSocketFeed, WebSocketDataAdapter, CandleBar
-from src.backtest.walk_forward import WalkForwardOptimizer, WalkForwardResult, optimize_ema_cross, optimize_dema_cross
+from src.backtest.walk_forward import WalkForwardOptimizer, WalkForwardResult, optimize_ema_cross, optimize_dema_cross, optimize_roc_ma_cross
 from src.ml.lstm_model import LSTMSignalGenerator
 
 
@@ -455,6 +455,29 @@ class TestWalkForwardOptimizer:
         assert hasattr(result, "strategy_name")
         assert hasattr(result, "best_params")
         assert hasattr(result, "avg_oos_sharpe")  # WalkForwardResult 필드명 확인
+
+    def test_optimize_roc_ma_cross_helper(self):
+        """optimize_roc_ma_cross 헬퍼 함수 — volume_filter+vol_ratio_min 그리드 WFO (Cycle390 A)."""
+        df = _make_df(400)
+        result = optimize_roc_ma_cross(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "roc_ma_cross"
+
+    def test_optimize_roc_ma_cross_single_window(self):
+        """optimize_roc_ma_cross — n_windows=1 엣지케이스 (Cycle390 A)."""
+        df = _make_df(300)
+        result = optimize_roc_ma_cross(df, n_windows=1)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "roc_ma_cross"
+
+    def test_optimize_roc_ma_cross_returns_result_fields(self):
+        """optimize_roc_ma_cross 결과 필드 존재 확인 (Cycle390 A)."""
+        df = _make_df(400)
+        result = optimize_roc_ma_cross(df, n_windows=2)
+        assert hasattr(result, "strategy_name")
+        assert hasattr(result, "best_params")
+        assert hasattr(result, "avg_oos_sharpe")
+        assert hasattr(result, "windows")
 
     def test_iter_param_combinations(self):
         """파라미터 조합 수 계산."""

@@ -243,6 +243,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   Sh=2.10, PF=1.52, Tr=51 — 전체 WFO 검증 필요 (Cycle389 D 실험)
     #   이전 filter=True 실험(Cycle354-357): bounce_pct=0.010, PF=1.20 FAIL
     #   신규 조합: bounce_pct=0.006 + filter=True — 미시험. 더 잦은 신호로 PF 개선 기대
+    # Cycle389 D(ML): vol_regime_filter=True+bounce_pct=0.006 전체 WFO: Sh=0.95, PF=1.33, Tr=34, 2/8 FAIL
+    #   방향 유효(baseline 대비 Sh+0.08, PF+0.13) — bounce_pct 하향 실험 예정
+    # Cycle390 C(데이터): bounce_pct=0.004 실험 결과 → WORSE (Sh=0.66↓-0.29, PF=1.27↓-0.06, Tr=27↓-7)
+    #   패턴 확인: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
+    #   bounce_pct 탐색 완전 종료: 0.010→0.008→0.006→0.004 전부 검증, 0.006 최적 확정
+    #   bounce_pct=0.006 복원. 새 개선 방향 필요 (다른 파라미터 또는 전략 전환 고려)
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 

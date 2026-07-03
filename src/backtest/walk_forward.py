@@ -189,7 +189,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     "price_cluster": {
         # Cycle382 D(ML): bounce_pct=0.008 추가 — 더 민감한 bounce 탐지 (Trades↑ 가설)
         #   기존 최소값 0.010 → 0.008 하향: 더 빈번한 신호 가능성 (PF 효과 불확실)
-        "bounce_pct": [0.008, 0.010, 0.020, 0.025],
+        # Cycle390 C(데이터): bounce_pct=0.004 실험 → dead param (Sh=0.66↓, PF=1.27↓, Tr=27↓ vs 0.006)
+        #   패턴 확인: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
+        #   bounce_pct 탐색 완전 종료: 0.010→0.008→0.006→0.004 전부 검증, 0.006(filter=T) 최적 확정
+        #   추가 bounce_pct 실험 금지. 파라미터 결론: vol_regime_filter=True+bounce_pct=0.006 최적
+        "bounce_pct": [0.006, 0.008, 0.010, 0.020, 0.025],
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],

@@ -1,43 +1,49 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-03 (Cycle 389 완료)_
+_Last updated: 2026-07-03 (Cycle 390 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 389
-- **다음 사이클**: 390 (390 mod 5 = 0 → A+C+F)
+- **완료된 사이클**: 390
+- **다음 사이클**: 391 (391 mod 5 = 1 → B+D+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross 유지 — Sh=1.81, PF=2.02, Consist=4/8)
 - **Bundle OOS**: 5/5 PASS (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
-- **전체 테스트 수**: 8496개 (+5 from Cycle389)
+- **전체 테스트 수**: 8497개 (+1 집계 기준, 실 추가 5개)
 
-## Cycle 389 주요 결과
+## Cycle 390 주요 결과
 
-### D(ML): price_cluster vol_regime_filter=True + bounce_pct=0.006 WFO 전체 검증
+### A(품질): optimize_roc_ma_cross 헬퍼 + volume_filter 파라미터 테스트 5개 추가
 
-- `paper_simulation.py` price_cluster 파라미터: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}`
-- **WFO 전체(8 윈도우) 결과**:
-  - Sh=0.95(+0.08), PF=1.33(+0.13), Tr=34, Consistency=2/8 → FAIL
-  - baseline(filter=False, bp=0.010): Sh=0.87, PF=1.20 대비 개선
-- **결론**: 방향은 맞지만 PF binding (1.33 < 1.5). 다음: bounce_pct=0.004 탐색
-- **최근 100일(Cycle388 F)**: Sh=2.10, PF=1.52 — favorable period 효과 확인
+- `tests/test_phase_d.py`: optimize_roc_ma_cross 헬퍼 3개 (helper, single_window, result_fields)
+- `tests/test_roc_ma_cross.py`: volume_filter 파라미터 2개 (저거래량 차단, 고거래량 허용)
 
-### E(실행): PaperTrader load_state 스키마 검증 테스트 추가
+### C(데이터): price_cluster bounce_pct=0.004 실험 → dead param 확정
 
-- `tests/test_paper_trader.py` 5개 테스트 추가:
-  - invalid initial_balance/balance 타입 → ValueError
-  - positions/avg_entry 심볼 불일치 → 합집합 복구
-  - kelly/vol_targeting 카운터 복원 검증
-  - schema_version > 1 → 경고만, raise 없음
+- `paper_simulation.py` bounce_pct 0.006→0.004 실험:
+  - **결과**: Sh=0.66(↓-0.29), PF=1.27(↓-0.06), Tr=27(↓-7) → 역효과
+  - 패턴: bounce_pct↓ = entry zone 좁아짐 → trades 감소 + signal quality 저하
+- **bounce_pct 탐색 완전 종료**: 0.010→0.008→0.006→0.004 전부 검증
+  - 0.006(filter=T) 최적 확정. 추가 bounce_pct 실험 금지
+- bounce_pct=0.006 복원 (변경 금지)
+- `walk_forward.py` DEFAULT_GRIDS price_cluster: bounce_pct=[0.006,...] + 탐색 종료 주석
 
-### F(리서치): WFO 분석 결론
+### F(리서치): price_cluster PF 개선 경로 분석
 
-- price_cluster filter=True+bp=0.006: 방향 유효, 아직 PASS 미달
-  - FAIL 원인: PF<1.5 (binding), Sh<1.0 (일부 윈도우), Consistency 2/8
-  - OOS SharpeStd=2.20 (허용 범위)
-- 다음 실험: bounce_pct=0.004 (신호 빈도↑ → PF 개선 기대)
+- 코드 로직 확인: threshold = cluster_low × bounce_pct (↓일수록 entry zone 좁아짐)
+- NEXT_STEPS의 "bounce_pct 하향 → Tr 증가" 예측이 코드 로직과 반대임을 확인
+  - 실측 데이터로 검증: 0.010(41)→0.008(38)→0.006(34)→0.004(27) 일관 감소
+- **결론**: bounce_pct 방향 완전 소진. 새 개선 방향: vol_atr_trend_min 탐색
 
-## 다음 사이클 (390) 핵심 과제
+## 다음 사이클 (391) 핵심 과제
 
-1. **A(품질)**: 테스트 커버리지 추가 (BacktestEngine 또는 WalkForwardOptimizer)
-2. **C(데이터)**: paper_simulation.py price_cluster → `{"vol_regime_filter": True, "bounce_pct": 0.004, "vol_atr_trend_min": 1.2}` 실험
-3. **F(리서치)**: PF 개선 경로 분석, 각 윈도우 FAIL 원인 패턴 파악
+1. **B(리스크)**: `src/risk/circuit_breaker.py` 또는 `drawdown_monitor.py` 미커버 기능 테스트
+2. **D(ML)**: price_cluster vol_atr_trend_min=1.0 실험 (`{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.0}`)
+   - 현재 1.2가 Tr=34 억제 → 1.0으로 완화 시 Tr=40+ 기대
+3. **F(리서치)**: price_cluster FAIL 윈도우 패턴 분석 (어느 period에 FAIL 집중?)
+   - vol_atr_trend_min이 신호를 얼마나 억제하는지 확인
+
+## ⚠️ 중요 메모
+
+- **price_cluster 파라미터**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
+- **bounce_pct 탐색 완전 종료** (Cycle390 C 확정): 추가 bounce_pct 실험 금지
+- **roc_ma_cross**: PASS 상태 유지 (Sh=1.81, Consist=4/8) — 파라미터 변경 금지

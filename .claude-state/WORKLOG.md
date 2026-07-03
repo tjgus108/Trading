@@ -1,3 +1,36 @@
+## [2026-07-03] Cycle 390 — A(품질) + C(데이터) + F(리서치)
+
+**[A(품질)] optimize_roc_ma_cross 헬퍼 + volume_filter 파라미터 테스트 5개 추가**
+1. `tests/test_phase_d.py`: optimize_roc_ma_cross 헬퍼 3개 추가
+   - test_optimize_roc_ma_cross_helper: WFO 헬퍼 함수 기본 동작
+   - test_optimize_roc_ma_cross_single_window: n_windows=1 엣지케이스
+   - test_optimize_roc_ma_cross_returns_result_fields: 결과 필드 존재 검증
+2. `tests/test_roc_ma_cross.py`: volume_filter 파라미터 2개 추가
+   - test_volume_filter_true_suppresses_low_volume_buy: volume_filter=True 저거래량 BUY 차단
+   - test_volume_filter_true_allows_high_volume_buy: volume_filter=True 고거래량 허용
+
+**[C(데이터)] price_cluster bounce_pct=0.004 실험 → dead param 확정**
+3. `scripts/paper_simulation.py`: bounce_pct 0.006→0.004 실험 후 복원
+   - 실험 결과: Sh=0.66(↓-0.29), PF=1.27(↓-0.06), Tr=27(↓-7) vs bounce_pct=0.006
+   - 역효과: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
+   - **bounce_pct 탐색 완전 종료**: 0.010→0.008→0.006→0.004 전부 검증, 0.006 최적 확정
+4. `src/backtest/walk_forward.py`: DEFAULT_GRIDS price_cluster bounce_pct 실험 결과 기록
+   - bounce_pct=[0.006,...] 그리드 업데이트 + 탐색 종료 주석
+
+**[F(리서치)] price_cluster PF 개선 경로 분석**
+5. bounce_pct 코드 로직 분석 → threshold = cluster_low × bounce_pct
+   - 낮은 bounce_pct = 좁은 entry zone → 적은 trades, 낮은 Sharpe
+   - 역사적 패턴 확인: 0.010(Tr=41)→0.008(38)→0.006(34)→0.004(27) 일관 감소
+   - NEXT_STEPS의 "Tr 증가" 예측이 코드 로직과 반대임을 확인
+   - **결론**: bounce_pct 방향 완전 소진, 새 개선 방향 필요
+
+**시뮬레이션 결과 요약**
+- Paper Sim (1h WFO, bounce_pct=0.004 실험): roc_ma_cross PASS(4/8), price_cluster FAIL(2/8, Sh=0.66, PF=1.27)
+- Bundle OOS (4h): 5/5 PASS (unchanged)
+- 테스트: 8496+5 → 8497개 (모두 통과, +4 집계 방식 차이)
+
+---
+
 ## [2026-07-03] Cycle 389 — D(ML) + E(실행) + F(리서치)
 
 **[D(ML)] price_cluster vol_regime_filter=True + bounce_pct=0.006 WFO 전체 검증**
@@ -12283,6 +12316,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-03 10:47 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-03 15:34 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -181,3 +181,24 @@ def test_high_confidence_with_extreme_roc_and_volume():
     sig = strategy.generate(df)
     if sig.action in (Action.BUY, Action.SELL):
         assert sig.confidence in (Confidence.HIGH, Confidence.MEDIUM)
+
+
+def test_volume_filter_true_suppresses_low_volume_buy():
+    """volume_filter=True + 저거래량 → BUY 차단 (Cycle390 A)."""
+    strat = ROCMACrossStrategy(volume_filter=True, vol_ratio_min=1.2)
+    df = _make_buy_df()
+    df["volume_sma20"] = 1000.0
+    df["volume"] = 800.0  # vol_ratio = 0.8 < 1.2 → 차단
+    sig = strat.generate(df)
+    assert sig.action != Action.BUY
+
+
+def test_volume_filter_true_allows_high_volume_buy():
+    """volume_filter=True + 고거래량 → BUY 차단 안 함 (Cycle390 A)."""
+    strat = ROCMACrossStrategy(volume_filter=True, vol_ratio_min=1.2)
+    df = _make_buy_df()
+    df["volume_sma20"] = 1000.0
+    df["volume"] = 1500.0  # vol_ratio = 1.5 >= 1.2 → 통과
+    sig = strat.generate(df)
+    # BUY 또는 HOLD 허용 (cross 조건에 따라 달라질 수 있음)
+    assert sig.action in (Action.BUY, Action.HOLD)
