@@ -197,6 +197,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],
+        # Cycle391 D(ML): vol_atr_trend_min=1.0 실험 → dead param (Sh=-0.93↓, PF=0.91↓, Tr=22↓)
+        #   원인: 낮은 임계값=더 강한 필터링=더 적은 거래 (방향 오인)
+        #   완화(=Trades↑) 방향: 임계값을 올려야 함 (1.5+ 시도 필요)
+        #   결론: 1.0 하향 방향 종료. 1.2 현재 최적. 다음: 1.5 상향 실험 (Cycle392 D 예정)
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
         # Cycle380 C(데이터): confirmation_bars 탐색 — bounce 후 N봉 확인 (0=즉시)
         # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓

@@ -1343,3 +1343,47 @@ class TestSharpDecayFilter:
         assert m.get_sharpe_decay_multiplier() == 0.5
         m2 = DrawdownMonitor.from_dict(m.to_dict())
         assert m2.get_sharpe_decay_multiplier() == 0.5
+
+
+# ── set_regime HIGH_VOL / RANGING 매크로 중립 테스트 (Cycle391 B) ──
+def test_set_regime_high_vol_tightens_daily_limit():
+    """HIGH_VOL 레짐 설정 시 일일 DD 한도가 _high_vol_daily_limit(2%)으로 강화된다."""
+    m = DrawdownMonitor(daily_limit=0.03, max_drawdown_pct=0.30)
+    m.set_daily_start(10000)
+    m.set_weekly_start(10000)
+    m.set_monthly_start(10000)
+
+    # 일일 낙폭 2% — 기본 daily_limit(3%) 미달이므로 halt 없음
+    status1 = m.update(9800)
+    assert status1.halted is False, "기본 레짐: 2% dd < 3% limit → halt 없음"
+
+    # HIGH_VOL 레짐 설정: _high_vol_daily_limit=0.02 적용
+    m.set_regime("HIGH_VOL")
+    m.set_daily_start(10000)   # daily 기준 리셋 (WARNING 해제 후 재측정)
+    m._halted = False          # 이전 halt 상태 초기화
+
+    status2 = m.update(9800)
+    assert status2.halted is True, "HIGH_VOL 레짐: 2% dd >= 2% high_vol_limit → halt"
+    assert status2.alert_level == AlertLevel.WARNING
+
+
+def test_set_ranging_macro_neutral_cooldown_multiplier():
+    """set_ranging_macro_neutral()이 RANGING 레짐 cooldown 배수를 올바르게 설정한다."""
+    m = DrawdownMonitor()
+
+    # 레짐 미설정 시 기본 배수 1.0
+    assert m._regime_cooldown_multiplier() == 1.0
+
+    # RANGING 레짐: 매크로 정보 없음 → 기본 RANGING 배수 1.2
+    m.set_regime("RANGING")
+    assert m._regime_cooldown_multiplier() == 1.2
+
+    # neutral macro (|slope| ≤ threshold) → 0.9x (mean-reversion 유리)
+    m.set_ranging_macro_neutral(ema50_slope=0.0001, threshold=0.0005)
+    assert m._ranging_macro_neutral is True
+    assert m._regime_cooldown_multiplier() == 0.9
+
+    # directional macro (|slope| > threshold) → 1.5x (mean-reversion 불리)
+    m.set_ranging_macro_neutral(ema50_slope=0.0010, threshold=0.0005)
+    assert m._ranging_macro_neutral is False
+    assert m._regime_cooldown_multiplier() == 1.5

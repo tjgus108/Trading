@@ -249,6 +249,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   패턴 확인: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
     #   bounce_pct 탐색 완전 종료: 0.010→0.008→0.006→0.004 전부 검증, 0.006 최적 확정
     #   bounce_pct=0.006 복원. 새 개선 방향 필요 (다른 파라미터 또는 전략 전환 고려)
+    # Cycle391 D(ML): vol_atr_trend_min=1.0 실험 → dead param (완전 실패)
+    #   결과: Sh=-0.93(↓-1.88), PF=0.91(↓-0.42), Tr=22(↓-12), 0/8 FAIL
+    #   원인 분석: 낮은 임계값=더 강한 필터링=더 적은 거래 (방향 오인)
+    #   vol_atr_trend_min이 낮을수록 ATR/ATR_MA > threshold 조건 충족이 쉬워져 MORE 신호 차단
+    #   완화(=Trades↑) 방향: vol_atr_trend_min을 올려야 함 (1.5+ 시도 필요)
+    #   결론: 1.0 하향 방향 종료. 1.2 유지. 다음: 1.5 상향 실험 (덜 필터링 → Tr↑ 기대)
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 
