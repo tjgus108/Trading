@@ -949,3 +949,62 @@ def test_min_hold_bars_stored_in_engine():
     """BacktestEngine이 min_hold_bars를 올바르게 저장해야 함."""
     engine = BacktestEngine(min_hold_bars=4)
     assert engine.min_hold_bars == 4
+
+
+# Cycle388 A(품질): consec_loss_scale_threshold 2단계 스케일링 테스트
+
+def test_consec_loss_scale_threshold_zero_no_scaling():
+    """threshold=0(기본값)이면 손실 스케일링이 전혀 발생하지 않아야 함."""
+    df = make_df(n=200, close_trend=-0.005)  # 하락 추세 → BUY 손실 반복
+    engine = BacktestEngine(
+        commission=0.0, slippage=0.0,
+        atr_multiplier_sl=0.5, atr_multiplier_tp=2.0,
+        consec_loss_scale_threshold=0,
+    )
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert result.loss_scale_half_count == 0, (
+        f"threshold=0 → half_count=0 기대: {result.loss_scale_half_count}"
+    )
+    assert result.loss_scale_full_count == 0, (
+        f"threshold=0 → full_count=0 기대: {result.loss_scale_full_count}"
+    )
+
+
+def test_consec_loss_scale_half_threshold_triggers():
+    """threshold=4이면 2회 연속 손실 후(half_thresh=2) 0.75 스케일 적용이 발생해야 함."""
+    df = make_df(n=300, close_trend=-0.005)  # 하락 → BUY 손실 반복
+    engine = BacktestEngine(
+        commission=0.0, slippage=0.0,
+        atr_multiplier_sl=0.5, atr_multiplier_tp=2.0,
+        consec_loss_scale_threshold=4,
+    )
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert result.loss_scale_half_count > 0, (
+        f"threshold=4, 반복손실 → loss_scale_half_count > 0 기대: {result.loss_scale_half_count}"
+    )
+
+
+def test_consec_loss_scale_full_threshold_triggers():
+    """threshold=4이면 4회 연속 손실 후 0.50 스케일 적용이 발생해야 함."""
+    df = make_df(n=400, close_trend=-0.005)  # 하락 → BUY 손실 반복
+    engine = BacktestEngine(
+        commission=0.0, slippage=0.0,
+        atr_multiplier_sl=0.5, atr_multiplier_tp=2.0,
+        consec_loss_scale_threshold=4,
+    )
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert result.loss_scale_full_count > 0, (
+        f"threshold=4, 반복손실 → loss_scale_full_count > 0 기대: {result.loss_scale_full_count}"
+    )
+
+
+def test_consec_loss_scale_threshold_stored_in_engine():
+    """BacktestEngine이 consec_loss_scale_threshold를 올바르게 저장해야 함."""
+    engine = BacktestEngine(consec_loss_scale_threshold=5)
+    assert engine.consec_loss_scale_threshold == 5
+
+
+def test_consec_loss_scale_threshold_negative_clamped_to_zero():
+    """음수 threshold는 0으로 고정되어야 함."""
+    engine = BacktestEngine(consec_loss_scale_threshold=-3)
+    assert engine.consec_loss_scale_threshold == 0

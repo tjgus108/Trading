@@ -1,50 +1,59 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 387 완료)_
+_Last updated: 2026-07-03 (Cycle 388 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 387
+### 이번 세션 완료 사이클: 388
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 385 | A+C+F | n_bins=4 테스트 추가, FAIL 윈도우 분석(vol_ratio 0.89-0.97 낮음), atr_expand_filter dead param |
 | 386 | B+D+F | set_atr_state/set_sharpe_decay 테스트 16개(110개 총), n_bins WFO(4=5=6 동등), roc_ma_cross IS-선택 vol_ratio_min=1.2 edge 재확인 |
 | 387 | C+E+F | bounce_pct=0.006 실험(Sh=0.77 FAIL, PF<1.5/MDD>20% binding), connector is_halted 테스트 4개(30개 총), roc_ma_cross SL/TP 전 조합 FAIL |
+| 388 | A+B+F | consec_loss_scale 테스트 5개, KellySizer Bayesian shrinkage 테스트 4개(+9 총계 8491), **vol_regime_filter=T+bp=0.006 PASS 발견** (최근 100일 한정) |
 
-### 🎯 Cycle 388 작업 방향 (388 mod 5 = 3 → A(품질) + B(리스크) + F(리서치))
+### 🎯 Cycle 389 작업 방향 (389 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### A(품질): BacktestEngine 또는 paper_trader 테스트 추가
+#### D(ML): price_cluster vol_regime_filter=True+bounce_pct=0.006 WFO 전체 검증
 
-- **배경**: connector 테스트 강화 완료(Cycle387 E). A(품질) 카테고리 차례
-- **작업 방향**: `src/backtest/engine.py` 또는 `src/exchange/paper_trader.py` 미커버 기능 확인
-  - BacktestEngine `min_hold_bars`, `consec_loss_scale_threshold` 등 Cycle298/331 기능 테스트
-  - 누락된 엣지 케이스 추가
+- **배경**: Cycle388 F 발견 — vol_regime_filter=True + bounce_pct=0.006 최근 100일에서 PASS (Sh=2.10, PF=1.52)
+  - 이전 실험들은 bounce_pct=0.010+filter=True 조합 (PF=1.20 FAIL)
+  - **신규 조합**: bounce_pct=0.006 + filter=True — 미시험 조합
+- **작업 방향**: `paper_simulation.py` PAPER_SIM_STRATEGY_PARAMS price_cluster 업데이트 + 실행
+  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}`
+  - 결과에 따라: PASS 확인 시 확정; FAIL 시 bounce_pct 조정(0.008 etc.) 또는 복원
 
-#### B(리스크): KellySizer 또는 CircuitBreaker 단위 테스트
+#### E(실행): paper_trader 또는 connector 추가 테스트
 
-- **배경**: DrawdownMonitor 커버리지 완성(Cycle386 B, 110개). 다음은 KellySizer/CircuitBreaker
-- **작업 방향**: `tests/test_kelly_sizer*.py` 또는 `tests/test_circuit_breaker.py` 검토
-  - KellySizer MIN_TRADES_FOR_KELLY=15, Bayesian shrinkage, regime scaling 경계값 테스트
-  - 혹은 CircuitBreaker 이상 감지 로직 테스트
+- **배경**: connector 테스트 30개 완료(Cycle387). 다음은 PaperTrader 또는 실행 로직
+- **작업 방향**: `src/exchange/paper_trader.py` 미커버 기능 확인
+  - PaperTrader slippage 적용, position tracking 테스트
 
-#### F(리서치): price_cluster vol_regime_filter=True 실험
+#### F(리서치): price_cluster vol_regime_filter WFO 결과 분석 → 다음 방향 도출
 
-- **배경**: Cycle387 C bounce_pct 탐색 한계 — bounce_pct=0.006이 최고 Sh=0.77(FAIL)
-  - 전체 데이터 결과: PF<1.5(1.17), MDD>20%(28.7%) 동시 개선 불가
-- **작업 방향**: `vol_regime_filter=True` 실험 (고변동성 기간 신호 억제)
-  - 현재: vol_regime_filter=False (기본값)
-  - 근거: ATR 기반 high-volatility 레짐에서 신호 차단 → noise↓, MDD↓, PF↑ 기대
-  - 비교: bounce_pct=0.006/0.008 × vol_regime_filter=False/True × vol_atr_trend_min=1.0/1.2
-  - 주의: Trades↓ 가능성 (paper_sim avg=41 trades로 여유 있음)
+- **배경**: Cycle388 F 발견이 유효한지 WFO 8개 윈도우로 검증 필요
+  - 최근 100일 favorable period 가능성 존재 (roc_ma_cross도 최근 favorable)
+  - WFO consistency ≥ 4/8이면 확정, < 4/8이면 방향 종료
+
+### ⚠️ 주의 사항 (Cycle 389 이후)
+
+- **vol_regime_filter=True+bounce_pct=0.006 PASS 발견** (Cycle388 F): 최근 100일 한정
+  - Sh=2.10, PF=1.52, Tr=51 — PF 기준(1.5) 간신히 통과
+  - 전체 WFO 검증 필수: Cycle389 D에서 paper_simulation.py 실행
+  - 이전 filter=True 실험들 (Cycle354-357)은 bounce_pct=0.010에서 PF=1.20 FAIL
+  - **신규 조합(bp=0.006+filter=T)은 미검증 — 유망 방향**
+- **consec_loss_scale_threshold 테스트 완료** (Cycle388 A): BacktestEngine 2단계 스케일링 커버리지
+  - loss_scale_half_count(0.75x) / loss_scale_full_count(0.50x) 직접 검증
+- **KellySizer Bayesian shrinkage 경계값 테스트 완료** (Cycle388 B): MIN_TRADES_FOR_KELLY=15
+  - n<15: shrinkage ON, n≥15: raw win_rate 직접 사용 확인
 
 ### ⚠️ 주의 사항 (Cycle 388 이후)
 
-- **bounce_pct 탐색 한계 도달** (Cycle387 C): bounce_pct=0.006이 최고(Sh=0.77) — PASS 불가
+- **bounce_pct 탐색 한계 도달** (Cycle387 C): bounce_pct=0.006이 최고(Sh=0.77) — 단독 PASS 불가
   - PF<1.5(1.17)와 MDD>20%(28.7%) 동시 binding constraint
-  - 다음 C/D 방향: vol_regime_filter=True (고변동성 제거 → PF↑, MDD↓ 기대)
+  - **새 경로**: vol_regime_filter=True + bounce_pct=0.006 조합 (Cycle388 F 발견)
 - **roc_ma_cross SL/TP 탐색 종료** (Cycle387 F): 전 조합 FAIL
   - sl=1.2가 최고 Sh(0.28), sl=2.0이 유일 MDD<20%(19.8%) 달성
   - 전체 데이터셋 Sh=-0.17 (baseline) — regime-dependent 전략 한계 확인
@@ -169,21 +178,28 @@ _Last updated: 2026-07-03 (Cycle 387 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 385 업데이트)
+### 핵심 메트릭 (Cycle 388 업데이트)
 
-| 지표 | Cycle 384 | Cycle 385 | 변화 |
+| 지표 | Cycle 387 | Cycle 388 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
 | 1h BTC price_cluster Sharpe | 0.87 | **0.87** | 유지 |
-| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** (ATR filter 실험→복원) | 유지 |
-| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** (복원) | 유지 |
+| 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
-| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** (atr_expand dead param) | 유지 |
+| 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8459 | **8462** (+3 price_cluster 테스트) | +3 |
+| 테스트 수 | 8482개 | **8491개** (+9) | +9 |
+
+### Cycle 388 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_backtest_engine.py` | consec_loss_scale_threshold 5개 테스트 추가 (Cycle388 A): threshold=0 미발생, half/full 스케일 트리거, 저장 검증, 음수 클램핑 |
+| `tests/test_kelly_sizer_regime_edge_cases.py` | TestKellySizerBayesianShrinkage 4개 테스트 추가 (Cycle388 B): MIN_TRADES=15 경계 shrinkage, empty 반환, 공식 검증 |
 
 ### Cycle 385 코드 변경 요약
 
