@@ -202,7 +202,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   원인: 임계값 낮춤 → 추세 억제 더 쉬워짐 → Trades 34→22 급감 → Sharpe 분산 증가
         #   vol_atr_trend_min 탐색 완전 종료: 1.0(dead), 1.2(최적), 1.5/2.0/2.5(Cycle355 이전 탐색)
         #   → vol_atr_trend_min=1.2 확정 불변. 추가 실험 금지.
-        #   다음 방향: close_window=60 탐색 (현재 50, 60은 그리드에 이미 있음 — WFO IS 선택 빈도 분석)
+        # Cycle392 D(ML): close_window=60 실험 → DEAD PARAM 확정 (2026-07-04)
+        #   결과(60): Sh=0.55(↓-0.40!), PF=1.22(↓-0.11), Tr=30(↓-4), Consistency=1/8(↓1)
+        #   원인: 긴 window → 오래된 가격 클러스터에 포함 → bounce 타이밍 지연 → 수익성 하락
+        #   close_window 탐색 완전 종료: 40(Cycle360: 대폭 악화), 50(최적), 60(역효과)
+        #   → close_window=50 확정 불변. 추가 실험 금지.
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
         # Cycle380 C(데이터): confirmation_bars 탐색 — bounce 후 N봉 확인 (0=즉시)
         # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓

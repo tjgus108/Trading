@@ -792,6 +792,33 @@ def test_reset_weekly_does_not_clear_force_liquidate():
     assert m.alert_level() == AlertLevel.FORCE_LIQUIDATE
 
 
+def test_reset_weekly_does_not_clear_warning():
+    """reset_weekly()는 WARNING 레벨을 해제하지 않는다 (reset_daily()만 해제)."""
+    m = DrawdownMonitor(daily_limit=0.05)
+    m.set_daily_start(10000)
+    m.update(9400)  # 6% 일일 낙폭 → WARNING
+    assert m.alert_level() == AlertLevel.WARNING
+
+    m.reset_weekly(9400)
+    assert m.is_halted() is True
+    assert m.alert_level() == AlertLevel.WARNING
+
+
+def test_set_regime_high_vol_tightens_daily_limit():
+    """HIGH_VOL 레짐 설정 시 일일 DD 한도가 2%로 강화된다."""
+    # 기본 daily_limit=0.03 — 2% 손실은 WARNING 미발생
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    m.update(9800)  # 2% 일일 낙폭
+    assert m.alert_level() == AlertLevel.NONE
+
+    # HIGH_VOL 전환 후 동일 2% 손실 → _high_vol_daily_limit=0.02 → WARNING 발생
+    m.reset_daily(10000)
+    m.set_regime("HIGH_VOL")
+    m.update(9800)  # 2% 일일 낙폭 ≥ 2% 한도
+    assert m.alert_level() == AlertLevel.WARNING
+
+
 def test_reset_monthly_updates_start_only():
     """reset_monthly()는 monthly_start만 갱신, FORCE_LIQUIDATE는 유지."""
     m = DrawdownMonitor(monthly_limit=0.10)

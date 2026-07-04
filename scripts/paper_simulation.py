@@ -255,6 +255,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #         trades 감소 → Sharpe 분산 증가 → 일부 윈도우 Sh=-4.95 극단값 발생
     #   vol_atr_trend_min 탐색 완전 종료: 1.0(dead), 1.2(최적), 1.5(Cycle355: 효과없음)
     #   → vol_atr_trend_min=1.2 확정 불변. 추가 실험 금지
+    # Cycle392 D(ML): close_window=60 실험 → DEAD PARAM (2026-07-04)
+    #   baseline(50): Sh=0.95, PF=1.33, Tr=34, Consistency=2/8
+    #   결과(60): Sh=0.55(↓-0.40!), PF=1.22(↓-0.11), Tr=30(↓-4), Consistency=1/8(↓1)
+    #   원인: 긴 window → 클러스터 추정 시 오래된 가격 반영 → bounce 타이밍 지연 → PF/Sharpe 하락
+    #   close_window 탐색 완전 종료: 40(Cycle360: 대폭 악화), 50(최적), 60(역효과)
+    #   → close_window=50 확정 불변. 추가 실험 금지
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 

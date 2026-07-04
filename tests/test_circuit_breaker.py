@@ -803,3 +803,32 @@ def test_rapid_decline_and_atr_surge_combined():
     # rapid_decline이 ATR surge보다 우선 처리되어 triggered=True
     assert result["triggered"] is True
     assert "급속" in result["reason"]
+
+
+def test_rapid_decline_oldest_price_exits_window():
+    """슬라이딩 윈도우에서 peak 가격이 만료되면 급속 하락이 더 이상 감지되지 않는다.
+
+    window=3, cooldown_periods=0(즉시 재평가): 3개 가격 [100, 95, 95]로 5% 하락 감지.
+    4번째 가격 추가 → 100이 deque에서 빠짐 → [95, 95, 97] → 하락 없음.
+    """
+    cb = CircuitBreaker(
+        rapid_decline_pct=0.05,
+        rapid_decline_window=3,
+        rapid_decline_cooldown_periods=0,
+        daily_drawdown_limit=0.99,
+        total_drawdown_limit=0.99,
+    )
+    cb.record_price(100.0)
+    cb.record_price(95.0)
+    cb.record_price(95.0)
+    # oldest=100, newest=95, decline=5% ≥ 5% → triggered
+    r1 = cb.check(10000, 10000, 10000)
+    assert r1["triggered"] is True
+    assert "급속" in r1["reason"]
+
+    # 4번째 가격 추가: deque → [95, 95, 97] (100 만료)
+    # cooldown_periods=0이므로 즉시 재평가: oldest=95, newest=97 → decline 음수 → 미감지
+    cb.record_price(97.0)
+    r2 = cb.check(10000, 10000, 10000)
+    assert r2["triggered"] is False
+    assert r2["size_multiplier"] == 1.0

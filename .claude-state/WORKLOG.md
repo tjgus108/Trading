@@ -1,3 +1,37 @@
+## [2026-07-04] Cycle 392 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] CircuitBreaker recovery_window 경계값 + DrawdownMonitor set_regime/reset_weekly 테스트 3개 추가**
+1. `tests/test_circuit_breaker.py`: rapid_decline_oldest_price_exits_window 추가
+   - 슬라이딩 윈도우에서 peak 가격 만료 시 급속 하락 감지 해제 경계값 검증
+   - window=3, cooldown_periods=0: [100,95,95] → triggered, 4번째 97 추가 → [95,95,97] → no trigger
+2. `tests/test_drawdown_monitor.py`: reset_weekly_does_not_clear_warning 추가
+   - reset_weekly()는 WARNING 미해제 (reset_daily()만 해제) 경계값 검증
+3. `tests/test_drawdown_monitor.py`: set_regime_high_vol_tightens_daily_limit 추가
+   - HIGH_VOL 레짐 설정 시 일일 한도 3%→2% 강화 → 동일 손실(2%)에 WARNING 트리거
+
+**[D(ML)] price_cluster close_window=60 실험 → DEAD PARAM 확정**
+4. `scripts/paper_simulation.py`: close_window 50→60 실험 후 복원
+   - **실험 결과**: Sh=0.55(↓-0.40!), PF=1.22(↓-0.11), Tr=30(↓-4), Consistency=1/8(↓1)
+   - 원인: 긴 window → 오래된 가격이 클러스터에 포함 → bounce 타이밍 지연 → 수익성 하락
+   - **close_window 탐색 완전 종료**: 40(Cycle360 대폭 악화), 50(최적), 60(역효과) 모두 검증
+   - close_window=50 확정 불변, 추가 실험 금지
+5. `src/backtest/walk_forward.py`: close_window=60 dead param 주석 추가
+
+**[F(리서치)] price_cluster 남은 개선 방향 재평가**
+- **결론**: 현재 알려진 모든 파라미터 방향 소진
+  - bounce_pct(완료, 0.006 최적), vol_atr_trend_min(완료, 1.2), close_window(완료, 50), n_bins(완료, 5)
+  - dead params: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, confirmation_bars=1
+  - 미검증 옵션: confirmation_bars=2, atr_bounce_factor (혼재 결과)
+- 다음 방향: confirmation_bars=2 또는 atr_bounce_factor 체계적 탐색
+
+**시뮬레이션 결과 요약**
+- Paper Sim (1h WFO, close_window=60 실험): roc_ma_cross PASS(4/8, Sh=1.81), price_cluster FAIL(1/8, Sh=0.55)
+- Paper Sim (복원 후): price_cluster FAIL(2/8, Sh=0.95, PF=1.33) — 기존 최적 유지
+- Bundle OOS (4h): 5/5 PASS (maintained, 실거래소 SSL 차단 → synthetic fallback → 보고서 덮어쓰기 방지)
+- 테스트: 8502+7 → **8509개** (all pass, +3 신규 테스트 확인됨)
+
+---
+
 ## [2026-07-04] Cycle 391 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] CircuitBreaker max_daily_trades + DrawdownMonitor set_ranging_macro_neutral 테스트 5개 추가**
@@ -12535,6 +12569,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 05:12 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
