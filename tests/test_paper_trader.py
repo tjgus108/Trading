@@ -2021,3 +2021,37 @@ def test_load_state_schema_version_gt1_no_raise():
     }
     pt.load_state(state)  # should not raise
     assert pt.account.balance == 8000.0
+
+
+# ── Cycle394 E(실행): 미커버 edge case 테스트 ─────────────────────────────────
+
+def test_execution_summary_single_trade_avg_fill_time_zero():
+    """거래 1건만 있을 때 avg_fill_time이 0.0 (len<2 → 구간 없음)."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert summary["total_trades"] == 1
+    assert summary["avg_fill_time"] == 0.0
+
+
+def test_tiered_slippage_large_order_small_cap_higher_than_large_cap():
+    """소형 심볼 대형 주문은 대형 심볼 대형 주문보다 slippage_bps 절댓값이 더 큼.
+
+    소형(SHIB): tier='small' → base_slip=1.0%
+    대형(BTC):  tier='large' → base_slip=0.05%
+    동일 주문 크기($40k notional) → volume_impact 동일 → 소형 slippage >> 대형
+    """
+    pt = PaperTrader(initial_balance=10_000_000.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, fee_rate=0.0,
+                     use_tiered_slippage=True)
+    # $40k notional → volume_impact = (40000/10000)^0.5 = 2.0
+    r_btc = pt.execute_signal("BTC/USDT", "BUY", price=40000.0, quantity=1.0,
+                              strategy="s", confidence="H")
+    r_shib = pt.execute_signal("SHIB/USDT", "BUY", price=0.00001, quantity=4_000_000_000.0,
+                               strategy="s", confidence="H")
+    assert r_btc["status"] == "filled"
+    assert r_shib["status"] == "filled"
+    # 소형 심볼이 훨씬 높은 slippage를 가져야 함
+    assert abs(r_shib["slippage_bps"]) > abs(r_btc["slippage_bps"])

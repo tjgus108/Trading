@@ -1,48 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-07-04 (Cycle 393 완료)_
+_Last updated: 2026-07-04 (Cycle 394 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 393
+### 이번 세션 완료 사이클: 394
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 391 | B+D+F | CB max_daily_trades+DM ranging_macro_neutral 테스트5개(+5), **vol_atr_trend_min=1.0 DEAD**(Sh=-0.93↓1.88!, Tr=22↓12), **vol_atr_trend_min 탐색 완전 종료** |
 | 392 | B+D+F | CB recovery_window+DM HIGH_VOL+DM reset_weekly 테스트3개(+7→8509), **close_window=60 DEAD**(Sh=0.55↓0.40!, Tr=30↓4), **close_window 탐색 완전 종료** |
 | 393 | C+B+F | feed NaN경계+DM레짐kill/trailing 테스트5개(+5→8514), **confirmation_bars=2 DEAD**(Sh=-0.36↓↓, 0/8), **confirmation_bars 탐색 완전 종료** |
+| 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95), **atr_bounce_factor탐색 진행 중** |
 
-### 🎯 Cycle 394 작업 방향 (394 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 395 작업 방향 (395 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): price_cluster atr_bounce_factor 체계적 탐색
+#### A(품질): BacktestEngine 또는 보고서 생성 미커버 케이스
 
-- **배경**: Cycle381에서 factor=1.0 → Sh=1.17(↑+0.30), PF=1.25(↑+0.05), Consistency=1/8(↓1) — Sharpe↑이나 Consistency↓
-- **작업 방향**: atr_bounce_factor 윈도우별 분석 또는 WFO 그리드 탐색
-  - 현재 grid: [0.0, 1.0] (Cycle381에서 추가됨)
-  - 가설: factor≠0이면 변동성 적응형 bounce_pct → 특정 레짐에서 유효
-  - Paper sim으로 factor=1.0 단독 실험 (vol_regime_filter와 조합)
+- **배경**: BacktestEngine 커버리지 지속 향상
+- **작업 방향**: `src/backtest/engine.py` 또는 `src/backtest/report.py` 미커버 케이스
+  - 잔고 부족 주문 처리 경계값, 포트폴리오 리밸런싱 경계값
 
-#### E(실행): execution 또는 paper trader 미커버 기능 테스트
+#### C(데이터): DataFeed 캐시 또는 오류 처리 미커버 케이스
 
-- **배경**: 테스트 총계 8514개 (Cycle393 +5)
-- **작업 방향**: PaperTrader 또는 실행 레이어 미커버 케이스
-  - trade slippage 경계값
-  - 또는 position sizing edge case
+- **배경**: feed.py 커버리지 지속 향상
+- **작업 방향**: `src/data/feed.py` 또는 연관 모듈 미커버 케이스
 
-#### F(리서치): price_cluster 최적화 공식 종료 여부 결정
+#### F(리서치): atr_bounce_factor WFO 결과 분석 + price_cluster 종료 여부 최종 결정
 
-- **배경**: 모든 주요 파라미터 소진 (confirmation_bars 포함 모두 완료)
-  - bounce_pct(완료, 0.006), vol_atr_trend_min(완료, 1.2), close_window(완료, 50), n_bins(완료, 5)
-  - dead: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, confirmation_bars(0,1,2 전체)
-  - 미검증 옵션: atr_bounce_factor (D 카테고리에서 탐색 예정)
-- **작업 방향**: D(ML) atr_bounce_factor 결과 분석 후 최적화 공식 종료 여부 결정
-  - atr_bounce_factor도 dead이면 → price_cluster 최적화 완전 종료 선언
-  - 유효하면 → atr_bounce_factor 최적값 확정
+- **배경**: Cycle394 D(ML)에서 아래 변경 완료
+  - WFO 그리드 트리밍: close_window→[50], vol_atr_trend_min→[1.2], bounce_pct→[0.006,0.008,0.010]
+  - atr_bounce_factor→[0.0, 0.3, 0.5, 1.0] 세밀 탐색 가능
+  - Sim결과: price_cluster FAIL(2/8, Sh=0.95, PF=1.33, Tr=34) 기준선 유지
+- **작업 방향**: run_bundle_oos.py 또는 paper_simulation.py로 새 WFO 결과 확인
+  - factor=0.3/0.5가 유효하면 → paper_sim 단독 실험 진행
+  - 모두 dead이면 → price_cluster 최적화 완전 종료 선언
 
 ### ⚠️ 주의 사항 (Cycle 394 이후)
 
+- **WFO 그리드 dead param 정리 완료** (Cycle394 D): walk_forward.py 갱신됨
+  - close_window→[50], vol_atr_trend_min→[1.2], bounce_pct→[0.006,0.008,0.010], atr_bounce_factor→[0.0,0.3,0.5,1.0]
+  - WFO 조합 수 대폭 감소 → 다음 OOS 번들 실행 시 훨씬 빠름
+- **atr_bounce_factor 탐색 진행 중** (Cycle394 D): [0.3, 0.5] 추가 → 다음 WFO로 결과 확인 예정
+  - factor=1.0 (Cycle381): paper_sim Sh=1.17(↑), Consistency=1/8(↓) — Sharpe↑ but Consistency↓
+  - 0.3~0.5 가설: fixed bounce_pct=0.6%와 유사 동적 임계 → Consistency 개선 가능성
+  - **결과가 FAIL이면 → price_cluster 최적화 완전 종료 선언**
 - **confirmation_bars 탐색 완전 종료** (Cycle393 F): bars=0 확정 불변, 추가 실험 금지
   - bars=0(Sh=0.95,PF=1.33,Tr=34,2/8) / bars=1(Sh=0.50,혼재) / bars=2(Sh=-0.36,DEAD,0/8)
   - **WFO grid도 [0]으로 축소 완료** (walk_forward.py 갱신됨)

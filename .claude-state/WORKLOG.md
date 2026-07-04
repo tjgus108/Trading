@@ -1,3 +1,40 @@
+## [2026-07-04] Cycle 394 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] WFO 그리드 dead param 정리 + atr_bounce_factor 중간값 추가**
+1. `src/backtest/walk_forward.py`: price_cluster STRATEGY_PARAM_GRIDS 개선
+   - `close_window`: [50, 60] → [50] 단일값 (60 DEAD 확정 Cycle392, 그리드 조합 50% 감소)
+   - `vol_atr_trend_min`: [1.0, 1.2, 1.5, 2.0, 2.5] → [1.2] 단일값 (1.0 DEAD, 1.5/2.0/2.5 구형 열세)
+   - `bounce_pct`: [0.006, 0.008, 0.010, 0.020, 0.025] → [0.006, 0.008, 0.010] (0.020/0.025 구형 제거)
+   - `atr_bounce_factor`: [0.0, 1.0] → [0.0, 0.3, 0.5, 1.0] 중간값 추가
+     - factor=0.3: ATR×0.3≈0.45%(BTC), 고정 bounce_pct=0.6%와 유사한 동적 임계
+     - factor=0.5: ATR×0.5≈0.75%, 중간 강도의 변동성 적응
+   - 효과: WFO 탐색 조합 수 대폭 감소 (고속화) + atr_bounce_factor 세밀 탐색 가능
+
+**[E(실행)] PaperTrader 미커버 edge case 테스트 2개 추가**
+2. `tests/test_paper_trader.py`: test_execution_summary_single_trade_avg_fill_time_zero 추가
+   - 거래 1건 시 avg_fill_time=0.0 (구간 없음) edge case 검증
+3. `tests/test_paper_trader.py`: test_tiered_slippage_large_order_small_cap_higher_than_large_cap 추가
+   - $40k 대형 주문에서 SHIB(small tier) vs BTC(large tier) slippage 차이 검증
+   - volume_impact=2.0 (√(40k/10k)) 적용 시 tiered 효과 정량 확인
+
+**[F(리서치)] price_cluster 최적화 공식 종료 여부 분석**
+- **현황**: Sh=0.95, PF=1.33, Consistency=2/8 → 기준선 유지 (Cycle393 bars=2 실험 복원 확인)
+  - 탐색 완료: bounce_pct(0.006), vol_atr_trend_min(1.2), close_window(50), n_bins(5), confirmation_bars(0)
+  - dead: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, bars(1,2), trend_min(1.0), win(60)
+  - SharpeStd=2.20 (고분산) → Consistency 2/8 ceiling 확인
+- **결론**: atr_bounce_factor [0.3, 0.5] 추가(D(ML)) → 다음 WFO 결과로 종료 여부 결정
+  - 유효하면: 최적 factor 확정 후 paper_sim 검증 진행
+  - dead이면: price_cluster 최적화 완전 종료 선언, 전략 은퇴 검토
+- **4h vs 1h 관찰**: OOS bundle 5/5 PASS(Sh 2.5~4.3) vs paper_sim 1/19 PASS(Sh 1.81)
+  - 4h 전략(cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area) 강세 지속
+  - 향후 신규 전략 평가 시 4h 타임프레임 우선 검토 권장
+
+**시뮬레이션 결과 요약**
+- Paper Sim (1h WFO, Cycle394): price_cluster FAIL(2/8, Sh=0.95, PF=1.33, Tr=34) 기준선 복원 ✓
+  - roc_ma_cross PASS(4/8, Sh=1.81, PF=2.02, Trades=14) — 1h 유일 PASS 유지
+- Bundle OOS (4h): 5/5 PASS (캐시 유지) — order_flow_imbalance_v2 rank1(Sh=4.35, PF=1.94)
+- **전체 테스트**: 8514 → 8516 (+2 명시적 추가, 총 수집: 8539)
+
 ## [2026-07-04] Cycle 393 — C(데이터) + B(리스크) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor should_kill_strategy 레짐 + trailing_stop_signal 회복 테스트 3개 추가**

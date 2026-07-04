@@ -1,59 +1,53 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-04 (Cycle 393 완료)_
+_Last updated: 2026-07-04 (Cycle 394 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 393
-- **다음 사이클**: 394 (394 mod 5 = 4 → D+E+F)
+- **완료된 사이클**: 394
+- **다음 사이클**: 395 (395 mod 5 = 0 → A+C+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross 유지 — Sh=1.81, PF=2.02, Consist=4/8)
 - **Bundle OOS**: 5/5 PASS (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
-- **전체 테스트 수**: 8514개 (+5)
+- **전체 테스트 수**: 8516개 (+2 명시적, 수집총계 8539)
 
-## Cycle 393 주요 결과
+## Cycle 394 주요 결과
 
-### B(리스크): DrawdownMonitor should_kill_strategy 레짐 + trailing_stop_signal 회복 테스트 3개
+### D(ML): WFO 그리드 개선 + atr_bounce_factor 세밀 탐색 추가
 
-- `tests/test_drawdown_monitor.py`: test_regime_ranging_tightens_kill_threshold 추가
-  - RANGING(cap=1.2): 0.13>0.10×1.2=0.12 → Kill 발동 (기본 cap없음에서는 0.13<0.15 미발동)
-- `tests/test_drawdown_monitor.py`: test_regime_high_vol_kills_at_backtest_mdd 추가
-  - HIGH_VOL(cap=1.0): 0.11>0.10×1.0=0.10 → Kill, 0.09<0.10 → 미발동
-- `tests/test_drawdown_monitor.py`: test_trailing_stop_signal_recovery_resets 추가
-  - 하락 후 51개 상승봉 완전 회복 → signal False 검증
+- `src/backtest/walk_forward.py`: price_cluster STRATEGY_PARAM_GRIDS 트리밍
+  - close_window: [50,60] → [50] (60 DEAD 확정)
+  - vol_atr_trend_min: [1.0,1.2,1.5,2.0,2.5] → [1.2] (1.0 DEAD, 나머지 열세)
+  - bounce_pct: [0.006,0.008,0.010,0.020,0.025] → [0.006,0.008,0.010] (구형 제거)
+  - atr_bounce_factor: [0.0,1.0] → [0.0,0.3,0.5,1.0] (중간값 추가)
 
-### C(데이터): feed.py _add_indicators() NaN 경계값 테스트 2개
+### E(실행): PaperTrader edge case 테스트 2개 추가
 
-- `tests/test_feed_boundary.py`: TestAddIndicatorsNanBoundary 클래스 추가
-  - test_zero_volume_no_inf_in_vwap: volume=0 → vwap/vwap20에 inf 없음 검증
-  - test_constant_close_rsi_no_crash: close 불변 → rsi14 inf 없음, 크래시 없음
+- `tests/test_paper_trader.py`: test_execution_summary_single_trade_avg_fill_time_zero
+  - 거래 1건 시 avg_fill_time=0.0 (len<2 → 구간 없음) 검증
+- `tests/test_paper_trader.py`: test_tiered_slippage_large_order_small_cap_higher_than_large_cap
+  - $40k 대형 주문에서 SHIB(small) >> BTC(large) slippage 차이 정량 검증
 
-### F(리서치): confirmation_bars=2 실험 → DEAD PARAM, 탐색 완전 종료
+### F(리서치): price_cluster 분석 + 4h/1h 타임프레임 패턴 관찰
 
-- **실험 결과**: Sh=-0.36(↓↓-1.31!), PF=1.00, Tr=29, Consistency=0/8 — 완전 붕괴
-- bars=0(0.95) → bars=1(0.50) → bars=2(-0.36): 단조 악화 패턴 확인
-- **confirmation_bars 탐색 완전 종료**: WFO grid [0]으로 축소, 추가 실험 금지
-  - close_window=50 확정 불변, 추가 실험 금지
-- close_window=50 복원 (변경 금지)
-- `walk_forward.py` DEFAULT_GRIDS: dead param 주석 + 탐색 완전 종료 명시
+- price_cluster 기준선 복원 확인: Sh=0.95, PF=1.33, Tr=34, Consistency=2/8 (FAIL)
+- atr_bounce_factor [0.3, 0.5] 추가 → 다음 WFO 결과로 최적화 종료 여부 결정
+- 4h OOS 5/5 PASS vs 1h 1/19 PASS → 4h 타임프레임 우수성 지속 확인
 
-### F(리서치): price_cluster 남은 개선 방향 재평가
+## 시뮬레이션 결과
 
-- 모든 주요 파라미터 방향 소진:
-  - bounce_pct(완료), vol_atr_trend_min(완료), close_window(완료), n_bins(완료)
-  - dead: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, confirmation_bars=1
-- 마지막 미검증: `atr_bounce_factor` 또는 `confirmation_bars=2`
-- 현재 최적 유지: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` → Sh=0.95, PF=1.33
+### Paper Sim (1h WFO, Cycle394)
 
-## 다음 사이클 (393) 핵심 과제
+| 전략 | Sharpe | PF | Trades | Consistency | Pass |
+|------|--------|-----|--------|-------------|------|
+| price_cluster | 0.95 | 1.33 | 34 | 2/8 | FAIL |
+| roc_ma_cross | 1.81 | 2.02 | 14 | 4/8 | PASS |
 
-1. **C(데이터)**: `src/data/feed.py` compute_indicators() NaN 경계값 또는 DataFeed 캐시 엣지케이스 테스트
-2. **B(리스크)**: `should_kill_strategy()` 레짐별 multiplier 또는 `trailing_stop_signal()` 가속도 경계값 테스트
-3. **F(리서치)**: price_cluster 마지막 방향 — `atr_bounce_factor` 또는 `confirmation_bars=2` 탐색 결정
+### Bundle OOS (4h, 캐시 유지)
 
-## ⚠️ 중요 메모
-
-- **price_cluster 파라미터**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
-- **close_window 탐색 완전 종료** (Cycle392 D 확정): 추가 close_window 실험 금지
-- **vol_atr_trend_min 탐색 완전 종료** (Cycle391 D 확정): 추가 vol_atr_trend_min 실험 금지
-- **bounce_pct 탐색 완전 종료** (Cycle390 C 확정): 추가 bounce_pct 실험 금지
-- **roc_ma_cross**: PASS 상태 유지 (Sh=1.81, Consist=4/8) — 파라미터 변경 금지
+| 전략 | Sharpe | PF | Consistency | Pass |
+|------|--------|-----|-------------|------|
+| order_flow_imbalance_v2 | 4.35 | 1.94 | 80% | PASS |
+| supertrend_multi | 3.89 | 2.74 | 80% | PASS |
+| value_area | 3.07 | 1.77 | 40% | PASS |
+| vwap_cross | 3.05 | 1.92 | 80% | PASS |
+| cmf | 2.51 | 1.39 | 100% | PASS |

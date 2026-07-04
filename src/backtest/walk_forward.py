@@ -187,39 +187,27 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   결론: 클러스터 강도 비율이 bounce 품질 예측 불가. min_cluster_strength_ratio 탐색 종료.
     #   파라미터 코드는 유지(향후 활용 가능성), WFO 그리드에서 제거.
     "price_cluster": {
-        # Cycle382 D(ML): bounce_pct=0.008 추가 — 더 민감한 bounce 탐지 (Trades↑ 가설)
-        #   기존 최소값 0.010 → 0.008 하향: 더 빈번한 신호 가능성 (PF 효과 불확실)
-        # Cycle390 C(데이터): bounce_pct=0.004 실험 → dead param (Sh=0.66↓, PF=1.27↓, Tr=27↓ vs 0.006)
-        #   패턴 확인: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
-        #   bounce_pct 탐색 완전 종료: 0.010→0.008→0.006→0.004 전부 검증, 0.006(filter=T) 최적 확정
-        #   추가 bounce_pct 실험 금지. 파라미터 결론: vol_regime_filter=True+bounce_pct=0.006 최적
-        "bounce_pct": [0.006, 0.008, 0.010, 0.020, 0.025],
+        # bounce_pct 탐색 완전 종료 (Cycle390): 0.006(filter=T) 최적 확정
+        # 0.004(dead), 0.006(최적), 0.008(차선), 0.010(열세), 0.020/0.025(구형)
+        # WFO 비교용으로 [0.006, 0.008, 0.010] 유지 (0.020/0.025 제거)
+        "bounce_pct": [0.006, 0.008, 0.010],
         "n_bins": [4, 5, 6],
-        "close_window": [50, 60],
+        # close_window 탐색 완전 종료 (Cycle392): 50 최적, 60 DEAD
+        # → [50] 단일값으로 고정. 그리드 조합 수 50% 감소.
+        "close_window": [50],
         "vol_regime_filter": [False, True],
-        # Cycle391 D(ML): vol_atr_trend_min=1.0 실험 → DEAD PARAM 확정 (2026-07-04)
-        #   결과: Sh=-0.93(↓-1.88!), PF=0.91(↓-0.42), Tr=22(↓-12), Consistency=0/8 → 치명적 악화
-        #   원인: 임계값 낮춤 → 추세 억제 더 쉬워짐 → Trades 34→22 급감 → Sharpe 분산 증가
-        #   vol_atr_trend_min 탐색 완전 종료: 1.0(dead), 1.2(최적), 1.5/2.0/2.5(Cycle355 이전 탐색)
-        #   → vol_atr_trend_min=1.2 확정 불변. 추가 실험 금지.
-        # Cycle392 D(ML): close_window=60 실험 → DEAD PARAM 확정 (2026-07-04)
-        #   결과(60): Sh=0.55(↓-0.40!), PF=1.22(↓-0.11), Tr=30(↓-4), Consistency=1/8(↓1)
-        #   원인: 긴 window → 오래된 가격 클러스터에 포함 → bounce 타이밍 지연 → 수익성 하락
-        #   close_window 탐색 완전 종료: 40(Cycle360: 대폭 악화), 50(최적), 60(역효과)
-        #   → close_window=50 확정 불변. 추가 실험 금지.
-        "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
-        # Cycle380+393: confirmation_bars 탐색 완전 종료 (DEAD PARAM)
-        # bars=0: Sh=0.95, bars=1: Sh=0.50(↓), bars=2: Sh=-0.36(↓↓) — 단조 악화
-        # 결론: 타이밍 지연 효과만 있음. confirmation_bars=0 확정 불변. 추가 실험 금지.
+        # vol_atr_trend_min 탐색 완전 종료 (Cycle391): 1.2 최적, 1.0 DEAD
+        # 1.5/2.0/2.5 구형값도 1.2 대비 열세 확인 (Cycle355 이전)
+        # → [1.2] 단일값으로 고정. 그리드 조합 수 80% 감소.
+        "vol_atr_trend_min": [1.2],
+        # confirmation_bars 탐색 완전 종료 (Cycle393): bars=0 확정
         "confirmation_bars": [0],
-        # Cycle381 D(ML): atr_bounce_factor 탐색 — ATR 기반 동적 bounce_pct
-        # paper_sim 결과: factor=1.0 → Sharpe=1.17(+0.30), PF=1.25(+0.05), Consistency=1/8(-1)
-        # Sharpe 개선되나 Consistency 악화 → 개인 윈도우 효과는 있음(WFO 탐색 가치 존재)
-        # 0.0=비활성(기본), 1.0=ATR/close×1.0≈1.49%(BTC), 2.0=약 3% threshold(고변동성 강화)
-        "atr_bounce_factor": [0.0, 1.0],
-        # Cycle384 D(ML): rsi_oversold_filter=True 실험 → dead param (0 trades, PF=0.00)
-        # 원인: cluster bounce는 RSI 중립 구간(40-60)에서 발생 → RSI<40 필터가 모든 신호 차단
-        # 결론: rsi_oversold_filter 탐색 종료. 기본값(False) 유지. WFO 그리드에서 제거.
+        # Cycle394 D(ML): atr_bounce_factor 중간값 추가 — 0.3/0.5 탐색
+        # 0.0=비활성, 0.3=ATR×0.3≈0.45%(BTC), 0.5=ATR×0.5≈0.75%, 1.0=ATR×1.0≈1.49%
+        # factor=1.0: paper_sim Sh=1.17(+0.30), Consistency=1/8(-1) — 윈도우별 효과 확인
+        # 가설: 0.3~0.5 구간이 fixed bounce_pct=0.6%와 유사 → 안정적 동적 조정 가능성
+        "atr_bounce_factor": [0.0, 0.3, 0.5, 1.0],
+        # Cycle384: rsi_oversold_filter DEAD (0 trades). 그리드에서 제거됨.
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)
