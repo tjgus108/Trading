@@ -1,3 +1,34 @@
+## [2026-07-04] Cycle 391 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] CircuitBreaker max_daily_trades + DrawdownMonitor set_ranging_macro_neutral 테스트 5개 추가**
+1. `tests/test_circuit_breaker.py`: max_daily_trades 3개 추가
+   - test_max_daily_trades_triggers_at_limit: 한도 도달 시 triggered=True + "거래 횟수" in reason
+   - test_max_daily_trades_zero_means_unlimited: max_daily_trades=0 → 100회 거래 후에도 미트리거
+   - test_max_daily_trades_resets_on_reset_daily: reset_daily() 후 daily_trade_count=0 → 미트리거
+2. `tests/test_drawdown_monitor.py`: set_ranging_macro_neutral 2개 추가
+   - test_set_ranging_macro_neutral_neutral_slope: |slope|<=threshold → _ranging_macro_neutral=True
+   - test_set_ranging_macro_neutral_directional_slope: |slope|>threshold → _ranging_macro_neutral=False
+
+**[D(ML)] price_cluster vol_atr_trend_min=1.0 실험 → DEAD PARAM 확정**
+3. `scripts/paper_simulation.py`: vol_atr_trend_min 1.2→1.0 실험 후 복원
+   - **실험 결과**: Sh=-0.93(↓-1.88!), PF=0.91(↓-0.42), Tr=22(↓-12), Consistency=0/8
+   - 원인: 임계값 낮춤 → 추세 억제 더 쉬워짐 → Trades 34→22 급감 → Sharpe 분산 폭발
+   - **vol_atr_trend_min 탐색 완전 종료**: 1.0(dead)/1.2(최적)/1.5(Cycle355 효과없음) 모두 검증
+   - vol_atr_trend_min=1.2 확정 불변, 추가 실험 금지
+4. `src/backtest/walk_forward.py`: vol_atr_trend_min=1.0 dead param 주석 추가 + 다음 방향(close_window=60) 명시
+
+**[F(리서치)] price_cluster FAIL 윈도우 패턴 분석**
+5. FAIL 원인 분석: PF<1.5가 주요 binding constraint (PF=1.33, gap=0.17)
+   - vol_atr_trend_min 방향 완전 소진 → close_window=60 탐색이 유일한 남은 방향
+   - close_window=60은 WFO 그리드에 이미 포함됨 → IS 선택 빈도 분석 필요
+
+**시뮬레이션 결과 요약**
+- Paper Sim (1h WFO, vol_atr_trend_min=1.0 실험): roc_ma_cross PASS(4/8 Sh=1.81), price_cluster FAIL(0/8 DEAD)
+- Bundle OOS (4h, --csv-dir): 5/5 PASS (maintained)
+- 테스트: 8497+5 → **8502개** (pytest로 확인)
+
+---
+
 ## [2026-07-03] Cycle 390 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] optimize_roc_ma_cross 헬퍼 + volume_filter 파라미터 테스트 5개 추가**
@@ -12410,6 +12441,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-03 15:34 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 00:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 00:09 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

@@ -1,54 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-07-03 (Cycle 390 완료)_
+_Last updated: 2026-07-04 (Cycle 391 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 390
+### 이번 세션 완료 사이클: 391
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 388 | A+B+F | consec_loss_scale 테스트 5개, KellySizer Bayesian shrinkage 테스트 4개(+9 총계 8491), **vol_regime_filter=T+bp=0.006 PASS 발견** (최근 100일 한정) |
 | 389 | D+E+F | price_cluster filter=T+bp=0.006 WFO전체: Sh=0.95(+0.08)/PF=1.33(+0.13)/Tr=34/2/8 FAIL, load_state 5개 테스트(총계 8496), Bundle OOS 5/5 유지 |
 | 390 | A+C+F | optimize_roc_ma_cross+volume_filter 5개 테스트(8497), bounce_pct=0.004 dead param(Sh=0.66↓,PF=1.27↓,Tr=27↓), **bounce_pct 탐색 완전 종료** |
+| 391 | B+D+F | CB max_daily_trades+DM ranging_macro_neutral 테스트5개(+5), **vol_atr_trend_min=1.0 DEAD**(Sh=-0.93↓1.88!, Tr=22↓12), **vol_atr_trend_min 탐색 완전 종료** |
 
-### 🎯 Cycle 391 작업 방향 (391 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 392 작업 방향 (392 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): risk 모듈 엣지케이스 테스트
+#### B(리스크): risk 모듈 엣지케이스 테스트 추가
 
-- **배경**: 테스트 총계 8497개 (Cycle390 +5). 다음 커버리지 개선 영역
+- **배경**: 테스트 총계 8502개 (Cycle391 +5)
 - **작업 방향**: `src/risk/circuit_breaker.py` 또는 `src/risk/drawdown_monitor.py` 미커버 기능
-  - CircuitBreaker: recovery_window 또는 cooldown_bars 경계값 테스트
-  - DrawdownMonitor: weekly_reset 또는 _update_regime 로직 테스트
+  - CircuitBreaker: recovery_window 경계값 (window 이전 손실 만료 동작)
+  - DrawdownMonitor: _update_regime / weekly_reset 로직
 
-#### D(ML): price_cluster 새 개선 방향 탐색
+#### D(ML): price_cluster close_window=60 IS 선택 빈도 분석
 
-- **배경**: bounce_pct 탐색 완전 종료 (0.006 최적 확정)
-  - 현재 best: vol_regime_filter=True+bounce_pct=0.006 → Sh=0.95, PF=1.33 (목표 PF=1.5, gap=0.17)
-  - bounce_pct 방향 소진 → 새 파라미터 필요
-- **작업 방향 선택지**:
-  - `close_window` 상향 탐색: 60→70 (더 긴 기간 클러스터 사용, 신호 안정성↑?)
-  - `vol_atr_trend_min` 탐색: 현재 1.2, 0.8→1.0 시도 (필터 완화 → Trades↑)
-  - **권장**: vol_atr_trend_min=1.0 실험 (현재 1.2가 Tr=34 억제, 완화 시 Tr=40+ 기대)
-  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.0}`
+- **배경**: vol_atr_trend_min 탐색 완전 종료 (1.0=dead, 1.2=최적, 1.5+는 Cycle355 이전 검증)
+  - 현재 best: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` → Sh=0.95, PF=1.33
+  - PF 목표 1.5, gap=0.17. 남은 방향: close_window 탐색
+- **작업 방향**: close_window=60 paper_sim 실험
+  - 현재 설정: close_window=50 (DEFAULT_GRIDS에 [50,60] 모두 포함됨)
+  - 실험 설정: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2, "close_window": 60}`
+  - 가설: 더 긴 window → 클러스터 추정 더 안정적 → PF↑ (MDD는 중립적)
+  - ⚠️ 참고: close_window=40은 Cycle303/360에서 모두 악화 확인됨 → 하향은 금지
 
-#### F(리서치): price_cluster FAIL 윈도우 패턴 분석
+#### F(리서치): price_cluster close_window=60 vs 50 비교 분석
 
-- **배경**: Cycle390 C 결과 — bounce_pct 탐색 종료, 새 방향 식별 필요
-  - 어떤 period에서 FAIL이 집중되는가?
-  - FAIL 원인: Sharpe<1.0 vs PF<1.5 vs Trades<15 vs MDD>20% 각 비율
-  - vol_atr_trend_min이 신호를 얼마나 억제하는지 확인 (filter=True의 실질 효과)
-  - 분석 결과로 vol_atr_trend_min 탐색 방향 결정
+- 60과 50에서 신호 타이밍 차이 분석
+- FAIL 원인: PF<1.5가 binding constraint (gap=0.17), Sharpe<1.0 이차 요인
 
-### ⚠️ 주의 사항 (Cycle 391 이후)
+### ⚠️ 주의 사항 (Cycle 392 이후)
+
+- **vol_atr_trend_min 탐색 완전 종료** (Cycle391 D): 1.2 최적 확정, 추가 탐색 금지
+  - 1.0(dead: Sh=-0.93↓1.88!, Tr=22↓12) / 1.2(최적: Sh=0.95, Tr=34) / 1.5+(Cycle355 이전 검증)
+  - **현재 최적**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
+  - 다음 탐색: close_window 상향(50→60)
 
 - **bounce_pct 탐색 완전 종료** (Cycle390 C): 0.006 최적 확정, 추가 탐색 금지
   - 0.010(Tr=41,Sh=0.87,PF=1.20) → 0.008(38,1.21,1.27) → 0.006(34,0.95,1.33) → 0.004(27,0.66,1.27) 패턴 확인
-  - bounce_pct=0.004 dead param: Sh↓-0.29, PF↓-0.06, Tr↓-7 → 하향은 entry zone 축소 → 신호 감소
-  - **현재 최적**: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2}` (변경 금지)
-  - 다음 탐색: vol_atr_trend_min 완화(1.2→1.0) 또는 close_window 상향(50→60)
 
 - **price_cluster vol_regime_filter=True+bounce_pct=0.006 전체 WFO 결과** (Cycle389 D):
   - Sh=0.95, PF=1.33, Tr=34, Consistency=2/8 → FAIL
@@ -189,23 +188,32 @@ _Last updated: 2026-07-03 (Cycle 390 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 390 업데이트)
+### 핵심 메트릭 (Cycle 391 업데이트)
 
-| 지표 | Cycle 389 | Cycle 390 | 변화 |
+| 지표 | Cycle 390 | Cycle 391 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.95(filter=T+bp=0.006) | **0.66**(bp=0.004 실험 FAIL→복원) | 복원 0.006 |
-| 1h BTC price_cluster PF | 1.33(filter=T+bp=0.006) | **1.27**(bp=0.004) → 복원 1.33 | bp=0.006 유지 |
-| 1h BTC price_cluster Trades | 34 | **27**(bp=0.004) → 복원 34 | bp=0.006 복원 |
+| 1h BTC price_cluster Sharpe | 0.95(filter=T+bp=0.006) | **-0.93**(1.0 실험 FAIL→복원 0.95) | 복원 1.2 |
+| 1h BTC price_cluster PF | 1.33 | **0.91**(1.0 실험) → 복원 1.33 | 복원 유지 |
+| 1h BTC price_cluster Trades | 34 | **22**(1.0 실험) → 복원 34 | 복원 유지 |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8496개 | **8497개** (+1) | +5 추가, 집계 차이 |
+| 테스트 수 | 8497개 | **8502개** (+5) | +5 추가 |
+
+### Cycle 391 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_circuit_breaker.py` | max_daily_trades 3개 테스트 추가 (Cycle391 B): limit 트리거, 0=무제한, reset_daily 초기화 |
+| `tests/test_drawdown_monitor.py` | set_ranging_macro_neutral 2개 테스트 추가 (Cycle391 B): neutral_slope=True, directional_slope=False |
+| `scripts/paper_simulation.py` | vol_atr_trend_min 1.2→1.0 실험→DEAD 확정→1.2 복원 + 결과 주석 (Cycle391 D) |
+| `src/backtest/walk_forward.py` | vol_atr_trend_min=1.0 dead param 주석 + 탐색 완전 종료 + 다음 방향 명시 (Cycle391 D+F) |
 
 ### Cycle 390 코드 변경 요약
 

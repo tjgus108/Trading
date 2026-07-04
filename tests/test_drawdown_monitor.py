@@ -6,6 +6,22 @@ import pytest
 from src.risk.drawdown_monitor import AlertLevel, DrawdownMonitor, MddLevel
 
 
+# ── set_ranging_macro_neutral — RANGING 레짐 cooldown 배수 ──────
+
+def test_set_ranging_macro_neutral_neutral_slope():
+    """|ema50_slope| <= threshold → _ranging_macro_neutral=True (cooldown 단축 0.9x)."""
+    m = DrawdownMonitor()
+    m.set_ranging_macro_neutral(ema50_slope=0.0003, threshold=0.0005)
+    assert m._ranging_macro_neutral is True
+
+
+def test_set_ranging_macro_neutral_directional_slope():
+    """|ema50_slope| > threshold → _ranging_macro_neutral=False (cooldown 연장 1.5x)."""
+    m = DrawdownMonitor()
+    m.set_ranging_macro_neutral(ema50_slope=0.0008, threshold=0.0005)
+    assert m._ranging_macro_neutral is False
+
+
 # ── 기존 MDD 동작 유지 ────────────────────────────────────────
 
 def test_legacy_mdd_halts():

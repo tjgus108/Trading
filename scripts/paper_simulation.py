@@ -249,6 +249,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   패턴 확인: bounce_pct 낮을수록 entry zone 좁아져 trades 감소 + signal quality 저하
     #   bounce_pct 탐색 완전 종료: 0.010→0.008→0.006→0.004 전부 검증, 0.006 최적 확정
     #   bounce_pct=0.006 복원. 새 개선 방향 필요 (다른 파라미터 또는 전략 전환 고려)
+    # Cycle391 D(ML): vol_atr_trend_min=1.0 실험 → DEAD PARAM (2026-07-04)
+    #   결과: Sh=-0.93(↓-1.88!), PF=0.91(↓-0.42), Tr=22(↓-12), Consistency=0/8
+    #   원인: 임계값 낮춤 → 추세 감지 더 쉽게 → 신호 억제 증가 → Trades 34→22 급감
+    #         trades 감소 → Sharpe 분산 증가 → 일부 윈도우 Sh=-4.95 극단값 발생
+    #   vol_atr_trend_min 탐색 완전 종료: 1.0(dead), 1.2(최적), 1.5(Cycle355: 효과없음)
+    #   → vol_atr_trend_min=1.2 확정 불변. 추가 실험 금지
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 

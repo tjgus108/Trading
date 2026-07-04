@@ -740,6 +740,46 @@ def test_rapid_decline_triggers_after_cooldown_expires():
     assert "급속" in result["reason"]
 
 
+# ── max_daily_trades 일일 거래 횟수 한도 ──────────────────────
+
+def test_max_daily_trades_triggers_at_limit():
+    """max_daily_trades회 거래 후 check() → triggered=True (일일 한도 초과)."""
+    cb = CircuitBreaker(max_daily_trades=3)
+    for _ in range(3):
+        cb.record_trade_result(is_loss=False)
+    assert cb.daily_trade_count == 3
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is True
+    assert "거래 횟수" in result["reason"]
+
+
+def test_max_daily_trades_zero_means_unlimited():
+    """max_daily_trades=0(기본) 설정 시 거래 횟수 무제한 — 트리거 없음."""
+    cb = CircuitBreaker(max_daily_trades=0)
+    for _ in range(100):
+        cb.record_trade_result(is_loss=False)
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False
+
+
+def test_max_daily_trades_resets_on_reset_daily():
+    """reset_daily() 후 daily_trade_count 초기화 → 한도 미초과."""
+    cb = CircuitBreaker(max_daily_trades=2)
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=False)
+    assert cb.daily_trade_count == 2
+    cb.reset_daily(10000.0)
+    assert cb.daily_trade_count == 0
+    result = cb.check(
+        current_balance=10000, peak_balance=10000, daily_start_balance=10000
+    )
+    assert result["triggered"] is False
+
+
 def test_rapid_decline_and_atr_surge_combined():
     """rapid_decline 감지 + ATR 급등 동시: triggered=True (rapid_decline 우선)."""
     cb = CircuitBreaker(

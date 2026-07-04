@@ -197,6 +197,12 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "n_bins": [4, 5, 6],
         "close_window": [50, 60],
         "vol_regime_filter": [False, True],
+        # Cycle391 D(ML): vol_atr_trend_min=1.0 실험 → DEAD PARAM 확정 (2026-07-04)
+        #   결과: Sh=-0.93(↓-1.88!), PF=0.91(↓-0.42), Tr=22(↓-12), Consistency=0/8 → 치명적 악화
+        #   원인: 임계값 낮춤 → 추세 억제 더 쉬워짐 → Trades 34→22 급감 → Sharpe 분산 증가
+        #   vol_atr_trend_min 탐색 완전 종료: 1.0(dead), 1.2(최적), 1.5/2.0/2.5(Cycle355 이전 탐색)
+        #   → vol_atr_trend_min=1.2 확정 불변. 추가 실험 금지.
+        #   다음 방향: close_window=60 탐색 (현재 50, 60은 그리드에 이미 있음 — WFO IS 선택 빈도 분석)
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
         # Cycle380 C(데이터): confirmation_bars 탐색 — bounce 후 N봉 확인 (0=즉시)
         # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓
