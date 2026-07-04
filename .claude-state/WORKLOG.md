@@ -1,3 +1,34 @@
+## [2026-07-04] Cycle 393 — C(데이터) + B(리스크) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor should_kill_strategy 레짐 + trailing_stop_signal 회복 테스트 3개 추가**
+1. `tests/test_drawdown_monitor.py`: test_regime_ranging_tightens_kill_threshold 추가
+   - RANGING 레짐(cap=1.2): multiplier=1.5가 1.2로 축소 → 0.13 MDD > 0.10×1.2=0.12 → Kill 발동
+   - 기본(cap없음): 0.13 < 0.10×1.5=0.15 → Kill 미발동 (레짐 효과 검증)
+2. `tests/test_drawdown_monitor.py`: test_regime_high_vol_kills_at_backtest_mdd 추가
+   - HIGH_VOL 레짐(cap=1.0): multiplier=1.5 → cap=1.0 → 0.11 > 0.10×1.0=0.10 → Kill
+   - 0.09 < 0.10×1.0=0.10 → Kill 미발동
+3. `tests/test_drawdown_monitor.py`: test_trailing_stop_signal_recovery_resets 추가
+   - 하락 후 완전 회복 시나리오: 51개 상승 후 short_rate < long_rate → signal=False 검증
+
+**[C(데이터)] feed.py _add_indicators() NaN 경계값 테스트 2개 추가**
+4. `tests/test_feed_boundary.py`: TestAddIndicatorsNanBoundary 클래스 추가
+   - test_zero_volume_no_inf_in_vwap: volume=0 → vwap/vwap20에 inf 미발생 (NaN 정상 처리)
+   - test_constant_close_rsi_no_crash: close 불변 → rsi14 inf 미발생, 크래시 없음
+
+**[F(리서치)] confirmation_bars=2 실험 → DEAD PARAM 확정, 탐색 완전 종료**
+5. `scripts/paper_simulation.py`: confirmation_bars=2 실험 후 복원
+   - **실험 결과**: Sh=-0.36(↓↓-1.31!), PF=1.00(↓↓-0.33), Tr=29(↓-5), Consistency=0/8 — 완전 붕괴
+   - bars=0(기준): Sh=0.95 → bars=1: Sh=0.50(↓) → bars=2: Sh=-0.36(↓↓) — 단조 악화
+   - **confirmation_bars 탐색 완전 종료**: 0(최적), 1(dead), 2(dead) 모두 검증
+   - 기본값 confirmation_bars=0 확정 불변, 추가 실험 금지
+6. `src/backtest/walk_forward.py`: confirmation_bars dead param 주석 갱신 + grid [0]으로 축소
+
+**시뮬레이션 결과 요약**
+- Paper Sim (1h WFO, bars=2 실험): roc_ma_cross PASS(4/8, Sh=1.81), price_cluster FAIL(0/8, Sh=-0.36)
+- Paper Sim (복원 후 기준): price_cluster FAIL(2/8, Sh=0.95, PF=1.33) — 기존 최적 유지
+- Bundle OOS (4h): 5/5 PASS (maintained, 보고서 덮어쓰기 방지 작동)
+- **전체 테스트**: 8509 → 8514 (+5)
+
 ## [2026-07-04] Cycle 392 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] CircuitBreaker recovery_window 경계값 + DrawdownMonitor set_regime/reset_weekly 테스트 3개 추가**
@@ -12663,6 +12694,194 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-04 05:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:09 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:32 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-04 10:32 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:32 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:32 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:32 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-04 10:32 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

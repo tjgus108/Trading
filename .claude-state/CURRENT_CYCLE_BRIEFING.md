@@ -1,33 +1,37 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-04 (Cycle 392 완료)_
+_Last updated: 2026-07-04 (Cycle 393 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 392
-- **다음 사이클**: 393 (393 mod 5 = 3 → C+B+F)
+- **완료된 사이클**: 393
+- **다음 사이클**: 394 (394 mod 5 = 4 → D+E+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross 유지 — Sh=1.81, PF=2.02, Consist=4/8)
 - **Bundle OOS**: 5/5 PASS (cmf, order_flow_imbalance_v2, supertrend_multi, vwap_cross, value_area)
-- **전체 테스트 수**: 8509개 (+7)
+- **전체 테스트 수**: 8514개 (+5)
 
-## Cycle 392 주요 결과
+## Cycle 393 주요 결과
 
-### B(리스크): CircuitBreaker recovery_window + DrawdownMonitor HIGH_VOL/reset_weekly 테스트 3개
+### B(리스크): DrawdownMonitor should_kill_strategy 레짐 + trailing_stop_signal 회복 테스트 3개
 
-- `tests/test_circuit_breaker.py`: rapid_decline_oldest_price_exits_window 추가
-  - window=3, cooldown_periods=0: [100,95,95] → triggered, 4번째 97 추가 → no trigger
-  - peak 가격이 슬라이딩 윈도우 밖으로 나가면 decline 감지 자동 해제 검증
-- `tests/test_drawdown_monitor.py`: reset_weekly_does_not_clear_warning 추가
-  - WARNING → reset_weekly() → WARNING 유지 (reset_daily()만 해제)
-- `tests/test_drawdown_monitor.py`: set_regime_high_vol_tightens_daily_limit 추가
-  - HIGH_VOL 레짐 → 일일 DD 한도 3%→2% 강화 → 2% 손실에 WARNING 트리거
+- `tests/test_drawdown_monitor.py`: test_regime_ranging_tightens_kill_threshold 추가
+  - RANGING(cap=1.2): 0.13>0.10×1.2=0.12 → Kill 발동 (기본 cap없음에서는 0.13<0.15 미발동)
+- `tests/test_drawdown_monitor.py`: test_regime_high_vol_kills_at_backtest_mdd 추가
+  - HIGH_VOL(cap=1.0): 0.11>0.10×1.0=0.10 → Kill, 0.09<0.10 → 미발동
+- `tests/test_drawdown_monitor.py`: test_trailing_stop_signal_recovery_resets 추가
+  - 하락 후 51개 상승봉 완전 회복 → signal False 검증
 
-### D(ML): price_cluster close_window=60 실험 → DEAD PARAM 확정
+### C(데이터): feed.py _add_indicators() NaN 경계값 테스트 2개
 
-- `paper_simulation.py` close_window 50→60 실험:
-  - **결과**: Sh=0.55(↓-0.40!), PF=1.22(↓-0.11), Tr=30(↓-4), Consistency=1/8(↓1) → 대폭 악화
-  - 원인: 긴 window → 오래된 가격 클러스터에 포함 → bounce 타이밍 지연 → 수익성 하락
-- **close_window 탐색 완전 종료**: 40(Cycle360 대폭 악화), 50(최적), 60(역효과) 모두 검증
+- `tests/test_feed_boundary.py`: TestAddIndicatorsNanBoundary 클래스 추가
+  - test_zero_volume_no_inf_in_vwap: volume=0 → vwap/vwap20에 inf 없음 검증
+  - test_constant_close_rsi_no_crash: close 불변 → rsi14 inf 없음, 크래시 없음
+
+### F(리서치): confirmation_bars=2 실험 → DEAD PARAM, 탐색 완전 종료
+
+- **실험 결과**: Sh=-0.36(↓↓-1.31!), PF=1.00, Tr=29, Consistency=0/8 — 완전 붕괴
+- bars=0(0.95) → bars=1(0.50) → bars=2(-0.36): 단조 악화 패턴 확인
+- **confirmation_bars 탐색 완전 종료**: WFO grid [0]으로 축소, 추가 실험 금지
   - close_window=50 확정 불변, 추가 실험 금지
 - close_window=50 복원 (변경 금지)
 - `walk_forward.py` DEFAULT_GRIDS: dead param 주석 + 탐색 완전 종료 명시

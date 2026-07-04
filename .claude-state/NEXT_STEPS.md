@@ -1,46 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-07-04 (Cycle 392 완료)_
+_Last updated: 2026-07-04 (Cycle 393 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 392
+### 이번 세션 완료 사이클: 393
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 390 | A+C+F | optimize_roc_ma_cross+volume_filter 5개 테스트(8497), bounce_pct=0.004 dead param(Sh=0.66↓,PF=1.27↓,Tr=27↓), **bounce_pct 탐색 완전 종료** |
 | 391 | B+D+F | CB max_daily_trades+DM ranging_macro_neutral 테스트5개(+5), **vol_atr_trend_min=1.0 DEAD**(Sh=-0.93↓1.88!, Tr=22↓12), **vol_atr_trend_min 탐색 완전 종료** |
 | 392 | B+D+F | CB recovery_window+DM HIGH_VOL+DM reset_weekly 테스트3개(+7→8509), **close_window=60 DEAD**(Sh=0.55↓0.40!, Tr=30↓4), **close_window 탐색 완전 종료** |
+| 393 | C+B+F | feed NaN경계+DM레짐kill/trailing 테스트5개(+5→8514), **confirmation_bars=2 DEAD**(Sh=-0.36↓↓, 0/8), **confirmation_bars 탐색 완전 종료** |
 
-### 🎯 Cycle 393 작업 방향 (393 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 394 작업 방향 (394 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): feed.py 또는 데이터 인프라 엣지케이스 테스트
+#### D(ML): price_cluster atr_bounce_factor 체계적 탐색
 
-- **배경**: 테스트 총계 8509개 (Cycle392 +7)
-- **작업 방향**: `src/data/feed.py` 또는 관련 데이터 모듈 미커버 기능
-  - compute_indicators()의 NaN 경계값 처리
-  - 또는 DataFeed 캐시/로딩 엣지케이스
+- **배경**: Cycle381에서 factor=1.0 → Sh=1.17(↑+0.30), PF=1.25(↑+0.05), Consistency=1/8(↓1) — Sharpe↑이나 Consistency↓
+- **작업 방향**: atr_bounce_factor 윈도우별 분석 또는 WFO 그리드 탐색
+  - 현재 grid: [0.0, 1.0] (Cycle381에서 추가됨)
+  - 가설: factor≠0이면 변동성 적응형 bounce_pct → 특정 레짐에서 유효
+  - Paper sim으로 factor=1.0 단독 실험 (vol_regime_filter와 조합)
 
-#### B(리스크): DrawdownMonitor should_kill_strategy 또는 trailing_stop_signal 테스트
+#### E(실행): execution 또는 paper trader 미커버 기능 테스트
 
-- **배경**: 8509개 테스트, B 카테고리 집중
-- **작업 방향**: 미커버 리스크 기능
-  - `should_kill_strategy()`: 레짐별 multiplier 효과
-  - `trailing_stop_signal()`: 가속도 임계값 경계값
+- **배경**: 테스트 총계 8514개 (Cycle393 +5)
+- **작업 방향**: PaperTrader 또는 실행 레이어 미커버 케이스
+  - trade slippage 경계값
+  - 또는 position sizing edge case
 
-#### F(리서치): price_cluster 남은 방향 결정
+#### F(리서치): price_cluster 최적화 공식 종료 여부 결정
 
-- **배경**: 모든 주요 파라미터 소진
-  - bounce_pct(완료), vol_atr_trend_min(완료), close_window(완료), n_bins(완료)
-  - dead: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, confirmation_bars=1
-- **작업 방향**: 마지막 미검증 옵션 평가
-  - `atr_bounce_factor` 체계적 탐색 (paper_sim에서 Sh↑이나 Consistency↓ — 윈도우별 분석 필요)
-  - 또는 `confirmation_bars=2` 실험 (bars=1은 dead, bars=2는 아직 미검증)
-  - 결과에 따라 price_cluster 최적화 공식 종료 여부 결정
+- **배경**: 모든 주요 파라미터 소진 (confirmation_bars 포함 모두 완료)
+  - bounce_pct(완료, 0.006), vol_atr_trend_min(완료, 1.2), close_window(완료, 50), n_bins(완료, 5)
+  - dead: rsi_oversold_filter, min_cluster_strength_ratio, high_conf_only, confirmation_bars(0,1,2 전체)
+  - 미검증 옵션: atr_bounce_factor (D 카테고리에서 탐색 예정)
+- **작업 방향**: D(ML) atr_bounce_factor 결과 분석 후 최적화 공식 종료 여부 결정
+  - atr_bounce_factor도 dead이면 → price_cluster 최적화 완전 종료 선언
+  - 유효하면 → atr_bounce_factor 최적값 확정
 
-### ⚠️ 주의 사항 (Cycle 393 이후)
+### ⚠️ 주의 사항 (Cycle 394 이후)
+
+- **confirmation_bars 탐색 완전 종료** (Cycle393 F): bars=0 확정 불변, 추가 실험 금지
+  - bars=0(Sh=0.95,PF=1.33,Tr=34,2/8) / bars=1(Sh=0.50,혼재) / bars=2(Sh=-0.36,DEAD,0/8)
+  - **WFO grid도 [0]으로 축소 완료** (walk_forward.py 갱신됨)
 
 - **close_window 탐색 완전 종료** (Cycle392 D): 50 최적 확정, 추가 탐색 금지
   - 40(Cycle360: 대폭 악화) / 50(최적: Sh=0.95, PF=1.33) / 60(역효과: Sh=0.55↓0.40!)

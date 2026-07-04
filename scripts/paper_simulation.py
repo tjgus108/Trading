@@ -261,6 +261,11 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   원인: 긴 window → 클러스터 추정 시 오래된 가격 반영 → bounce 타이밍 지연 → PF/Sharpe 하락
     #   close_window 탐색 완전 종료: 40(Cycle360: 대폭 악화), 50(최적), 60(역효과)
     #   → close_window=50 확정 불변. 추가 실험 금지
+    # Cycle393 F(리서치): confirmation_bars=2 실험 결과 (2026-07-04) — DEAD PARAM 확정
+    #   bars=0(baseline): Sh=0.95, PF=1.33, Tr=34, Consistency=2/8
+    #   bars=1(Cycle380): Sh=0.50(↓-0.37), PF=1.18(↓-0.15), Tr=39, Consistency=2/8 — 타이밍 지연
+    #   bars=2: Sh=-0.36(↓↓), PF=1.00(↓↓), Tr=29, Consistency=0/8 — 단조 악화, DEAD
+    #   결론: bars 증가 방향 완전 종료. confirmation_bars=0(기본값) 확정 불변. 추가 실험 금지.
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
 }
 

@@ -1386,3 +1386,46 @@ class TestSharpDecayFilter:
         assert m.get_sharpe_decay_multiplier() == 0.5
         m2 = DrawdownMonitor.from_dict(m.to_dict())
         assert m2.get_sharpe_decay_multiplier() == 0.5
+
+
+# ── should_kill_strategy 레짐별 multiplier — RANGING / HIGH_VOL (Cycle 393 B) ─
+
+
+def test_regime_ranging_tightens_kill_threshold():
+    """RANGING 레짐: cap=1.2 → multiplier=1.5가 1.2로 축소되어 더 빨리 kill."""
+    m = DrawdownMonitor()
+    # backtest_mdd=0.10, current_mdd=0.13
+    # 기본(1.5): threshold=0.15 → no kill
+    assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5) is False
+    # RANGING(cap=1.2): threshold=0.12 → kill
+    assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="RANGING") is True
+
+
+def test_regime_high_vol_kills_at_backtest_mdd():
+    """HIGH_VOL 레짐: cap=1.0 → backtest MDD 초과 즉시 kill."""
+    m = DrawdownMonitor()
+    # backtest_mdd=0.10, current_mdd=0.11 → threshold=0.10*1.0=0.10 → 0.11 > 0.10 → kill
+    assert m.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="HIGH_VOL") is True
+    # current_mdd=0.09 → 0.09 < 0.10 → no kill
+    assert m.should_kill_strategy(0.09, 0.10, multiplier=1.5, regime="HIGH_VOL") is False
+
+
+# ── trailing_stop_signal 회복 시 신호 해제 (Cycle 393 B) ──────────────────────
+
+
+def test_trailing_stop_signal_recovery_resets():
+    """급락 후 완전 회복하면 long_mdd=0 → trailing_stop_signal=False."""
+    m = DrawdownMonitor(rolling_window=50)
+    # 30봉 안정
+    for _ in range(30):
+        m.update(10000)
+    # 20봉 급락 → signal=True
+    for i in range(20):
+        m.update(10000 - (i + 1) * 250)
+    assert m.trailing_stop_signal(accel_threshold=1.5) is True
+
+    # 51봉 이상 완전 회복 (새로운 고점) → maxlen=50으로 구 이력 밀려남
+    for i in range(51):
+        m.update(10001 + i * 100)  # 지속 상승
+    # 최근 50봉이 모두 상승 구간 → MDD≈0 → False
+    assert m.trailing_stop_signal(accel_threshold=1.5) is False

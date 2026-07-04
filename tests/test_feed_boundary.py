@@ -274,3 +274,47 @@ class TestVolumeNormalization:
         feed = DataFeed(connector)
         result = feed.fetch("BTC/USDT", "1h", limit=50)
         assert "volume_quote_sma20" in result.df.columns
+
+
+# ── _add_indicators NaN 경계값 테스트 (Cycle 393 C) ───────────────────────────
+
+
+class TestAddIndicatorsNanBoundary:
+    """_add_indicators() NaN/영값 경계 조건 테스트."""
+
+    def _make_raw_candles(self, n=50, close=42000.0, volume=100.0):
+        """단순 OHLCV raw 리스트 생성."""
+        return [
+            [1704067200000 + i * 3600000,
+             close * 0.99, close * 1.01, close * 0.98, close, volume]
+            for i in range(n)
+        ]
+
+    def test_zero_volume_no_inf_in_vwap(self):
+        """volume=0 캔들에서 VWAP 계산 시 inf 발생 없음 (NaN이어야 함)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=30, volume=0.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df = result.df
+        # VWAP 컬럼 존재 확인
+        assert "vwap" in df.columns
+        assert "vwap20" in df.columns
+        # inf가 없어야 함 (NaN 또는 정상값만 허용)
+        import numpy as np
+        assert not np.isinf(df["vwap"].dropna()).any(), "vwap에 inf 발생"
+        assert not np.isinf(df["vwap20"].dropna()).any(), "vwap20에 inf 발생"
+
+    def test_constant_close_rsi_no_crash(self):
+        """close 값이 모두 동일하면 avg_loss=0 → RSI가 NaN (크래시 아님)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=30, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df = result.df
+        # rsi14 컬럼 존재 (크래시 없이 완료)
+        assert "rsi14" in df.columns
+        # close 불변 → delta=0 → gain=loss=0 → rs=NaN → rsi14=NaN (첫 봉 이후)
+        import numpy as np
+        rsi_values = df["rsi14"].iloc[1:]  # 첫 봉 제외
+        assert not np.isinf(rsi_values.dropna()).any(), "rsi14에 inf 발생"

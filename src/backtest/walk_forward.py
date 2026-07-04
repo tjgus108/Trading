@@ -208,10 +208,10 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   close_window 탐색 완전 종료: 40(Cycle360: 대폭 악화), 50(최적), 60(역효과)
         #   → close_window=50 확정 불변. 추가 실험 금지.
         "vol_atr_trend_min": [1.0, 1.2, 1.5, 2.0, 2.5],
-        # Cycle380 C(데이터): confirmation_bars 탐색 — bounce 후 N봉 확인 (0=즉시)
-        # 가설: N봉 hold 확인 → 오신호(false bounce) 감소 → PF↑, Trades↓
-        # 주의: confirmation_bars>0이면 entries 지연 → trades 감소 위험
-        "confirmation_bars": [0, 1, 2],
+        # Cycle380+393: confirmation_bars 탐색 완전 종료 (DEAD PARAM)
+        # bars=0: Sh=0.95, bars=1: Sh=0.50(↓), bars=2: Sh=-0.36(↓↓) — 단조 악화
+        # 결론: 타이밍 지연 효과만 있음. confirmation_bars=0 확정 불변. 추가 실험 금지.
+        "confirmation_bars": [0],
         # Cycle381 D(ML): atr_bounce_factor 탐색 — ATR 기반 동적 bounce_pct
         # paper_sim 결과: factor=1.0 → Sharpe=1.17(+0.30), PF=1.25(+0.05), Consistency=1/8(-1)
         # Sharpe 개선되나 Consistency 악화 → 개인 윈도우 효과는 있음(WFO 탐색 가치 존재)
