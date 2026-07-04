@@ -1008,3 +1008,36 @@ def test_consec_loss_scale_threshold_negative_clamped_to_zero():
     """음수 threshold는 0으로 고정되어야 함."""
     engine = BacktestEngine(consec_loss_scale_threshold=-3)
     assert engine.consec_loss_scale_threshold == 0
+
+
+def test_atr_zero_skips_signal_adds_fail_reason():
+    """ATR=0인 DataFrame에서 신호가 스킵되고 fail_reasons에 atr=0 기록이 추가되어야 함."""
+    n = 200
+    closes = 100.0 * np.cumprod(1 + 0.001 * np.ones(n))
+    highs = closes * 1.005
+    lows = closes * 0.995
+    df = pd.DataFrame({
+        "close": closes, "high": highs, "low": lows,
+        "atr14": np.zeros(n),  # ATR=0: 포지션 사이징 불가
+    })
+    engine = BacktestEngine()
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert result.total_trades == 0, "ATR=0 → 거래 0건 기대"
+    atr_reasons = [r for r in result.fail_reasons if "atr=0" in r]
+    assert len(atr_reasons) > 0, f"fail_reasons에 'atr=0' 항목이 없음: {result.fail_reasons}"
+
+
+def test_small_initial_balance_engine_no_crash():
+    """초기 잔고가 매우 작을 때 엔진이 크래시 없이 실행되어야 함."""
+    engine = BacktestEngine(
+        initial_balance=1.0,  # $1 잔고
+        commission=0.0,
+        slippage=0.0,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+    )
+    df = make_df(n=200, close_trend=0.001)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    # 잔고 1달러라도 size > 0이면 거래 발생, size≈0이면 거래 0건 — 어느 쪽이든 크래시 없어야 함
+    assert result.total_trades >= 0

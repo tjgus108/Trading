@@ -318,3 +318,32 @@ class TestAddIndicatorsNanBoundary:
         import numpy as np
         rsi_values = df["rsi14"].iloc[1:]  # 첫 봉 제외
         assert not np.isinf(rsi_values.dropna()).any(), "rsi14에 inf 발생"
+
+    def test_bb_width_non_negative_for_normal_prices(self):
+        """정상 가격 데이터에서 bb_width >= 0 이어야 함 (bb_upper >= bb_lower)."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=50, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "bb_width" in df.columns
+        valid = df["bb_width"].dropna()
+        assert (valid >= 0).all(), f"bb_width 음수 발생: {valid[valid < 0]}"
+
+    def test_macd_hist_equals_macd_minus_signal(self):
+        """macd_hist = macd - macd_signal 일관성 검증."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=50, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "macd" in df.columns
+        assert "macd_signal" in df.columns
+        assert "macd_hist" in df.columns
+        expected = df["macd"] - df["macd_signal"]
+        np.testing.assert_allclose(
+            df["macd_hist"].values, expected.values, atol=1e-10,
+            err_msg="macd_hist ≠ macd - macd_signal"
+        )

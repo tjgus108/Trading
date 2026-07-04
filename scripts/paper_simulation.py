@@ -266,7 +266,15 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   bars=1(Cycle380): Sh=0.50(↓-0.37), PF=1.18(↓-0.15), Tr=39, Consistency=2/8 — 타이밍 지연
     #   bars=2: Sh=-0.36(↓↓), PF=1.00(↓↓), Tr=29, Consistency=0/8 — 단조 악화, DEAD
     #   결론: bars 증가 방향 완전 종료. confirmation_bars=0(기본값) 확정 불변. 추가 실험 금지.
-    "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2},
+    # Cycle395 F(리서치): atr_bounce_factor 탐색 완전 종료 (2026-07-04)
+    #   baseline(factor=0.0): Sh=0.95, PF=1.33, Tr=34, Consistency=2/8, SharpeStd=2.20 → FAIL
+    #   factor=0.3: Sh=0.07(↓↓ DEAD), 동적 threshold≈0.45% < 0.6% baseline → 노이즈 증가
+    #   factor=0.5: Sh=1.06(+0.11↑), PF=1.32, Tr=35, Consistency=2/8(변화없음), SharpeStd=1.67(↓ 안��화)
+    #   factor=1.0(Cycle381): Sh=1.17(↑), Consistency=1/8(↓) — Sharpe↑ but Consistency↓
+    #   결론: factor=0.5가 Sharpe/안정성 소폭 개선이나 Consistency ceiling=2/8 돌파 불가
+    #   → price_cluster 1h BTC 최적화 완전 종료 선언 (Consistency 2/8 ceiling 확정)
+    #   확정 파라미터: factor=0.5 (Sharpe/SharpeStd 기준 가장 양호)
+    "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2, "atr_bounce_factor": 0.5},
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

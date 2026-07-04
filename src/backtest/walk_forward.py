@@ -202,10 +202,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "vol_atr_trend_min": [1.2],
         # confirmation_bars 탐색 완전 종료 (Cycle393): bars=0 확정
         "confirmation_bars": [0],
-        # Cycle394 D(ML): atr_bounce_factor 중간값 추가 — 0.3/0.5 탐색
-        # 0.0=비활성, 0.3=ATR×0.3≈0.45%(BTC), 0.5=ATR×0.5≈0.75%, 1.0=ATR×1.0≈1.49%
-        # factor=1.0: paper_sim Sh=1.17(+0.30), Consistency=1/8(-1) — 윈도우별 효과 확인
-        # 가설: 0.3~0.5 구간이 fixed bounce_pct=0.6%와 유사 → 안정적 동적 조정 가능성
+        # Cycle395 F(리서치): atr_bounce_factor 탐색 완전 종료 (2026-07-04)
+        # factor=0.0(baseline): Sh=0.95, PF=1.33, Tr=34, Consistency=2/8, SharpeStd=2.20
+        # factor=0.3: Sh=0.07 DEAD (동적threshold≈0.45% < 0.6% baseline → 노이즈 급증)
+        # factor=0.5: Sh=1.06(+0.11↑), PF=1.32, Tr=35, Consistency=2/8(변화없음), SharpeStd=1.67(↓안정화)
+        # factor=1.0(Cycle381): Sh=1.17(+0.22), Consistency=1/8(↓) — Sharpe↑ Consistency↓
+        # 결론: factor=0.5가 Sharpe/안정성 최적. Consistency ceiling=2/8 돌파 불가.
+        # → price_cluster 1h BTC 최적화 완전 종료. 추가 atr_bounce_factor 실험 금지.
+        # paper_sim 확정 파라미터: factor=0.5 (Sh=1.06, SharpeStd=1.67)
         "atr_bounce_factor": [0.0, 0.3, 0.5, 1.0],
         # Cycle384: rsi_oversold_filter DEAD (0 trades). 그리드에서 제거됨.
     },

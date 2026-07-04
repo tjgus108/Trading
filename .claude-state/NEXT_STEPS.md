@@ -1,51 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-07-04 (Cycle 394 완료)_
+_Last updated: 2026-07-04 (Cycle 395 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 394
+### 이번 세션 완료 사이클: 395
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 392 | B+D+F | CB recovery_window+DM HIGH_VOL+DM reset_weekly 테스트3개(+7→8509), **close_window=60 DEAD**(Sh=0.55↓0.40!, Tr=30↓4), **close_window 탐색 완전 종료** |
 | 393 | C+B+F | feed NaN경계+DM레짐kill/trailing 테스트5개(+5→8514), **confirmation_bars=2 DEAD**(Sh=-0.36↓↓, 0/8), **confirmation_bars 탐색 완전 종료** |
-| 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95), **atr_bounce_factor탐색 진행 중** |
+| 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95) |
+| 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 
-### 🎯 Cycle 395 작업 방향 (395 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 396 작업 방향 (396 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): BacktestEngine 또는 보고서 생성 미커버 케이스
+#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스
 
-- **배경**: BacktestEngine 커버리지 지속 향상
-- **작업 방향**: `src/backtest/engine.py` 또는 `src/backtest/report.py` 미커버 케이스
-  - 잔고 부족 주문 처리 경계값, 포트폴리오 리밸런싱 경계값
+- **배경**: 리스크 모듈 커버리지 지속 향상
+- **작업 방향**: `src/risk/drawdown_monitor.py` 또는 `src/risk/circuit_breaker.py` 미커버 케이스
+  - should_kill_strategy 추가 경계값, get_size_multiplier 엣지케이스
 
-#### C(데이터): DataFeed 캐시 또는 오류 처리 미커버 케이스
+#### D(ML): walk_forward WFO 그리드 점검 또는 ML trainer 개선
 
-- **배경**: feed.py 커버리지 지속 향상
-- **작업 방향**: `src/data/feed.py` 또는 연관 모듈 미커버 케이스
+- **배경**: price_cluster 최적화 종료 → dema_cross WFO 그리드 정리 또는 다른 전략 검토
+- **작업 방향**: `src/backtest/walk_forward.py` dema_cross WFO 그리드 현행화
+  - 탐색 완료된 파라미터(ema200_filter, macd_hist_filter, rsi_dir_filter 등) dead param 주석 정리
+  - 또는 frama/roc_ma_cross WFO 그리드 최적화
 
-#### F(리서치): atr_bounce_factor WFO 결과 분석 + price_cluster 종료 여부 최종 결정
+#### F(리서치): price_cluster 완전 종료 → dema_cross 또는 roc_ma_cross 다음 방향 분석
 
-- **배경**: Cycle394 D(ML)에서 아래 변경 완료
-  - WFO 그리드 트리밍: close_window→[50], vol_atr_trend_min→[1.2], bounce_pct→[0.006,0.008,0.010]
-  - atr_bounce_factor→[0.0, 0.3, 0.5, 1.0] 세밀 탐색 가능
-  - Sim결과: price_cluster FAIL(2/8, Sh=0.95, PF=1.33, Tr=34) 기준선 유지
-- **작업 방향**: run_bundle_oos.py 또는 paper_simulation.py로 새 WFO 결과 확인
-  - factor=0.3/0.5가 유효하면 → paper_sim 단독 실험 진행
-  - 모두 dead이면 → price_cluster 최적화 완전 종료 선언
+- **배경**: price_cluster 1h BTC 최적화 완전 종료 (Cycle395)
+  - 최종 확정 파라미터: vol_regime_filter=True, bounce_pct=0.006, vol_atr_trend_min=1.2, atr_bounce_factor=0.5
+  - Consistency ceiling=2/8 불변 (구조적 한계 도달)
+- **작업 방향**: dema_cross PF=1.38 → 1.50 갭(0.12) 달성 방법 분석
+  - 탐색 완료: fast/slow/dist_pct/rsi_dir_filter/bb_width/macd_hist/ema200/atr_vol_min
+  - 새 방향: SL/TP 튜닝? 새 신호 조건? → F(리서치)에서 방향 결정
+  - 또는: roc_ma_cross SL/TP 실험 (Trades=14 avg에서 PF 개선 가능성)
 
-### ⚠️ 주의 사항 (Cycle 394 이후)
+### ⚠️ 주의 사항 (Cycle 395 이후)
 
-- **WFO 그리드 dead param 정리 완료** (Cycle394 D): walk_forward.py 갱신됨
-  - close_window→[50], vol_atr_trend_min→[1.2], bounce_pct→[0.006,0.008,0.010], atr_bounce_factor→[0.0,0.3,0.5,1.0]
-  - WFO 조합 수 대폭 감소 → 다음 OOS 번들 실행 시 훨씬 빠름
-- **atr_bounce_factor 탐색 진행 중** (Cycle394 D): [0.3, 0.5] 추가 → 다음 WFO로 결과 확인 예정
-  - factor=1.0 (Cycle381): paper_sim Sh=1.17(↑), Consistency=1/8(↓) — Sharpe↑ but Consistency↓
-  - 0.3~0.5 가설: fixed bounce_pct=0.6%와 유사 동적 임계 → Consistency 개선 가능성
-  - **결과가 FAIL이면 → price_cluster 최적화 완전 종료 선언**
+- **price_cluster 최적화 완전 종료** (Cycle395 F): 추가 실험 금지
+  - 확정 파라미터: `{"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2, "atr_bounce_factor": 0.5}`
+  - Consistency ceiling=2/8 (구조적 한계). 1h BTC에서 4/8 달성 불가 확인
+  - atr_bounce_factor: 0.3(DEAD), 0.5(best:Sh=1.06,SharpeStd=1.67), 1.0(Sh=1.17,Consist↓) 모두 검증
+- **atr_bounce_factor 탐색 완전 종료** (Cycle395 F): 추가 실험 금지
 - **confirmation_bars 탐색 완전 종료** (Cycle393 F): bars=0 확정 불변, 추가 실험 금지
   - bars=0(Sh=0.95,PF=1.33,Tr=34,2/8) / bars=1(Sh=0.50,혼재) / bars=2(Sh=-0.36,DEAD,0/8)
   - **WFO grid도 [0]으로 축소 완료** (walk_forward.py 갱신됨)
@@ -200,23 +200,34 @@ _Last updated: 2026-07-04 (Cycle 394 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 392 업데이트)
+### 핵심 메트릭 (Cycle 395 업데이트)
 
-| 지표 | Cycle 391 | Cycle 392 | 변화 |
+| 지표 | Cycle 394 | Cycle 395 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.95(filter=T+bp=0.006) | **0.55**(cw=60 DEAD)→복원 **0.95** | 복원 유지 |
-| 1h BTC price_cluster PF | 1.33 | **1.22**(cw=60)→복원 **1.33** | 복원 유지 |
-| 1h BTC price_cluster Trades | 34 | **30**(cw=60)→복원 **34** | 복원 유지 |
+| 1h BTC price_cluster Sharpe | 0.95(f=0.0) | **1.06**(f=0.5 확정) | +0.11↑ |
+| 1h BTC price_cluster SharpeStd | 2.20 | **1.67** | ↓안정화 |
+| 1h BTC price_cluster Consistency | 2/8 | **2/8** | 유지(ceiling) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8502개 | **8509개** (+7) | +7 추가 |
+| 테스트 수 | 8516개 | **8520개** (+4) | +4 추가 |
+
+### Cycle 395 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_backtest_engine.py` | test_atr_zero_skips_signal_adds_fail_reason 추가 (Cycle395 A): ATR=0 신호스킵+fail_reasons 검증 |
+| `tests/test_backtest_engine.py` | test_small_initial_balance_engine_no_crash 추가 (Cycle395 A): initial_balance=$1 크래시없음 |
+| `tests/test_feed_boundary.py` | test_bb_width_non_negative_for_normal_prices 추가 (Cycle395 C): bb_width>=0 검증 |
+| `tests/test_feed_boundary.py` | test_macd_hist_equals_macd_minus_signal 추가 (Cycle395 C): macd_hist=macd-macd_signal 일관성 |
+| `scripts/paper_simulation.py` | atr_bounce_factor=0.3→0.5→확정 실험 + 탐색 종료 주석 (Cycle395 F) |
+| `src/backtest/walk_forward.py` | atr_bounce_factor 탐색 완전 종료 주석 추가 (Cycle395 F) |
 
 ### Cycle 392 코드 변경 요약
 
