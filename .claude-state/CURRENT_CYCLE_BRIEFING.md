@@ -1,54 +1,53 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-05 (Cycle 397 완료)_
+_Last updated: 2026-07-05 (Cycle 398 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 397
-- **다음 사이클**: 398 (398 mod 5 = 3 → C+B+F)
+- **완료된 사이클**: 398
+- **다음 사이클**: 399 (399 mod 5 = 4 → D+E+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Consist=4/8)
-- **frama**: Sh=0.24, PF=1.12, Trades=40 → 다음 개선 타겟 (atr_period dead param 확정됨)
+- **frama**: Sh=0.24, PF=1.12, Trades=40 → weak_rsi_buy_max=50 실험 중 (다음 sim에서 확인)
 - **price_cluster**: Sh=1.06, Consist=2/8 → 최적화 완전 종료
 - **dema_cross**: Sh=0.85, PF=1.38 → 탐색 완전 종료
 - **Bundle OOS**: 5/5 PASS (최신)
-- **전체 테스트 수**: 8532개 (+6)
+- **전체 테스트 수**: 8544개 (+12)
 
-## Cycle 397 주요 결과
+## Cycle 398 주요 결과
 
-### B(리스크): DrawdownMonitor 미커버 케이스 6개 추가
+### C(데이터): feed.py _add_indicators() 단행 DF 경계 케이스 5개 추가
 
-- `tests/test_drawdown_monitor.py`: transition_cushion_multiplier 경계값 3개
-  - regime_confidence=0 (최솟값) → 0.5x 축소
-  - regime_confidence == threshold(0.70) → 1.0 (< 조건 불성립)
-  - regime_confidence=1.0 (최댓값) → 1.0
-- `tests/test_drawdown_monitor.py`: should_liquidate_all 3개
-  - MDD 15.5% (LIQUIDATE 레벨) → True
-  - MDD 21% (FULL_HALT 레벨) → True
-  - MDD 11% (BLOCK_ENTRY 레벨) → False (청산 미발동)
+- `tests/test_feed_boundary.py`: `TestAddIndicatorsShortDf` 클래스 신규 (5 tests)
+  - 1-row / 3-row df → crash 없이 컬럼 생성 확인
+  - 5-row df → donchian(rolling(20)) all NaN, EWM ATR은 값 존재
+  - volume_quote + volume_quote_sma20 자동 생성 확인
+  - 사전 미발견: `_add_indicators()` 1행 입력 시 crash 여부 미검증
 
-### F(리서치): frama 신호 로직 분석 — 중요 발견
+### B(리스크): kelly_sizer compute_from_trades() 엣지케이스 7개 추가
 
-- **핵심 발견**: `frama.py`에서 `atr_contracting` 변수는 계산만 되고 BUY/SELL 조건에 미사용
-  - `atr_str` 로그 문자열에만 사용 → ATR 수축 필터 = dead code
-  - 따라서 `atr_period` 파라미터가 신호 생성에 완전히 무효과
-  - Cycle363/371 에서 atr_period 실험이 "효과 없음"이었던 이유 설명됨
-- **약한신호 RSI 조건**: gap<1%일 때 RSI<40(BUY)/RSI>60(SELL) 하드코딩
-  - BTC 1h RANGING(47.3%)에서 RSI가 40-60 구간에 머물면 신호 차단
-  - 다음 방향: weak_rsi_buy_max 파라미터화로 완화 검토
+- `tests/test_kelly_sizer_regime_edge_cases.py`: `TestKellyComputeFromTrades` 클래스 신규 (7 tests)
+  - 전패 입력(avg_win=0) → size=0
+  - 전승 입력(avg_loss=0) → crash 없음, size>=0
+  - NaN/inf 포함 입력 → 필터링 후 유한 결과
+  - 빈 리스트([]) → 0.0
+  - 전체 NaN → 0.0
+  - 소표본(n=10) → Bayesian shrinkage 적용
+  - 손익분기 트레이드([0.0×4]) → 0.0
 
-### D(ML): frama WFO 그리드 atr_period DEAD PARAM 정리
+### F(리서치): frama weak_rsi_buy_max 파라미터화
 
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["frama"] 업데이트
-  - atr_period=[10,14,18] → 주석 처리 (dead param)
-  - F(리서치) 분석 결과 + 탐색 종료 사유 문서화
-  - WFO combos: 27 → 9 (3x 속도 향상 가능)
-  - 다음 개선 방향(weak_rsi_buy_max 파라미터화) 주석 추가
+- `src/strategy/frama.py`: `weak_rsi_buy_max=40`, `weak_rsi_sell_min=60` 파라미터 추가
+  - 기존: gap<1% 약한신호 → RSI<40(BUY) / RSI>60(SELL) 하드코딩
+  - 변경: 파라미터화 → WFO 그리드 탐색 가능
+  - 동기: BTC 1h RANGING(47.3%)에서 RSI 40-60 구간 신호 차단 → Trades 증가 가능성
+- `src/backtest/walk_forward.py`: `weak_rsi_buy_max=[40, 50, 60]` 그리드 추가 (9→27 combos)
+- `scripts/paper_simulation.py`: `weak_rsi_buy_max=50` 실험 파라미터 추가
 
-## 시뮬레이션 현황 (Cycle 396 생성, Cycle 397 분석)
+## 시뮬레이션 현황 (Cycle 398 생성, baseline — 코드 변경 전 실행)
 
 | 전략 | Sharpe | PF | Trades | Consist | Pass |
 |------|--------|-----|--------|---------|------|
 | roc_ma_cross | 1.81 | 2.02 | 14 | 4/8 | **PASS** |
 | price_cluster | 1.06 | 1.32 | 35 | 2/8 | FAIL |
 | dema_cross | 0.85 | 1.38 | 26 | 2/8 | FAIL |
-| frama | 0.24 | 1.12 | 40 | 1/8 | FAIL (다음 타겟) |
+| frama | 0.24 | 1.12 | 40 | 1/8 | FAIL (weak_rsi_buy_max=50 실험 → 다음 sim에서 확인) |

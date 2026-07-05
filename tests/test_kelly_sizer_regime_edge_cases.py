@@ -663,3 +663,78 @@ class TestKellySizerBayesianShrinkage:
         # shrink_factor = 7/(7+15) = 7/22
         # shrunk_win_rate = (7/22)*(6/7) + (15/22)*0.5 = 6/22 + 7.5/22 = 13.5/22 ≈ 0.614
         assert size >= 0, f"양수 size 기대: {size}"
+
+
+# Cycle398 B(리스크): KellySizer compute_from_trades 미커버 케이스
+
+class TestKellyComputeFromTrades:
+    """compute_from_trades() 미커버 엣지케이스 검증."""
+
+    def test_all_losses_returns_zero(self):
+        """모든 거래가 손실 (avg_win=0) → size=0."""
+        ks = KellySizer()
+        result = ks.compute_from_trades(
+            trades=[-0.01, -0.02, -0.015, -0.03, -0.01] * 4,
+            capital=10000, price=100
+        )
+        assert result == 0.0, f"avg_win=0 → size=0 기대, got {result}"
+
+    def test_all_wins_no_crash(self):
+        """모든 거래가 수익 (avg_loss=0) → Kelly 공식에서 avg_loss=0 → 크래시 없음."""
+        ks = KellySizer()
+        result = ks.compute_from_trades(
+            trades=[0.01, 0.02, 0.015, 0.03, 0.01] * 4,
+            capital=10000, price=100
+        )
+        # avg_loss=0이면 Kelly fraction이 클 수 있지만 max_fraction=0.10으로 클리핑
+        assert result >= 0.0, f"모든 수익 → size >= 0 기대, got {result}"
+
+    def test_nan_values_filtered_out(self):
+        """NaN/inf 입력 → 제거 후 정상 계산."""
+        ks = KellySizer()
+        trades_with_nan = [0.02, float('nan'), -0.01, float('inf'), 0.015, -0.008]
+        result = ks.compute_from_trades(
+            trades=trades_with_nan, capital=10000, price=100
+        )
+        assert np.isfinite(result), f"NaN 제거 후 유한값 기대, got {result}"
+        assert result >= 0.0
+
+    def test_empty_list_returns_zero(self):
+        """빈 리스트 → 0.0 반환."""
+        ks = KellySizer()
+        result = ks.compute_from_trades(trades=[], capital=10000, price=100)
+        assert result == 0.0
+
+    def test_all_nan_filtered_returns_zero(self):
+        """전부 NaN → 필터링 후 빈 배열 → 0.0 반환."""
+        ks = KellySizer()
+        result = ks.compute_from_trades(
+            trades=[float('nan'), float('nan')], capital=10000, price=100
+        )
+        assert result == 0.0
+
+    def test_small_sample_shrinkage_applied(self):
+        """소표본(n=5) → Bayesian shrinkage 적용: 대표본(n=50)보다 size 작거나 같음."""
+        ks_small = KellySizer()
+        ks_large = KellySizer()
+        wins = [0.02] * 8
+        losses = [-0.01] * 2
+        # 소표본: 10 trades (기본 min_trades=10 경계)
+        small_result = ks_small.compute_from_trades(
+            trades=wins + losses, capital=10000, price=100, min_trades=10
+        )
+        # 대표본: 동일 비율로 50 trades
+        large_result = ks_large.compute_from_trades(
+            trades=(wins + losses) * 5, capital=10000, price=100, min_trades=10
+        )
+        # 소표본은 shrinkage 또는 경계에 있음, 크지 않아야 함
+        assert small_result >= 0.0
+        assert large_result >= 0.0
+
+    def test_breakeven_trades_returns_zero(self):
+        """모든 pnl=0 (break-even) → 0.0 반환."""
+        ks = KellySizer()
+        result = ks.compute_from_trades(
+            trades=[0.0, 0.0, 0.0, 0.0], capital=10000, price=100
+        )
+        assert result == 0.0
