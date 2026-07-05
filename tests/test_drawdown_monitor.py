@@ -1476,3 +1476,48 @@ def test_trailing_stop_signal_recovery_resets():
         m.update(10001 + i * 100)  # 지속 상승
     # 최근 50봉이 모두 상승 구간 → MDD≈0 → False
     assert m.trailing_stop_signal(accel_threshold=1.5) is False
+
+
+# ── Cycle 397 B(리스크): get_transition_cushion_multiplier 경계값 + should_liquidate_all ──
+
+
+def test_transition_cushion_confidence_zero_returns_half():
+    """enabled=True, regime_confidence=0 → threshold=0.70 미만이므로 0.5 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    assert m.get_transition_cushion_multiplier(0.0) == 0.5
+
+
+def test_transition_cushion_confidence_at_exact_threshold_returns_one():
+    """regime_confidence == threshold(=0.70): < 조건 불성립 → 1.0 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    assert m.get_transition_cushion_multiplier(0.70) == 1.0
+
+
+def test_transition_cushion_confidence_one_returns_one():
+    """enabled=True, regime_confidence=1.0 → threshold=0.70 이상 → 1.0 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.70)
+    assert m.get_transition_cushion_multiplier(1.0) == 1.0
+
+
+def test_should_liquidate_all_at_liquidate_level():
+    """MDD >= mdd_liquidate_pct(15%) → LIQUIDATE 단계 → should_liquidate_all=True."""
+    m = DrawdownMonitor(mdd_liquidate_pct=0.15, mdd_halt_pct=0.20)
+    m.update(10000)
+    m.update(8450)  # 15.5% 낙폭 → LIQUIDATE
+    assert m.should_liquidate_all() is True
+
+
+def test_should_liquidate_all_at_full_halt_level():
+    """MDD >= mdd_halt_pct(20%) → FULL_HALT 단계 → should_liquidate_all=True."""
+    m = DrawdownMonitor(mdd_halt_pct=0.20)
+    m.update(10000)
+    m.update(7900)  # 21% 낙폭 → FULL_HALT
+    assert m.should_liquidate_all() is True
+
+
+def test_should_liquidate_all_at_block_entry_is_false():
+    """MDD 10-15% → BLOCK_ENTRY 단계 → should_liquidate_all=False."""
+    m = DrawdownMonitor(mdd_block_pct=0.10, mdd_liquidate_pct=0.15)
+    m.update(10000)
+    m.update(8900)  # 11% 낙폭 → BLOCK_ENTRY (< 15%)
+    assert m.should_liquidate_all() is False

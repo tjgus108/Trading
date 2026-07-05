@@ -1,47 +1,54 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-05 (Cycle 396 완료)_
+_Last updated: 2026-07-05 (Cycle 397 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 396
-- **다음 사이클**: 397 (397 mod 5 = 2 → B+D+F)
+- **완료된 사이클**: 397
+- **다음 사이클**: 398 (398 mod 5 = 3 → C+B+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Consist=4/8)
+- **frama**: Sh=0.24, PF=1.12, Trades=40 → 다음 개선 타겟 (atr_period dead param 확정됨)
 - **price_cluster**: Sh=1.06, Consist=2/8 → 최적화 완전 종료
 - **dema_cross**: Sh=0.85, PF=1.38 → 탐색 완전 종료
-- **Bundle OOS**: 5/5 PASS (Cycle395 실데이터 — 최신)
-- **전체 테스트 수**: 8526개 (+6)
+- **Bundle OOS**: 5/5 PASS (최신)
+- **전체 테스트 수**: 8532개 (+6)
 
-## Cycle 396 주요 결과
+## Cycle 397 주요 결과
 
 ### B(리스크): DrawdownMonitor 미커버 케이스 6개 추가
 
-- `tests/test_drawdown_monitor.py`: should_kill_strategy HIGH_VOL 레짐 테스트
-  - HIGH_VOL cap=1.0 → threshold=0.10 (backtest MDD 초과 즉시 kill) 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy RANGING 레짐 테스트
-  - RANGING cap=1.2 → threshold=0.12 (빠른 kill) 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy TREND_DOWN 레짐 테스트
-  - TREND_DOWN cap=1.2 → threshold=0.12 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy 알 수 없는 레짐 fallback 테스트
-  - 미정의 레짐 → multiplier 그대로 사용 검증
-- `tests/test_drawdown_monitor.py`: get_size_multiplier MDD WARN + ATR elevated 조합 테스트
-  - min(streak=1.0, mdd=0.5, atr=0.5, sharpe=1.0) = 0.5 검증
-- `tests/test_drawdown_monitor.py`: get_size_multiplier MDD BLOCK + streak 조합 테스트
-  - min(streak=0.5, mdd=0.0) = 0.0 (BLOCK 우선) 검증
+- `tests/test_drawdown_monitor.py`: transition_cushion_multiplier 경계값 3개
+  - regime_confidence=0 (최솟값) → 0.5x 축소
+  - regime_confidence == threshold(0.70) → 1.0 (< 조건 불성립)
+  - regime_confidence=1.0 (최댓값) → 1.0
+- `tests/test_drawdown_monitor.py`: should_liquidate_all 3개
+  - MDD 15.5% (LIQUIDATE 레벨) → True
+  - MDD 21% (FULL_HALT 레벨) → True
+  - MDD 11% (BLOCK_ENTRY 레벨) → False (청산 미발동)
 
-### D(ML): dema_cross WFO 그리드 dead param 현행화
+### F(리서치): frama 신호 로직 분석 — 중요 발견
 
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["dema_cross"] 각 파라미터에 dead param 주석 추가
-  - fast=10,12 DEAD (8 확정), slow=15,25 DEAD (20 확정)
-  - rsi_dir_filter=False DEAD, rsi_dir_threshold=45 DEAD
-  - ema_slope_min_buy=0.0003 DEAD, macd_hist_filter=True DEAD
-  - bb_width_min_filter=0.0 DEAD, ema200_filter=True DEAD
-  - Cycle396 종료 선언 주석 + 확정 파라미터 문서화
+- **핵심 발견**: `frama.py`에서 `atr_contracting` 변수는 계산만 되고 BUY/SELL 조건에 미사용
+  - `atr_str` 로그 문자열에만 사용 → ATR 수축 필터 = dead code
+  - 따라서 `atr_period` 파라미터가 신호 생성에 완전히 무효과
+  - Cycle363/371 에서 atr_period 실험이 "효과 없음"이었던 이유 설명됨
+- **약한신호 RSI 조건**: gap<1%일 때 RSI<40(BUY)/RSI>60(SELL) 하드코딩
+  - BTC 1h RANGING(47.3%)에서 RSI가 40-60 구간에 머물면 신호 차단
+  - 다음 방향: weak_rsi_buy_max 파라미터화로 완화 검토
 
-### F(리서치): 시뮬 결과 분석 + 다음 방향 결정
+### D(ML): frama WFO 그리드 atr_period DEAD PARAM 정리
 
-- **Paper Sim BTC 1h**: roc_ma_cross PASS(4/8, Sh=1.81) 유지 / price_cluster Sh=1.06 2/8 / dema_cross Sh=0.85 PF=1.38
-- **다음 최적화 대상**: **frama** (Sh=0.24, PF=1.12, Trades=40, +1.60% avg return)
-  - 이유: Trades=40 풍부 (signal 부족 없음), positive return edge 존재
-  - 미래: frama WFO 그리드 탐색 → atr_period 최적화 → Sharpe ≥ 1.0 목표
-  - 이전 탐색: atr_period=[10,14,18] WFO 그리드 존재 (Cycle363 F 추가)
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["frama"] 업데이트
+  - atr_period=[10,14,18] → 주석 처리 (dead param)
+  - F(리서치) 분석 결과 + 탐색 종료 사유 문서화
+  - WFO combos: 27 → 9 (3x 속도 향상 가능)
+  - 다음 개선 방향(weak_rsi_buy_max 파라미터화) 주석 추가
+
+## 시뮬레이션 현황 (Cycle 396 생성, Cycle 397 분석)
+
+| 전략 | Sharpe | PF | Trades | Consist | Pass |
+|------|--------|-----|--------|---------|------|
+| roc_ma_cross | 1.81 | 2.02 | 14 | 4/8 | **PASS** |
+| price_cluster | 1.06 | 1.32 | 35 | 2/8 | FAIL |
+| dema_cross | 0.85 | 1.38 | 26 | 2/8 | FAIL |
+| frama | 0.24 | 1.12 | 40 | 1/8 | FAIL (다음 타겟) |

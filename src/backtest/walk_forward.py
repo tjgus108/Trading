@@ -157,10 +157,21 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # atr_period=10: 더 빠른 반응 (노이즈 증가), 14: 기본값, 18: 더 완만한 평활화 (지연)
     # 배경: BTC rank2 Sharpe=0.24 PF=1.12 SharpeStd=1.60 (안정적, Cycle370 기준) — PF 개선 가능성 탐색
     # Cycle371 D(ML): paper_sim atr_period=10 실험 → 결과 NEXT_STEPS.md 참조
+    # Cycle397 F(리서치): atr_period DEAD PARAM 확정 — 중요 발견
+    #   frama.py 코드 분석 결과: atr_contracting (last_atr < prev_atr*1.05) 가 계산되지만
+    #   BUY/SELL 조건에서 사용되지 않음 — atr_str 로그 문자열에만 사용.
+    #   따라서 atr_period=[10,14,18] 탐색이 신호 생성에 무효과 (완전한 dead param).
+    #   이것이 Cycle371 D atr_period=10 "효과 없음" 이유임.
+    #   atr_period 탐색 종료. WFO 그리드에서 제거하여 9→3 combos (3x 속도 향상).
+    # Cycle397 F: frama 개선 방향 확정
+    #   현재 약한신호(gap<1%) RSI<40(BUY)/RSI>60(SELL) — RANGING(47.3% BTC 1h) 에서 과도 차단
+    #   다음 탐색 방향: rsi_period 탐색 유지 (rsi 임계값 자체는 하드코딩이라 WFO에서 변경 불가)
+    #   frama.py 파라미터화 가능한 것: weak_rsi_buy_max (현재 40 하드코딩) 추가 시 RANGING 개선 가능
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
-        "atr_period": [10, 14, 18],
+        # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
+        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 확정)
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)

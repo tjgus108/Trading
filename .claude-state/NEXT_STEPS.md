@@ -1,47 +1,55 @@
 # Next Steps
 
-_Last updated: 2026-07-05 (Cycle 396 완료)_
+_Last updated: 2026-07-05 (Cycle 397 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 396
+### 이번 세션 완료 사이클: 397
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95) |
 | 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 | 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
+| 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 
-### 🎯 Cycle 397 작업 방향 (397 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 398 작업 방향 (398 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스 (계속)
+#### C(데이터): feed.py 또는 data_utils 미커버 케이스
+
+- **배경**: 데이터 파이프라인 커버리지 향상
+- **작업 방향**: `src/data/feed.py` 또는 `src/data/data_utils.py` 미커버 케이스
+  - compute_indicators() 엣지케이스: 매우 짧은 df (< 10 rows), NaN 포함 입력
+  - load_csv_ohlcv() 파싱 실패 케이스
+  - enrich_indicators() 지표 일관성 추가 검증
+
+#### B(리스크): CircuitBreaker 또는 KellySizer 미커버 케이스
 
 - **배경**: 리스크 모듈 커버리지 지속 향상
-- **작업 방향**: `src/risk/drawdown_monitor.py` 미커버 케이스
-  - get_transition_cushion_multiplier 경계값 (regime_confidence=0, 0.5, 1.0)
-  - should_liquidate_all / trailing_stop_signal 엣지케이스
-  - 또는 rolling_mdd 윈도우 경계값
+- **작업 방향**: Cycle397 B 완료 → 다른 리스크 모듈
+  - `src/risk/circuit_breaker.py`: 미커버 엣지케이스
+  - `src/risk/kelly_sizer.py`: 미커버 경계값
 
-#### D(ML): frama WFO 그리드 탐색 시작
+#### F(리서치): frama 개선 방향 구체화
 
-- **배경**: Cycle396 F(리서치) 결정 — frama 다음 최적화 타겟
-  - frama: Sh=0.24, PF=1.12, Trades=40, AvgReturn=+1.60% (BTC 1h 실데이터)
-  - Trades 풍부 → signal scarcity 없음 (roc_ma_cross Trades=14 경계 문제 없음)
-  - 목표: Sharpe ≥ 1.0, PF ≥ 1.5 달성
-- **작업 방향**: `scripts/paper_simulation.py`에서 frama 파라미터 실험
-  - atr_period=[10,14,18] WFO 그리드 이미 존재 (Cycle363 F 추가)
-  - atr_period=10 기존 실험 결과 확인 후 새 파라미터 방향 탐색
-  - 또는 roc_ma_cross Trades=14(avg) 개선 방향 (PF 추가 개선 실험)
+- **배경**: Cycle397 F 발견 — atr_contracting dead code, weak RSI 조건이 bottleneck
+- **작업 방향**: frama.py에 `weak_rsi_buy_max` 파라미터 추가 가능성 탐색
+  - 현재: weak signal(gap<1%) → RSI<40(BUY), RSI>60(SELL) 하드코딩
+  - 제안: `weak_rsi_buy_max=40` 파라미터화 → WFO 그리드 탐색 가능
+  - RANGING 47.3%에서 RSI 40-60 구간 신호가 차단됨 → 완화로 Trades 증가 가능
+  - 주의: frama.py 수정 시 기존 테스트 호환성 확인 필수
 
-#### F(리서치): frama BTC 1h 기술적 특성 분석
+### ⚠️ 주의 사항 (Cycle 397 이후)
 
-- **배경**: frama 최적화 시작 전 전략 이해 필요
-- **작업 방향**: frama 신호 생성 로직 분석
-  - 어떤 시장 조건에서 신호 생성? (RANGING vs TREND)
-  - 신호 품질 분석: PASS 윈도우 vs FAIL 윈도우 차이
-  - 개선 가능 파라미터: atr_period 외에 추가 탐색 가능한 파라미터 있는지 확인
+- **frama atr_period DEAD PARAM 확정** (Cycle397 F): atr_contracting은 BUY/SELL 조건 미사용
+  - frama.py: `atr_contracting` 계산은 되지만 로그 문자열(`atr_str`)에만 사용
+  - WFO 그리드 atr_period=[10,14,18] 전부 신호 생성에 무효과
+  - atr_period 탐색 완전 종료 / walk_forward.py 그리드 주석화 완료
+  - Cycle363 F + Cycle371 D atr_period 실험 "효과 없음" 원인 확인됨
+- **frama 다음 방향**: weak signal RSI 임계값 파라미터화 (40→완화)
+  - 현재 gap<1%일 때 RSI<40(BUY) 하드코딩 → RANGING 47.3%에서 신호 차단
+  - frama.py에 `weak_rsi_buy_max` 파라미터 추가 필요
 
 ### ⚠️ 주의 사항 (Cycle 395 이후)
 
@@ -204,23 +212,32 @@ _Last updated: 2026-07-05 (Cycle 396 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 396 업데이트)
+### 핵심 메트릭 (Cycle 397 업데이트)
 
-| 지표 | Cycle 395 | Cycle 396 | 변화 |
+| 지표 | Cycle 396 | Cycle 397 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
 | 1h BTC price_cluster Sharpe | 1.06 | **1.06** | 유지 |
-| 1h BTC price_cluster SharpeStd | 1.67 | **1.67** | 유지 |
 | 1h BTC price_cluster Consistency | 2/8 | **2/8** | 유지(ceiling) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (다음 타겟) |
+| frama WFO combos | 27 | **9** | -18 (atr_period dead param) |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8520개 | **8526개** (+6) | +6 추가 |
+| 테스트 수 | 8526개 | **8532개** (+6) | +6 추가 |
+
+### Cycle 397 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_drawdown_monitor.py` | transition_cushion_multiplier 경계값 3개 테스트 추가 (Cycle397 B): confidence=0/threshold/1.0 |
+| `tests/test_drawdown_monitor.py` | should_liquidate_all 3개 테스트 추가 (Cycle397 B): LIQUIDATE/FULL_HALT=True, BLOCK_ENTRY=False |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["frama"] atr_period 탐색 종료 주석 + dead code 설명 (Cycle397 D+F) |
+| `src/backtest/walk_forward.py` | frama WFO 그리드 atr_period 라인 주석화 (27→9 combos, Cycle397 D) |
 
 ### Cycle 396 코드 변경 요약
 
