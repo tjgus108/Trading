@@ -942,6 +942,53 @@ class TestMddKillSwitch:
         assert status["threshold"] == pytest.approx(0.12)
         assert status["should_kill"] is True
 
+    def test_regime_high_vol_kills_at_backtest_mdd(self):
+        """HIGH_VOL 레짐 시 effective_mult=1.0 → backtest MDD 초과 즉시 kill."""
+        m = DrawdownMonitor()
+        # HIGH_VOL cap=1.0 → min(1.5, 1.0)=1.0 → threshold=0.10
+        assert m.should_kill_strategy(0.11, 0.10, multiplier=1.5, regime="HIGH_VOL") is True
+        assert m.should_kill_strategy(0.10, 0.10, multiplier=1.5, regime="HIGH_VOL") is False
+
+    def test_regime_ranging_tightens_kill_threshold(self):
+        """RANGING 레짐 시 cap=1.2 → threshold=0.12."""
+        m = DrawdownMonitor()
+        # min(1.5, 1.2)=1.2 → threshold=0.12
+        assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="RANGING") is True
+        assert m.should_kill_strategy(0.12, 0.10, multiplier=1.5, regime="RANGING") is False
+
+    def test_regime_trend_down_tightens_kill_threshold(self):
+        """TREND_DOWN 레짐 시 cap=1.2 → threshold=0.12."""
+        m = DrawdownMonitor()
+        # min(1.5, 1.2)=1.2 → threshold=0.12
+        assert m.should_kill_strategy(0.13, 0.10, multiplier=1.5, regime="TREND_DOWN") is True
+        assert m.should_kill_strategy(0.12, 0.10, multiplier=1.5, regime="TREND_DOWN") is False
+
+    def test_regime_unknown_falls_back_to_multiplier(self):
+        """알 수 없는 레짐은 multiplier를 그대로 사용."""
+        m = DrawdownMonitor()
+        # 알 수 없는 레짐 → cap = multiplier → threshold=0.15
+        assert m.should_kill_strategy(0.16, 0.10, multiplier=1.5, regime="UNKNOWN") is True
+        assert m.should_kill_strategy(0.14, 0.10, multiplier=1.5, regime="UNKNOWN") is False
+
+    def test_get_size_multiplier_mdd_warn_plus_atr_elevated(self):
+        """MDD WARN(0.5) + ATR elevated(0.5) → get_size_multiplier = min=0.5."""
+        m = DrawdownMonitor(mdd_warn_pct=0.05)
+        m.update(10000)
+        m.update(9400)  # 6% MDD → WARN → mdd_mult=0.5
+        m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)  # atr_vol_mult=0.5
+        # min(streak=1.0, mdd=0.5, atr=0.5, sharpe=1.0) = 0.5
+        assert m.get_size_multiplier() == pytest.approx(0.5)
+
+    def test_get_size_multiplier_mdd_block_overrides_streak(self):
+        """MDD BLOCK(0.0)은 연속 손실 streak(0.5)보다 우선."""
+        m = DrawdownMonitor(mdd_block_pct=0.10, loss_streak_threshold=3)
+        m.update(10000)
+        m.update(8900)  # 11% MDD → BLOCK_ENTRY → mdd_mult=0.0
+        for _ in range(3):
+            m.record_trade_result(pnl=-100, equity=8800)  # streak=3 → streak_mult=0.5
+        # min(streak=0.5, mdd=0.0, atr=1.0, sharpe=1.0) = 0.0
+        assert m.get_size_multiplier() == pytest.approx(0.0)
+
 
 # ── kelly_reduce_at_mdd 단위 테스트 ──────────────────────────────────────
 

@@ -301,15 +301,29 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle377 D(ML): ema200_filter 추가 — 약세장 롱 진입 차단
     #   배경: W1/W5 PASS = BTC 강세장(EMA200 위), W2/W3/W4 FAIL = 하락/횡보 가능성
     #   가설: close > ema200 필터 → 약세장 롱 진입 차단 → W2/W3/W4 손실 회피 → PF↑
+    #   결과: ema200_filter=True DEAD (Cycle377 D): Sh=0.56(-34%), PF=1.34, Trades=22
+    #   원인: 2023초 BTC 회복 구간(EMA200 미만) 수익 신호 차단 + 200봉 워밍업 감소
+    # Cycle396 D(ML): dema_cross 탐색 완전 종료 (Cycle377 F 선언 이후) — dead param 정리
+    #   확정 파라미터: fast=8, slow=20, rsi_dir_filter=True, rsi_dir_threshold=40,
+    #                 bb_width_min_filter=0.04, dist_pct_min=0.002 (dema_cross.py 기본값)
+    #   DEAD params (추가 탐색 금지):
+    #     fast=10,12 — 8이 최적 (Cycle356 D ~ Cycle367 D 검증)
+    #     slow=15,25 — 20이 최적 (Cycle367 D 확정)
+    #     rsi_dir_filter=False — True가 PF 1.26→1.45 확정 (Cycle360 A)
+    #     rsi_dir_threshold=45 — 40이 전체 기간 우세 (Cycle369 D, Cycle371 B 재확인)
+    #     ema_slope_min_buy=0.0003 — dead param (Cycle372 F 역효과)
+    #     macd_hist_filter=True — dead param (Cycle373 F 역효과)
+    #     bb_width_min_filter=0.0 — 0.04 mild positive 확정 (Cycle374 D, Cycle375 C)
+    #     ema200_filter=True — dead param (Cycle377 D: Sh↓34%)
     "dema_cross": {
-        "fast": [8, 10, 12],
-        "slow": [15, 20, 25],
-        "rsi_dir_filter": [False, True],
-        "rsi_dir_threshold": [40, 45],
-        "ema_slope_min_buy": [0.0, 0.0003],
-        "macd_hist_filter": [False, True],
-        "bb_width_min_filter": [0.0, 0.04],
-        "ema200_filter": [False, True],
+        "fast": [8, 10, 12],           # DEAD: 10,12 (8 확정, Cycle367 D)
+        "slow": [15, 20, 25],          # DEAD: 15,25 (20 확정, Cycle367 D)
+        "rsi_dir_filter": [False, True],          # DEAD: False (True 확정, Cycle360 A)
+        "rsi_dir_threshold": [40, 45],            # DEAD: 45 (40 확정, Cycle371 B)
+        "ema_slope_min_buy": [0.0, 0.0003],       # DEAD: 0.0003 (역효과, Cycle372 F)
+        "macd_hist_filter": [False, True],         # DEAD: True (역효과, Cycle373 F)
+        "bb_width_min_filter": [0.0, 0.04],       # DEAD: 0.0 (0.04 확정, Cycle374 D)
+        "ema200_filter": [False, True],            # DEAD: True (역효과, Cycle377 D)
     },
 }
 

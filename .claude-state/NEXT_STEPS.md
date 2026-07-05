@@ -1,43 +1,47 @@
 # Next Steps
 
-_Last updated: 2026-07-04 (Cycle 395 완료)_
+_Last updated: 2026-07-05 (Cycle 396 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 395
+### 이번 세션 완료 사이클: 396
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 393 | C+B+F | feed NaN경계+DM레짐kill/trailing 테스트5개(+5→8514), **confirmation_bars=2 DEAD**(Sh=-0.36↓↓, 0/8), **confirmation_bars 탐색 완전 종료** |
 | 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95) |
 | 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
+| 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
 
-### 🎯 Cycle 396 작업 방향 (396 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 397 작업 방향 (397 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스
+#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스 (계속)
 
 - **배경**: 리스크 모듈 커버리지 지속 향상
-- **작업 방향**: `src/risk/drawdown_monitor.py` 또는 `src/risk/circuit_breaker.py` 미커버 케이스
-  - should_kill_strategy 추가 경계값, get_size_multiplier 엣지케이스
+- **작업 방향**: `src/risk/drawdown_monitor.py` 미커버 케이스
+  - get_transition_cushion_multiplier 경계값 (regime_confidence=0, 0.5, 1.0)
+  - should_liquidate_all / trailing_stop_signal 엣지케이스
+  - 또는 rolling_mdd 윈도우 경계값
 
-#### D(ML): walk_forward WFO 그리드 점검 또는 ML trainer 개선
+#### D(ML): frama WFO 그리드 탐색 시작
 
-- **배경**: price_cluster 최적화 종료 → dema_cross WFO 그리드 정리 또는 다른 전략 검토
-- **작업 방향**: `src/backtest/walk_forward.py` dema_cross WFO 그리드 현행화
-  - 탐색 완료된 파라미터(ema200_filter, macd_hist_filter, rsi_dir_filter 등) dead param 주석 정리
-  - 또는 frama/roc_ma_cross WFO 그리드 최적화
+- **배경**: Cycle396 F(리서치) 결정 — frama 다음 최적화 타겟
+  - frama: Sh=0.24, PF=1.12, Trades=40, AvgReturn=+1.60% (BTC 1h 실데이터)
+  - Trades 풍부 → signal scarcity 없음 (roc_ma_cross Trades=14 경계 문제 없음)
+  - 목표: Sharpe ≥ 1.0, PF ≥ 1.5 달성
+- **작업 방향**: `scripts/paper_simulation.py`에서 frama 파라미터 실험
+  - atr_period=[10,14,18] WFO 그리드 이미 존재 (Cycle363 F 추가)
+  - atr_period=10 기존 실험 결과 확인 후 새 파라미터 방향 탐색
+  - 또는 roc_ma_cross Trades=14(avg) 개선 방향 (PF 추가 개선 실험)
 
-#### F(리서치): price_cluster 완전 종료 → dema_cross 또는 roc_ma_cross 다음 방향 분석
+#### F(리서치): frama BTC 1h 기술적 특성 분석
 
-- **배경**: price_cluster 1h BTC 최적화 완전 종료 (Cycle395)
-  - 최종 확정 파라미터: vol_regime_filter=True, bounce_pct=0.006, vol_atr_trend_min=1.2, atr_bounce_factor=0.5
-  - Consistency ceiling=2/8 불변 (구조적 한계 도달)
-- **작업 방향**: dema_cross PF=1.38 → 1.50 갭(0.12) 달성 방법 분석
-  - 탐색 완료: fast/slow/dist_pct/rsi_dir_filter/bb_width/macd_hist/ema200/atr_vol_min
-  - 새 방향: SL/TP 튜닝? 새 신호 조건? → F(리서치)에서 방향 결정
-  - 또는: roc_ma_cross SL/TP 실험 (Trades=14 avg에서 PF 개선 가능성)
+- **배경**: frama 최적화 시작 전 전략 이해 필요
+- **작업 방향**: frama 신호 생성 로직 분석
+  - 어떤 시장 조건에서 신호 생성? (RANGING vs TREND)
+  - 신호 품질 분석: PASS 윈도우 vs FAIL 윈도우 차이
+  - 개선 가능 파라미터: atr_period 외에 추가 탐색 가능한 파라미터 있는지 확인
 
 ### ⚠️ 주의 사항 (Cycle 395 이후)
 
@@ -200,23 +204,31 @@ _Last updated: 2026-07-04 (Cycle 395 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 395 업데이트)
+### 핵심 메트릭 (Cycle 396 업데이트)
 
-| 지표 | Cycle 394 | Cycle 395 | 변화 |
+| 지표 | Cycle 395 | Cycle 396 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
 | 1h BTC dema_cross PF | 1.38 | **1.38** | 유지 |
 | 1h BTC dema_cross Trades | 26 | **26** | 유지 |
-| 1h BTC price_cluster Sharpe | 0.95(f=0.0) | **1.06**(f=0.5 확정) | +0.11↑ |
-| 1h BTC price_cluster SharpeStd | 2.20 | **1.67** | ↓안정화 |
+| 1h BTC price_cluster Sharpe | 1.06 | **1.06** | 유지 |
+| 1h BTC price_cluster SharpeStd | 1.67 | **1.67** | 유지 |
 | 1h BTC price_cluster Consistency | 2/8 | **2/8** | 유지(ceiling) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 |
+| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (다음 타겟) |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
-| Bundle OOS PASS | 5/5 | **5/5** | 변화 없음 |
-| 테스트 수 | 8516개 | **8520개** (+4) | +4 추가 |
+| Bundle OOS PASS | 5/5 | **5/5** | 유지 |
+| 테스트 수 | 8520개 | **8526개** (+6) | +6 추가 |
+
+### Cycle 396 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_drawdown_monitor.py` | HIGH_VOL/RANGING/TREND_DOWN 레짐 kill 테스트 3개 추가 (Cycle396 B) |
+| `tests/test_drawdown_monitor.py` | 알 수 없는 레짐 fallback + size_mult 조합 테스트 3개 추가 (Cycle396 B) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["dema_cross"] 파라미터별 DEAD 인라인 주석 + 탐색 종료 문서화 (Cycle396 D) |
 
 ### Cycle 395 코드 변경 요약
 
