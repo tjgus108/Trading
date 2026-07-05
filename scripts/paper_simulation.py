@@ -124,7 +124,14 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     "price_cluster": {"vol_regime_filter": False},
     # Cycle371 D(ML): frama atr_period=10 실험 → 중립 확정 (Sh=0.24 = 기본값(14)과 동일)
     # 결론: BTC 1h frama ATR 기간(10 vs 14)이 성능에 무영향 → 기본값(14) 유지
-    # "frama": {"atr_period": 10},  # 제거: 효과 없음 (Cycle371 D)
+    # Cycle397 F(리서치): atr_contracting이 신호 게이팅에 미사용(dead code) 확인
+    # Cycle397 D(ML): rsi_weak_buy_max=55 실험 결과 (2026-07-05) — DEAD PARAM (역효과)
+    #   rsi_weak_buy_max=55: Sh=0.15(↓-0.09), PF=1.08(↓-0.04), Trades=71(↑+31), Consist=1/8
+    #   원인: RSI 40-55 구간 weak 크로스는 노이즈 신호 — 기대 수익 음수로 PF/Sharpe 하락
+    #   핵심 교훈: weak 신호(gap<1%) RSI 필터(rsi<40)는 BTC 1h에서 최적 임계값 — 완화 금지
+    #   결론: rsi_weak_buy_max=40 확정 불변. 추가 완화 실험 금지.
+    #   frama 파라미터 탐색 방향: weak RSI 탐색 종료. 다른 방향 필요.
+    # "frama": {"rsi_weak_buy_max": 55},  # 제거: DEAD PARAM (Cycle397 D)
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류

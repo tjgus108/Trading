@@ -1,47 +1,50 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-05 (Cycle 396 완료)_
+_Last updated: 2026-07-05 (Cycle 397 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 396
-- **다음 사이클**: 397 (397 mod 5 = 2 → B+D+F)
+- **완료된 사이클**: 397
+- **다음 사이클**: 398 (398 mod 5 = 3 → C+B+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Consist=4/8)
-- **price_cluster**: Sh=1.06, Consist=2/8 → 최적화 완전 종료
-- **dema_cross**: Sh=0.85, PF=1.38 → 탐색 완전 종료
-- **Bundle OOS**: 5/5 PASS (Cycle395 실데이터 — 최신)
-- **전체 테스트 수**: 8526개 (+6)
+- **frama**: Sh=0.24, PF=1.12, Trades=40 — rsi_weak_buy_max=55 DEAD PARAM 확정
+- **Bundle OOS**: 5/5 PASS (4h BTC 실데이터)
+- **전체 테스트 수**: 8532개 (+6)
 
-## Cycle 396 주요 결과
+## Cycle 397 주요 결과
 
-### B(리스크): DrawdownMonitor 미커버 케이스 6개 추가
+### B(리스크): DrawdownMonitor 경계값/윈도우 엣지케이스 6개 추가
 
-- `tests/test_drawdown_monitor.py`: should_kill_strategy HIGH_VOL 레짐 테스트
-  - HIGH_VOL cap=1.0 → threshold=0.10 (backtest MDD 초과 즉시 kill) 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy RANGING 레짐 테스트
-  - RANGING cap=1.2 → threshold=0.12 (빠른 kill) 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy TREND_DOWN 레짐 테스트
-  - TREND_DOWN cap=1.2 → threshold=0.12 검증
-- `tests/test_drawdown_monitor.py`: should_kill_strategy 알 수 없는 레짐 fallback 테스트
-  - 미정의 레짐 → multiplier 그대로 사용 검증
-- `tests/test_drawdown_monitor.py`: get_size_multiplier MDD WARN + ATR elevated 조합 테스트
-  - min(streak=1.0, mdd=0.5, atr=0.5, sharpe=1.0) = 0.5 검증
-- `tests/test_drawdown_monitor.py`: get_size_multiplier MDD BLOCK + streak 조합 테스트
-  - min(streak=0.5, mdd=0.0) = 0.0 (BLOCK 우선) 검증
+- `tests/test_drawdown_monitor.py`: 6개 테스트 추가 (총 129개)
+  - `test_transition_cushion_enabled_exact_threshold`: confidence==threshold → 1.0 (경계값 ≥)
+  - `test_transition_cushion_enabled_zero_confidence`: confidence=0 → 0.5 반환
+  - `test_transition_cushion_enabled_full_confidence`: confidence=1.0 → 1.0 반환
+  - `test_rolling_mdd_window_one_returns_zero`: window=1 → 요소 1개 → 0.0
+  - `test_rolling_mdd_window_equals_history_length`: window==len(history) → 자르지 않음
+  - `test_trailing_stop_signal_very_small_rolling_window`: rolling_window=4 → short_window=2 → False
 
-### D(ML): dema_cross WFO 그리드 dead param 현행화
+### D(ML): frama rsi_weak_buy_max 파라미터 실험 — DEAD 확정
 
-- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["dema_cross"] 각 파라미터에 dead param 주석 추가
-  - fast=10,12 DEAD (8 확정), slow=15,25 DEAD (20 확정)
-  - rsi_dir_filter=False DEAD, rsi_dir_threshold=45 DEAD
-  - ema_slope_min_buy=0.0003 DEAD, macd_hist_filter=True DEAD
-  - bb_width_min_filter=0.0 DEAD, ema200_filter=True DEAD
-  - Cycle396 종료 선언 주석 + 확정 파라미터 문서화
+- `src/strategy/frama.py`: `rsi_weak_buy_max=40` 파라미터 추가 (하드코딩→가변화)
+- `src/backtest/walk_forward.py`: DEFAULT_GRIDS["frama"]에 rsi_weak_buy_max=[40] 추가
+- **실험 결과** (rsi_weak_buy_max=55 vs 40):
+  - rsi_weak_buy_max=55: Sh=0.15(↓-0.09), PF=1.08(↓-0.04), Trades=71(↑+31), Consist=1/8
+  - 원인: RSI 40~55 구간 weak 크로스는 노이즈 신호 → PF/Sharpe 하락
+  - **결론**: rsi_weak_buy_max=40 확정 불변. 추가 완화 실험 금지.
 
-### F(리서치): 시뮬 결과 분석 + 다음 방향 결정
+### F(리서치): frama atr_contracting dead code 발견
 
-- **Paper Sim BTC 1h**: roc_ma_cross PASS(4/8, Sh=1.81) 유지 / price_cluster Sh=1.06 2/8 / dema_cross Sh=0.85 PF=1.38
-- **다음 최적화 대상**: **frama** (Sh=0.24, PF=1.12, Trades=40, +1.60% avg return)
-  - 이유: Trades=40 풍부 (signal 부족 없음), positive return edge 존재
-  - 미래: frama WFO 그리드 탐색 → atr_period 최적화 → Sharpe ≥ 1.0 목표
-  - 이전 탐색: atr_period=[10,14,18] WFO 그리드 존재 (Cycle363 F 추가)
+- `src/strategy/frama.py`: `atr_contracting` 계산되나 신호 게이팅 조건에 미사용
+  - `if crossed_up and rsi_buy_ok:` — `atr_contracting` 포함 안 됨
+  - ATR 변동성 필터가 실질적으로 비활성화 상태 (dead code in condition)
+- `src/backtest/walk_forward.py`: 주석으로 문서화
+
+### 시뮬레이션 결과
+
+- **Paper Sim (1h BTC)**: 1/19 PASS — roc_ma_cross (Sh=1.81, PF=2.02, Trades=14, Consist=4/8)
+- **Bundle OOS (4h BTC 실데이터)**: 5/5 PASS
+  - order_flow_imbalance_v2: Sh=4.345
+  - supertrend_multi: Sh=3.892
+  - value_area: Sh=3.069
+  - vwap_cross: Sh=3.047
+  - cmf: Sh=2.508

@@ -1476,3 +1476,54 @@ def test_trailing_stop_signal_recovery_resets():
         m.update(10001 + i * 100)  # 지속 상승
     # 최근 50봉이 모두 상승 구간 → MDD≈0 → False
     assert m.trailing_stop_signal(accel_threshold=1.5) is False
+
+
+# ── Cycle 397 B(리스크): 경계값 및 윈도우 엣지케이스 ─────────────────────────────
+
+
+def test_transition_cushion_enabled_exact_threshold():
+    """enabled=True, confidence == threshold → 경계값 >= 조건으로 1.0 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.60)
+    # 정확히 threshold에 걸리면 0.5가 아닌 1.0 (코드: confidence < threshold)
+    assert m.get_transition_cushion_multiplier(0.60) == 1.0
+
+
+def test_transition_cushion_enabled_zero_confidence():
+    """enabled=True, confidence=0 → threshold(0.6) 미만 → 0.5 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.60)
+    assert m.get_transition_cushion_multiplier(0.0) == 0.5
+
+
+def test_transition_cushion_enabled_full_confidence():
+    """enabled=True, confidence=1.0 → threshold(0.6) 이상 → 1.0 반환."""
+    m = DrawdownMonitor(transition_cushion_enabled=True, transition_cushion_threshold=0.60)
+    assert m.get_transition_cushion_multiplier(1.0) == 1.0
+
+
+def test_rolling_mdd_window_one_returns_zero():
+    """window=1 → 슬라이스 후 요소 1개 → 데이터 부족 → 0.0."""
+    m = DrawdownMonitor()
+    for eq in [10000, 9000, 8000]:
+        m.update(eq)
+    # window=1: history[-1:] → 단일 요소 → len < 2 → 0.0
+    assert m.rolling_mdd(window=1) == 0.0
+
+
+def test_rolling_mdd_window_equals_history_length():
+    """window == len(history): 조건 < 가 False라 자르지 않음 → 전체 MDD와 동일."""
+    m = DrawdownMonitor()
+    for eq in [10000, 9500, 9000]:
+        m.update(eq)
+    full_mdd = m.rolling_mdd()
+    # len(history)=3이고 window=3 → 자르지 않음 → 동일
+    assert abs(m.rolling_mdd(window=3) - full_mdd) < 1e-9
+
+
+def test_trailing_stop_signal_very_small_rolling_window():
+    """rolling_window=4 → short_window=min(20,2)=2; 균일 하락 시 False."""
+    m = DrawdownMonitor(rolling_window=4)
+    # 4봉 균일 하락 (short/long rate 동일)
+    for i in range(4):
+        m.update(10000 - i * 100)
+    # short_rate ≈ long_rate → 1.5 배율 미달
+    assert m.trailing_stop_signal(accel_threshold=1.5) is False
