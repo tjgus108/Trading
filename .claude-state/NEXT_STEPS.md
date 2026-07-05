@@ -1,44 +1,54 @@
 # Next Steps
 
-_Last updated: 2026-07-05 (Cycle 397 완료)_
+_Last updated: 2026-07-05 (Cycle 398 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 397
+### 이번 세션 완료 사이클: 398
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
 | 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 | 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
 | 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
+| 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
 
-### 🎯 Cycle 398 작업 방향 (398 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 399 작업 방향 (399 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): feed.py 또는 data_utils 미커버 케이스
+#### D(ML): MLSignalGenerator 미커버 케이스
 
-- **배경**: 데이터 파이프라인 커버리지 향상
-- **작업 방향**: `src/data/feed.py` 또는 `src/data/data_utils.py` 미커버 케이스
-  - compute_indicators() 엣지케이스: 매우 짧은 df (< 10 rows), NaN 포함 입력
-  - load_csv_ohlcv() 파싱 실패 케이스
-  - enrich_indicators() 지표 일관성 추가 검증
+- **배경**: ML 모듈 커버리지 향상
+- **작업 방향**: `src/ml/signal_generator.py` 또는 `src/ml/regime_classifier.py` 미커버 케이스
+  - predict() 엣지케이스: 빈 피처, NaN 피처, 미학습 모델 상태
+  - regime_classifier: 경계 confidence 값, UNKNOWN 레짐 처리
+  - feature_pipeline: 매우 짧은 window 크기 입력
 
-#### B(리스크): CircuitBreaker 또는 KellySizer 미커버 케이스
+#### E(실행): PaperTrader 또는 OrderManager 미커버 케이스
 
-- **배경**: 리스크 모듈 커버리지 지속 향상
-- **작업 방향**: Cycle397 B 완료 → 다른 리스크 모듈
-  - `src/risk/circuit_breaker.py`: 미커버 엣지케이스
-  - `src/risk/kelly_sizer.py`: 미커버 경계값
+- **배경**: 실행 모듈 커버리지 지속 향상
+- **작업 방향**: `src/execution/paper_trader.py` 또는 `src/execution/order_manager.py` 미커버 케이스
+  - PaperTrader: 포지션 제한 초과, 수수료 계산 경계값
+  - OrderManager: 주문 취소/수정 엣지케이스
 
-#### F(리서치): frama 개선 방향 구체화
+#### F(리서치): frama weak_rsi_buy_max=50 실험 결과 분석
 
-- **배경**: Cycle397 F 발견 — atr_contracting dead code, weak RSI 조건이 bottleneck
-- **작업 방향**: frama.py에 `weak_rsi_buy_max` 파라미터 추가 가능성 탐색
-  - 현재: weak signal(gap<1%) → RSI<40(BUY), RSI>60(SELL) 하드코딩
-  - 제안: `weak_rsi_buy_max=40` 파라미터화 → WFO 그리드 탐색 가능
-  - RANGING 47.3%에서 RSI 40-60 구간 신호가 차단됨 → 완화로 Trades 증가 가능
-  - 주의: frama.py 수정 시 기존 테스트 호환성 확인 필수
+- **배경**: Cycle398 F — weak_rsi_buy_max 파라미터화 완료, paper_sim에 =50 실험 추가
+- **작업 방향**: 이번 사이클의 paper sim 결과에서 frama 성과 확인
+  - 기준: 기존 Sh=0.24, Trades=40 vs 새 실험 (weak_rsi_buy_max=50)
+  - Trades 증가 여부: RANGING(47.3%)에서 RSI 40-50 구간 신호 해제 효과
+  - Sharpe 영향: 신호 품질 하락 없이 Trades 늘어나는지 확인
+  - 결과 좋으면: WFO 그리드 이미 [40,50,60] 추가 완료 → 최적값 결정
+  - 결과 나쁘면: weak_rsi_buy_max 기본값 유지(40), 그리드도 [40] 복귀
+
+### ⚠️ 주의 사항 (Cycle 398 이후)
+
+- **frama weak_rsi_buy_max 파라미터화 완료** (Cycle398 F):
+  - frama.py: `weak_rsi_buy_max=40` (기본값), `weak_rsi_sell_min=60` 파라미터 추가
+  - walk_forward.py: `weak_rsi_buy_max=[40, 50, 60]` WFO 그리드 추가 (9→27 combos)
+  - paper_simulation.py: `weak_rsi_buy_max=50` 실험 추가
+  - 다음 사이클 paper sim에서 효과 확인 필요
 
 ### ⚠️ 주의 사항 (Cycle 397 이후)
 

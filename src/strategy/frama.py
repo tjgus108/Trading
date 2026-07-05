@@ -124,10 +124,22 @@ class FRAMAStrategy(BaseStrategy):
     """
     name = "frama"
 
-    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14, **kwargs) -> None:
+    def __init__(
+        self,
+        period: int = 16,
+        rsi_period: int = 14,
+        atr_period: int = 14,
+        weak_rsi_buy_max: int = 40,
+        weak_rsi_sell_min: int = 60,
+        **kwargs,
+    ) -> None:
         self.period = period
         self.rsi_period = rsi_period
         self.atr_period = atr_period
+        # weak signal(gap<1%) RSI 임계값 (Cycle398 F: 파라미터화, 기본값=40)
+        # RANGING(47.3% BTC 1h)에서 RSI 40-60 구간 신호 차단 완화 탐색용
+        self.weak_rsi_buy_max = weak_rsi_buy_max
+        self.weak_rsi_sell_min = weak_rsi_sell_min
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
@@ -192,9 +204,9 @@ class FRAMAStrategy(BaseStrategy):
             rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 85
             rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 15
         else:
-            # 약한 신호: 극단값 요구
-            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 40
-            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 60
+            # 약한 신호: weak_rsi_buy_max/sell_min 파라미터 사용 (기본 40/60)
+            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < self.weak_rsi_buy_max
+            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > self.weak_rsi_sell_min
 
         rsi_str = f"RSI={last_rsi:.1f}" if not np.isnan(last_rsi) else "RSI=N/A"
         atr_str = f"ATR={'수축' if atr_contracting else '확장'}" if not np.isnan(last_atr) else "ATR=N/A"

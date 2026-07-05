@@ -166,12 +166,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle397 F: frama 개선 방향 확정
     #   현재 약한신호(gap<1%) RSI<40(BUY)/RSI>60(SELL) — RANGING(47.3% BTC 1h) 에서 과도 차단
     #   다음 탐색 방향: rsi_period 탐색 유지 (rsi 임계값 자체는 하드코딩이라 WFO에서 변경 불가)
-    #   frama.py 파라미터화 가능한 것: weak_rsi_buy_max (현재 40 하드코딩) 추가 시 RANGING 개선 가능
+    # Cycle398 F: weak_rsi_buy_max 파라미터화 완료 (frama.py 수정)
+    #   weak_rsi_buy_max=40(기본) vs 50(중간 완화) vs 60(RANGING 허용) 탐색
+    #   RANGING 47.3%에서 RSI 40-60 구�� 신호 차단 해소 → Trades 증가 가능
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
+        "weak_rsi_buy_max": [40, 50, 60],  # Cycle398 F: 약한신호 RSI 임계값 탐색
         # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
-        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 확정)
+        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 ��정)
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
@@ -1276,7 +1279,9 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
         return FRAMAStrategy(
             period=params.get("period", 16),
             rsi_period=params.get("rsi_period", 14),
-            atr_period=params.get("atr_period", 14),  # Cycle364 F(리서치): Cycle363에서 atr_period 그리드 추가했으나 factory에서 누락됐던 버그 수정
+            atr_period=params.get("atr_period", 14),
+            weak_rsi_buy_max=params.get("weak_rsi_buy_max", 40),  # Cycle398 F: 약한신호 RSI 임계값
+            weak_rsi_sell_min=params.get("weak_rsi_sell_min", 60),
         )
 
     opt = WalkForwardOptimizer(

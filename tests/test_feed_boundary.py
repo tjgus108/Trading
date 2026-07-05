@@ -347,3 +347,72 @@ class TestAddIndicatorsNanBoundary:
             df["macd_hist"].values, expected.values, atol=1e-10,
             err_msg="macd_hist ≠ macd - macd_signal"
         )
+
+
+# ── _add_indicators 매우 짧은 df 엣지케이스 테스트 (Cycle 398 C) ──────────────
+
+
+class TestAddIndicatorsShortDf:
+    """_add_indicators() 매우 짧은 df (< 10 rows) 경계 조건 테스트."""
+
+    def _make_raw_candles(self, n: int, close: float = 42000.0, volume: float = 100.0):
+        return [
+            [1704067200000 + i * 3600000,
+             close * 0.99, close * 1.01, close * 0.98, close, volume]
+            for i in range(n)
+        ]
+
+    def test_very_short_df_3rows_no_crash(self):
+        """3행 df → _add_indicators 크래시 없음, 모든 컬럼 생성."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=3)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=3)
+        df = result.df
+        for col in ["ema20", "ema50", "atr14", "rsi14", "sma20", "bb_upper", "bb_lower",
+                    "macd", "macd_signal", "macd_hist", "bb_width", "vwap"]:
+            assert col in df.columns, f"{col} 컬럼 없음"
+
+    def test_very_short_df_1row_no_crash(self):
+        """1행 df → 크래시 없음, 컬럼 추가됨."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=1)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=1)
+        df = result.df
+        assert len(df) == 1
+        assert "ema20" in df.columns
+        assert "atr14" in df.columns
+
+    def test_short_df_5rows_atr_all_nan_except_last(self):
+        """5행 df → ATR은 EWM이므로 값이 있어야 함 (rolling이 아닌 ewm 방식)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=5)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=5)
+        df = result.df
+        # EWM(alpha=1/14) 방식: 첫 봉부터 값 계산됨 (NaN은 첫 봉만)
+        assert "atr14" in df.columns
+        non_nan = df["atr14"].dropna()
+        assert len(non_nan) >= 1, "atr14가 전부 NaN"
+
+    def test_short_df_volume_quote_auto_created(self):
+        """단 행 df에서도 volume_quote 컬럼이 자동 생성됨."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=2)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=2)
+        df = result.df
+        assert "volume_quote" in df.columns
+        assert "volume_quote_sma20" in df.columns
+
+    def test_short_df_donchian_all_nan_when_insufficient_data(self):
+        """5행 df → donchian은 rolling(20)이므로 전부 NaN."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_candles(n=5)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=5)
+        df = result.df
+        assert "donchian_high" in df.columns
+        # donchian_high: shift(1).rolling(20) → n=5에서는 전부 NaN
+        assert df["donchian_high"].isna().all(), "donchian_high가 5행에서 NaN이 아님"
