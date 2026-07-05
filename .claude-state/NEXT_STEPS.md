@@ -1,47 +1,47 @@
 # Next Steps
 
-_Last updated: 2026-07-05 (Cycle 396 완료)_
+_Last updated: 2026-07-05 (Cycle 397 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 396
+### 이번 세션 완료 사이클: 397
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 394 | D+E+F | WFO그리드dead정리(vol_atr→[1.2],close_win→[50],bounce→[0.006/0.008/0.010])+atr_factor[0.3/0.5]추가, PaperTrader테스트2개(+2→8516), Sim:price_cluster FAIL(2/8,Sh=0.95) |
 | 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 | 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
+| 397 | B+D+F | DM 경계값/윈도우 6개(+6→8532), **frama rsi_weak_buy_max 파라미터 추가**, **rsi_weak_buy_max=55 DEAD PARAM 확정**(Sh↓0.09, Trades↑71), **atr_contracting dead code 발견** |
 
-### 🎯 Cycle 397 작업 방향 (397 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 398 작업 방향 (398 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스 (계속)
+#### C(데이터): feed.py 또는 데이터 파이프라인 미커버 케이스
+
+- **배경**: 데이터 인프라 신뢰성 향상
+- **작업 방향**: `src/data/feed.py` 미커버 케이스 탐색
+  - `_add_indicators()`: NaN 전파, 최소 데이터 경계, 컬럼 누락 처리
+  - 또는 `compute_indicators()` 지표 순서/의존성 검증
+  - 또는 데이터 resample 경계값 (1h→4h 빈 봉 처리)
+
+#### B(리스크): CircuitBreaker 또는 KellySizer 미커버 케이스
 
 - **배경**: 리스크 모듈 커버리지 지속 향상
-- **작업 방향**: `src/risk/drawdown_monitor.py` 미커버 케이스
-  - get_transition_cushion_multiplier 경계값 (regime_confidence=0, 0.5, 1.0)
-  - should_liquidate_all / trailing_stop_signal 엣지케이스
-  - 또는 rolling_mdd 윈도우 경계값
+- **작업 방향**: `src/risk/circuit_breaker.py` 또는 `src/risk/kelly_sizer.py` 미커버 케이스
+  - CircuitBreaker: 엣지케이스 (연속 실패 카운트 리셋, max_daily_trades 병렬 실패)
+  - KellySizer: 경계값 (MIN_TRADES=15, kelly_cap vs max_fraction 조합)
 
-#### D(ML): frama WFO 그리드 탐색 시작
+#### F(리서치): frama 신규 파라미터 방향 탐색
 
-- **배경**: Cycle396 F(리서치) 결정 — frama 다음 최적화 타겟
-  - frama: Sh=0.24, PF=1.12, Trades=40, AvgReturn=+1.60% (BTC 1h 실데이터)
-  - Trades 풍부 → signal scarcity 없음 (roc_ma_cross Trades=14 경계 문제 없음)
-  - 목표: Sharpe ≥ 1.0, PF ≥ 1.5 달성
-- **작업 방향**: `scripts/paper_simulation.py`에서 frama 파라미터 실험
-  - atr_period=[10,14,18] WFO 그리드 이미 존재 (Cycle363 F 추가)
-  - atr_period=10 기존 실험 결과 확인 후 새 파라미터 방향 탐색
-  - 또는 roc_ma_cross Trades=14(avg) 개선 방향 (PF 추가 개선 실험)
-
-#### F(리서치): frama BTC 1h 기술적 특성 분석
-
-- **배경**: frama 최적화 시작 전 전략 이해 필요
-- **작업 방향**: frama 신호 생성 로직 분석
-  - 어떤 시장 조건에서 신호 생성? (RANGING vs TREND)
-  - 신호 품질 분석: PASS 윈도우 vs FAIL 윈도우 차이
-  - 개선 가능 파라미터: atr_period 외에 추가 탐색 가능한 파라미터 있는지 확인
+- **배경**: Cycle397 D - rsi_weak_buy_max 탐색 종료 (40 확정, 55 DEAD)
+  - **발견**: atr_contracting dead code (신호 게이팅에 미사용, 로그 전용)
+  - Trades=40, Sh=0.24 → 신호 풍부하나 품질 낮음 (edge 부족)
+- **작업 방향**: frama 새 파라미터 방향 탐색
+  - **옵션 1**: `period=14` 실험 — 기본 period=16보다 빠른 반응 (Cycle397까지 미시험)
+  - **옵션 2**: `rsi_period=12` 실험 — 더 빠른 RSI 반응 (Cycle397까지 미시험)
+  - **옵션 3**: `atr_contracting` 활성화 실험 — 신호 조건에 `and atr_contracting` 추가
+    - 주의: ATR 수축 조건 추가 → Trades 감소 가능성 → 구조적 제약 가능성
+  - 목표: Sh=0.24 → Sh≥1.0 달성 (6년 가치 경험 필요)
 
 ### ⚠️ 주의 사항 (Cycle 395 이후)
 

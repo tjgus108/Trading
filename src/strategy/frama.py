@@ -124,10 +124,13 @@ class FRAMAStrategy(BaseStrategy):
     """
     name = "frama"
 
-    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14, **kwargs) -> None:
+    def __init__(self, period: int = 16, rsi_period: int = 14, atr_period: int = 14,
+                 rsi_weak_buy_max: int = 40, **kwargs) -> None:
         self.period = period
         self.rsi_period = rsi_period
         self.atr_period = atr_period
+        # 약한 신호(gap < 1%) BUY 허용 RSI 상한 (기본 40=과매도만 허용, 55=중립 포함)
+        self.rsi_weak_buy_max = rsi_weak_buy_max
 
     def generate(self, df: pd.DataFrame) -> Signal:
         if len(df) < MIN_ROWS:
@@ -192,9 +195,9 @@ class FRAMAStrategy(BaseStrategy):
             rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 85
             rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 15
         else:
-            # 약한 신호: 극단값 요구
-            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < 40
-            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > 60
+            # 약한 신호: rsi_weak_buy_max 이하만 허용 (기본 40=과매도, 55=중립 포함)
+            rsi_buy_ok = np.isnan(last_rsi) or last_rsi < self.rsi_weak_buy_max
+            rsi_sell_ok = np.isnan(last_rsi) or last_rsi > (100 - self.rsi_weak_buy_max)
 
         rsi_str = f"RSI={last_rsi:.1f}" if not np.isnan(last_rsi) else "RSI=N/A"
         atr_str = f"ATR={'수축' if atr_contracting else '확장'}" if not np.isnan(last_atr) else "ATR=N/A"

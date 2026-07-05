@@ -157,10 +157,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # atr_period=10: 더 빠른 반응 (노이즈 증가), 14: 기본값, 18: 더 완만한 평활화 (지연)
     # 배경: BTC rank2 Sharpe=0.24 PF=1.12 SharpeStd=1.60 (안정적, Cycle370 기준) — PF 개선 가능성 탐색
     # Cycle371 D(ML): paper_sim atr_period=10 실험 → 결과 NEXT_STEPS.md 참조
+    # Cycle397 F(리서치): atr_contracting 계산되나 신호 게이팅에 미사용 확인 (dead code in condition)
+    # Cycle397 D(ML): rsi_weak_buy_max=55 실험 → DEAD PARAM 확정 (Sh↓, PF↓, Trades↑+31)
+    #   55: Sh=0.15(↓-0.09), PF=1.08(↓-0.04), Trades=71(↑) — 노이즈 신호 포함으로 성능 하락
+    #   결론: rsi_weak_buy_max=40 확정 불변. weak RSI 탐색 완전 종료.
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
         "atr_period": [10, 14, 18],
+        "rsi_weak_buy_max": [40],  # Cycle397 D(ML): 55 DEAD, 40 확정
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
@@ -1266,6 +1271,7 @@ def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
             period=params.get("period", 16),
             rsi_period=params.get("rsi_period", 14),
             atr_period=params.get("atr_period", 14),  # Cycle364 F(리서치): Cycle363에서 atr_period 그리드 추가했으나 factory에서 누락됐던 버그 수정
+            rsi_weak_buy_max=params.get("rsi_weak_buy_max", 40),  # Cycle397 D(ML)
         )
 
     opt = WalkForwardOptimizer(
