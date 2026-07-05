@@ -168,13 +168,17 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   다음 탐색 방향: rsi_period 탐색 유지 (rsi 임계값 자체는 하드코딩이라 WFO에서 변경 불가)
     # Cycle398 F: weak_rsi_buy_max 파라미터화 완료 (frama.py 수정)
     #   weak_rsi_buy_max=40(기본) vs 50(중간 완화) vs 60(RANGING 허용) 탐색
-    #   RANGING 47.3%에서 RSI 40-60 구�� 신호 차단 해소 → Trades 증가 가능
+    #   RANGING 47.3%에서 RSI 40-60 구간 신호 차단 해소 → Trades 증가 가능
+    # Cycle399 F: buy_max=50+sell_min=50 혼재 실험 결과
+    #   Sh=0.44(↑+0.20), Trades=65(↑+25,+63%), PF=1.11(유지), Consist=0/8(↓1/8)
+    #   방향 유효: RSI 40-50 차단 해제 → Trades 대폭 증가 확인
+    #   다음: sell_min 격리(=60 고정), buy_max 단독 효과 검증 필요 (paper_sim 업데이트됨)
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
         "weak_rsi_buy_max": [40, 50, 60],  # Cycle398 F: 약한신호 RSI 임계값 탐색
         # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
-        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 ��정)
+        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 확정)
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)

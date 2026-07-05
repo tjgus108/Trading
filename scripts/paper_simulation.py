@@ -125,9 +125,12 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle371 D(ML): frama atr_period=10 실험 → 중립 확정 (Sh=0.24 = 기본값(14)과 동일)
     # 결론: BTC 1h frama ATR 기간(10 vs 14)이 성능에 무영향 → 기본값(14) 유지
     # "frama": {"atr_period": 10},  # 제거: 효과 없음 (Cycle371 D)
-    # Cycle398 F(리서치): weak_rsi_buy_max=50 실험 (기본값=40, 완화 탐색)
-    # 가설: RANGING(47.3% BTC 1h) RSI 40-60 구간 신호 차단 완화 → Trades 증가 기대
-    "frama": {"weak_rsi_buy_max": 50, "weak_rsi_sell_min": 50},
+    # Cycle398 F(리서치): weak_rsi_buy_max=50 + weak_rsi_sell_min=50 실험
+    # Cycle399 F(리서치): 결과 확인 — Sh=0.44(↑+0.20), Trades=65(↑+25, +63%), PF=1.11(유지), Consist=0/8(↓)
+    #   효과: RSI 40-50 구간 신호 차단 해제로 Trades 대폭 증가 + Sharpe 개선 확인
+    #   문제: sell_min=50도 동시 변경 → buy_max 단독 효과 불명확 (혼재 실험)
+    #   다음: sell_min을 기본값(60)으로 격리, buy_max=50 효과만 평가
+    "frama": {"weak_rsi_buy_max": 50, "weak_rsi_sell_min": 60},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%
     #   모든 threshold(0.5%~2.0%)에서 BTC Sharpe 악화 확인 → paper_sim 적용 보류
