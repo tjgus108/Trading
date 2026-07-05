@@ -1,46 +1,46 @@
 # Next Steps
 
-_Last updated: 2026-07-05 (Cycle 398 완료)_
+_Last updated: 2026-07-05 (Cycle 399 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 398
+### 이번 세션 완료 사이클: 399
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 | 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
 | 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 | 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
+| 399 | D+E+F | MLSigGen 6개+PaperTrader 6개(+12→8579), **frama buy_max=50 효과 확인**(Sh=0.44↑,Trades=65↑+63%), sell_min 격리, paper_sim sell_min=60 복원 |
 
-### 🎯 Cycle 399 작업 방향 (399 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 400 작업 방향 (400 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): MLSignalGenerator 미커버 케이스
+#### A(품질): BacktestEngine 또는 WalkForwardOptimizer 미커버 케이스
 
-- **배경**: ML 모듈 커버리지 향상
-- **작업 방향**: `src/ml/signal_generator.py` 또는 `src/ml/regime_classifier.py` 미커버 케이스
-  - predict() 엣지케이스: 빈 피처, NaN 피처, 미학습 모델 상태
-  - regime_classifier: 경계 confidence 값, UNKNOWN 레짐 처리
-  - feature_pipeline: 매우 짧은 window 크기 입력
+- **배경**: 품질 카테고리 커버리지 향상
+- **작업 방향**: `src/backtest/engine.py` 또는 `src/backtest/walk_forward.py`
+  - BacktestEngine: 최대 보유 기간 만료 강제청산, nan_policy 경계값
+  - WalkForwardOptimizer: 윈도우 수 경계(n_windows=1), 빈 결과 처리
+  - plateau_pct=0.0/1.0 경계 동작 검증
 
-#### E(실행): PaperTrader 또는 OrderManager 미커버 케이스
+#### C(데이터): feed.py compute_indicators() 엣지케이스
 
-- **배경**: 실행 모듈 커버리지 지속 향상
-- **작업 방향**: `src/execution/paper_trader.py` 또는 `src/execution/order_manager.py` 미커버 케이스
-  - PaperTrader: 포지션 제한 초과, 수수료 계산 경계값
-  - OrderManager: 주문 취소/수정 엣지케이스
+- **배경**: 데이터 모듈 커버리지 향상
+- **작업 방향**: `src/data/feed.py` `_add_indicators()` 미커버 케이스
+  - volume=0 전체 구간에서 volume_quote NaN 처리
+  - ema200 계산 시 200행 미만 short df
+  - bb_width=0 케이스 (close=constant → bb_upper=bb_lower)
 
-#### F(리서치): frama weak_rsi_buy_max=50 실험 결과 분석
+#### F(리서치): frama weak_rsi_buy_max=50 단독 효과 검증
 
-- **배경**: Cycle398 F — weak_rsi_buy_max 파라미터화 완료, paper_sim에 =50 실험 추가
-- **작업 방향**: 이번 사이클의 paper sim 결과에서 frama 성과 확인
-  - 기준: 기존 Sh=0.24, Trades=40 vs 새 실험 (weak_rsi_buy_max=50)
-  - Trades 증가 여부: RANGING(47.3%)에서 RSI 40-50 구간 신호 해제 효과
-  - Sharpe 영향: 신호 품질 하락 없이 Trades 늘어나는지 확인
-  - 결과 좋으면: WFO 그리드 이미 [40,50,60] 추가 완료 → 최적값 결정
-  - 결과 나쁘면: weak_rsi_buy_max 기본값 유지(40), 그리드도 [40] 복귀
+- **배경**: Cycle399 F — buy_max=50+sell_min=50 혼재 실험. sell_min=60으로 격리 완료
+- **작업 방향**: 이번 사이클 paper_sim 결과에서 frama 성과 확인
+  - 기준: Cycle399 혼재 (buy=50, sell=50): Sh=0.44, Trades=65, 0/8
+  - 이번 격리 실험 (buy=50, sell=60 기본값) 결과 비교
+  - Sharpe/Trades 유지되면: buy_max=50 확정, WFO [40,50,60] 유지
+  - Sharpe/Trades 크게 하락 시: sell_min도 효과가 있었음 → 함께 탐색 필요
 
 ### ⚠️ 주의 사항 (Cycle 398 이후)
 

@@ -357,6 +357,96 @@ class TestDataQuality:
 
 
 # ─────────────────────────────────────────────────────────────────
+# MLSignalGenerator 고급 케이스 (D카테고리 — Cycle 399)
+# ─────────────────────────────────────────────────────────────────
+
+class TestMLSignalGeneratorAdvanced:
+    """MLSignalGenerator 미커버 엣지케이스."""
+
+    def test_benchmark_stats_empty_before_predict(self):
+        """predict() 호출 전 benchmark_stats는 count=0, 모든 ms=0.0."""
+        gen = MLSignalGenerator()
+        stats = gen.benchmark_stats()
+        assert stats["count"] == 0
+        assert stats["mean_ms"] == 0.0
+        assert stats["p95_ms"] == 0.0
+        assert stats["max_ms"] == 0.0
+
+    def test_benchmark_stats_recorded_after_predict(self):
+        """predict() 호출 후 latency가 기록됨."""
+        df = _make_df(200)
+        gen = MLSignalGenerator()
+        gen.predict(df)
+        gen.predict(df)
+        stats = gen.benchmark_stats()
+        assert stats["count"] == 2
+        assert stats["mean_ms"] >= 0.0
+
+    def test_load_trained_regime_auto_enables_regime_aware(self, tmp_path):
+        """load() 시 trained_regime이 있으면 regime_aware 자동 활성화."""
+        import pickle
+        from sklearn.ensemble import RandomForestClassifier
+
+        clf = RandomForestClassifier(n_estimators=3, random_state=0)
+        clf.fit(np.ones((10, 4)), [0, 1, -1, 0, 1, -1, 0, 1, -1, 0])
+        model_data = {
+            "model": clf,
+            "name": "test_model",
+            "class_order": [-1, 0, 1],
+            "feature_importances": {"f1": 0.5, "f2": 0.3, "f3": 0.15, "f4": 0.05},
+            "feature_names": ["f1", "f2", "f3", "f4"],
+            "trained_regime": "TREND",
+            "train_date": "2024-01-01",
+        }
+        path = tmp_path / "model.pkl"
+        with open(path, "wb") as f:
+            pickle.dump(model_data, f)
+
+        gen = MLSignalGenerator(regime_aware=False)
+        assert gen.regime_aware is False
+        result = gen.load(str(path))
+        assert result is True
+        assert gen.regime_aware is True
+        assert gen._trained_regime == "TREND"
+
+    def test_predict_feature_names_mismatch_fills_zeros(self):
+        """_feature_names가 실제 피처와 다를 때 reindex로 0.0 채움."""
+        df = _make_df(300)
+        gen = MLSignalGenerator()
+        mock_model = MagicMock()
+        mock_model.predict_proba = MagicMock(return_value=np.array([[0.1, 0.7, 0.2]]))
+        gen._model = mock_model
+        gen._class_order = [-1, 0, 1]
+        gen._feature_names = ["ghost_col_1", "ghost_col_2", "ghost_col_3"]
+
+        pred = gen.predict(df)
+        assert pred is not None
+        called_X = mock_model.predict_proba.call_args[0][0]
+        assert called_X.shape[1] == 3
+        assert list(called_X.columns) == ["ghost_col_1", "ghost_col_2", "ghost_col_3"]
+        assert called_X.iloc[0].tolist() == [0.0, 0.0, 0.0]
+
+    def test_get_feature_importances_top_n_truncated(self):
+        """get_feature_importances(top_n=N)은 상위 N개만 반환."""
+        gen = MLSignalGenerator()
+        gen._feature_importances = {"f1": 0.5, "f2": 0.3, "f3": 0.15, "f4": 0.05}
+        top2 = gen.get_feature_importances(top_n=2)
+        assert len(top2) == 2
+        assert top2[0] == ("f1", 0.5)
+        assert top2[1] == ("f2", 0.3)
+
+    def test_get_low_importance_features_below_threshold(self):
+        """get_low_importance_features()는 threshold 미만 피처만 반환."""
+        gen = MLSignalGenerator()
+        gen._feature_importances = {"f1": 0.5, "f2": 0.3, "f3": 0.008, "f4": 0.004}
+        low = gen.get_low_importance_features(threshold=0.01)
+        assert "f3" in low
+        assert "f4" in low
+        assert "f1" not in low
+        assert "f2" not in low
+
+
+# ─────────────────────────────────────────────────────────────────
 # WalkForwardTrainer 최소 데이터 요건 (D카테고리 — Cycle 197)
 # ─────────────────────────────────────────────────────────────────
 

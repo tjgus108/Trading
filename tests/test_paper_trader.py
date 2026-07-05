@@ -2036,6 +2036,85 @@ def test_execution_summary_single_trade_avg_fill_time_zero():
     assert summary["avg_fill_time"] == 0.0
 
 
+# ── Cycle 399: E(실행) 미커버 케이스 ──────────────────────────────
+
+def test_execute_signal_zero_price_rejected():
+    """price=0 이면 수량 체크 통과 후 price must be positive로 거부."""
+    pt = PaperTrader(slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=0.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+    assert "price" in result["reason"]
+
+
+def test_execute_signal_zero_quantity_rejected():
+    """quantity=0 이면 quantity must be positive로 거부."""
+    pt = PaperTrader(slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=0.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+    assert "quantity" in result["reason"]
+
+
+def test_kelly_sizer_zero_qty_skips_adjustment():
+    """kelly_sizer.compute_dynamic이 0 반환 시 원래 수량 유지."""
+    mock_kelly = MagicMock()
+    mock_kelly.compute_dynamic = MagicMock(return_value=0.0)
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, kelly_sizer=mock_kelly)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    assert abs(pt.account.positions.get("BTC/USDT", 0.0) - 2.0) < 1e-6
+    mock_kelly.compute_dynamic.assert_called_once()
+
+
+def test_kelly_sizer_record_trade_exception_no_crash():
+    """kelly_sizer.record_trade 예외 발생 시 경고만 기록, 크래시 없음."""
+    import pandas as pd
+
+    mock_kelly = MagicMock()
+    mock_kelly.compute_dynamic = MagicMock(return_value=1.0)
+    mock_kelly.record_trade = MagicMock(side_effect=RuntimeError("kelly error"))
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, kelly_sizer=mock_kelly)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    result = pt.execute_signal("BTC/USDT", "SELL", price=1100.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "filled"
+    mock_kelly.record_trade.assert_called_once()
+
+
+def test_vol_targeting_exception_no_crash():
+    """vol_targeting.adjust 예외 발생 시 경고만 기록, 원래 수량 유지."""
+    import pandas as pd
+
+    mock_vt = MagicMock()
+    mock_vt.adjust = MagicMock(side_effect=ValueError("vt error"))
+    candle_df = pd.DataFrame({"close": [1000.0]})
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0, vol_targeting=mock_vt)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0,
+                               strategy="s", confidence="H", candle_df=candle_df)
+    assert result["status"] == "filled"
+    assert abs(pt.account.positions.get("BTC/USDT", 0.0) - 2.0) < 1e-6
+
+
+def test_execution_summary_win_rate_two_wins_one_loss():
+    """get_execution_summary win_rate: 2승 1패 → 2/3."""
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    for buy_p, sell_p in [(100.0, 110.0), (200.0, 220.0), (300.0, 280.0)]:
+        pt.execute_signal("BTC/USDT", "BUY", price=buy_p, quantity=1.0,
+                          strategy="s", confidence="H")
+        pt.execute_signal("BTC/USDT", "SELL", price=sell_p, quantity=1.0,
+                          strategy="s", confidence="H")
+    summary = pt.get_execution_summary()
+    assert summary["total_trades"] == 6
+    assert abs(summary["win_rate"] - 2 / 3) < 1e-4
+
+
 def test_tiered_slippage_large_order_small_cap_higher_than_large_cap():
     """소형 심볼 대형 주문은 대형 심볼 대형 주문보다 slippage_bps 절댓값이 더 큼.
 
