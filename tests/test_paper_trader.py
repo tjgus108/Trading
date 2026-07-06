@@ -2055,3 +2055,68 @@ def test_tiered_slippage_large_order_small_cap_higher_than_large_cap():
     assert r_shib["status"] == "filled"
     # 소형 심볼이 훨씬 높은 slippage를 가져야 함
     assert abs(r_shib["slippage_bps"]) > abs(r_btc["slippage_bps"])
+
+
+# ── Cycle399 E(실행): PaperTrader 미커버 케이스 ───────────────────────────────
+
+def test_execute_signal_unknown_action_returns_error():
+    """BUY/SELL 외 알 수 없는 action(HOLD)은 status='error' 반환."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "HOLD", price=1000.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "error"
+    assert "unknown action" in result["reason"].lower()
+
+
+def test_execute_signal_zero_price_rejected():
+    """price=0 이면 status='rejected'."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=0.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+
+
+def test_execute_signal_zero_quantity_rejected():
+    """quantity=0 이면 status='rejected'."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=0.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+
+
+def test_get_summary_with_open_position_value():
+    """open_position_value는 qty × avg_entry 합계를 반영한다."""
+    pt = PaperTrader(initial_balance=100000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=2.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_summary()
+    # 오픈 포지션 가치 = 2 × 1000 = 2000 (슬리피지=0이면 정확히)
+    assert summary["open_position_value"] == pytest.approx(2000.0, rel=0.01)
+
+
+def test_get_summary_no_sells_win_rate_zero():
+    """SELL 거래 없으면 win_rate=0.0."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    summary = pt.get_summary()
+    assert summary["win_rate"] == 0.0
+    assert summary["sell_count"] == 0
+
+
+def test_reset_clears_positions_and_trades():
+    """reset() 후 잔고·포지션·거래 내역이 초기화된다."""
+    pt = PaperTrader(initial_balance=10000.0, fee_rate=0.0,
+                     slippage_pct=0.0, partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=100.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    assert len(pt.account.trades) == 1
+    pt.reset()
+    assert len(pt.account.trades) == 0
+    assert pt.account.positions == {}
+    assert pt.account.balance == pytest.approx(10000.0)

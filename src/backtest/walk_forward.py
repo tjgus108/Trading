@@ -169,6 +169,11 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     # Cycle398 F: weak_rsi_buy_max 파라미터화 완료 (frama.py 수정)
     #   weak_rsi_buy_max=40(기본) vs 50(중간 완화) vs 60(RANGING 허용) 탐색
     #   RANGING 47.3%에서 RSI 40-60 구�� 신호 차단 해소 → Trades 증가 가능
+    # Cycle399 F(리서치): weak_rsi_buy_max=50 paper_sim 결과 분석
+    #   BTC 1h WFO: Sh=0.44(↑0.24+83%), Trades=65(↑40+62.5%), PF=1.11, 0/8 Consistency
+    #   40→50 개선 확인: 신호 품질 하락 없이 Trades 대폭 증가, Sharpe도 개선
+    #   결론: 50 > 40 확정. WFO 그리드 [40,50,60]에서 최적값 탐색 지속 (60도 실험 대기 중)
+    #   0/8 Consistency는 파라미터 문제가 아닌 frama 구조적 한계
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],

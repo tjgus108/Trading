@@ -127,6 +127,10 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # "frama": {"atr_period": 10},  # 제거: 효과 없음 (Cycle371 D)
     # Cycle398 F(리서치): weak_rsi_buy_max=50 실험 (기본값=40, 완화 탐색)
     # 가설: RANGING(47.3% BTC 1h) RSI 40-60 구간 신호 차단 완화 → Trades 증가 기대
+    # Cycle399 F(리서치): weak_rsi_buy_max=50 실험 결과 분석
+    #   BTC 1h WFO: Sh=0.44(↑0.24+83%), Trades=65(↑40+62.5%), PF=1.11, 0/8 Consist
+    #   결론: 50 > 40 확정. 신호 품질 하락 없이 Trades 대폭 증가 확인. 50 유지.
+    #   WFO 그리드 [40,50,60]에서 60 추가 실험 대기 중
     "frama": {"weak_rsi_buy_max": 50, "weak_rsi_sell_min": 50},
     # Cycle354 E(실행): dema_cross convergence_signal 실험 → BTC real data 검증 결과 제거
     #   BTC full dataset: 23 trades(baseline) vs 867 trades(2% threshold) → Sharpe -2.37, ret -76%

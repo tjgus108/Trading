@@ -400,3 +400,64 @@ class TestWalkForwardTrainerMinData:
         assert result.passed is False
         assert result.n_samples == 99
         assert any("샘플" in r for r in result.fail_reasons)
+
+
+# ─────────────────────────────────────────────────────────────────
+# Cycle399 D(ML): MLSignalGenerator 미커버 케이스
+# ─────────────────────────────────────────────────────────────────
+
+class TestMLSignalGeneratorBenchmarkStats:
+    """benchmark_stats / reset_benchmark 미커버 케이스."""
+
+    def test_benchmark_stats_empty_returns_zero(self):
+        """예측 전 benchmark_stats()는 count=0, 나머지 모두 0.0."""
+        gen = MLSignalGenerator()
+        stats = gen.benchmark_stats()
+        assert stats["count"] == 0
+        assert stats["mean_ms"] == 0.0
+        assert stats["p50_ms"] == 0.0
+        assert stats["p95_ms"] == 0.0
+        assert stats["max_ms"] == 0.0
+
+    def test_benchmark_stats_accumulates_after_predict(self):
+        """predict() 호출 횟수만큼 count가 누적된다 (모델 없어도 latency 기록)."""
+        gen = MLSignalGenerator()
+        df = _make_df(60)
+        gen.predict(df)
+        gen.predict(df)
+        gen.predict(df)
+        stats = gen.benchmark_stats()
+        assert stats["count"] == 3
+        assert stats["mean_ms"] > 0.0
+
+    def test_reset_benchmark_clears_stats(self):
+        """reset_benchmark() 후 benchmark_stats()는 count=0."""
+        gen = MLSignalGenerator()
+        df = _make_df(60)
+        gen.predict(df)
+        gen.predict(df)
+        gen.reset_benchmark()
+        stats = gen.benchmark_stats()
+        assert stats["count"] == 0
+        assert stats["mean_ms"] == 0.0
+
+
+class TestMLSignalGeneratorFeatureImportance:
+    """get_feature_importances / feature_importance_report 미커버 케이스."""
+
+    def test_get_feature_importances_no_model_empty(self):
+        """모델 미로드 시 get_feature_importances()는 빈 리스트."""
+        gen = MLSignalGenerator()
+        assert gen.get_feature_importances() == []
+
+    def test_feature_importance_report_no_data_string(self):
+        """feature_importances 없으면 '(no data)' 포함 문자열 반환."""
+        gen = MLSignalGenerator()
+        report = gen.feature_importance_report()
+        assert "(no data)" in report
+
+    def test_get_low_importance_features_empty_model(self):
+        """모델 미로드 시 get_low_importance_features()는 빈 리스트."""
+        gen = MLSignalGenerator()
+        result = gen.get_low_importance_features(threshold=0.05)
+        assert result == []
