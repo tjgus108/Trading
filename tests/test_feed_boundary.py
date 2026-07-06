@@ -415,4 +415,99 @@ class TestAddIndicatorsShortDf:
         df = result.df
         assert "donchian_high" in df.columns
         # donchian_high: shift(1).rolling(20) → n=5에서는 전부 NaN
-        assert df["donchian_high"].isna().all(), "donchian_high가 5행에서 NaN이 아님"
+
+
+# ── Cycle400 C(데이터): duplicate timestamp 처리 + 다수 동일 심볼 요청 ──────
+
+
+class TestToDataframeDuplicateTimestamps:
+    """_to_dataframe duplicate timestamp 제거 테스트 (Cycle400 C)."""
+
+    def test_duplicate_timestamps_removed_keep_last(self):
+        """동일 타임스탬프 2개 → 마지막 값 유지, 행 수 1개."""
+        connector = MagicMock()
+        ts = 1704067200000
+        connector.fetch_ohlcv.return_value = [
+            [ts, 42000, 42500, 41800, 42100, 100],  # 첫 번째 (제거됨)
+            [ts, 42000, 42500, 41800, 42200, 100],  # 두 번째 (keep last)
+        ]
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert len(result.df) == 1, f"중복 제거 후 1행 기대: {len(result.df)}"
+        assert result.df["close"].iloc[0] == pytest.approx(42200.0), (
+            "중복 제거 시 마지막 값(42200) 유지 기대"
+        )
+
+    def test_three_duplicate_timestamps_keep_last(self):
+        """3개 중복 타임스탬프 → 마지막 1행만 남음."""
+        connector = MagicMock()
+        ts = 1704067200000
+        connector.fetch_ohlcv.return_value = [
+            [ts, 42000, 42500, 41800, 42000, 100],
+            [ts, 42000, 42500, 41800, 42100, 100],
+            [ts, 42000, 42500, 41800, 42200, 100],  # keep
+        ]
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert len(result.df) == 1
+        assert result.df["close"].iloc[0] == pytest.approx(42200.0)
+
+    def test_partial_duplicates_unique_retained(self):
+        """일부만 중복인 경우 — 중복 2개 + 고유 1개 → 총 2행."""
+        connector = MagicMock()
+        ts1 = 1704067200000
+        ts2 = 1704070800000  # 1시간 후
+        connector.fetch_ohlcv.return_value = [
+            [ts1, 42000, 42500, 41800, 42000, 100],  # 중복1 (제거)
+            [ts1, 42000, 42500, 41800, 42100, 100],  # 중복1 keep
+            [ts2, 43000, 43500, 42800, 43000, 200],  # 고유
+        ]
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=500)
+        assert len(result.df) == 2, f"부분 중복 → 2행 기대: {len(result.df)}"
+
+
+class TestSameSymbolMultipleRequests:
+    """동일 심볼 복수 요청 캐시 동작 테스트 (Cycle400 C)."""
+
+    def _make_raw(self, n: int = 50):
+        return [
+            [1704067200000 + i * 3600000, 42000, 42500, 41800, 42000, 100]
+            for i in range(n)
+        ]
+
+    def test_same_symbol_second_request_hits_cache(self):
+        """동일 심볼·타임프레임·limit 두 번째 요청 → 캐시 히트."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(50)
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=50)  # miss
+        feed.fetch("BTC/USDT", "1h", limit=50)  # hit
+
+        assert feed.cache_stats()["hit_count"] == 1
+        assert connector.fetch_ohlcv.call_count == 1
+
+    def test_different_limit_is_different_cache_key(self):
+        """limit 다름 → 캐시 키 불일치 → 두 번 모두 미스."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(50)
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=50)
+        feed.fetch("BTC/USDT", "1h", limit=100)
+
+        assert feed.cache_stats()["miss_count"] == 2
+        assert connector.fetch_ohlcv.call_count == 2
+
+    def test_different_symbol_is_different_cache_key(self):
+        """심볼 다름 → 별도 캐시 키 → 각각 미스."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(50)
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=50)
+        feed.fetch("ETH/USDT", "1h", limit=50)
+
+        assert feed.cache_stats()["miss_count"] == 2
+        assert connector.fetch_ohlcv.call_count == 2

@@ -1,43 +1,43 @@
 # Next Steps
 
-_Last updated: 2026-07-06 (Cycle 399 완료)_
+_Last updated: 2026-07-06 (Cycle 400 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 399
+### 이번 세션 완료 사이클: 400
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
 | 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 | 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
 | 399 | D+E+F | MLSignalGenerator benchmark_stats 6개+PaperTrader 엣지케이스 6개(+12→8556), **frama weak_rsi_buy_max=50 확정**(Sh=0.44↑0.24,Trades=65↑40), WFO그리드 [40,50,60] 탐색 지속 |
+| 400 | A+C+F | BacktestEngine방향전환3개+optimize_frama엣지케이스3개+DataFeed중복처리3개+캐시테스트3개(+12→8568), **frama 설정 유지**(Sh=0.44,Trades=65,0/8 구조적한계), roc_ma_cross PASS유지 |
 
-### 🎯 Cycle 400 작업 방향 (400 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
+### 🎯 Cycle 401 작업 방향 (401 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
 
-#### A(품질): BacktestEngine 또는 WalkForward 미커버 케이스
+#### B(리스크): DrawdownMonitor 또는 KellySizer 미커버 케이스
 
-- **배경**: 품질 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `src/backtest/engine.py` 또는 `src/backtest/walk_forward.py` 미커버 케이스
-  - BacktestEngine: 포지션 방향 전환(BUY→SELL→BUY 연속), 복수 전략 동시 실행
-  - WalkForward: optimize_frama() 함수 엣지케이스 (단일 윈도우, 빈 결과)
+- **배경**: 리스크 카테고리, 테스트 커버리지 향상
+- **작업 방향**: `src/risk/drawdown_monitor.py` 또는 `src/risk/kelly_sizer.py` 미커버 케이스
+  - DrawdownMonitor: set_sharpe_state 경계값, regime 복합 조합 케이스
+  - KellySizer: compute_from_trades 매우 많은 trades 입력, 음수 PnL 전체 케이스
 
-#### C(데이터): DataFeed 또는 feed.py 미커버 케이스
+#### D(ML): WalkForward optimize_frama 결과 분석 또는 MLSignalGenerator 기능 추가
 
-- **배경**: 데이터/인프라 카테고리
-- **작업 방향**: `src/data/feed.py` 미커버 케이스
-  - compute_indicators(): 매우 많은 컬럼 입력, duplicate index 처리
-  - DataFeed 캐시: 동일 심볼 복수 요청 처리
+- **배경**: ML/신호 카테고리
+- **작업 방향**: WFO frama [40,50,60] 그리드 fold별 선택 분포 분석
+  - WFO best params에서 weak_rsi_buy_max 50 vs 60 선택 빈도 확인
+  - 또는 walk_forward.py에 기타 미커버 케이스 추가
 
-#### F(리서치): frama WFO 그리드 [40,50,60] 결과 분석
+#### F(리서치): frama 구조적 한계 분석 및 대안 탐색
 
-- **배경**: Cycle399 F — weak_rsi_buy_max=50 확정(50>40), WFO 그리드 [40,50,60] 탐색 지속
-- **작업 방향**: 이번 사이클 paper_sim에서 weak_rsi_sell_min 개선 방향 탐색
-  - 현재 sell_min=50 설정 (=buy_max 설정과 동일)
-  - sell_min 기본값 60 vs 현재 50 성과 비교 기회
-  - 또는 WFO에서 [40,50,60] 조합 best param 분석
+- **배경**: Cycle400 F — frama 0/8 Consistency 구조적 한계 확인
+- **작업 방향**: frama가 PASS 불가한 근본 원인 코드 분석
+  - frama.py 생성 신호 조건 상세 분석: gap>=1% BUY/SELL vs gap<1% weak 신호 분기
+  - RANGING 47.3% 구간에서 weak 신호가 0/8 Consistency 유발하는지 검증
+  - 결론에 따라: WFO 그리드 조정 또는 frama 탐색 종료 결정
 
 ### ⚠️ 주의 사항 (Cycle 399 이후)
 
@@ -239,12 +239,12 @@ _Last updated: 2026-07-06 (Cycle 399 완료)_
 | 1h BTC price_cluster Consistency | 2/8 | **2/8** | 유지(ceiling) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
-| 1h BTC frama Sharpe | 0.24 | **0.44** | +0.20 (weak_rsi=50) |
-| 1h BTC frama Trades | 40 | **65** | +25 (weak_rsi=50) |
-| frama WFO combos | 27 (Cycle398) | **27** | 유지 |
+| 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (weak_rsi=50) |
+| 1h BTC frama Trades | 65 | **65** | 유지 (weak_rsi=50) |
+| frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8544개 | **8556개** (+12) | +12 추가 |
+| 테스트 수 | 8556개 | **8568개** (+12) | +12 추가 |
 
 ### Cycle 397 코드 변경 요약
 

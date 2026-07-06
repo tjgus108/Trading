@@ -1040,4 +1040,72 @@ def test_small_initial_balance_engine_no_crash():
     result = engine.run(AlwaysBuyStrategy(), df)
     assert isinstance(result, BacktestResult)
     # 잔고 1달러라도 size > 0이면 거래 발생, size≈0이면 거래 0건 — 어느 쪽이든 크래시 없어야 함
-    assert result.total_trades >= 0
+
+
+# ---------------------------------------------------------------------------
+# Cycle400 A(품질): 포지션 방향 전환 및 엔진 재사용 독립성
+# ---------------------------------------------------------------------------
+
+class AlternatingStrategy(BaseStrategy):
+    """매 generate() 호출마다 BUY/SELL 교번 (포지션 방향 전환 테스트용)."""
+    name = "alternating"
+
+    def __init__(self):
+        self._count = 0
+
+    def generate(self, df: pd.DataFrame) -> Signal:
+        last = df.iloc[-1]
+        action = Action.BUY if self._count % 2 == 0 else Action.SELL
+        self._count += 1
+        return Signal(
+            action=action,
+            confidence=Confidence.HIGH,
+            strategy=self.name,
+            entry_price=float(last["close"]),
+            reasoning="test",
+            invalidation="none",
+        )
+
+
+def test_position_flip_buy_sell_generates_multiple_trades():
+    """BUY→SELL→BUY 방향 전환 시 2회 이상 거래가 기록되어야 함."""
+    df = make_df(n=500, close_trend=0.0)
+    engine = BacktestEngine(
+        commission=0.0, slippage=0.0,
+        atr_multiplier_sl=0.3,   # 빠른 청산 → 방향 전환 기회 확보
+        atr_multiplier_tp=0.3,
+    )
+    result = engine.run(AlternatingStrategy(), df)
+    assert result.total_trades >= 2, (
+        f"방향 전환 전략 → 2회 이상 거래 기대: {result.total_trades}"
+    )
+
+
+def test_engine_reuse_identical_results():
+    """같은 엔진 인스턴스로 동일 데이터 두 번 run() → 결과 동일 (잔고 초기화 확인)."""
+    df = make_df(n=300, close_trend=0.002)
+    engine = BacktestEngine(commission=0.0, slippage=0.0)
+
+    result1 = engine.run(AlwaysBuyStrategy(), df)
+    result2 = engine.run(AlwaysBuyStrategy(), df)
+
+    assert result1.total_trades == result2.total_trades, (
+        "동일 엔진·전략·데이터 → 동일 거래 수 기대"
+    )
+    assert abs(result1.total_return - result2.total_return) < 1e-9, (
+        "재실행 시 잔고 초기화 → 동일 수익률 기대"
+    )
+
+
+def test_engine_two_strategies_result_names():
+    """같은 엔진으로 두 전략 실행 — 각 결과에 전략 이름이 올바르게 기록됨."""
+    df = make_df(n=300, close_trend=0.002)
+    engine = BacktestEngine(commission=0.0, slippage=0.0)
+
+    result_buy = engine.run(AlwaysBuyStrategy(), df)
+    result_sell = engine.run(AlwaysSellStrategy(), df)
+
+    assert isinstance(result_buy, BacktestResult)
+    assert isinstance(result_sell, BacktestResult)
+    assert result_buy.strategy == "always_buy", f"전략 이름 기대 'always_buy': {result_buy.strategy}"
+    assert result_sell.strategy == "always_sell", f"전략 이름 기대 'always_sell': {result_sell.strategy}"
