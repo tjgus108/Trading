@@ -1,43 +1,44 @@
 # Next Steps
 
-_Last updated: 2026-07-06 (Cycle 400 완료)_
+_Last updated: 2026-07-06 (Cycle 401 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 400
+### 이번 세션 완료 사이클: 401
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 | 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
 | 399 | D+E+F | MLSignalGenerator benchmark_stats 6개+PaperTrader 엣지케이스 6개(+12→8556), **frama weak_rsi_buy_max=50 확정**(Sh=0.44↑0.24,Trades=65↑40), WFO그리드 [40,50,60] 탐색 지속 |
 | 400 | A+C+F | BacktestEngine방향전환3개+optimize_frama엣지케이스3개+DataFeed중복처리3개+캐시테스트3개(+12→8568), **frama 설정 유지**(Sh=0.44,Trades=65,0/8 구조적한계), roc_ma_cross PASS유지 |
+| 401 | B+D+F | DM sharpe_decay 경계값+regime cooldown 6개+frama WFO weak_rsi 검증 6개(+12→8580), **frama 탐색 종료 확정**(gap<1%+RSI중립(40-60) 구조적 차단), WFO그리드 유지(최적값 선택용) |
 
-### 🎯 Cycle 401 작업 방향 (401 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 402 작업 방향 (402 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 KellySizer 미커버 케이스
+#### B(리스크): KellySizer 미커버 케이스
 
 - **배경**: 리스크 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `src/risk/drawdown_monitor.py` 또는 `src/risk/kelly_sizer.py` 미커버 케이스
-  - DrawdownMonitor: set_sharpe_state 경계값, regime 복합 조합 케이스
-  - KellySizer: compute_from_trades 매우 많은 trades 입력, 음수 PnL 전체 케이스
+- **작업 방향**: `src/risk/kelly_sizer.py` 미커버 케이스
+  - `compute_from_trades` 대용량 입력: 500+ trades 처리, 음수 PnL 전체 케이스
+  - `get_dynamic_fraction`: regime별 경계값 (정확히 threshold에서의 동작)
+  - `vol_scaled_fraction`: realized_vol 극단값 (매우 큰 vol, 정확히 target_vol)
 
-#### D(ML): WalkForward optimize_frama 결과 분석 또는 MLSignalGenerator 기능 추가
+#### D(ML): MLSignalGenerator 또는 walk_forward 미커버 케이스
 
 - **배경**: ML/신호 카테고리
-- **작업 방향**: WFO frama [40,50,60] 그리드 fold별 선택 분포 분석
-  - WFO best params에서 weak_rsi_buy_max 50 vs 60 선택 빈도 확인
-  - 또는 walk_forward.py에 기타 미커버 케이스 추가
+- **작업 방향**: MLSignalGenerator 기능 또는 walk_forward.py 추가 커버리지
+  - ML 모델 학습 완료 후 predict 시 edge case (empty df, NaN features)
+  - 또는 walk_forward WFO 결과 필드 검증 추가
 
-#### F(리서치): frama 구조적 한계 분석 및 대안 탐색
+#### F(리서치): dema_cross 또는 price_cluster 추가 개선 가능성 분석
 
-- **배경**: Cycle400 F — frama 0/8 Consistency 구조적 한계 확인
-- **작업 방향**: frama가 PASS 불가한 근본 원인 코드 분석
-  - frama.py 생성 신호 조건 상세 분석: gap>=1% BUY/SELL vs gap<1% weak 신호 분기
-  - RANGING 47.3% 구간에서 weak 신호가 0/8 Consistency 유발하는지 검증
-  - 결론에 따라: WFO 그리드 조정 또는 frama 탐색 종료 결정
+- **배경**: Cycle401 F frama 탐색 종료 → 다른 전략 분석으로 전환
+- **작업 방향**: dema_cross(Sh=0.85, PF=1.38) 또는 price_cluster(Sh=1.06, PF=1.32) 개선 방향
+  - dema_cross: PF 1.38 → 1.50 목표. 아직 미탐색 파라미터 있는지 확인
+  - price_cluster: Consistency 2/8 ceiling → 해소 가능성 재분석
+  - 결론에 따라: 새 파라미터 실험 또는 현재 설정 유지 결정
 
 ### ⚠️ 주의 사항 (Cycle 399 이후)
 
@@ -227,9 +228,9 @@ _Last updated: 2026-07-06 (Cycle 400 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 399 업데이트)
+### 핵심 메트릭 (Cycle 401 업데이트)
 
-| 지표 | Cycle 398 | Cycle 399 | 변화 |
+| 지표 | Cycle 400 | Cycle 401 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -241,10 +242,19 @@ _Last updated: 2026-07-06 (Cycle 400 완료)_
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (weak_rsi=50) |
 | 1h BTC frama Trades | 65 | **65** | 유지 (weak_rsi=50) |
-| frama WFO combos | 27 | **27** | 유지 |
+| frama WFO combos | 27 | **27** | 유지 (탐색 종료) |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8556개 | **8568개** (+12) | +12 추가 |
+| 테스트 수 | 8568개 | **8580개** (+12) | +12 추가 |
+
+### Cycle 401 코드 변경 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_drawdown_monitor.py` | sharpe_decay 경계값 3개 테스트 추가 (Cycle401 B): negative OOS, recovery, ATR+decay 복합 |
+| `tests/test_drawdown_monitor.py` | RANGING regime cooldown 복합 3개 테스트 추가 (Cycle401 B): neutral/directional/no-info |
+| `tests/test_phase_d.py` | TestOptimizeFramaWeakRsi 클래스 6개 테스트 추가 (Cycle401 D): 그리드 검증, factory 전달, window params |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["frama"] Cycle401 F 분석 결론 주석 추가: frama 탐색 종료 결정 문서화 |
 
 ### Cycle 397 코드 변경 요약
 

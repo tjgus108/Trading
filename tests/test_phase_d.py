@@ -665,3 +665,70 @@ class TestOptimizeFrama:
         assert hasattr(result, "best_params")
         assert hasattr(result, "oos_sharpe_std")
         assert isinstance(result.best_params, dict)
+
+
+# Cycle401 D(ML): optimize_frama WFO 그리드 weak_rsi_buy_max [40,50,60] 탐색 검증
+# ---------------------------------------------------------------------------
+
+class TestOptimizeFramaWeakRsi:
+    """optimize_frama() weak_rsi_buy_max 그리드 탐색 검증 (Cycle401 D)."""
+
+    def test_default_grid_has_three_weak_rsi_values(self):
+        """DEFAULT_GRIDS['frama']['weak_rsi_buy_max'] == [40, 50, 60] 확인."""
+        from src.backtest.walk_forward import DEFAULT_GRIDS
+        assert "frama" in DEFAULT_GRIDS
+        assert DEFAULT_GRIDS["frama"]["weak_rsi_buy_max"] == [40, 50, 60]
+
+    def test_optimize_frama_best_params_contains_weak_rsi_key(self):
+        """WFO 결과 best_params에 weak_rsi_buy_max 키 존재."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(500)
+        result = optimize_frama(df, n_windows=2)
+        if not result.windows:
+            pytest.skip("no windows generated with this data")
+        assert "weak_rsi_buy_max" in result.best_params
+
+    def test_optimize_frama_best_params_weak_rsi_in_valid_range(self):
+        """best_params weak_rsi_buy_max가 [40, 50, 60] 중 하나."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(500)
+        result = optimize_frama(df, n_windows=2)
+        if not result.windows:
+            pytest.skip("no windows generated with this data")
+        assert result.best_params["weak_rsi_buy_max"] in [40, 50, 60]
+
+    def test_optimize_frama_factory_propagates_weak_rsi_50(self):
+        """factory(weak_rsi_buy_max=50) → FRAMAStrategy.weak_rsi_buy_max==50."""
+        from src.backtest.walk_forward import optimize_frama, WalkForwardOptimizer, DEFAULT_GRIDS
+        from src.strategy.frama import FRAMAStrategy
+
+        def factory(params):
+            return FRAMAStrategy(
+                weak_rsi_buy_max=params.get("weak_rsi_buy_max", 40),
+            )
+
+        s = factory({"weak_rsi_buy_max": 50})
+        assert s.weak_rsi_buy_max == 50
+
+    def test_optimize_frama_factory_propagates_weak_rsi_60(self):
+        """factory(weak_rsi_buy_max=60) → FRAMAStrategy.weak_rsi_buy_max==60."""
+        from src.strategy.frama import FRAMAStrategy
+
+        def factory(params):
+            return FRAMAStrategy(
+                weak_rsi_buy_max=params.get("weak_rsi_buy_max", 40),
+            )
+
+        s = factory({"weak_rsi_buy_max": 60})
+        assert s.weak_rsi_buy_max == 60
+
+    def test_optimize_frama_window_params_have_valid_weak_rsi(self):
+        """각 window params에 weak_rsi_buy_max가 유효한 값으로 존재."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(500)
+        result = optimize_frama(df, n_windows=2)
+        if not result.windows:
+            pytest.skip("no windows generated with this data")
+        for w in result.windows:
+            assert "weak_rsi_buy_max" in w.params
+            assert w.params["weak_rsi_buy_max"] in [40, 50, 60]

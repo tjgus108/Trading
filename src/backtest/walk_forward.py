@@ -174,12 +174,22 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   40→50 개선 확인: 신호 품질 하락 없이 Trades 대폭 증가, Sharpe도 개선
     #   결론: 50 > 40 확정. WFO 그리드 [40,50,60]에서 최적값 탐색 지속 (60도 실험 대기 중)
     #   0/8 Consistency는 파라미터 문제가 아닌 frama 구조적 한계
+    # Cycle401 F(리서치): frama 0/8 Consistency 구조적 한계 코드 레벨 확정
+    #   핵심 분석: frama.py 신호 분기 — gap>=1%(강한신호) vs gap<1%(약한신호)
+    #   RANGING(47.3% BTC 1h) 특성: gap 대부분 < 1% + RSI 중립(40-60) 동시 발생
+    #   → 약한신호 경로에서 RSI 필터가 RANGING 신호의 대부분을 차단
+    #   → weak_rsi_buy_max=40: RSI<40만 통과(과매도만), 50: RSI<50(중립 절반), 60: RSI<60(대부분)
+    #   → weak_rsi_buy_max 상향이 Trades 증가에 기여하지만 RANGING 창 신호 품질은 개선 불가
+    #   → 0/8 Consistency = RANGING 창에서 항상 FAIL, TRENDING 창에서도 강한신호 부족
+    #   결론: frama는 gap>=1% 강한신호에 의존하는 추세추종 전략. RANGING 47.3%에서 구조적 불리.
+    #   파라미터 개선으로 Consistency 해소 불가 → frama 탐색 종료 결정
+    #   WFO 그리드 [40,50,60] 유지 (최적값 자동 선택용), paper_sim weak_rsi=50 유지
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
-        "weak_rsi_buy_max": [40, 50, 60],  # Cycle398 F: 약한신호 RSI 임계값 탐색
+        "weak_rsi_buy_max": [40, 50, 60],  # Cycle398 F: 약한신호 RSI 임계값 탐색 (Cycle401 F: 탐색 종료)
         # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
-        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 ��정)
+        # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 확정)
     },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)

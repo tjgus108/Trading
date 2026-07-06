@@ -1521,3 +1521,56 @@ def test_should_liquidate_all_at_block_entry_is_false():
     m.update(10000)
     m.update(8900)  # 11% 낙폭 → BLOCK_ENTRY (< 15%)
     assert m.should_liquidate_all() is False
+
+
+# ── Cycle 401 B(리스크): set_sharpe_decay 경계값 + regime 복합 cooldown 케이스 ──
+
+
+def test_sharpe_decay_negative_recent_sharpe_detects_decay():
+    """OOS Sharpe 음수(ratio < 0 < threshold) → decay 감지 → 0.5x."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=-0.5, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+
+
+def test_sharpe_decay_recovery_after_decay_resets_to_1x():
+    """decay 감지 후 ratio 회복(≥ threshold) → 1.0x로 복원."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=0.3, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 1.0
+
+
+def test_get_size_multiplier_atr_and_sharpe_decay_both_elevated():
+    """ATR 급등 + Sharpe decay 동시 → get_size_multiplier()=0.5 (min 동일)."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.set_atr_state(atr=3.0, atr_ma=1.0, threshold=1.5)   # ATR 급등 → 0.5x
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)  # decay → 0.5x
+    assert m.get_size_multiplier() == 0.5
+
+
+def test_ranging_neutral_macro_reduces_effective_cooldown():
+    """RANGING 레짐 + neutral macro → _effective_cooldown_seconds = base * 0.9."""
+    m = DrawdownMonitor(cooldown_seconds=1000.0)
+    m.set_regime("RANGING")
+    m.set_ranging_macro_neutral(ema50_slope=0.0001, threshold=0.0005)  # neutral → True
+    assert m._effective_cooldown_seconds() == pytest.approx(900.0)
+
+
+def test_ranging_directional_macro_extends_effective_cooldown():
+    """RANGING 레짐 + directional macro → _effective_cooldown_seconds = base * 1.5."""
+    m = DrawdownMonitor(cooldown_seconds=1000.0)
+    m.set_regime("RANGING")
+    m.set_ranging_macro_neutral(ema50_slope=0.001, threshold=0.0005)  # directional → False
+    assert m._effective_cooldown_seconds() == pytest.approx(1500.0)
+
+
+def test_ranging_no_macro_info_uses_default_ranging_multiplier():
+    """RANGING 레짐 + macro info 없음(None) → _effective_cooldown_seconds = base * 1.2."""
+    m = DrawdownMonitor(cooldown_seconds=1000.0)
+    m.set_regime("RANGING")
+    # _ranging_macro_neutral는 초기값 None
+    assert m._ranging_macro_neutral is None
+    assert m._effective_cooldown_seconds() == pytest.approx(1200.0)
