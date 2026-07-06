@@ -197,3 +197,60 @@ class TestCrisisModePositionScale:
         scale = RegimeDetector.get_position_scale(regime)
         assert regime == "CRISIS"
         assert scale == 0.5
+
+
+# ── Cycle 399 D(ML): 미커버 edge case ─────────────────────────────────────────
+
+class TestRegimeDetectorEdgeCases:
+
+    def test_minimum_warmup_bars_value(self):
+        """minimum_warmup_bars가 adx_period+1과 atr_period+atr_ma_period 중 큰 값."""
+        rd = RegimeDetector(adx_period=14, atr_period=20, atr_ma_period=20)
+        expected = max(14 + 1, 20 + 20)
+        assert rd.minimum_warmup_bars == expected
+
+    def test_detect_at_exact_minimum_bars_does_not_return_default(self):
+        """데이터가 정확히 minimum_warmup_bars 길이면 계산 경로 진입 (default 반환 안 함)."""
+        rd = RegimeDetector(adx_period=14, atr_period=5, atr_ma_period=5)
+        n = rd.minimum_warmup_bars  # max(15, 10) = 15
+        df = _make_ohlcv(n)
+        # 계산 경로 진입 시 유효한 레짐 반환 (TREND/RANGE/CRISIS 중 하나)
+        result = rd.detect(df)
+        assert result in ("TREND", "RANGE", "CRISIS")
+
+    def test_high_nan_ratio_keeps_current_regime(self):
+        """ohlcv NaN 비율 >10% 시 이전 레짐 유지."""
+        rd = RegimeDetector(adx_period=14, atr_period=20, atr_ma_period=20)
+        n = rd.minimum_warmup_bars + 5
+        df = _make_ohlcv(n)
+        # 최근 warmup_bars 범위에 NaN 30% 주입
+        rd._current_regime = "TREND"
+        nan_start = n - rd.minimum_warmup_bars
+        df.loc[df.index[nan_start: nan_start + rd.minimum_warmup_bars // 3], "close"] = float("nan")
+        df.loc[df.index[nan_start: nan_start + rd.minimum_warmup_bars // 3], "high"] = float("nan")
+        df.loc[df.index[nan_start: nan_start + rd.minimum_warmup_bars // 3], "low"] = float("nan")
+        result = rd.detect(df)
+        assert result == "TREND"  # NaN 많으면 이전 레짐 유지
+
+    def test_classify_atr_ma_zero_returns_none(self):
+        """atr_ma=0일 때 _classify()는 CRISIS/RANGE 조건 불충족 → None 반환."""
+        rd = RegimeDetector()
+        # atr_ma=0: CRISIS 조건(atr_ma>0 실패), RANGE 조건(atr_ma>0 실패)
+        result = rd._classify(adx=10.0, atr=5.0, atr_ma=0.0)
+        assert result is None  # 이전 상태 유지
+
+    def test_classify_adx_exactly_25_is_not_trend(self):
+        """adx=25.0 (정확히)는 TREND 조건(>25) 불충족 → None 반환."""
+        rd = RegimeDetector()
+        # adx=25.0, atr_ma > 0, atr not crisis → TREND 불성립
+        result = rd._classify(adx=25.0, atr=1.0, atr_ma=2.0)
+        # atr < atr_ma and adx < 20 이 아니므로 None
+        assert result is None
+
+    def test_confirm_bars_1_single_bar_transition(self):
+        """confirm_bars=1이면 단 1봉 조건 충족으로 즉시 레짐 전환."""
+        rd = RegimeDetector(confirm_bars=1)
+        rd._current_regime = "RANGE"
+        rd._update_state("CRISIS", index=0)
+        assert rd._current_regime == "CRISIS"
+        assert len(rd.get_history()) == 1

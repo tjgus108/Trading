@@ -2055,3 +2055,61 @@ def test_tiered_slippage_large_order_small_cap_higher_than_large_cap():
     assert r_shib["status"] == "filled"
     # 소형 심볼이 훨씬 높은 slippage를 가져야 함
     assert abs(r_shib["slippage_bps"]) > abs(r_btc["slippage_bps"])
+
+
+# ── Cycle 399 E(실행): 미커버 edge case ─────────────────────────────────────────
+
+def test_execute_signal_zero_quantity_rejected():
+    """quantity=0이면 'rejected' 반환 (quantity must be positive)."""
+    pt = PaperTrader(initial_balance=10000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=0.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+    assert "quantity" in result["reason"]
+
+
+def test_execute_signal_negative_price_rejected():
+    """price<=0이면 'rejected' 반환 (price must be positive)."""
+    pt = PaperTrader(initial_balance=10000.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    result = pt.execute_signal("BTC/USDT", "BUY", price=-100.0, quantity=1.0,
+                               strategy="s", confidence="H")
+    assert result["status"] == "rejected"
+    assert "price" in result["reason"]
+
+
+def test_check_sl_tp_no_position_returns_no_hit():
+    """포지션 없을 때 check_sl_tp()는 hit=False 반환."""
+    pt = PaperTrader()
+    result = pt.check_sl_tp("BTC/USDT", current_price=1000.0,
+                            stop_loss=900.0, take_profit=1100.0)
+    assert result["hit"] is False
+    assert result["type"] is None
+    assert result["pnl"] is None
+
+
+def test_check_sl_tp_stop_loss_triggered():
+    """현재가 <= stop_loss이면 SL 체결되고 hit=True, type='sl'."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    result = pt.check_sl_tp("BTC/USDT", current_price=900.0, stop_loss=950.0)
+    assert result["hit"] is True
+    assert result["type"] == "sl"
+    assert result["pnl"] is not None
+    # SL 체결 후 포지션 소거
+    assert pt.account.positions.get("BTC/USDT", 0.0) == 0.0
+
+
+def test_check_sl_tp_take_profit_triggered():
+    """현재가 >= take_profit이면 TP 체결되고 hit=True, type='tp'."""
+    pt = PaperTrader(initial_balance=50000.0, fee_rate=0.0, slippage_pct=0.0,
+                     partial_fill_prob=0.0, timeout_prob=0.0)
+    pt.execute_signal("BTC/USDT", "BUY", price=1000.0, quantity=1.0,
+                      strategy="s", confidence="H")
+    result = pt.check_sl_tp("BTC/USDT", current_price=1100.0, take_profit=1050.0)
+    assert result["hit"] is True
+    assert result["type"] == "tp"
+    assert result["pnl"] > 0

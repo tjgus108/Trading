@@ -1,54 +1,61 @@
 # Next Steps
 
-_Last updated: 2026-07-05 (Cycle 398 완료)_
+_Last updated: 2026-07-06 (Cycle 399 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 398
+### 이번 세션 완료 사이클: 399
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 395 | A+C+F | ATR경계/잔고경계+feed지표일관성 테스트4개(+4→8520), **atr_bounce_factor 탐색 완전 종료**(factor=0.5확정:Sh=1.06↑,SharpeStd↓), **price_cluster 최적화 완전 종료 선언** |
 | 396 | B+D+F | DM kill/size_mult 미커버 6개(+6→8526), **dema_cross WFO dead param 인라인 주석**, **frama 다음 타겟 결정**(Sh=0.24,Trades=40,+1.60%) |
 | 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 | 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
+| 399 | D+E+F | RegimeDetector엣지6개+PaperTrader엣지5개(+11→8555), **frama weak_rsi_buy_max=50 DEAD PARAM 확정**(Consistency 1/8→0/8악화), WFO그리드 [40,50,60]→주석화(27→9복귀) |
 
-### 🎯 Cycle 399 작업 방향 (399 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 400 작업 방향 (400 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): MLSignalGenerator 미커버 케이스
+#### A(품질): BacktestEngine 또는 WalkForwardOptimizer 미커버 케이스
 
-- **배경**: ML 모듈 커버리지 향상
-- **작업 방향**: `src/ml/signal_generator.py` 또는 `src/ml/regime_classifier.py` 미커버 케이스
-  - predict() 엣지케이스: 빈 피처, NaN 피처, 미학습 모델 상태
-  - regime_classifier: 경계 confidence 값, UNKNOWN 레짐 처리
-  - feature_pipeline: 매우 짧은 window 크기 입력
+- **배경**: 품질 카테고리 — 백테스트 엔진 커버리지 향상
+- **작업 방향**: `src/backtest/backtest_engine.py` 미커버 케이스 탐색
+  - 포지션 청산 로직 경계값 (partial close, full close)
+  - max_hold_candles 초과 시 강제 청산 검증
+  - fee_rate=0 경계값 검증
 
-#### E(실행): PaperTrader 또는 OrderManager 미커버 케이스
+#### C(데이터): feed.py 또는 data 모듈 미커버 케이스
 
-- **배경**: 실행 모듈 커버리지 지속 향상
-- **작업 방향**: `src/execution/paper_trader.py` 또는 `src/execution/order_manager.py` 미커버 케이스
-  - PaperTrader: 포지션 제한 초과, 수수료 계산 경계값
-  - OrderManager: 주문 취소/수정 엣지케이스
+- **배경**: 데이터 인프라 커버리지
+- **작업 방향**: `src/data/feed.py` 또는 `src/data/` 미커버 케이스
+  - _add_indicators() 특수 케이스 (빈 OHLCV, 단일 심볼)
+  - enrich_indicators() 경계값
 
-#### F(리서치): frama weak_rsi_buy_max=50 실험 결과 분석
+#### F(리서치): frama 다음 방향 탐색
 
-- **배경**: Cycle398 F — weak_rsi_buy_max 파라미터화 완료, paper_sim에 =50 실험 추가
-- **작업 방향**: 이번 사이클의 paper sim 결과에서 frama 성과 확인
-  - 기준: 기존 Sh=0.24, Trades=40 vs 새 실험 (weak_rsi_buy_max=50)
-  - Trades 증가 여부: RANGING(47.3%)에서 RSI 40-50 구간 신호 해제 효과
-  - Sharpe 영향: 신호 품질 하락 없이 Trades 늘어나는지 확인
-  - 결과 좋으면: WFO 그리드 이미 [40,50,60] 추가 완료 → 최적값 결정
-  - 결과 나쁘면: weak_rsi_buy_max 기본값 유지(40), 그리드도 [40] 복귀
+- **배경**: weak_rsi_buy_max 탐색 완전 종료. frama Sh=0.24, Trades=40 — 개선 방향 필요
+- **작업 방향**: frama 개선 가능성 분석
+  - 현재 frama WFO 그리드: period=[14,16,18], rsi_period=[12,14,16] (9 combos)
+  - WFO IS 선택 분포 분석: 어떤 period/rsi_period 조합이 IS에서 선호되는지
+  - PASS 달성 가능성 평가: Sh 0.24 → 1.0 목표까지 gap=0.76 (먼 거리)
+  - frama 탐색 종료 여부 검토: 개선 방향이 없으면 탐색 완전 종료 선언
+
+### ⚠️ 주의 사항 (Cycle 399 이후)
+
+- **frama weak_rsi_buy_max=50 DEAD PARAM 확정** (Cycle399 F):
+  - Sh=0.24→0.44(↑), Trades=40→65(↑), Consistency=1/8→0/8(↓악화)
+  - weak_rsi_buy_max 탐색 완전 종료. 기본값 40 확정 불변
+  - paper_simulation.py: 실험 제거 → frama 기본값(empty dict)
+  - walk_forward.py: weak_rsi_buy_max 그리드 주석화 (27→9 combos 복귀)
+  - **frama 추가 탐색 방향**: period, rsi_period WFO IS 선택 분포 분석 or 탐색 종료 검토
 
 ### ⚠️ 주의 사항 (Cycle 398 이후)
 
-- **frama weak_rsi_buy_max 파라미터화 완료** (Cycle398 F):
-  - frama.py: `weak_rsi_buy_max=40` (기본값), `weak_rsi_sell_min=60` 파라미터 추가
-  - walk_forward.py: `weak_rsi_buy_max=[40, 50, 60]` WFO 그리드 추가 (9→27 combos)
-  - paper_simulation.py: `weak_rsi_buy_max=50` 실험 추가
-  - 다음 사이클 paper sim에서 효과 확인 필요
+- **frama weak_rsi_buy_max 파라미터화 완료** (Cycle398 F, Cycle399 F에서 DEAD 확정):
+  - frama.py: `weak_rsi_buy_max=40` (기본값), `weak_rsi_sell_min=60` 파라미터 추가 (코드 유지)
+  - walk_forward.py: weak_rsi_buy_max 그리드 주석화 (탐색 종료)
+  - paper_simulation.py: frama 기본값 사용
 
 ### ⚠️ 주의 사항 (Cycle 397 이후)
 
@@ -222,9 +229,9 @@ _Last updated: 2026-07-05 (Cycle 398 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 397 업데이트)
+### 핵심 메트릭 (Cycle 399 업데이트)
 
-| 지표 | Cycle 396 | Cycle 397 | 변화 |
+| 지표 | Cycle 398 | Cycle 399 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -234,11 +241,11 @@ _Last updated: 2026-07-05 (Cycle 398 완료)_
 | 1h BTC price_cluster Consistency | 2/8 | **2/8** | 유지(ceiling) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
-| 1h BTC frama Sharpe | 0.24 | **0.24** | 유지 (다음 타겟) |
-| frama WFO combos | 27 | **9** | -18 (atr_period dead param) |
+| 1h BTC frama Sharpe (baseline=40) | 0.24 | **0.24** | 유지 (wrbm=50 DEAD) |
+| frama WFO combos | 27 | **9** | -18 (weak_rsi dead) |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8526개 | **8532개** (+6) | +6 추가 |
+| 테스트 수 | 8544개 | **8555개** (+11) | +11 추가 |
 
 ### Cycle 397 코드 변경 요약
 

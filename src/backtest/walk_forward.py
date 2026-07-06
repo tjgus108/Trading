@@ -172,7 +172,8 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
-        "weak_rsi_buy_max": [40, 50, 60],  # Cycle398 F: 약한신호 RSI 임계값 탐색
+        # weak_rsi_buy_max: Cycle399 F — DEAD PARAM. 50→Consistency 0/8 악화. 40 기본값 확정. 탐색 종료.
+        # "weak_rsi_buy_max": [40, 50, 60],  # 탐색 종료 (Cycle399 F)
         # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
         # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 ��정)
     },
