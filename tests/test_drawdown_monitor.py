@@ -1521,3 +1521,58 @@ def test_should_liquidate_all_at_block_entry_is_false():
     m.update(10000)
     m.update(8900)  # 11% 낙폭 → BLOCK_ENTRY (< 15%)
     assert m.should_liquidate_all() is False
+
+
+# ── Cycle 401 B(리스크): set_sharpe_decay 복합 조합 케이스 ─────────────────────
+
+
+def test_sharpe_decay_and_atr_elevated_compound():
+    """ATR elevated + Sharpe decay 동시 활성 → get_size_multiplier() = 0.5."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.set_atr_state(atr=2.5, atr_ma=1.5, threshold=1.5)       # elevated: 2.5/1.5 = 1.67x ≥ 1.5
+    m.set_sharpe_decay(recent_sharpe=0.3, historical_sharpe=1.0, threshold=0.50)  # decayed
+    assert m.get_atr_vol_multiplier() == 0.5
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    assert m.get_size_multiplier() == 0.5  # min(1.0, 1.0, 0.5, 0.5)
+
+
+def test_sharpe_decay_negative_recent_sharpe_is_decayed():
+    """recent_sharpe < 0 → ratio 음수 < threshold(0.50) → decayed=True."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=-0.5, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+
+
+def test_sharpe_decay_recovery_resets_multiplier():
+    """decay 상태에서 OOS Sharpe 회복 → get_sharpe_decay_multiplier() = 1.0."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 1.0
+
+
+def test_sharpe_decay_zero_recent_sharpe():
+    """recent_sharpe=0 → ratio=0 < threshold(0.50) → decayed=True."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=0.0, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+
+
+def test_sharpe_decay_custom_threshold_boundary():
+    """custom threshold=0.80, ratio=0.80 → exactly threshold → not decayed."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0, threshold=0.80)
+    assert m.get_sharpe_decay_multiplier() == 1.0  # ratio==threshold: < 조건 불성립
+
+
+def test_sharpe_decay_and_mdd_warn_compound():
+    """MDD WARN(0.5) + Sharpe decay(0.5) 복합 → get_size_multiplier() = 0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05, mdd_block_pct=0.10)
+    m.update(10000)
+    m.update(9400)   # 6% MDD → WARN → mdd_size_multiplier=0.5
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_mdd_size_multiplier() == 0.5
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    assert m.get_size_multiplier() == 0.5  # min(1.0, 0.5, 1.0, 0.5)

@@ -665,3 +665,24 @@ class TestOptimizeFrama:
         assert hasattr(result, "best_params")
         assert hasattr(result, "oos_sharpe_std")
         assert isinstance(result.best_params, dict)
+
+    def test_optimize_frama_weak_rsi_key_in_best_params(self):
+        """best_params dict에 weak_rsi_buy_max 키 포함 (Cycle398 F 파라미터화 검증)."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(1200)  # 충분한 데이터로 유효 윈도우 보장
+        result = optimize_frama(df, n_windows=2)
+        assert "weak_rsi_buy_max" in result.best_params
+
+    def test_optimize_frama_grid_combos_count(self):
+        """DEFAULT_GRIDS["frama"] 조합 수 = 3*3*3 = 27 (period×rsi_period×weak_rsi_buy_max)."""
+        from src.backtest.walk_forward import DEFAULT_GRIDS
+        grid = DEFAULT_GRIDS["frama"]
+        combos = 1
+        for vals in grid.values():
+            combos *= len(vals)
+        assert combos == 27
+
+    def test_optimize_frama_no_atr_period_in_grid(self):
+        """atr_period는 DEAD PARAM → DEFAULT_GRIDS["frama"]에서 제거됨 (Cycle397 F)."""
+        from src.backtest.walk_forward import DEFAULT_GRIDS
+        assert "atr_period" not in DEFAULT_GRIDS["frama"]

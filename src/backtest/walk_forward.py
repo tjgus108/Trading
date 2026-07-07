@@ -174,6 +174,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   40→50 개선 확인: 신호 품질 하락 없이 Trades 대폭 증가, Sharpe도 개선
     #   결론: 50 > 40 확정. WFO 그리드 [40,50,60]에서 최적값 탐색 지속 (60도 실험 대기 중)
     #   0/8 Consistency는 파라미터 문제가 아닌 frama 구조적 한계
+    # Cycle401 F(리서치): frama 0/8 Consistency 근본 원인 코드 분석 완료
+    #   신호 구조: strong_signal(gap>=1%) → RSI<85 (거의 통과), weak_signal(gap<1%) → RSI<weak_rsi_buy_max (엄격)
+    #   RANGING(47.3% BTC 1h)에서 gap<1% 비율 높음 → weak 신호 경로가 지배적
+    #   weak_rsi_buy_max=40: RSI 40-85 구간 완전 차단 / =50: 50-85 차단 / =60: 60-85 차단
+    #   RSI 중립(40-60) 구간이 RANGING에서 지배적 → weak_rsi 완화해도 구조적 한계 유지
+    #   atr_contracting은 BUY/SELL 조건에 미사용 (로그 전용) → ATR 파라미터 탐색 전혀 무효
+    #   결론: frama WFO 그리드 [40,50,60] 유지 (자동 선택), 추가 파라미터 탐색 종료
+    #         paper_sim weak_rsi_buy_max=50 확정 유지. frama는 보조 신호로 보존.
     "frama": {
         "period": [14, 16, 18],
         "rsi_period": [12, 14, 16],
