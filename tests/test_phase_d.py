@@ -665,3 +665,75 @@ class TestOptimizeFrama:
         assert hasattr(result, "best_params")
         assert hasattr(result, "oos_sharpe_std")
         assert isinstance(result.best_params, dict)
+
+
+# Cycle 401 D(ML): frama [40,50,60] 그리드 검증 + FRAMAStrategy 파라미터 동작
+# ---------------------------------------------------------------------------
+
+class TestFramaWfoGrid:
+    """WFO frama 그리드 구조 및 FRAMAStrategy weak_rsi 파라미터 검증."""
+
+    def test_default_grids_frama_has_weak_rsi_buy_max(self):
+        """DEFAULT_GRIDS["frama"]에 weak_rsi_buy_max=[40,50,60] 존재."""
+        from src.backtest.walk_forward import DEFAULT_GRIDS
+        grid = DEFAULT_GRIDS["frama"]
+        assert "weak_rsi_buy_max" in grid
+        assert set(grid["weak_rsi_buy_max"]) == {40, 50, 60}
+
+    def test_frama_grid_produces_27_combinations(self):
+        """DEFAULT_GRIDS["frama"] period×rsi_period×weak_rsi_buy_max = 3×3×3 = 27 combos."""
+        from src.backtest.walk_forward import DEFAULT_GRIDS
+        import itertools
+        grid = DEFAULT_GRIDS["frama"]
+        combos = list(itertools.product(*grid.values()))
+        assert len(combos) == 27, f"기대 27개 조합, 실제 {len(combos)}개"
+
+    def test_frama_strategy_stores_weak_rsi_buy_max(self):
+        """FRAMAStrategy(weak_rsi_buy_max=50) → .weak_rsi_buy_max == 50."""
+        from src.strategy.frama import FRAMAStrategy
+        strat = FRAMAStrategy(weak_rsi_buy_max=50)
+        assert strat.weak_rsi_buy_max == 50
+
+    def test_frama_strategy_default_weak_rsi_buy_max_is_40(self):
+        """FRAMAStrategy() 기본값 weak_rsi_buy_max=40."""
+        from src.strategy.frama import FRAMAStrategy
+        strat = FRAMAStrategy()
+        assert strat.weak_rsi_buy_max == 40
+
+    def test_optimize_frama_factory_passes_weak_rsi_buy_max(self):
+        """optimize_frama 내부 factory가 weak_rsi_buy_max 파라미터를 FRAMAStrategy에 전달.
+
+        n=400: window_size=200, is_size=120(>100), oos_size=80(>30) → 윈도우 1개 보장.
+        """
+        from src.backtest.walk_forward import WalkForwardOptimizer, DEFAULT_GRIDS
+        from src.strategy.frama import FRAMAStrategy
+
+        created_params = []
+
+        def tracking_factory(params: dict):
+            created_params.append(params.copy())
+            return FRAMAStrategy(**{k: params[k] for k in params if k in
+                                    ["period", "rsi_period", "atr_period",
+                                     "weak_rsi_buy_max", "weak_rsi_sell_min"]})
+
+        opt = WalkForwardOptimizer(
+            strategy_name="frama",
+            strategy_factory=tracking_factory,
+            param_grid={"weak_rsi_buy_max": [40, 50]},
+            n_windows=1,
+        )
+        df = _make_df(400)
+        opt.run(df)
+        seen_values = {p.get("weak_rsi_buy_max") for p in created_params}
+        assert 40 in seen_values and 50 in seen_values, (
+            f"weak_rsi_buy_max=40,50 모두 factory에 전달되어야 함, 실제: {seen_values}"
+        )
+
+    def test_frama_different_instances_independent_params(self):
+        """weak_rsi_buy_max=40 vs 50 인스턴스가 서로 독립적 파라미터 보유."""
+        from src.strategy.frama import FRAMAStrategy
+        s40 = FRAMAStrategy(weak_rsi_buy_max=40)
+        s50 = FRAMAStrategy(weak_rsi_buy_max=50)
+        assert s40.weak_rsi_buy_max == 40
+        assert s50.weak_rsi_buy_max == 50
+        assert s40.weak_rsi_buy_max != s50.weak_rsi_buy_max

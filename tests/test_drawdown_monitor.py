@@ -1521,3 +1521,36 @@ def test_should_liquidate_all_at_block_entry_is_false():
     m.update(10000)
     m.update(8900)  # 11% 낙폭 → BLOCK_ENTRY (< 15%)
     assert m.should_liquidate_all() is False
+
+
+# ── Cycle 401 B(리스크): set_sharpe_decay 경계값 + ATR/Sharpe 복합 조합 ──────
+
+
+def test_sharpe_decay_negative_recent_sharpe_triggers_decay():
+    """recent_sharpe < 0 + historical > 0 → ratio < 0 < threshold → decay 적용."""
+    m = DrawdownMonitor()
+    m.set_sharpe_decay(recent_sharpe=-0.5, historical_sharpe=1.0, threshold=0.50)
+    # ratio = -0.5 / 1.0 = -0.5 < 0.50 → decayed
+    assert m.get_sharpe_decay_multiplier() == 0.5
+
+
+def test_sharpe_decay_recovery_after_decayed_state():
+    """decay 상태에서 ratio >= threshold로 개선되면 multiplier 1.0 복원."""
+    m = DrawdownMonitor()
+    # 먼저 decay 상태 설정
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    # ratio = 0.6 / 1.0 = 0.6 >= 0.50 → 회복
+    m.set_sharpe_decay(recent_sharpe=0.6, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 1.0
+
+
+def test_atr_elevated_and_sharpe_decay_combined_size_multiplier():
+    """ATR 급등(0.5) + Sharpe decay(0.5) 동시 활성 → get_size_multiplier() = min = 0.5."""
+    m = DrawdownMonitor()
+    m.update(10000)
+    m.set_atr_state(atr=3.0, atr_ma=1.0, threshold=1.5)  # ATR 3.0 > 1.0*1.5 → elevated
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_atr_vol_multiplier() == 0.5
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    assert m.get_size_multiplier() == 0.5  # min(1.0, 0.5, 0.5) = 0.5
