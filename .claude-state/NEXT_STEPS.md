@@ -1,43 +1,43 @@
 # Next Steps
 
-_Last updated: 2026-07-07 (Cycle 401 완료)_
+_Last updated: 2026-07-07 (Cycle 402 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 401
+### 이번 세션 완료 사이클: 402
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
 | 399 | D+E+F | MLSignalGenerator benchmark_stats 6개+PaperTrader 엣지케이스 6개(+12→8556), **frama weak_rsi_buy_max=50 확정**(Sh=0.44↑0.24,Trades=65↑40), WFO그리드 [40,50,60] 탐색 지속 |
 | 400 | A+C+F | BacktestEngine방향전환3개+optimize_frama엣지케이스3개+DataFeed중복처리3개+캐시테스트3개(+12→8568), **frama 설정 유지**(Sh=0.44,Trades=65,0/8 구조적한계), roc_ma_cross PASS유지 |
 | 401 | B+D+F | DM set_sharpe_decay 복합조합 6개+optimize_frama 검증 3개(+9→8577), **frama 구조적 한계 확정**(RANGING weak_signal 경로 코드 분석), frama 탐색 완전 종료 |
+| 402 | E+A+F | PaperConnector 미커버 3개+apply_wfe 4개(+7→8607), **engine.py summary() 음수WFE버그픽스**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 402 작업 방향 (402 mod 5 = 2 → E(실행) + A(품질) + F(리서치))
+### 🎯 Cycle 403 작업 방향 (403 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### E(실행): PaperTrader 또는 PaperConnector 미커버 케이스
+#### C(데이터): DataFeed 또는 피처 엔지니어링 미커버 케이스
 
-- **배경**: 실행 카테고리, paper trading 테스트 커버리지 향상
-- **작업 방향**: `src/exchange/paper_connector.py` 또는 `tests/test_paper_trader.py` 미커버 케이스
-  - PaperConnector: slippage 계산 경계값, order 취소/수정 케이스
-  - PaperTrader: 잔고 부족 시 주문 거부, 포지션 한도 초과 시 처리
+- **배경**: 데이터 카테고리, DataFeed 관련 테스트 커버리지 향상
+- **작업 방향**: `tests/test_feed_boundary.py` 또는 `tests/test_feed.py` 미커버 케이스
+  - compute_indicators() 엣지케이스 (극단값, NaN 처리)
+  - DataFeed 캐시 무효화 케이스
 
-#### A(품질): BacktestEngine 또는 WalkForwardOptimizer 미커버 케이스
+#### B(리스크): DrawdownMonitor 또는 KellySizer 미커버 케이스
 
-- **배경**: 품질 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `src/backtest/engine.py` 또는 `src/backtest/walk_forward.py` 미커버 케이스
-  - BacktestEngine: fee 계산 검증, 포지션 사이징 엣지케이스
-  - WalkForwardOptimizer: 윈도우 분할 경계 케이스
+- **배경**: 리스크 카테고리, 테스트 커버리지 향상
+- **작업 방향**: `tests/test_drawdown_monitor.py` 또는 `tests/test_kelly_sizer.py` 미커버 케이스
+  - DrawdownMonitor: reset_daily()와 연동된 복합 케이스
+  - KellySizer: compute_dynamic 경계값 케이스
 
-#### F(리서치): price_cluster 또는 dema_cross 추가 개선 방향 탐색
+#### F(리서치): 새 전략 후보 탐색 또는 Bundle OOS 확장 방향 분석
 
-- **배경**: Cycle401에서 frama 탐색 완전 종료 — 다음 개선 대상 결정 필요
-- **작업 방향**: 현재 FAIL 전략 중 개선 가능성 분석
-  - price_cluster (Sh=1.06, 2/8 Consistency): 추가 파라미터 발굴 가능한지 분석
-  - dema_cross (Sh=0.85, PF=1.38, 2/8): PF 목표 1.50까지 gap=0.12 — 달성 가능한 방향 존재하는지 확인
-  - roc_ma_cross (PASS, 4/8, Tr=14): Consistency 개선 방향 탐색 (SL/TP, 추가 필터)
+- **배경**: Cycle402 F에서 기존 3대 전략(price_cluster, dema_cross, frama) 모두 탐색 종료 확정
+- **작업 방향**: 다음 개선 대상 결정
+  - 1h paper_sim에서 가장 가능성 있는 미탐색 전략 분석
+  - positional_scaling (1/8, Sh=-0.38, PF=1.09): 개선 가능한 파라미터 존재하는지 확인
+  - 또는 Bundle OOS 4h 6번째 전략 후보 검토
 
 ### ⚠️ 주의 사항 (Cycle 401 이후)
 
@@ -238,9 +238,9 @@ _Last updated: 2026-07-07 (Cycle 401 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 401 업데이트)
+### 핵심 메트릭 (Cycle 402 업데이트)
 
-| 지표 | Cycle 400 | Cycle 401 | 변화 |
+| 지표 | Cycle 401 | Cycle 402 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -255,7 +255,7 @@ _Last updated: 2026-07-07 (Cycle 401 완료)_
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8568개 | **8577개** (+9) | +9 추가 |
+| 테스트 수 | 8577개 | **8607개** (+30) | +30 추가 |
 
 ### Cycle 397 코드 변경 요약
 

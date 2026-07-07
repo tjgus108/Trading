@@ -1120,3 +1120,46 @@ class TestPaperConnectorTieredSlippage:
         )
         summary = pc.get_paper_summary()
         assert summary.get("tiered_slippage_active") is False
+
+
+# ---------------------------------------------------------------------------
+# Cycle 402 E(실행): PaperConnector 미커버 케이스
+# ---------------------------------------------------------------------------
+
+class TestPaperConnectorCycle402:
+    """Cycle 402 E(실행): error 상태, partial fill 플래그, 주문 ID 형식."""
+
+    def test_create_order_invalid_action_raises_error(self):
+        """unknown action(HOLD) → PaperTrader error → ValueError('Order error') 발생."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        with pytest.raises(ValueError, match="Order error"):
+            pc.create_order("BTC/USDT", "hold", 1.0, price=10000.0)
+
+    def test_create_order_partial_fill_info_flag(self):
+        """partial_fill_prob=1.0 → 모든 주문이 부분체결 → info['is_partial']=True."""
+        import random
+        random.seed(42)
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=1.0, timeout_prob=0.0,
+        )
+        result = pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        assert result["status"] == "closed"
+        assert result["info"]["is_partial"] is True
+        assert result["filled"] < result["amount"]
+
+    def test_create_order_filled_id_has_string_prefix(self):
+        """정상 체결 시 order id가 'paper_order_' 접두사를 포함한 문자열."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        result = pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        assert isinstance(result["id"], str)
+        assert result["id"].startswith("paper_order_")

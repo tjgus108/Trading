@@ -1109,3 +1109,53 @@ def test_engine_two_strategies_result_names():
     assert isinstance(result_sell, BacktestResult)
     assert result_buy.strategy == "always_buy", f"전략 이름 기대 'always_buy': {result_buy.strategy}"
     assert result_sell.strategy == "always_sell", f"전략 이름 기대 'always_sell': {result_sell.strategy}"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 402 A(품질): BacktestEngine.apply_wfe() 미커버 케이스
+# ---------------------------------------------------------------------------
+
+def _make_result(sharpe: float, strategy: str = "test") -> BacktestResult:
+    """apply_wfe 테스트용 최소 BacktestResult 헬퍼."""
+    return BacktestResult(
+        strategy=strategy,
+        total_trades=20,
+        win_rate=0.5,
+        profit_factor=1.5,
+        sharpe_ratio=sharpe,
+        max_drawdown=0.10,
+        total_return=0.05,
+        passed=True,
+        fail_reasons=[],
+    )
+
+
+def test_apply_wfe_positive_is_sets_ratio():
+    """IS>0, OOS>0 → wfe = OOS/IS."""
+    result = _make_result(sharpe=1.0)
+    BacktestEngine.apply_wfe(result, is_sharpe=2.0)
+    assert result.wfe == pytest.approx(0.5, abs=1e-4)
+
+
+def test_apply_wfe_negative_is_large_oos_gives_partial():
+    """IS<-1.0, OOS>1.5 → wfe=0.5 (역방향 레짐, 강한 회복)."""
+    result = _make_result(sharpe=2.0)
+    BacktestEngine.apply_wfe(result, is_sharpe=-2.0)
+    assert result.wfe == pytest.approx(0.5, abs=1e-4)
+
+
+def test_apply_wfe_negative_is_small_oos_gives_zero():
+    """IS<-1.0, OOS<=1.5 → wfe=0.0 (강한 역방향)."""
+    result = _make_result(sharpe=1.0)
+    BacktestEngine.apply_wfe(result, is_sharpe=-2.0)
+    assert result.wfe == pytest.approx(0.0, abs=1e-4)
+
+
+def test_summary_negative_wfe_shown_not_na():
+    """wfe 음수(IS>0, OOS<0) → summary에서 'N/A' 아닌 음수 문자열로 표시."""
+    result = _make_result(sharpe=-0.5)  # OOS < 0
+    BacktestEngine.apply_wfe(result, is_sharpe=2.0)  # IS > 0 → wfe = -0.5/2.0 = -0.25
+    assert result.wfe < 0
+    summary = result.summary()
+    assert "N/A" not in summary or "-" in summary
+    assert f"{result.wfe:.3f}" in summary

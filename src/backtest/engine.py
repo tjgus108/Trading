@@ -88,7 +88,8 @@ class BacktestResult:
 
     def summary(self) -> str:
         verdict = "PASS" if self.passed else "FAIL"
-        wfe_str = f"{self.wfe:.3f}" if self.wfe > 0 else "N/A"
+        # wfe==0.0 은 "미계산" 상태; 음수는 IS과최적화(OOS 역방향) → 명시적으로 표시
+        wfe_str = f"{self.wfe:.3f}" if self.wfe != 0.0 else "N/A"
         lines = [
             f"BACKTEST_RESULT:",
             f"  strategy: {self.strategy}",
