@@ -738,3 +738,36 @@ class TestKellyComputeFromTrades:
             trades=[0.0, 0.0, 0.0, 0.0], capital=10000, price=100
         )
         assert result == 0.0
+
+
+# ── Cycle403 B(리스크): compute_dynamic 경계값 테스트 ────────────────────────
+
+
+class TestComputeDynamicBoundary:
+    """compute_dynamic() 경계값 케이스 (Cycle403 B)."""
+
+    def test_compute_dynamic_no_history_returns_min_fraction_capital(self):
+        """거래 기록 없음 → min_fraction * capital 반환 (기본 min_fraction=0.001)."""
+        ks = KellySizer(min_fraction=0.001)
+        result = ks.compute_dynamic(capital=10000, price=1.0, min_trades=10)
+        assert result == pytest.approx(10000 * 0.001)
+
+    def test_compute_dynamic_below_min_trades_uses_fallback(self):
+        """min_trades 미만 거래 기록 → estimate_from_history=None → 폴백."""
+        ks = KellySizer(min_fraction=0.002)
+        # 5건만 기록 (min_trades=10 미만)
+        for pnl in [0.02, 0.03, -0.01, 0.02, -0.01]:
+            ks.record_trade(pnl)
+        result = ks.compute_dynamic(capital=5000, price=1.0, min_trades=10)
+        assert result == pytest.approx(5000 * 0.002)
+
+    def test_compute_dynamic_sufficient_history_returns_positive(self):
+        """충분한 수익 이력 → 양수 포지션 사이즈 반환."""
+        ks = KellySizer(min_fraction=0.001, max_fraction=0.10)
+        # 12건 수익 거래 기록 (min_trades=10 이상)
+        for _ in range(9):
+            ks.record_trade(0.02)  # 2% 수익
+        for _ in range(3):
+            ks.record_trade(-0.01)  # 1% 손실
+        result = ks.compute_dynamic(capital=10000, price=100.0, min_trades=10)
+        assert result > 0.0, f"충분한 이력에서 양수 기대, 실제: {result}"

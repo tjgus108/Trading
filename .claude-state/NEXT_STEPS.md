@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-07-07 (Cycle 402 완료)_
+_Last updated: 2026-07-07 (Cycle 403 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 402
+### 이번 세션 완료 사이클: 403
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -14,30 +14,38 @@ _Last updated: 2026-07-07 (Cycle 402 완료)_
 | 400 | A+C+F | BacktestEngine방향전환3개+optimize_frama엣지케이스3개+DataFeed중복처리3개+캐시테스트3개(+12→8568), **frama 설정 유지**(Sh=0.44,Trades=65,0/8 구조적한계), roc_ma_cross PASS유지 |
 | 401 | B+D+F | DM set_sharpe_decay 복합조합 6개+optimize_frama 검증 3개(+9→8577), **frama 구조적 한계 확정**(RANGING weak_signal 경로 코드 분석), frama 탐색 완전 종료 |
 | 402 | E+A+F | PaperConnector 미커버 3개+apply_wfe 4개(+7→8607), **engine.py summary() 음수WFE버그픽스**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 403 | C+B+F | DataFeed ema200/ema20_slope/return_5 엣지3개+DM reset_daily 복합3개+KellySizer compute_dynamic 경계3개(+9→8616), **positional_scaling 구조적문제 확정**(Sh=-0.38 Sh음수 Break-even수준 탐색보류), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 403 작업 방향 (403 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 404 작업 방향 (404 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): DataFeed 또는 피처 엔지니어링 미커버 케이스
+#### D(ML): MLSignalGenerator 또는 WalkForward ML 관련 미커버 케이스
 
-- **배경**: 데이터 카테고리, DataFeed 관련 테스트 커버리지 향상
-- **작업 방향**: `tests/test_feed_boundary.py` 또는 `tests/test_feed.py` 미커버 케이스
-  - compute_indicators() 엣지케이스 (극단값, NaN 처리)
-  - DataFeed 캐시 무효화 케이스
+- **배경**: ML 카테고리, 테스트 커버리지 향상
+- **작업 방향**: `tests/test_ml_signal_generator.py` 또는 `tests/test_walk_forward.py` 미커버 케이스
+  - MLSignalGenerator: 피처 선택 엣지케이스 (X_train 극소 행 수, 빈 피처셋)
+  - WalkForwardOptimizer: 단일 윈도우 극단 케이스 (train < min_bars)
 
-#### B(리스크): DrawdownMonitor 또는 KellySizer 미커버 케이스
+#### E(실행): PaperConnector 또는 BacktestEngine 미커버 케이스
 
-- **배경**: 리스크 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `tests/test_drawdown_monitor.py` 또는 `tests/test_kelly_sizer.py` 미커버 케이스
-  - DrawdownMonitor: reset_daily()와 연동된 복합 케이스
-  - KellySizer: compute_dynamic 경계값 케이스
+- **배경**: 실행 카테고리, 테스트 커버리지 향상
+- **작업 방향**: `tests/test_exchange.py` 또는 `tests/test_backtest_engine.py` 미커버 케이스
+  - PaperConnector: 포지션 state 관련 케이스
+  - BacktestEngine: 극단값 진입/청산 케이스
 
-#### F(리서치): 새 전략 후보 탐색 또는 Bundle OOS 확장 방향 분석
+#### F(리서치): 1h paper_sim FAIL 전략 중 개선 가능성 분석
 
-- **배경**: Cycle402 F에서 기존 3대 전략(price_cluster, dema_cross, frama) 모두 탐색 종료 확정
-- **작업 방향**: 다음 개선 대상 결정
-  - 1h paper_sim에서 가장 가능성 있는 미탐색 전략 분석
-  - positional_scaling (1/8, Sh=-0.38, PF=1.09): 개선 가능한 파라미터 존재하는지 확인
-  - 또는 Bundle OOS 4h 6번째 전략 후보 검토
+- **배경**: Cycle403 F에서 positional_scaling 구조적 한계 확인(탐색 보류)
+- **작업 방향**: 1h paper_sim rank 상위 미탐색 전략 중 파라미터화 가능한 후보 탐색
+  - `engulfing_zone` (ETH 1h top-1: Sh=0.44, Trades=24), `frama` (ETH 1h top-1: Sh=0.37, Trades=48) BTC 1h 성과 확인
+  - 또는 Bundle OOS 4h 6번째 전략 후보 검토 (`engulfing_zone`, `volatility_cluster`)
+
+### ⚠️ 주의 사항 (Cycle 403 이후)
+
+- **positional_scaling 탐색 보류** (Cycle403 F):
+  - 구조적 문제: triple EMA alignment(RANGING 47.3%에서 정렬 빈도 낮음), pullback/rally 조건 동일, pullback_atr_mult=0.3 하드코딩
+  - Sh=-0.38(음수), PF=1.09(Break-even) → 파라미터화 완료 전 탐색 의미 없음
+  - walk_forward.py DEFAULT_GRIDS["positional_scaling"] 추가됨 (빈 dict, 파라미터화 후 탐색 예정)
+  - **positional_scaling 파라미터 탐색 완전 보류. strategy.py 수정 없이 실험 금지.**
 
 ### ⚠️ 주의 사항 (Cycle 401 이후)
 
@@ -238,9 +246,9 @@ _Last updated: 2026-07-07 (Cycle 402 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 402 업데이트)
+### 핵심 메트릭 (Cycle 403 업데이트)
 
-| 지표 | Cycle 401 | Cycle 402 | 변화 |
+| 지표 | Cycle 402 | Cycle 403 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -255,7 +263,7 @@ _Last updated: 2026-07-07 (Cycle 402 완료)_
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 | 8577개 | **8607개** (+30) | +30 추가 |
+| 테스트 수 | 8607개 | **8616개** (+9) | +9 추가 |
 
 ### Cycle 397 코드 변경 요약
 

@@ -467,6 +467,59 @@ class TestToDataframeDuplicateTimestamps:
         assert len(result.df) == 2, f"부분 중복 → 2행 기대: {len(result.df)}"
 
 
+# ── Cycle403 C(데이터): ema200/ema20_slope/return_5 엣지케이스 ─────────────────
+
+
+class TestAddIndicatorsNewColumnsEdge:
+    """ema200, ema20_slope, return_5 엣지케이스 (Cycle403 C)."""
+
+    def _make_raw(self, n: int = 50, close: float = 42000.0):
+        return [
+            [1704067200000 + i * 3600000,
+             close * 0.99, close * 1.01, close * 0.98, close, 100.0]
+            for i in range(n)
+        ]
+
+    def test_ema200_column_present_and_last_value_finite(self):
+        """50행 데이터 → ema200 컬럼이 생성되고 마지막 행은 유한값."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=50)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "ema200" in df.columns, "ema200 컬럼 없음"
+        assert np.isfinite(df["ema200"].iloc[-1]), "ema200 마지막 값이 NaN/inf"
+
+    def test_ema20_slope_near_zero_for_constant_close(self):
+        """close 일정 → ema20 기울기(ema20_slope)는 0에 근접해야 함."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=50, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "ema20_slope" in df.columns, "ema20_slope 컬럼 없음"
+        # close 일정 → ema20 diff ≈ 0, slope ≈ 0
+        valid = df["ema20_slope"].dropna()
+        assert (valid.abs() < 1e-8).all(), f"ema20_slope가 0 아님: {valid.abs().max()}"
+
+    def test_return_5_nan_first_rows_finite_after_five(self):
+        """20행 데이터 → return_5(pct_change(5)): 처음 4행 NaN, 5행 이후 유한값."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=20)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=20)
+        df = result.df
+        assert "return_5" in df.columns, "return_5 컬럼 없음"
+        # 첫 5행은 NaN (pct_change(5))
+        assert df["return_5"].iloc[:5].isna().all(), "return_5 첫 5행이 NaN이 아님"
+        # 6행 이후(인덱스 5+)는 유한값
+        later = df["return_5"].iloc[5:]
+        assert later.notna().all(), f"return_5 6행 이후에 NaN 존재: {later.isna().sum()}"
+
+
 class TestSameSymbolMultipleRequests:
     """동일 심볼 복수 요청 캐시 동작 테스트 (Cycle400 C)."""
 

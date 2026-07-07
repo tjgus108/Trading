@@ -189,6 +189,21 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # atr_period: Cycle397 F — DEAD PARAM. atr_contracting은 BUY/SELL 조건에 미사용.
         # "atr_period": [10, 14, 18],  # 탐색 종료 (신호 생성 무효과 ��정)
     },
+    # Cycle403 F(리서치): positional_scaling 구조 분석 — BTC 1h 1/8 Consistency, Sh=-0.38, PF=1.09
+    # 구조적 문제:
+    #   1. triple EMA alignment(20/50/100): RANGING(47.3% BTC 1h)에서 정렬 빈도 낮음 → 신호 희소
+    #   2. pullback/rally 조건 동일: deviation = c/e20-1 → ±threshold 동일 범위 (방향 구분 없음)
+    #   3. pullback_atr_mult=0.3 하드코딩: ATR*0.3/e20 ≈ 0.45% — 매우 좁은 진입 구간
+    # 탐색 방향:
+    #   - pullback_atr_mult: 0.3(현재) → 0.5/1.0(완화) — 진입 구간 확대로 Trades 증가 기대
+    #   - alignment 완화: triple EMA → dual EMA(20/50만) 체크 — RANGING 신호 포착 가능성
+    # 탐색 전제: strategy 파라미터화 필요 (positional_scaling.py pullback_atr_mult 추가)
+    # 현재 상태: 파라미터 미지원 → WFO 최적화 불가. 하드코딩값만 유지.
+    # Sh=-0.38(음수) → 구조적 신호 품질 문제. PF=1.09는 Break-even 수준. 탐색 보류.
+    "positional_scaling": {
+        # 현재 모든 파라미터 하드코딩 — 전략 파라미터화 완료 후 그리드 탐색 예정
+        # pullback_atr_mult=[0.3, 0.5, 1.0]  (탐색 예정, strategy 수정 필요)
+    },
     # Cycle302 D(ML): price_cluster 파라미터 최적화 그리드 추가
     # n_bins=7 실험에서 역효과 확인 → [4,5,6] 범위로 제한 (5가 현재 최적)
     # bounce_pct=0.025 확정 (Cycle301 B), 양방향 탐색 [0.020, 0.025, 0.030]

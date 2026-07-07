@@ -1576,3 +1576,48 @@ def test_sharpe_decay_and_mdd_warn_compound():
     assert m.get_mdd_size_multiplier() == 0.5
     assert m.get_sharpe_decay_multiplier() == 0.5
     assert m.get_size_multiplier() == 0.5  # min(1.0, 0.5, 1.0, 0.5)
+
+
+# ── Cycle403 B(리스크): reset_daily 복합 케이스 ──────────────────────────────
+
+
+def test_reset_daily_not_halted_updates_daily_start():
+    """미정지 상태에서 reset_daily → daily_start만 갱신, 상태 변화 없음."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    # halted 상태 아님
+    assert not m.is_halted()
+    m.reset_daily(9500)   # 새 equity로 daily_start 갱신
+    # 여전히 halted 아님
+    assert not m.is_halted()
+    # 갱신된 daily_start 기준으로 일일 DD 계산됨
+    # 9500 * 0.97 = 9215 아래로 가야 WARNING
+    status = m.update(9250)  # (9500 - 9250) / 9500 = 2.6% < 3% → WARNING 없음
+    assert not status.halted
+
+
+def test_reset_daily_halt_level_not_cleared():
+    """HALT 레벨 정지 상태에서 reset_daily → HALT 해제 안 됨 (WARNING만 해제)."""
+    m = DrawdownMonitor(weekly_limit=0.05)
+    m.set_weekly_start(10000)
+    m.update(10000)
+    m.update(9400)   # 6% 주간 DD → HALT
+    assert m.is_halted()
+    assert m._alert_level == AlertLevel.HALT
+    # reset_daily는 WARNING만 해제 — HALT는 유지
+    m.reset_daily(9400)
+    assert m.is_halted(), "HALT 레벨은 reset_daily로 해제 안 됨"
+    assert m._alert_level == AlertLevel.HALT
+
+
+def test_reset_daily_force_liquidate_not_cleared():
+    """FORCE_LIQUIDATE 레벨에서 reset_daily → 정지 유지."""
+    m = DrawdownMonitor(monthly_limit=0.10)
+    m.set_monthly_start(10000)
+    m.update(10000)
+    m.update(8900)   # 11% 월간 DD → FORCE_LIQUIDATE
+    assert m.is_halted()
+    assert m._alert_level == AlertLevel.FORCE_LIQUIDATE
+    m.reset_daily(8900)
+    assert m.is_halted(), "FORCE_LIQUIDATE는 reset_daily로 해제 안 됨"
+    assert m._alert_level == AlertLevel.FORCE_LIQUIDATE
