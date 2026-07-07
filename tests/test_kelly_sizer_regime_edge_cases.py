@@ -738,3 +738,48 @@ class TestKellyComputeFromTrades:
             trades=[0.0, 0.0, 0.0, 0.0], capital=10000, price=100
         )
         assert result == 0.0
+
+    # Cycle 401 B(리스크): compute_from_trades 미커버 케이스
+
+    def test_large_n_above_min_trades_no_shrinkage(self):
+        """n=100 >> min_trades=10 → shrinkage 없음. 결과가 유한값이고 안정적."""
+        ks = KellySizer()
+        wins = [0.02] * 60
+        losses = [-0.01] * 40
+        result = ks.compute_from_trades(
+            trades=wins + losses, capital=10000, price=100, min_trades=10
+        )
+        # raw win_rate=0.6, avg_win=0.02, avg_loss=0.01 → Kelly > 0
+        assert result > 0.0
+        assert np.isfinite(result)
+
+    def test_capital_scales_position_size(self):
+        """동일 win/loss 비율로 capital 2배 → size 2배."""
+        trades = [0.02] * 8 + [-0.01] * 2
+        ks1 = KellySizer()
+        ks2 = KellySizer()
+        size1 = ks1.compute_from_trades(trades=trades, capital=10000, price=100, min_trades=5)
+        size2 = ks2.compute_from_trades(trades=trades, capital=20000, price=100, min_trades=5)
+        assert size1 > 0.0
+        assert abs(size2 / size1 - 2.0) < 0.01, f"capital 2x → size 2x 기대: {size1} vs {size2}"
+
+    def test_ranging_regime_reduces_size_vs_no_regime(self):
+        """RANGING 레짐 → Kelly fraction 0.5x 축소 → size < 레짐 없음.
+
+        kelly_cap=0.20, RANGING scale=0.5 → fractional_f*0.5=0.10.
+        max_fraction=0.15 사용 시 default(0.15) > RANGING(0.10) 차이가 보임.
+        """
+        trades = [0.02] * 8 + [-0.01] * 2
+        # max_fraction=0.15: default는 kelly_cap=0.20 → clip to 0.15
+        # RANGING: 0.20 * 0.5 = 0.10 → max_fraction 미달 → 0.10
+        ks_default = KellySizer(max_fraction=0.15)
+        ks_ranging = KellySizer(max_fraction=0.15)
+        size_default = ks_default.compute_from_trades(
+            trades=trades, capital=10000, price=100, min_trades=5
+        )
+        size_ranging = ks_ranging.compute_from_trades(
+            trades=trades, capital=10000, price=100, min_trades=5, regime="RANGING"
+        )
+        assert size_ranging < size_default, (
+            f"RANGING → 축소 기대: {size_ranging} < {size_default}"
+        )

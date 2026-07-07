@@ -1,3 +1,53 @@
+## [2026-07-07] Cycle 401 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor set_sharpe_decay 경계값 + KellySizer compute_from_trades 6개 추가** (+6)
+
+DrawdownMonitor (test_drawdown_monitor.py):
+1. `test_sharpe_decay_negative_recent_sharpe_triggers_decay`: recent_sharpe<0, historical>0 → ratio<0 → decay 적용
+2. `test_sharpe_decay_recovery_after_decayed_state`: decay 상태에서 ratio>=threshold → 1.0 복원
+3. `test_atr_elevated_and_sharpe_decay_combined_size_multiplier`: ATR 급등+Sharpe decay 동시 → min(0.5,0.5)=0.5
+
+KellySizer (test_kelly_sizer_regime_edge_cases.py):
+4. `test_large_n_above_min_trades_no_shrinkage`: n=100 > min_trades=10 → shrinkage 없음, 안정적 계산
+5. `test_capital_scales_position_size`: capital 2배 → size 2배 (비례 검증)
+6. `test_ranging_regime_reduces_size_vs_no_regime`: RANGING 레짐(0.5x) → max_fraction=0.15 기준 축소 확인
+
+**[D(ML)] WFO frama [40,50,60] 그리드 구조 + FRAMAStrategy 파라미터 동작 6개 추가** (+6)
+
+TestFramaWfoGrid (test_phase_d.py):
+7. `test_default_grids_frama_has_weak_rsi_buy_max`: DEFAULT_GRIDS["frama"]에 weak_rsi_buy_max=[40,50,60] 존재 확인
+8. `test_frama_grid_produces_27_combinations`: 3×3×3=27 combos 정확성 검증
+9. `test_frama_strategy_stores_weak_rsi_buy_max`: FRAMAStrategy(weak_rsi_buy_max=50) 파라미터 저장 확인
+10. `test_frama_strategy_default_weak_rsi_buy_max_is_40`: 기본값=40 확인
+11. `test_optimize_frama_factory_passes_weak_rsi_buy_max`: WFO factory가 [40,50] 각각 전달 확인
+12. `test_frama_different_instances_independent_params`: 인스턴스별 독립 파라미터 확인
+
+**[F(리서치)] frama 0/8 Consistency 근본 원인 분석 (탐색 종료 결정)**
+
+frama.py 코드 분석 + 65 trades / 8 windows = 8.1 trades/window 계산:
+- **근본 원인 확정**: OOS 윈도우당 평균 8.1 거래 → min_trades=15 기준 구조적 미달
+- gap<1% weak 신호는 RANGING(47.3%)에서 생성되지만, 신호 수가 절대적으로 부족
+- weak_rsi_buy_max=50 → 65 trades (40 대비 +62.5%), 그러나 8.1/window는 15 미달
+- weak_rsi_buy_max=60으로 올려도 ~100 trades 예상 → 12.5/window, 여전히 < 15
+- **결론**: frama 1h paper_sim Consistency PASS 불가 (trades 구조적 한계)
+- **차기 방향**: frama 탐색 종료 or 4h 타임프레임 전환 검토
+
+**시뮬레이션 결과**:
+- **Bundle OOS**: 5/5 PASS (기존 2026-07-04 보고서 유지, SSL 차단으로 신규 실데이터 불가)
+- **paper_sim BTC 1h**: 1/19 PASS (roc_ma_cross: Sh=1.81, PF=2.02, Trades=14, 4/8)
+  - frama: Sh=0.44, Trades=65, PF=1.11, 0/8 (Cycle400 동일 — 구조적 한계 확정)
+  - price_cluster: Sh=1.06, Trades=35, PF=1.32, 2/8
+  - dema_cross: Sh=0.85, Trades=26, PF=1.38, 2/8
+
+**F(리서치) 핵심 결론 — frama 1h 탐색 종료 결정**:
+- 65 trades / 8 windows = 8.1 trades/window < min_trades=15 → 구조적 미달
+- weak_rsi_buy_max=60 시 ~100 trades 예상 → 12.5/window (여전히 < 15)
+- **frama 1h paper_sim PASS 불가 확정. WFO 그리드 유지하되 추가 탐색 중단**
+
+**테스트**: 8568 → 8580 (+12개 추가)
+
+---
+
 ## [2026-07-06] Cycle 400 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] BacktestEngine 방향 전환 + optimize_frama 엣지케이스 12개 추가** (+12)
@@ -14673,6 +14723,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-06 10:21 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-07 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-07 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-07 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-07 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-07 00:18 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-07 00:18 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

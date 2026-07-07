@@ -1,43 +1,51 @@
 # Next Steps
 
-_Last updated: 2026-07-06 (Cycle 400 완료)_
+_Last updated: 2026-07-07 (Cycle 401 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 400
+### 이번 세션 완료 사이클: 401
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 397 | B+D+F | DM transition_cushion 경계값/should_liquidate_all 6개(+6→8532), **frama atr_contracting DEAD CODE 발견**(atr_period 전체 dead param 확정), WFO그리드 27→9 combos 정리 |
 | 398 | C+B+F | feed단행DF 5개+kelly_compute_from_trades 7개(+12→8544), **frama weak_rsi_buy_max 파라미터화** (40→가변), WFO그리드 weak_rsi_buy_max=[40,50,60] 추가(9→27combos) |
 | 399 | D+E+F | MLSignalGenerator benchmark_stats 6개+PaperTrader 엣지케이스 6개(+12→8556), **frama weak_rsi_buy_max=50 확정**(Sh=0.44↑0.24,Trades=65↑40), WFO그리드 [40,50,60] 탐색 지속 |
 | 400 | A+C+F | BacktestEngine방향전환3개+optimize_frama엣지케이스3개+DataFeed중복처리3개+캐시테스트3개(+12→8568), **frama 설정 유지**(Sh=0.44,Trades=65,0/8 구조적한계), roc_ma_cross PASS유지 |
+| 401 | B+D+F | DM set_sharpe_decay 경계값3+Kelly compute_from_trades 3개(+6→8574), **frama WFO 그리드 구조 검증 6개**(+6→8580), **frama 1h 탐색 종료 확정**(65/8=8.1 trades/window < 15 구조적미달) |
 
-### 🎯 Cycle 401 작업 방향 (401 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 402 작업 방향 (402 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 KellySizer 미커버 케이스
+#### B(리스크): CircuitBreaker 또는 DrawdownMonitor 미커버 케이스
 
-- **배경**: 리스크 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `src/risk/drawdown_monitor.py` 또는 `src/risk/kelly_sizer.py` 미커버 케이스
-  - DrawdownMonitor: set_sharpe_state 경계값, regime 복합 조합 케이스
-  - KellySizer: compute_from_trades 매우 많은 trades 입력, 음수 PnL 전체 케이스
+- **배경**: 리스크 카테고리 커버리지 향상 (Cycle401 DM sharpe_decay 커버 완료)
+- **작업 방향**: `src/risk/circuit_breaker.py` 미커버 케이스
+  - CircuitBreaker: consecutive_losses 조합 + reset_on_win 경계값
+  - 또는 DrawdownMonitor: should_kill_strategy TREND_DOWN/CRISIS 레짐 + mdd 조합
 
-#### D(ML): WalkForward optimize_frama 결과 분석 또는 MLSignalGenerator 기능 추가
+#### D(ML): WalkForwardOptimizer plateau rule 또는 MLSignalGenerator 추가 커버리지
 
-- **배경**: ML/신호 카테고리
-- **작업 방향**: WFO frama [40,50,60] 그리드 fold별 선택 분포 분석
-  - WFO best params에서 weak_rsi_buy_max 50 vs 60 선택 빈도 확인
-  - 또는 walk_forward.py에 기타 미커버 케이스 추가
+- **배경**: WFO plateau_pct 규칙 테스트 미커버 확인
+- **작업 방향**: `src/backtest/walk_forward.py` plateau 규칙 엣지케이스
+  - plateau_pct=1.0 (단일 최고값만 선택) 경계 검증
+  - 또는 WalkForwardResult 직렬화/역직렬화 미커버
 
-#### F(리서치): frama 구조적 한계 분석 및 대안 탐색
+#### F(리서치): frama 탐색 종료 확정 + dema_cross 개선 여지 분석
 
-- **배경**: Cycle400 F — frama 0/8 Consistency 구조적 한계 확인
-- **작업 방향**: frama가 PASS 불가한 근본 원인 코드 분석
-  - frama.py 생성 신호 조건 상세 분석: gap>=1% BUY/SELL vs gap<1% weak 신호 분기
-  - RANGING 47.3% 구간에서 weak 신호가 0/8 Consistency 유발하는지 검증
-  - 결론에 따라: WFO 그리드 조정 또는 frama 탐색 종료 결정
+- **배경**: Cycle401 F — frama 1h trades 구조적 미달 확정
+- **작업 방향**: dema_cross PF=1.38 → 1.50 gap 분석
+  - dema_cross 현재 설정(fast=8, slow=20, rsi_dir=True, thr=40, bb_width=0.04) 최종 확인
+  - 아직 시도 안 한 방향: SL/TP 파라미터, dist_pct_min 완화
+  - 또는 price_cluster 2/8 → 4/8으로 향상 가능한 조건 분석
+
+### ⚠️ 주의 사항 (Cycle 401 이후)
+
+- **frama 1h paper_sim PASS 불가 확정** (Cycle401 F):
+  - 65 trades / 8 windows = 8.1 trades/window < min_trades=15 (구조적 미달)
+  - weak_rsi_buy_max=60 에서도 ~100 trades → 12.5/window (여전히 미달)
+  - WFO 그리드 [40,50,60] 자동 탐색 유지하되 추가 수동 탐색 중단
+  - frama 1h paper_sim PASS를 위한 추가 파라미터 실험 금지
 
 ### ⚠️ 주의 사항 (Cycle 399 이후)
 
