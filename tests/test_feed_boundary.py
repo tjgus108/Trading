@@ -564,3 +564,58 @@ class TestSameSymbolMultipleRequests:
 
         assert feed.cache_stats()["miss_count"] == 2
         assert connector.fetch_ohlcv.call_count == 2
+
+
+# ── Cycle405 C(데이터): rsi14 NaN 첫 행, bb 관계, volume 0 처리 ──────────────
+
+
+class TestIndicatorEdgeCases:
+    """DataFeed 지표 엣지케이스 — rsi14, bb 관계, volume 0 (Cycle405 C)."""
+
+    def _make_raw(self, n: int, close: float = 42000.0, volume: float = 100.0):
+        return [
+            [1704067200000 + i * 3600000,
+             close * 0.99, close * 1.01, close * 0.98, close, volume]
+            for i in range(n)
+        ]
+
+    def test_rsi14_nan_first_rows(self):
+        """30행 데이터 → rsi14 첫 14행 이내에 NaN이 존재해야 함 (warm-up 필요)."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=30)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df = result.df
+        assert "rsi14" in df.columns, "rsi14 컬럼 없음"
+        # RSI(14)는 최소 14+1=15행 이후부터 유효 — 앞부분에 NaN 존재해야 함
+        early = df["rsi14"].iloc[:14]
+        assert early.isna().any(), "rsi14 첫 14행 내 NaN이 없음 (warm-up 미적용)"
+
+    def test_bb_upper_gte_bb_lower(self):
+        """50행 정상 데이터 → bb_upper >= bb_lower 항상 성립해야 함."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=50)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "bb_upper" in df.columns
+        assert "bb_lower" in df.columns
+        valid = df[["bb_upper", "bb_lower"]].dropna()
+        assert (valid["bb_upper"] >= valid["bb_lower"]).all(), (
+            "bb_upper < bb_lower 케이스 발생"
+        )
+
+    def test_volume_zero_no_inf_no_crash(self):
+        """volume=0 데이터 → 크래시 없음, vwap/volume_quote에 inf 없음."""
+        import numpy as np
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=30, volume=0.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df = result.df
+        assert isinstance(df, pd.DataFrame)
+        for col in ["vwap", "volume_quote"]:
+            if col in df.columns:
+                vals = df[col].replace([np.inf, -np.inf], np.nan)
+                assert not np.isinf(df[col].fillna(0)).any(), f"{col}에 inf 존재"

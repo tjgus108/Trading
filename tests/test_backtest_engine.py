@@ -1159,3 +1159,46 @@ def test_summary_negative_wfe_shown_not_na():
     summary = result.summary()
     assert "N/A" not in summary or "-" in summary
     assert f"{result.wfe:.3f}" in summary
+
+
+# ---------------------------------------------------------------------------
+# Cycle405 A(품질): 극단 슬리피지/커미션 엣지케이스
+# ---------------------------------------------------------------------------
+
+def test_extreme_slippage_no_crash():
+    """slippage=1.0(100%) 극단값 → 엔진 크래시 없이 실행되어야 함."""
+    engine = BacktestEngine(
+        commission=0.0,
+        slippage=1.0,  # 100% 슬리피지 — 극단 엣지케이스
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+    )
+    df = make_df(n=100, close_trend=0.001)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    # 극단 슬리피지로 손실 발생 가능하지만 크래시 없어야 함
+    assert isinstance(result.total_return, float)
+
+
+def test_extreme_commission_no_crash():
+    """commission=0.5(50%) 극단값 → 엔진 크래시 없이 실행되어야 함."""
+    engine = BacktestEngine(
+        commission=0.5,  # 50% 수수료 — 극단 엣지케이스
+        slippage=0.0,
+        atr_multiplier_sl=1.5,
+        atr_multiplier_tp=3.0,
+    )
+    df = make_df(n=100, close_trend=0.001)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    assert isinstance(result.total_return, float)
+
+
+def test_extreme_slippage_worsens_result():
+    """slippage=1.0 → slippage=0 대비 최종 잔고가 같거나 더 나빠야 함."""
+    df = make_df(n=200, close_trend=0.001)
+    r_no_slip = BacktestEngine(slippage=0.0, commission=0.0).run(AlwaysBuyStrategy(), df)
+    r_extreme = BacktestEngine(slippage=1.0, commission=0.0).run(AlwaysBuyStrategy(), df)
+    assert r_extreme.total_return <= r_no_slip.total_return, (
+        f"극단 슬리피지가 결과를 악화해야 함: {r_extreme.total_return:.4f} vs {r_no_slip.total_return:.4f}"
+    )

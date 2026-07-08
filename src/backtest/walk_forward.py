@@ -367,6 +367,24 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "bb_width_min_filter": [0.0, 0.04],       # DEAD: 0.0 (0.04 확정, Cycle374 D)
         "ema200_filter": [False, True],            # DEAD: True (역효과, Cycle377 D)
     },
+    # Cycle405 F(리서치): lob_maker 구조적 한계 분석 완료
+    # BTC 1h paper_sim: rank5, Sh=-0.04, Trades=75, MDD=17%, 0/8 Consistency
+    # 근본 원인:
+    #   1. LOB 데이터(bid_vol/ask_vol) 없음 → OFI proxy = (close-open)/(high-low) 사용
+    #      이 proxy는 단순 캔들 방향성 비율(body/range) — 실제 order flow 불균형 측정 불가
+    #   2. VPIN도 OHLCV만으로 추정 → 정밀도 제한, fallback=0.5(불확실)
+    #   3. RSI 필터: rsi < 22 시 BUY 차단 (RSI<22=과매도 → 반직관적, 추세추종 의도)
+    # 결론: LOB 데이터 인프라(WebSocket bid/ask) 없이 파라미터 조정으로 PASS 불가
+    #   ofi_buy_threshold 상향 → Trades 감소 → Sh 추가 악화 가능
+    #   volume_multiplier 상향 → 동일 문제
+    #   STRUCTURAL LIMIT: 실거래소 LOB 스트림 없이 lob_maker 최적화 불가
+    # 탐색 보류 (LOB 데이터 인프라 구축 후 재평가)
+    "lob_maker": {
+        # 모든 파라미터 하드코딩 상태 — LOB 데이터 없이 최적화 의미 없음
+        # ofi_buy_threshold, volume_multiplier, vpin 임계값 파라미터화 가능하지만
+        # proxy OFI 근본 문제 해결 없이 grid search는 과최적화 위험만 증가
+        # lob_maker 탐색 완전 보류 (LOB 인프라 없음)
+    },
 }
 
 # 과최적화 판단 기준
