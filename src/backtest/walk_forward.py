@@ -393,6 +393,20 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # proxy OFI 근본 문제 해결 없이 grid search는 과최적화 위험만 증가
         # lob_maker 탐색 완전 보류 (LOB 인프라 없음)
     },
+    # Cycle407 F(리서치): acceleration_band 1h BTC 구조적 한계 분석
+    # BTC 1h paper_sim: rank15, Sh=-0.94, PF=0.98(<1.0!), Trades=44, 1/8 Consistency
+    # 구조적 문제:
+    #   1. OR 조건 과도 완화: `trend_up OR vol_ok`
+    #      vol_ok = (현재_range > avg_range*0.5) → 대부분 캔들 True → 거짓 돌파 과다
+    #   2. strong_band 필터 게이팅 없음: band_width>0.025는 HIGH/MEDIUM confidence 결정만
+    #      BUY/SELL 신호 자체는 막지 않음 → 좁은 밴드에서도 진입
+    #   3. 1h BTC ATR band breakout 특성: breakout 후 평균회귀 빈번
+    #      PF=0.98<1.0 → 방향성 없는 노이즈 (파라미터 조정으로 해결 불가)
+    #   4. narrow_range/engulfing_zone(Cycle404)/narrow_range(Cycle406)와 동일 패턴:
+    #      1h BTC breakout 전략 계열 구조적 한계 재확인
+    # 탐색 불필요: strong_band를 AND 조건으로 추가 시 Trades 급감(44→<15) 위험
+    # acceleration_band 1h 탐색 보류 (4h 타임프레임은 미평가)
+    "acceleration_band": {},  # 파라미터화 없음, 구조적 한계로 탐색 보류
 }
 
 # 과최적화 판단 기준

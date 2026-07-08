@@ -1,44 +1,56 @@
 # Next Steps
 
-_Last updated: 2026-07-08 (Cycle 406 완료)_
+_Last updated: 2026-07-08 (Cycle 407 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 406
+### 이번 세션 완료 사이클: 407
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 402 | E+A+F | PaperConnector 미커버 3개+apply_wfe 4개(+7→8607), **engine.py summary() 음수WFE버그픽스**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 403 | C+B+F | DataFeed ema200/ema20_slope/return_5 엣지3개+DM reset_daily 복합3개+KellySizer compute_dynamic 경계3개(+9→8616), **positional_scaling 구조적문제 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 404 | D+E+F | select_features_pfi 엣지3개+PaperConnector position_state 3개(+6→8622), **engulfing_zone/volatility_cluster Bundle OOS 후보→부적합 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 405 | A+C+F | BacktestEngine극단슬리피지3개+DataFeed지표엣지3개(+6→8628 총계), **lob_maker 구조적한계 확정**(OFI proxy, LOB 인프라 없음), walk_forward.py DEFAULT_GRIDS["lob_maker"] 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 406 | B+D+F | DM CRISIS/HIGH_VOL+쿠션 복합3개+select_features_pfi 경계3개(+6→8634 총계), **narrow_range 1h 구조적한계 확정**(PF=0.97<1, NR breakout 1h 노이즈 부재), walk_forward.py narrow_range 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 407 | B+D+F | CB 복합3개+optimize_frama타입+optimize_narrow_range신규4개(+7→8641 총계), **acceleration_band 1h 구조적한계 확정**(PF=0.98<1, OR조건과완화, breakout노이즈), walk_forward.py DEFAULT_GRIDS["acceleration_band"] 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 407 작업 방향 (407 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 408 작업 방향 (408 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): CircuitBreaker 미커버 케이스
+#### C(데이터): DataFeed/BacktestEngine 미커버 엣지케이스
 
-- **배경**: 리스크 카테고리, 테스트 커버리지 향상 (Cycle406에서 DrawdownMonitor 완료)
-- **작업 방향**: `tests/test_circuit_breaker.py`
-  - max_daily_drawdown 복합 케이스: daily_drawdown + atr_surge 동시 발동
-  - rapid_decline + consecutive_losses 동시 활성 복합 케이스 (미확인)
-  - reset_daily 후 rapid_decline 상태 클리어 여부 엣지케이스
+- **배경**: 데이터 카테고리, DataFeed 경계값 테스트 향상 (Cycle405에서 지표 엣지 완료)
+- **작업 방향**: `tests/test_feed_boundary.py`
+  - `return_5` 피처: 5봉 미만 데이터에서 NaN 처리 확인
+  - `ema20_slope` 피처: slope 계산 경계 (단조 증가/감소 시퀀스)
+  - `volume` 0값 엣지: volume=0 캔들에서 VWAP 처리
 
-#### D(ML): optimize_frama() 또는 optimize_narrow_range() 엣지케이스
+#### B(리스크): DrawdownMonitor 미커버 케이스
 
-- **배경**: ML 카테고리, WFO 최적화 함수 커버리지 향상
-- **작업 방향**: `tests/test_phase_d.py`
-  - `optimize_frama()`: avg_oos_sharpe 타입 검증, oos_sharpe_std 비음수 검증
-  - `optimize_narrow_range()`: 단일 윈도우 엣지케이스, 결과 필드 검증
+- **배경**: CircuitBreaker Cycle407에서 완료, 다음 리스크 모듈로 전환
+- **작업 방향**: `tests/test_drawdown_monitor.py`
+  - `set_ranging_macro_neutral`: directional_slope=True+False 복합 엣지 (미확인)
+  - `get_size_multiplier`: 복합 레짐 + Sharpe decay 동시 활성 케이스
+  - `from_dict`: schema_version 없는 legacy state 복원 엣지케이스
 
-#### F(리서치): rank 상위 미탐색 전략 분석
+#### F(리서치): dema_cross PF=1.38 → 1.50 갭 분석
 
-- **배경**: Cycle406 F에서 narrow_range 1h 구조적 한계 확정 (PF<1.0, NR breakout 노이즈)
-- **작업 방향**: 1h composite score rank 상위 미탐색 전략 중 다음 후보
-  - `acceleration_band` (rank 15, Sh=-0.94, Trades=44): 1h BTC 구조 분석 (ATR band breakout)
-  - 또는 `dema_cross` 추가 파라미터 탐색 재검토 (PF=1.38 → 1.50 gap=0.12 여전히 존재)
+- **배경**: Cycle407 F에서 acceleration_band 구조적 한계 확정 (PF<1, breakout 노이즈)
+- **작업 방향**: dema_cross PF=1.38 → 1.50 개선 가능성 재검토
+  - 현재 확정 파라미터: fast=8, slow=20, rsi_dir_filter=True, thr=40, bb_width=0.04
+  - Cycle377 이후 모든 방향 소진됨 → 새로운 각도: `dist_pct_min` 범위 확인
+  - 또는 `rsi_dir_threshold=42` 중간값 실험 (40→42, 파인 튜닝)
+  - 단, AvgTrades=26 (15 기준 여유 있음), PF 개선 여지 확인 필요
+
+### ⚠️ 주의 사항 (Cycle 407 이후)
+
+- **acceleration_band 탐색 완전 보류** (Cycle407 F):
+  - OR 조건 과완화: `trend_up OR vol_ok` → vol_ok=True 대부분 캔들 → 거짓 돌파 과다
+  - strong_band(band_width>0.025)가 신호 게이팅 없음: HIGH/MEDIUM confidence 결정만
+  - BTC 1h: Sh=-0.94, PF=0.98(<1.0!), Trades=44, 1/8 Consistency
+  - PF<1.0 → 평균 손실 > 이익 → narrow_range/engulfing_zone과 동일 1h breakout 노이즈 패턴
+  - **결론**: acceleration_band 1h 탐색 보류. walk_forward.py DEFAULT_GRIDS["acceleration_band"] = {} 추가.
 
 ### ⚠️ 주의 사항 (Cycle 405 이후)
 
@@ -265,9 +277,9 @@ _Last updated: 2026-07-08 (Cycle 406 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 405 업데이트)
+### 핵심 메트릭 (Cycle 407 업데이트)
 
-| 지표 | Cycle 404 | Cycle 405 | 변화 |
+| 지표 | Cycle 406 | Cycle 407 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -279,12 +291,12 @@ _Last updated: 2026-07-08 (Cycle 406 완료)_
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
 | 1h BTC frama Trades | 65 | **65** | 유지 (탐색 종료) |
-| 1h BTC lob_maker Sharpe | -0.04 | **-0.04** | 유지 (탐색 보류) |
+| 1h BTC acceleration_band Sharpe | -0.94 | **-0.94** | 유지 (탐색 보류) |
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 (passed) | 8622개 | **8605개 passed** | +23 skipped |
-| 테스트 수 (총계) | 8622개 | **8628개 총계** (+6) | +6 추가 |
+| 테스트 수 (passed) | 8611개 passed | **8618개 passed** | +7 |
+| 테스트 수 (총계) | 8634개 총계 (+6) | **8641개 총계** (+7) | +7 추가 |
 
 ### Cycle 397 코드 변경 요약
 

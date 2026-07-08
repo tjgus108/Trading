@@ -686,3 +686,44 @@ class TestOptimizeFrama:
         """atr_period는 DEAD PARAM → DEFAULT_GRIDS["frama"]에서 제거됨 (Cycle397 F)."""
         from src.backtest.walk_forward import DEFAULT_GRIDS
         assert "atr_period" not in DEFAULT_GRIDS["frama"]
+
+    def test_optimize_frama_avg_oos_sharpe_is_float(self):
+        """avg_oos_sharpe가 float 타입 반환 (Cycle407 D)."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(400)
+        result = optimize_frama(df, n_windows=2)
+        assert isinstance(result.avg_oos_sharpe, float)
+
+    def test_optimize_frama_oos_sharpe_std_non_negative(self):
+        """oos_sharpe_std는 항상 0 이상 (표준편차는 음수 없음, Cycle407 D)."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(400)
+        result = optimize_frama(df, n_windows=2)
+        assert result.oos_sharpe_std >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Cycle407 D(ML): optimize_narrow_range() 엣지케이스
+# ---------------------------------------------------------------------------
+
+class TestOptimizeNarrowRange:
+    """optimize_narrow_range() 엣지케이스 테스트 (Cycle407 D)."""
+
+    def test_optimize_narrow_range_single_window_no_crash(self):
+        """n_windows=1 → 단일 윈도우 실행, 크래시 없음."""
+        from src.backtest.walk_forward import optimize_narrow_range
+        df = _make_df(300)
+        result = optimize_narrow_range(df, n_windows=1)
+        assert isinstance(result, WalkForwardResult)
+        assert len(result.windows) <= 1
+
+    def test_optimize_narrow_range_result_fields_present(self):
+        """결과에 avg_oos_sharpe, oos_sharpe_std, best_params 핵심 필드 존재."""
+        from src.backtest.walk_forward import optimize_narrow_range
+        df = _make_df(400)
+        result = optimize_narrow_range(df, n_windows=2)
+        assert hasattr(result, "avg_oos_sharpe")
+        assert hasattr(result, "oos_sharpe_std")
+        assert hasattr(result, "best_params")
+        assert isinstance(result.best_params, dict)
+        assert result.oos_sharpe_std >= 0.0
