@@ -151,6 +151,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   ema_slope_min_buy=0.002: RANGING BUY ~20% 통과 → 과도하게 엄격, 제거
         "ema_slope_min_buy": [0.0, 0.0005, 0.001],   # BUY: EMA20 slope ≥ N (상승추세 필수)
         "ema_slope_max_sell": [0.0, -0.0005, -0.001], # SELL: EMA20 slope ≤ N (하락추세 필수)
+        # Cycle406 F(리서치): narrow_range 1h BTC 구조적 한계 확정
+        #   BTC 1h WFO 결과: Sh=-0.51, PF=0.97(<1.0!), Trades=46, MDD=10.1%, 0/8 Consistency
+        #   PF<1.0 → 평균 손실 > 평균 이익 → 파라미터 조정으로 해결 불가 수준
+        #   EMA slope filter: trades=46→~20-25로 감소 → Trades<15 위험, PF 개선폭 불확실
+        #   NR7(엄격): trades 추가 감소 + 동일 구조 문제 → 근본 해결 안 됨
+        #   핵심 원인: 1h BTC 고빈도 노이즈 → NR breakout 지속성 부재
+        #   NR전략은 4h/daily 타임프레임에 적합 (5-bundle OOS 대상이 아님)
+        #   → narrow_range 1h 탐색 보류. 기존 확정 파라미터 유지, 추가 실험 금지.
     },
     # Cycle363 F(리서치): atr_period 추가 탐색
     # frama ATR 수축 필터: last_atr < prev_atr*1.05 (ATR 감소 추세에서만 신호 허용)

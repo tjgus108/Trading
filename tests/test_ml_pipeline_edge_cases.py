@@ -508,3 +508,34 @@ class TestSelectFeaturesPfi:
         selected = trainer.select_features_pfi(clf, X, y, top_k=1)
         assert len(selected) == 2
         assert all(f in list(X.columns) for f in selected)
+
+    # ── Cycle406 D(ML): select_features_pfi() 추가 경계 케이스 ────────────────
+
+    def test_select_features_pfi_top_k_zero_enforces_minimum(self):
+        """top_k=0 → k=max(2,min(0,3))=2, 최소 2개 반환 (0값 엣지케이스)."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=60, n_features=3, seed=3)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=0)
+        assert len(selected) == 2
+        assert all(f in list(X.columns) for f in selected)
+
+    def test_select_features_pfi_exactly_100_samples_normal_path(self):
+        """n_samples=100 (< 100 분기 경계): n_repeats=5 정상 경로, 크래시 없음."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        # n_samples=100 → 조건 `n_samples < 100` 미충족 → n_repeats=5 (정상 경로)
+        clf, X, y = self._make_clf_and_data(n_samples=100, n_features=4, seed=4)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=3)
+        assert isinstance(selected, list)
+        assert len(selected) == 3
+        assert all(f in list(X.columns) for f in selected)
+
+    def test_select_features_pfi_top_k_equals_feature_count(self):
+        """top_k=n_features=5 → k=max(2,min(5,5))=5, 전체 5개 피처 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=60, n_features=5, seed=5)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=5)
+        assert len(selected) == 5
+        assert set(selected) == set(X.columns)

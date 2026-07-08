@@ -1,43 +1,44 @@
 # Next Steps
 
-_Last updated: 2026-07-08 (Cycle 405 완료)_
+_Last updated: 2026-07-08 (Cycle 406 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 405
+### 이번 세션 완료 사이클: 406
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 401 | B+D+F | DM set_sharpe_decay 복합조합 6개+optimize_frama 검증 3개(+9→8577), **frama 구조적 한계 확정**(RANGING weak_signal 경로 코드 분석), frama 탐색 완전 종료 |
 | 402 | E+A+F | PaperConnector 미커버 3개+apply_wfe 4개(+7→8607), **engine.py summary() 음수WFE버그픽스**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 403 | C+B+F | DataFeed ema200/ema20_slope/return_5 엣지3개+DM reset_daily 복합3개+KellySizer compute_dynamic 경계3개(+9→8616), **positional_scaling 구조적문제 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 404 | D+E+F | select_features_pfi 엣지3개+PaperConnector position_state 3개(+6→8622), **engulfing_zone/volatility_cluster Bundle OOS 후보→부적합 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 405 | A+C+F | BacktestEngine극단슬리피지3개+DataFeed지표엣지3개(+6→8628 총계), **lob_maker 구조적한계 확정**(OFI proxy, LOB 인프라 없음), walk_forward.py DEFAULT_GRIDS["lob_maker"] 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 406 | B+D+F | DM CRISIS/HIGH_VOL+쿠션 복합3개+select_features_pfi 경계3개(+6→8634 총계), **narrow_range 1h 구조적한계 확정**(PF=0.97<1, NR breakout 1h 노이즈 부재), walk_forward.py narrow_range 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 406 작업 방향 (406 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 407 작업 방향 (407 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스
+#### B(리스크): CircuitBreaker 미커버 케이스
 
-- **배경**: 리스크 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `tests/test_drawdown_monitor.py` 또는 `tests/test_circuit_breaker.py`
-  - DrawdownMonitor: set_regime + transition_cushion 복합 케이스 미커버
-  - CircuitBreaker: max_daily_drawdown 복합 케이스 또는 rapid_decline 엣지케이스
+- **배경**: 리스크 카테고리, 테스트 커버리지 향상 (Cycle406에서 DrawdownMonitor 완료)
+- **작업 방향**: `tests/test_circuit_breaker.py`
+  - max_daily_drawdown 복합 케이스: daily_drawdown + atr_surge 동시 발동
+  - rapid_decline + consecutive_losses 동시 활성 복합 케이스 (미확인)
+  - reset_daily 후 rapid_decline 상태 클리어 여부 엣지케이스
 
-#### D(ML): WalkForwardOptimizer 또는 ML 트레이너 미커버 케이스
+#### D(ML): optimize_frama() 또는 optimize_narrow_range() 엣지케이스
 
-- **배경**: ML 카테고리, 테스트 커버리지 향상
-- **작업 방향**: `tests/test_phase_d.py` 또는 `tests/test_ml_pipeline*.py`
-  - optimize_price_cluster() or optimize_frama() 엣지케이스
-  - select_features_pfi() 추가 경계 케이스
+- **배경**: ML 카테고리, WFO 최적화 함수 커버리지 향상
+- **작업 방향**: `tests/test_phase_d.py`
+  - `optimize_frama()`: avg_oos_sharpe 타입 검증, oos_sharpe_std 비음수 검증
+  - `optimize_narrow_range()`: 단일 윈도우 엣지케이스, 결과 필드 검증
 
-#### F(리서치): 1h paper_sim rank 상위 미탐색 전략 분석
+#### F(리서치): rank 상위 미탐색 전략 분석
 
-- **배경**: Cycle405 F에서 lob_maker 구조적 한계 확정 (LOB 데이터 없음, Sh≈0)
-- **작업 방향**: 1h composite score rank 상위 다음 미탐색 전략 분석
-  - `narrow_range` (rank 9, Sh=-0.51, Trades=46): EMA slope filter 효과 및 NR7→NR5 탐색 가능성
-  - 4h Bundle OOS 6번째 후보 탐색 재검토: dema_cross 4h 결과 분석
+- **배경**: Cycle406 F에서 narrow_range 1h 구조적 한계 확정 (PF<1.0, NR breakout 노이즈)
+- **작업 방향**: 1h composite score rank 상위 미탐색 전략 중 다음 후보
+  - `acceleration_band` (rank 15, Sh=-0.94, Trades=44): 1h BTC 구조 분석 (ATR band breakout)
+  - 또는 `dema_cross` 추가 파라미터 탐색 재검토 (PF=1.38 → 1.50 gap=0.12 여전히 존재)
 
 ### ⚠️ 주의 사항 (Cycle 405 이후)
 

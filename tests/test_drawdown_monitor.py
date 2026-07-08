@@ -1621,3 +1621,60 @@ def test_reset_daily_force_liquidate_not_cleared():
     m.reset_daily(8900)
     assert m.is_halted(), "FORCE_LIQUIDATE는 reset_daily로 해제 안 됨"
     assert m._alert_level == AlertLevel.FORCE_LIQUIDATE
+
+
+# ── Cycle406 B(리스크): set_regime + transition_cushion 복합 케이스 ───────────
+
+
+def test_crisis_regime_tightens_daily_limit():
+    """CRISIS 레짐 → HIGH_VOL과 동일하게 _high_vol_daily_limit(2%) 적용."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    # 기본 한도(3%): 2% 손실 → WARNING 없음
+    m.update(9800)
+    assert m.alert_level() == AlertLevel.NONE
+
+    # CRISIS 전환 → _effective_daily_limit = 2%
+    m.reset_daily(10000)
+    m.set_regime("CRISIS")
+    m.update(9800)  # 2% 손실 ≥ 2% 한도 → WARNING
+    assert m.alert_level() == AlertLevel.WARNING
+
+
+def test_high_vol_regime_and_transition_cushion_compound():
+    """HIGH_VOL 레짐(일일 한도 강화) + transition_cushion(저신뢰도→0.5x) 동시 활성."""
+    m = DrawdownMonitor(
+        daily_limit=0.03,
+        transition_cushion_enabled=True,
+        transition_cushion_threshold=0.70,
+    )
+    m.set_regime("HIGH_VOL")
+    m.set_daily_start(10000)
+
+    # HIGH_VOL: 일일 한도 2%로 강화 → 2% 손실 시 WARNING
+    m.update(9800)
+    assert m.alert_level() == AlertLevel.WARNING
+
+    # transition_cushion: 저신뢰도(0.5 < threshold=0.70) → 0.5x 반환
+    cushion = m.get_transition_cushion_multiplier(0.5)
+    assert cushion == pytest.approx(0.5)
+
+    # 고신뢰도(0.80 > threshold) → 1.0x (정상)
+    assert m.get_transition_cushion_multiplier(0.80) == pytest.approx(1.0)
+
+
+def test_regime_reset_reverts_daily_limit():
+    """HIGH_VOL 레짐 이후 TREND_UP 전환 → 일일 한도 원복."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+
+    # HIGH_VOL: 2% 손실 → WARNING
+    m.set_regime("HIGH_VOL")
+    m.update(9800)
+    assert m.alert_level() == AlertLevel.WARNING
+
+    # TREND_UP 전환 후 daily 리셋 → 한도 3% 복원 → 2% 손실은 WARNING 미발생
+    m.reset_daily(10000)
+    m.set_regime("TREND_UP")
+    m.update(9800)  # 2% 손실 < 3% 한도 → NONE
+    assert m.alert_level() == AlertLevel.NONE
