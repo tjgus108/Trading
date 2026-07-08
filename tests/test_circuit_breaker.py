@@ -832,3 +832,81 @@ def test_rapid_decline_oldest_price_exits_window():
     r2 = cb.check(10000, 10000, 10000)
     assert r2["triggered"] is False
     assert r2["size_multiplier"] == 1.0
+
+
+# ── Cycle407 B: 복합 케이스 3종 ─────────────────────────────────────────────
+
+def test_reset_daily_does_not_clear_consecutive_loss_cooldown():
+    """reset_daily()는 일일 상태만 초기화 — 연속 손실 쿨다운은 유지된다."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.05,
+        max_consecutive_losses=2,
+        cooldown_periods=4,
+    )
+    # 연속 손실 → 쿨다운 시작
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 4
+
+    # reset_daily: 일일 상태만 초기화, 쿨다운 유지
+    cb.reset_daily(10000.0)
+    assert cb.cooldown_remaining == 4  # 연속 손실 쿨다운은 유지
+
+    # check() → 쿨다운으로 triggered=True
+    result = cb.check(
+        current_balance=9900.0, peak_balance=10000.0, daily_start_balance=10000.0
+    )
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+
+
+def test_daily_drawdown_and_rapid_decline_drawdown_wins():
+    """일일 낙폭 초과 + rapid_decline 동시 발동 → 낙폭(우선순위 2)이 rapid_decline(4)보다 우선."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.05,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=10,
+    )
+    # rapid_decline 조건 설정
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락 → rapid_decline 감지 대상
+
+    # daily_dd=6% > limit=5% 도 초과
+    result = cb.check(
+        current_balance=9400.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+    )
+    assert result["triggered"] is True
+    # 낙폭(우선순위 2)이 급속 하락(우선순위 4)보다 먼저 감지되어야 함
+    assert "일일" in result["reason"]
+    assert "급속" not in result["reason"]
+
+
+def test_max_daily_trades_and_atr_surge_trades_limit_wins():
+    """일일 거래 횟수 초과(우선순위 5) + ATR surge(우선순위 6) 동시 → triggered=True (거래 횟수)."""
+    cb = CircuitBreaker(
+        max_daily_trades=3,
+        atr_surge_multiplier=2.0,
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+    )
+    # 3회 거래 → 한도 도달
+    for _ in range(3):
+        cb.record_trade_result(is_loss=False)
+    assert cb.daily_trade_count == 3
+
+    # ATR surge 조건도 충족
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.06,
+        baseline_atr=0.02,  # 3x surge
+    )
+    assert result["triggered"] is True
+    assert "거래 횟수" in result["reason"]
+    # ATR surge info가 노출되어선 안 됨 (이미 triggered)
+    assert result["volatility_surge"] is False

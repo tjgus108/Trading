@@ -1,3 +1,42 @@
+## [2026-07-08] Cycle 407 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] CircuitBreaker 복합 케이스 3개** (+3)
+
+tests/test_circuit_breaker.py (Cycle407 B):
+1. `test_reset_daily_does_not_clear_consecutive_loss_cooldown`: reset_daily() → 일일 상태만 초기화, 연속 손실 쿨다운 유지 확인
+2. `test_daily_drawdown_and_rapid_decline_drawdown_wins`: daily_dd 초과 + rapid_decline 동시 발동 → 낙폭(우선순위2) > 급속하락(우선순위4)
+3. `test_max_daily_trades_and_atr_surge_trades_limit_wins`: max_daily_trades(우선순위5) + ATR surge(우선순위6) → 거래횟수 한도 우선
+
+**[D(ML)] optimize_frama() 타입 검증 + optimize_narrow_range() 신규 테스트 클래스** (+4)
+
+tests/test_phase_d.py (Cycle407 D):
+4. `test_optimize_frama_avg_oos_sharpe_is_float`: avg_oos_sharpe float 타입 검증
+5. `test_optimize_frama_oos_sharpe_std_non_negative`: oos_sharpe_std >= 0 검증
+6. `test_optimize_narrow_range_single_window_no_crash`: n_windows=1 단일 윈도우 크래시 없음 (TestOptimizeNarrowRange 신규)
+7. `test_optimize_narrow_range_result_fields_present`: avg_oos_sharpe/oos_sharpe_std/best_params 필드 검증
+
+**[F(리서치)] acceleration_band 1h BTC 구조적 한계 분석 → walk_forward.py 문서화**
+
+BTC 1h paper_sim: rank15, Sh=-0.94, PF=0.98(<1.0!), Trades=44, 1/8 Consistency
+구조적 문제:
+- OR 신호 조건 과완화: `trend_up OR vol_ok` → vol_ok는 대부분 캔들 True → 거짓 돌파 과다
+- strong_band(band_width>0.025)가 신호 게이팅 없음: HIGH/MEDIUM confidence 결정만
+- PF=0.98<1.0 → 평균 손실 > 이익 → 파라미터 조정으로 근본 해결 불가 (narrow_range/engulfing_zone과 동일 패턴)
+- 1h BTC breakout 전략 계열 구조적 한계 재확인
+결론: acceleration_band 1h 탐색 보류 → walk_forward.py DEFAULT_GRIDS["acceleration_band"]에 구조적 한계 주석 추가
+
+Paper Simulation (1h BTC Cycle 407): PASS 1/19 유지 (이전 사이클 동일)
+- roc_ma_cross: PASS (4/8, Sh=1.81, PF=2.02, Tr=14, MDD=3.4%)
+- price_cluster: FAIL (2/8, Sh=1.06, PF=1.32, Tr=35)
+- dema_cross: FAIL (2/8, Sh=0.85, PF=1.38, Tr=26)
+- acceleration_band: FAIL (1/8, Sh=-0.94, PF=0.98, Tr=44)
+
+Bundle OOS (4h BTC Cycle 407): 5/5 PASS 유지 (SSL 차단으로 이전 리포트 보존)
+
+테스트: 8634 → 8641 총계 (+7), 8618 passed + 23 skipped = 8641
+
+---
+
 ## [2026-07-08] Cycle 406 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor set_regime + transition_cushion 복합 케이스 3개** (+3)
@@ -16420,6 +16459,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-08 15:17 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-08 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-08 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-08 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-08 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-08 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-08 20:12 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A
