@@ -121,7 +121,7 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     # Cycle360 C(데이터): close_window=40 실험 → BTC Sharpe 0.72→0.07 (대폭 악화) → default(50) 복원
     #   결론: close_window=40 (짧은 윈도우)는 cluster 안정성 저하로 역효과. close_window=50 최적 확정
     #   다음 탐색 방향: bounce_pct 또는 다른 파라미터 (close_window 탐색 완료)
-    "price_cluster": {"vol_regime_filter": False},
+    # NOTE Cycle405 A(품질): 위 "price_cluster" 항목은 중복 키로 아래 line284 설정에 의해 무시됨 → 제거
     # Cycle371 D(ML): frama atr_period=10 실험 → 중립 확정 (Sh=0.24 = 기본값(14)과 동일)
     # 결론: BTC 1h frama ATR 기간(10 vs 14)이 성능에 무영향 → 기본값(14) 유지
     # "frama": {"atr_period": 10},  # 제거: 효과 없음 (Cycle371 D)
@@ -282,6 +282,13 @@ PAPER_SIM_STRATEGY_PARAMS: Dict[str, dict] = {
     #   → price_cluster 1h BTC 최적화 완전 종료 선언 (Consistency 2/8 ceiling 확정)
     #   확정 파라미터: factor=0.5 (Sharpe/SharpeStd 기준 가장 양호)
     "price_cluster": {"vol_regime_filter": True, "bounce_pct": 0.006, "vol_atr_trend_min": 1.2, "atr_bounce_factor": 0.5},
+    # Cycle405 F(리서치): lob_maker 구조 분석 결과 (Sh=-0.04, Trades=75, 0/8 Consistency)
+    #   Sh≈0 근본 원인: proxy OFI = (close-open)/(high-low) — 실거래소 Order Book 없음
+    #   VPIN: VPINCalculator(OHLCV 기반) — 실제 order flow toxicity 계산 불가
+    #   삼중 조건 (ofi>0.38 + volume>=1.3×avg + vpin>0.43) 모두 proxy → 신호 품질 랜덤 수준
+    #   BTC/ETH/SOL 모두 일관되게 Sh<0 (BTC -0.04, ETH -0.90, SOL -0.73)
+    #   결론: lob_maker 탐색 완전 종료. 실거래소 LOB 데이터 없이 구조적 개선 불가.
+    #         ofi_buy_threshold/vpin_low_threshold 파라미터화도 의미 없음 (proxy 신호 한계)
 }
 
 # 레짐 필터 전략 목록 (Cycle 339 D(ML): TREND_UP 레짐에서만 BUY 허용)

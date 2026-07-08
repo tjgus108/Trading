@@ -564,3 +564,50 @@ class TestSameSymbolMultipleRequests:
 
         assert feed.cache_stats()["miss_count"] == 2
         assert connector.fetch_ohlcv.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Cycle 405 C(데이터): 미커버 엣지케이스 — rsi14 첫 행 NaN, bb 관계, volume 0
+# ---------------------------------------------------------------------------
+
+class TestIndicatorEdgeCases405:
+    """Cycle405 C(데이터): rsi14/bb/volume 엣지케이스."""
+
+    def _make_raw(self, n: int, close: float = 42000.0, volume: float = 100.0):
+        return [
+            [1704067200000 + i * 3600000,
+             close * 0.99, close * 1.01, close * 0.98, close, volume]
+            for i in range(n)
+        ]
+
+    def test_rsi14_first_row_nan(self):
+        """정상 데이터에서 rsi14 첫 행은 NaN (close.diff() → 첫 delta=NaN)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=30, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df = result.df
+        assert "rsi14" in df.columns
+        assert pd.isna(df["rsi14"].iloc[0]), "rsi14 첫 행은 NaN이어야 함 (delta=NaN)"
+
+    def test_bb_upper_geq_bb_lower_direct(self):
+        """bb_upper >= bb_lower 항상 성립 (표준편차 ≥ 0)."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=50, close=42000.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "bb_upper" in df.columns
+        assert "bb_lower" in df.columns
+        diff = (df["bb_upper"] - df["bb_lower"]).dropna()
+        assert (diff >= 0).all(), f"bb_upper < bb_lower 발생: {diff[diff < 0]}"
+
+    def test_volume_zero_volume_quote_zero(self):
+        """volume=0 캔들 → volume_quote = volume * close = 0."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(n=20, close=42000.0, volume=0.0)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=20)
+        df = result.df
+        assert "volume_quote" in df.columns
+        assert (df["volume_quote"] == 0.0).all(), "volume=0 캔들의 volume_quote는 0이어야 함"
