@@ -1163,3 +1163,55 @@ class TestPaperConnectorCycle402:
         result = pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
         assert isinstance(result["id"], str)
         assert result["id"].startswith("paper_order_")
+
+
+# ---------------------------------------------------------------------------
+# Cycle 404 E(실행): PaperConnector 포지션 state 케이스
+# ---------------------------------------------------------------------------
+
+class TestPaperConnectorCycle404:
+    """Cycle 404 E(실행): open_positions 상태 및 timeout 포지션 불변."""
+
+    def test_open_positions_after_buy(self):
+        """buy 후 get_paper_summary()['open_positions']에 심볼 포지션이 존재."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        summary = pc.get_paper_summary()
+        open_pos = summary.get("open_positions", {})
+        assert "BTC/USDT" in open_pos
+        assert open_pos["BTC/USDT"] > 0
+
+    def test_open_positions_cleared_after_sell(self):
+        """buy→sell 후 get_paper_summary()['open_positions']가 비거나 수량=0."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        pc.create_order("BTC/USDT", "sell", 1.0, price=11000.0)
+        summary = pc.get_paper_summary()
+        open_pos = summary.get("open_positions", {})
+        qty = open_pos.get("BTC/USDT", 0.0)
+        assert qty == pytest.approx(0.0, abs=1e-9)
+
+    def test_timeout_order_does_not_modify_position(self):
+        """timeout_prob=1.0 → 주문 취소, 잔고 변화 없고 open_positions 비어 있음."""
+        import random as _random
+        _random.seed(0)
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=50000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=1.0,
+        )
+        result = pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        assert result["status"] == "canceled"
+        balance = pc.fetch_balance()
+        assert balance["free"] == pytest.approx(50000.0, abs=1e-6)
+        summary = pc.get_paper_summary()
+        open_pos = summary.get("open_positions", {})
+        assert open_pos.get("BTC/USDT", 0.0) == pytest.approx(0.0, abs=1e-9)

@@ -461,3 +461,50 @@ class TestMLSignalGeneratorFeatureImportance:
         gen = MLSignalGenerator()
         result = gen.get_low_importance_features(threshold=0.05)
         assert result == []
+
+
+# ─────────────────────────────────────────────────────────────────
+# Cycle404 D(ML): WalkForwardTrainer.select_features_pfi() 엣지케이스
+# ─────────────────────────────────────────────────────────────────
+
+class TestSelectFeaturesPfi:
+    """select_features_pfi() 극소 샘플·top_k 경계값 케이스 (Cycle404 D)."""
+
+    def _make_clf_and_data(self, n_samples: int, n_features: int, seed: int = 0):
+        """학습된 RF 분류기 + X_train/y_train 반환."""
+        from sklearn.ensemble import RandomForestClassifier
+        rng = np.random.default_rng(seed)
+        cols = [chr(ord("a") + i) for i in range(n_features)]
+        X = pd.DataFrame(rng.standard_normal((n_samples, n_features)), columns=cols)
+        y = pd.Series(rng.choice([0, 1], size=n_samples))
+        clf = RandomForestClassifier(n_estimators=5, random_state=seed)
+        clf.fit(X, y)
+        return clf, X, y
+
+    def test_select_features_pfi_small_xtrain_no_crash(self):
+        """X_train 20행 (< 100) → n_repeats=10 경로 사용, 비어 있지 않은 리스트 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=20, n_features=4)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=3)
+        assert isinstance(selected, list)
+        assert len(selected) >= 1
+        assert all(f in list(X.columns) for f in selected)
+
+    def test_select_features_pfi_top_k_exceeds_feature_count(self):
+        """top_k=20, 피처=3 → k=max(2,min(20,3))=3, 전체 3개 피처 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=60, n_features=3, seed=1)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=20)
+        assert len(selected) == 3
+        assert set(selected) == set(X.columns)
+
+    def test_select_features_pfi_top_k_one_enforces_minimum(self):
+        """top_k=1, 피처=3 → k=max(2,min(1,3))=2, 최소 2개 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=60, n_features=3, seed=2)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=1)
+        assert len(selected) == 2
+        assert all(f in list(X.columns) for f in selected)
