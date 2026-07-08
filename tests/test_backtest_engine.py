@@ -1159,3 +1159,36 @@ def test_summary_negative_wfe_shown_not_na():
     summary = result.summary()
     assert "N/A" not in summary or "-" in summary
     assert f"{result.wfe:.3f}" in summary
+
+
+# ---------------------------------------------------------------------------
+# Cycle 405 A(품질): 극단 슬리피지/커미션 케이스 (slippage=1.0, commission=0.5)
+# ---------------------------------------------------------------------------
+
+def test_extreme_slippage_no_crash():
+    """slippage=1.0 (100%) 극단값 — 엔진 크래시 없음, 결과 반환."""
+    df = make_df(n=100)
+    engine = BacktestEngine(slippage=1.0, commission=0.0)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    assert isinstance(result.total_return, float)
+
+
+def test_extreme_commission_no_crash():
+    """commission=0.5 (50%) 극단값 — 엔진 크래시 없음, total_fees > 0."""
+    df = make_df(n=100)
+    engine = BacktestEngine(commission=0.5, slippage=0.0)
+    result = engine.run(AlwaysBuyStrategy(), df)
+    assert isinstance(result, BacktestResult)
+    if result.total_trades > 0:
+        assert result.total_fees > 0
+
+
+def test_extreme_slippage_cost_greater_than_normal():
+    """slippage=1.0이 slippage=0.001보다 슬리피지 비용이 훨씬 커야 함."""
+    df = make_df(n=100)
+    strategy = AlwaysBuyStrategy()
+    r_normal = BacktestEngine(slippage=0.001, commission=0.0).run(strategy, df)
+    r_extreme = BacktestEngine(slippage=1.0, commission=0.0).run(strategy, df)
+    if r_normal.total_trades > 0 and r_extreme.total_trades > 0:
+        assert r_extreme.total_slippage_cost > r_normal.total_slippage_cost
