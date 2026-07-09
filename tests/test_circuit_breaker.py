@@ -832,3 +832,68 @@ def test_rapid_decline_oldest_price_exits_window():
     r2 = cb.check(10000, 10000, 10000)
     assert r2["triggered"] is False
     assert r2["size_multiplier"] == 1.0
+
+
+# ── Cycle407 B(리스크): CircuitBreaker 미커버 복합 케이스 ────────────────────
+
+def test_daily_drawdown_exact_boundary_with_atr_surge():
+    """일일 낙폭 정확히 한계값 + ATR surge 동시 → 낙폭 우선, triggered=True, size_multiplier=0.0."""
+    cb = CircuitBreaker(daily_drawdown_limit=0.05, atr_surge_multiplier=2.0)
+    # daily_dd = (10000 - 9500) / 10000 = 0.05 == limit (경계값)
+    result = cb.check(
+        current_balance=9500.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.06,   # 3x surge
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "일일" in result["reason"]
+    assert result["volatility_surge"] is False  # ATR surge가 낙폭에 묻힘
+
+
+def test_rapid_decline_does_not_set_is_triggered():
+    """rapid_decline 감지 시 result['triggered']=True지만 cb.is_triggered=False (비영속적 트리거)."""
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=5,
+    )
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락 → rapid_decline 감지
+
+    result = cb.check(current_balance=9000, peak_balance=10000, daily_start_balance=10000)
+    assert result["triggered"] is True
+    assert "급속" in result["reason"]
+    # rapid_decline은 _triggered 프로퍼티를 설정하지 않음 (비영속적 차단)
+    assert cb.is_triggered is False
+
+
+def test_consecutive_loss_cooldown_ignores_atr_surge():
+    """연속 손실 쿨다운 활성 + ATR surge 동시 → 쿨다운 우선, triggered=True, size_multiplier=0.0."""
+    cb = CircuitBreaker(
+        max_consecutive_losses=3,
+        cooldown_periods=4,
+        atr_surge_multiplier=2.0,
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+    )
+    for _ in range(3):
+        cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 4
+
+    result = cb.check(
+        current_balance=9900.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        current_atr=0.10,    # 5x surge
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "쿨다운" in result["reason"]
+    # ATR surge는 쿨다운에 묻혀 표현되지 않음
+    assert result["volatility_surge"] is False

@@ -160,6 +160,16 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   NR전략은 4h/daily 타임프레임에 적합 (5-bundle OOS 대상이 아님)
         #   → narrow_range 1h 탐색 보류. 기존 확정 파라미터 유지, 추가 실험 금지.
     },
+    # Cycle407 F(리서치): acceleration_band 1h BTC 구조적 한계 확정
+    #   paper_sim BTC 1h: Sh=-0.94, PF=0.98(<1.0=음의엣지), Trades=44, Consistency=1/8
+    #   paper_sim ETH 1h: Sh=-2.03, PF=0.57, Trades=13 (<15 min) — 신호 부족
+    #   paper_sim SOL 1h: Sh=-0.80, PF=1.00, Trades=11 (<15 min) — 신호 부족
+    #   핵심 원인: ATR band breakout 전략은 TRENDING 환경에 적합
+    #     BTC 1h RANGING 47.3% → 밴드 돌파 후 추세 지속성 부재 → 허위 돌파 과다
+    #   파라미터화 가능 요소 없음: period=20, strong_band_margin=0.025 하드코딩
+    #   dema_cross 대안: PF gap=0.12 (1.38→1.50) 여전히 존재하나 탐색 종료 선언됨 (Cycle377 F)
+    #   → acceleration_band 추가 탐색 금지. 음의 엣지 전략으로 확정.
+    "acceleration_band": {},  # WFO 파라미터 없음 (구조적 한계, Cycle407 F)
     # Cycle363 F(리서치): atr_period 추가 탐색
     # frama ATR 수축 필터: last_atr < prev_atr*1.05 (ATR 감소 추세에서만 신호 허용)
     # atr_period=10: 더 빠른 반응 (노이즈 증가), 14: 기본값, 18: 더 완만한 평활화 (지연)
