@@ -1678,3 +1678,56 @@ def test_regime_reset_reverts_daily_limit():
     m.set_regime("TREND_UP")
     m.update(9800)  # 2% 손실 < 3% 한도 → NONE
     assert m.alert_level() == AlertLevel.NONE
+
+
+# ── Cycle408 B(리스크): get_size_multiplier 복합 케이스 ──────────────────────
+
+
+def test_atr_elevated_and_mdd_warn_compound():
+    """ATR elevated(0.5x) + MDD WARN(0.5x) 동시 활성 → get_size_multiplier() = 0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05)
+    m.update(10000)   # peak 설정
+    # MDD WARN 유발: 6% 낙폭 → WARN (0.5x)
+    m.update(9400)
+    assert m.get_mdd_size_multiplier() == 0.5
+    # ATR elevated (2x MA) → _atr_vol_mult = 0.5
+    m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+    assert m.get_atr_vol_multiplier() == 0.5
+    # 두 인자가 모두 0.5 → min(1.0, 0.5, 0.5, 1.0) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+
+
+def test_get_size_multiplier_all_four_factors_compound():
+    """streak(0.5) + MDD WARN(0.5) + ATR elevated(0.5) + Sharpe decay(0.5) 동시 → 0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.05, loss_streak_threshold=2)
+    m.update(10000)   # peak 설정
+    # MDD WARN
+    m.update(9400)   # 6% → WARN
+    assert m.get_mdd_size_multiplier() == 0.5
+    # streak: 2연속 손실
+    m.record_trade_result(pnl=-50.0, equity=9400)
+    m.record_trade_result(pnl=-50.0, equity=9350)
+    assert m._consecutive_losses >= 2
+    # ATR elevated
+    m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+    assert m.get_atr_vol_multiplier() == 0.5
+    # Sharpe decay
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    # 4인자 모두 0.5 → min(0.5, 0.5, 0.5, 0.5) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+
+
+def test_trend_down_regime_does_not_change_daily_limit():
+    """TREND_DOWN 레짐은 일일 DD 한도를 강화하지 않음 (HIGH_VOL/CRISIS만 강화)."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    # TREND_DOWN 설정 → 한도는 여전히 3%
+    m.set_regime("TREND_DOWN")
+    m.update(9800)   # 2% 손실 < 3% 한도 → WARNING 없음
+    assert m.alert_level() == AlertLevel.NONE
+    # 3% 경계 테스트: 3% 손실 → WARNING 발생
+    m.reset_daily(10000)
+    m.set_regime("TREND_DOWN")
+    m.update(9700)   # 3% 손실 ≥ 3% 한도 → WARNING
+    assert m.alert_level() == AlertLevel.WARNING

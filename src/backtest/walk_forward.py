@@ -403,6 +403,21 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # proxy OFI 근본 문제 해결 없이 grid search는 과최적화 위험만 증가
         # lob_maker 탐색 완전 보류 (LOB 인프라 없음)
     },
+    # Cycle408 F(리서치): htf_ema 구조적 한계 확정
+    #   paper_sim BTC 1h: Sh=-0.72, Trades=43, rank13 → 음의 Sharpe, 구조적 실패
+    #   근본 원인:
+    #     1. HTF 시뮬레이션 방식 부정확: iloc[::4]로 4봉마다 샘플링 = 인덱스 기반 다운샘플링
+    #        → 실제 4h 캔들 OHLCV와 불일치 (open/high/low/close가 다름)
+    #        → EWM(span=21) 값이 실제 4h EMA와 다른 proxy가 됨
+    #     2. BTC 1h RANGING 47.3% → EMA9 cross 신호가 양방향으로 빈번히 발생
+    #        but htf_ema rising/falling 조건이 이 중 절반 이상을 차단하지 못함
+    #     3. 신호 조건 복잡성 과다: htf_rising AND cross_above AND cross_valid AND rsi_ok
+    #        → 필터 조합이 Trades=43 (BTC 1h 15개월 기준 ≈ 2.9/month)으로 적음
+    #        → OOS Sharpe=-0.72 (음의 엣지, 랜덤보다 나쁨)
+    #   파라미터화 가능 요소 없음: htf span=21, ema9=9, rsi thresh=75/25 하드코딩
+    #     → 파라미터 변경으로 HTF 다운샘플링 근본 문제 해결 불가
+    #   결론: htf_ema 추가 탐색 금지. 실제 4h 데이터 없이 1h 샘플링으로는 PASS 불가.
+    "htf_ema": {},  # WFO 파라미터 없음 (구조적 한계, Cycle408 F)
 }
 
 # 과최적화 판단 기준

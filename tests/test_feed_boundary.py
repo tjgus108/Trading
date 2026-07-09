@@ -619,3 +619,75 @@ class TestIndicatorEdgeCases:
             if col in df.columns:
                 vals = df[col].replace([np.inf, -np.inf], np.nan)
                 assert not np.isinf(df[col].fillna(0)).any(), f"{col}에 inf 존재"
+
+
+# ── Cycle408 C(데이터): ema200/bb_width/macd_hist 경계값 테스트 ──────────────
+
+
+class TestIndicatorBoundaryC408:
+    """Cycle408 C(데이터): ema200 지연 특성, bb_width 상수, macd_hist 추세 방향 경계 테스트."""
+
+    def _make_raw(self, closes, base_ts=1704067200000):
+        """지정된 close 값으로 OHLCV raw 리스트 생성."""
+        rows = []
+        for i, c in enumerate(closes):
+            rows.append([
+                base_ts + i * 3600000,
+                c * 0.999, c * 1.001, c * 0.998, c, 100.0
+            ])
+        return rows
+
+    def test_ema200_lags_ema20_on_sudden_spike(self):
+        """가격 급등 시 ema200이 ema20보다 close와의 거리가 더 멀어야 함 (ema200 더 느린 반응)."""
+        import numpy as np
+        # 250 행: 처음 240은 고정, 마지막 10은 급등
+        base_price = 42000.0
+        spike_price = 50000.0
+        closes = [base_price] * 240 + [spike_price] * 10
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=250)
+        df = result.df
+        last_close = float(df["close"].iloc[-1])
+        last_ema20 = float(df["ema20"].iloc[-1])
+        last_ema200 = float(df["ema200"].iloc[-1])
+        dist20 = abs(last_close - last_ema20)
+        dist200 = abs(last_close - last_ema200)
+        assert dist200 > dist20, (
+            f"ema200({dist200:.2f})이 ema20({dist20:.2f})보다 close와 가까움 — 반응 속도 역전"
+        )
+
+    def test_bb_width_zero_for_constant_close(self):
+        """모든 봉의 close가 동일 → std=0 → bb_upper=bb_lower → bb_width=0."""
+        import numpy as np
+        constant_close = 42000.0
+        closes = [constant_close] * 50
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "bb_width" in df.columns, "bb_width 컬럼 없음"
+        valid = df["bb_width"].dropna()
+        assert len(valid) > 0, "bb_width 유효값 없음"
+        # 상수 close → std=0 → bb_width=0
+        assert (valid.abs() < 1e-9).all(), (
+            f"상수 가격 bb_width 비영 값 존재: max={valid.abs().max():.2e}"
+        )
+
+    def test_macd_hist_positive_in_sustained_uptrend(self):
+        """지속적 상승 추세에서 macd_hist > 0 이어야 함 (fast EMA > slow EMA → hist > 0)."""
+        import numpy as np
+        # 100 행 단조 증가 가격
+        closes = [40000.0 + i * 50.0 for i in range(100)]
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=100)
+        df = result.df
+        assert "macd_hist" in df.columns, "macd_hist 컬럼 없음"
+        last_hist = float(df["macd_hist"].iloc[-1])
+        assert last_hist > 0, (
+            f"단조 상승 추세 macd_hist 마지막 값 음수: {last_hist:.6f}"
+        )
