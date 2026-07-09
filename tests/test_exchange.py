@@ -1215,3 +1215,39 @@ class TestPaperConnectorCycle404:
         summary = pc.get_paper_summary()
         open_pos = summary.get("open_positions", {})
         assert open_pos.get("BTC/USDT", 0.0) == pytest.approx(0.0, abs=1e-9)
+
+
+class TestPaperConnectorCycle409:
+    """Cycle 409 E(실행): PaperConnector 미커버 실행 케이스."""
+
+    def _make_pc(self, initial: float = 50000.0) -> PaperConnector:
+        return PaperConnector(
+            symbol="BTC/USDT", initial_balance=initial,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+
+    def test_profitable_round_trip_increases_balance(self):
+        """buy @ 10000 → sell @ 11000: 수익 거래 후 잔고 > 초기 잔고."""
+        pc = self._make_pc(initial=50000.0)
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        pc.create_order("BTC/USDT", "sell", 1.0, price=11000.0)
+        balance = pc.fetch_balance()
+        assert balance["free"] > 50000.0
+
+    def test_multiple_buys_increase_position_cumulatively(self):
+        """연속 3번 buy → open_positions 수량이 누적 증가."""
+        pc = self._make_pc(initial=100000.0)
+        pc.create_order("BTC/USDT", "buy", 0.5, price=10000.0)
+        pc.create_order("BTC/USDT", "buy", 0.5, price=10000.0)
+        pc.create_order("BTC/USDT", "buy", 0.5, price=10000.0)
+        summary = pc.get_paper_summary()
+        qty = summary.get("open_positions", {}).get("BTC/USDT", 0.0)
+        assert qty == pytest.approx(1.5, abs=1e-9)
+
+    def test_full_fill_remaining_is_zero(self):
+        """정상 체결(timeout_prob=0) 시 order['remaining'] == 0.0."""
+        pc = self._make_pc()
+        order = pc.create_order("BTC/USDT", "buy", 2.0, price=10000.0)
+        assert order["status"] == "closed"
+        assert order["remaining"] == pytest.approx(0.0, abs=1e-9)

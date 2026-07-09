@@ -1,44 +1,54 @@
 # Next Steps
 
-_Last updated: 2026-07-09 (Cycle 408 완료)_
+_Last updated: 2026-07-09 (Cycle 409 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 408
+### 이번 세션 완료 사이클: 409
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 404 | D+E+F | select_features_pfi 엣지3개+PaperConnector position_state 3개(+6→8622), **engulfing_zone/volatility_cluster Bundle OOS 후보→부적합 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 405 | A+C+F | BacktestEngine극단슬리피지3개+DataFeed지표엣지3개(+6→8628 총계), **lob_maker 구조적한계 확정**(OFI proxy, LOB 인프라 없음), walk_forward.py DEFAULT_GRIDS["lob_maker"] 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 406 | B+D+F | DM CRISIS/HIGH_VOL+쿠션 복합3개+select_features_pfi 경계3개(+6→8634 총계), **narrow_range 1h 구조적한계 확정**(PF=0.97<1, NR breakout 1h 노이즈 부재), walk_forward.py narrow_range 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 407 | B+D+F | CB 복합케이스3개+optimize_frama타입2개+TestOptimizeNarrowRange3개(+8→8642 총계, 8619 passed), **acceleration_band 1h 구조적한계 확정**(PF=0.98<1.0, 파라미터화 불가), walk_forward.py DEFAULT_GRIDS["acceleration_band"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 408 | C+B+F | DataFeed ema200/bb_width/macd_hist 경계3개+DM size_multiplier 복합3개(+6→8648 총계, 8625 passed), **htf_ema 1h 구조적한계 확정**(Sh=-0.72, PF=0.91<1.0, iloc[::4] HTF 시뮬레이션 proxy 불정확), walk_forward.py DEFAULT_GRIDS["htf_ema"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 409 작업 방향 (409 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 410 작업 방향 (410 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): ML 파이프라인 미커버 케이스
+#### A(품질): BacktestEngine 또는 walk_forward 미커버 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle408 이후)
-- **작업 방향**: `tests/test_ml_pipeline_edge_cases.py` 또는 `tests/test_phase_d.py`
-  - WalkForwardTrainer 또는 optimize_* 함수의 미커버 경계 케이스
-  - select_features_pfi() 경계값 추가 테스트
+- **배경**: 품질 카테고리 로테이션 (Cycle409 이후)
+- **작업 방향**: `tests/test_backtest_engine.py` 또는 `tests/test_walk_forward.py`
+  - BacktestEngine WFE 계산 관련 미커버 케이스
+  - perturbation_check 또는 engine 재사용 관련 엣지케이스 추가
 
-#### E(실행): PaperConnector 또는 BacktestEngine 미커버
+#### C(데이터): DataFeed 지표 경계값 추가
 
-- **배경**: 실행 카테고리 로테이션 (Cycle408 이후)
-- **작업 방향**: `tests/test_exchange.py` 또는 `tests/test_backtest_engine.py`
-  - PaperTrader position_state 추가 케이스
-  - BacktestEngine 극단 케이스 추가
+- **배경**: 데이터 카테고리 로테이션 (Cycle409 이후)
+- **작업 방향**: `tests/test_feed_boundary.py`
+  - RSI, 볼린저 밴드, VWAP 등 미커버 지표 경계값 테스트 추가
 
-#### F(리서치): rank 상위 미탐색 전략 분석
+#### F(리서치): relative_volume BTC 1h 구조 분석
 
-- **배경**: Cycle408 F에서 htf_ema 구조적 한계 확정 (PF<1.0, iloc[::4] HTF proxy 불정확)
-- **작업 방향**: 1h composite score rank 다음 미탐색 후보
-  - `price_action_momentum` (rank 14, BTC 1h Sh=-1.08, Trades=73): 신호 과다 + PF<1.0 분석
-  - 또는 `relative_volume` (rank 15, BTC 1h Sh=-0.99, Trades=64): vol ratio 구조 분석
+- **배경**: Cycle409 F에서 price_action_momentum 구조적 한계 확정 (PF<1.0, RANGING과 부조화)
+- **작업 방향**: 1h composite score rank 8 미탐색 후보
+  - `relative_volume` (rank 8, BTC 1h Sh=-0.99, Trades=64): RVOL+VWAP 구조 분석
+    - rvol_buy_sell=1.2 (PAPER_SIM_STRATEGY_PARAMS), RSI<68 BUY 조건
+    - RANGING 47.3% → 볼륨 스파이크 후 즉각 반전? 구조 분석 필요
   - `positional_scaling` 파라미터화 진행 여부 재검토 (구조적 문제 확정됨, 보류 유지 권고)
+
+### ⚠️ 주의 사항 (Cycle 409 이후)
+
+- **price_action_momentum 탐색 완전 보류** (Cycle409 F):
+  - roc5 > 0.005 + body_strength >= 0.50 AND 조건이 RANGING(47.3%) BTC 1h에서 14%/bar 빈도 충족
+  - BTC 1h Sh=-1.08, PF=0.97(**<1.0, 음의 엣지**), Trades=73, 1/8 Consistency
+  - 파라미터화 가능 요소: body_strength_threshold, roc5_threshold 하드코딩
+    → 강화 시 이미 음의 엣지에서 더 나쁜 timing → 개선 불가
+  - **결론**: 모멘텀 추종 전략이 RANGING 47.3% BTC 1h에서 구조적 실패. 추가 탐색 금지.
+  - walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가 (구조적 한계 주석)
 
 ### ⚠️ 주의 사항 (Cycle 408 이후)
 
@@ -274,9 +284,9 @@ _Last updated: 2026-07-09 (Cycle 408 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 408 업데이트)
+### 핵심 메트릭 (Cycle 409 업데이트)
 
-| 지표 | Cycle 407 | Cycle 408 | 변화 |
+| 지표 | Cycle 408 | Cycle 409 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -287,6 +297,7 @@ _Last updated: 2026-07-09 (Cycle 408 완료)_
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
+| 1h BTC price_action_momentum Sharpe | -1.08 | **-1.08** | 구조적 실패 확정 |
 | 1h BTC frama Trades | 65 | **65** | 유지 (탐색 종료) |
 | 1h BTC lob_maker Sharpe | -0.04 | **-0.04** | 유지 (탐색 보류) |
 | 1h BTC htf_ema Sharpe | -0.72 | **-0.72** | 구조적 실패 확정 |

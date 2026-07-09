@@ -418,6 +418,19 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #     → 파라미터 변경으로 HTF 다운샘플링 근본 문제 해결 불가
     #   결론: htf_ema 추가 탐색 금지. 실제 4h 데이터 없이 1h 샘플링으로는 PASS 불가.
     "htf_ema": {},  # WFO 파라미터 없음 (구조적 한계, Cycle408 F)
+    # Cycle409 F(리서치): price_action_momentum BTC 1h 구조적 한계 확정
+    #   BTC 1h paper_sim: Sh=-1.08, PF<1.0, Trades=73 (8윈도우, avg=9.1/window)
+    #   구조 분석:
+    #   1. BUY: body > 0 AND body_strength >= 0.50 AND roc5 > 0.005 AND close > sma50
+    #      → roc5 > 0.005 (5h 내 0.5% 상승) 조건이 BTC 1h RANGING(47.3%)에서도 빈번히 충족
+    #      → RANGING 진입 후 즉각 반전 → 음의 엣지(-1.08)
+    #   2. body_strength >= 0.50 + roc5 조건 AND = 신호 73회 (avg 9/window) — 과다
+    #      이 두 조건이 RANGING 구간에서 동시 충족되는 경우 많음 → 노이즈 추종
+    #   3. 파라미터화 가능 요소: body_strength_threshold(0.50), roc5_threshold(0.005) 하드코딩
+    #      → 강화 시 Trades 추가 감소 + 음의 엣지 전략에서 더 나쁜 timing 선택
+    #   결론: 모멘텀 추종 전략이 RANGING 47.3% BTC 1h에서 구조적으로 실패.
+    #   파라미터 강화로 Sh=-1.08 개선 불가. 추가 탐색 금지.
+    "price_action_momentum": {},  # WFO 파라미터 없음 (구조적 한계, Cycle409 F)
 }
 
 # 과최적화 판단 기준

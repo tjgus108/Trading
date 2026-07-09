@@ -1,13 +1,13 @@
 # Paper Trading 시뮬레이션 통합 리포트
 
-_Generated: 2026-07-09T10:10:42.338371Z_
+_Generated: 2026-07-09T20:16:52.025922Z_
 _Symbols: BTC/USDT, ETH/USDT, SOL/USDT_
 
 ---
 
 # Paper Trading 시뮬레이션 리포트 — BTC/USDT (Walk-Forward)
 
-_Generated: 2026-07-09T10:14:33.313755Z_
+_Generated: 2026-07-09T20:23:06.129381Z_
 _Symbol: BTC/USDT_
 _Data Source: CSV fallback BTC/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
@@ -185,7 +185,7 @@ _adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
 
 # Paper Trading 시뮬레이션 리포트 — ETH/USDT (Walk-Forward)
 
-_Generated: 2026-07-09T10:18:06.205654Z_
+_Generated: 2026-07-09T20:28:44.141224Z_
 _Symbol: ETH/USDT_
 _Data Source: CSV fallback ETH/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_
@@ -363,7 +363,7 @@ _adaptive_slippage=True 시 진입별 레짐 카운트 (low/normal/high)_
 
 # Paper Trading 시뮬레이션 리포트 — SOL/USDT (Walk-Forward)
 
-_Generated: 2026-07-09T10:21:33.554791Z_
+_Generated: 2026-07-09T20:34:14.347759Z_
 _Symbol: SOL/USDT_
 _Data Source: CSV fallback SOL/USDT 1h (/home/user/Trading/data/historical)_
 _Data Range: 2023-01-01 00:00:00+00:00 ~ 2024-05-14 23:00:00+00:00 (499일)_

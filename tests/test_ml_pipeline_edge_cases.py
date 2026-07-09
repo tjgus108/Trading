@@ -539,3 +539,34 @@ class TestSelectFeaturesPfi:
         selected = trainer.select_features_pfi(clf, X, y, top_k=5)
         assert len(selected) == 5
         assert set(selected) == set(X.columns)
+
+    # ── Cycle409 D(ML): select_features_pfi() n_samples 경계값 + n_features=2 ──
+
+    def test_select_features_pfi_n99_boundary_small_sample_path(self):
+        """n_samples=99 (< 100 경계): n_repeats=10 경로 진입, 비어 있지 않은 리스트 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=99, n_features=4, seed=6)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=3)
+        assert isinstance(selected, list)
+        assert len(selected) >= 1
+        assert all(f in list(X.columns) for f in selected)
+
+    def test_select_features_pfi_two_features_returns_both(self):
+        """n_features=2, top_k=8 → k=max(2,min(8,2))=2, 두 피처 모두 반환."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=120, n_features=2, seed=7)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=8)
+        assert len(selected) == 2
+        assert set(selected) == set(X.columns)
+
+    def test_select_features_pfi_selected_features_are_subset_of_columns(self):
+        """반환된 피처가 전부 X_train.columns 원소 — 존재하지 않는 피처명 없음."""
+        from src.ml.trainer import WalkForwardTrainer
+        trainer = WalkForwardTrainer(symbol="BTC/USDT")
+        clf, X, y = self._make_clf_and_data(n_samples=150, n_features=6, seed=8)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=4)
+        col_set = set(X.columns)
+        assert all(f in col_set for f in selected)
+        assert len(selected) == 4

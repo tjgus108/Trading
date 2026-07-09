@@ -733,3 +733,10 @@ class TestOptimizeNarrowRange:
         df = _make_df(400)
         result = optimize_narrow_range(df, n_windows=2)
         assert result.oos_sharpe_std >= 0.0
+
+    def test_optimize_narrow_range_avg_oos_sharpe_is_float(self):
+        """avg_oos_sharpe 반환값은 float 타입 (Cycle409 D)."""
+        from src.backtest.walk_forward import optimize_narrow_range
+        df = _make_df(400)
+        result = optimize_narrow_range(df, n_windows=2)
+        assert isinstance(result.avg_oos_sharpe, float)
