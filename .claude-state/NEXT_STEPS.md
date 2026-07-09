@@ -1,44 +1,45 @@
 # Next Steps
 
-_Last updated: 2026-07-08 (Cycle 406 완료)_
+_Last updated: 2026-07-09 (Cycle 407 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 406
+### 이번 세션 완료 사이클: 407
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 402 | E+A+F | PaperConnector 미커버 3개+apply_wfe 4개(+7→8607), **engine.py summary() 음수WFE버그픽스**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 403 | C+B+F | DataFeed ema200/ema20_slope/return_5 엣지3개+DM reset_daily 복합3개+KellySizer compute_dynamic 경계3개(+9→8616), **positional_scaling 구조적문제 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 404 | D+E+F | select_features_pfi 엣지3개+PaperConnector position_state 3개(+6→8622), **engulfing_zone/volatility_cluster Bundle OOS 후보→부적합 확정**, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 405 | A+C+F | BacktestEngine극단슬리피지3개+DataFeed지표엣지3개(+6→8628 총계), **lob_maker 구조적한계 확정**(OFI proxy, LOB 인프라 없음), walk_forward.py DEFAULT_GRIDS["lob_maker"] 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 406 | B+D+F | DM CRISIS/HIGH_VOL+쿠션 복합3개+select_features_pfi 경계3개(+6→8634 총계), **narrow_range 1h 구조적한계 확정**(PF=0.97<1, NR breakout 1h 노이즈 부재), walk_forward.py narrow_range 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 407 | B+D+F | CB total_dd+ATR우선순위/reset_daily쿨다운유지/rapid_decline직렬화 3개+optimize_frama타입/비음수+optimize_narrow_range단일윈도우/필드 4개(+7→8641 총계), **acceleration_band 1h 구조적실패 확정**(PF=0.98<1.0, RANGING 47.3%, false breakout), walk_forward.py acceleration_band 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 407 작업 방향 (407 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 408 작업 방향 (408 mod 5 = 3 → C(데이터) + E(실행) + F(리서치))
 
-#### B(리스크): CircuitBreaker 미커버 케이스
+#### C(데이터): DataFeed / WebSocket 엣지케이스
 
-- **배경**: 리스크 카테고리, 테스트 커버리지 향상 (Cycle406에서 DrawdownMonitor 완료)
-- **작업 방향**: `tests/test_circuit_breaker.py`
-  - max_daily_drawdown 복합 케이스: daily_drawdown + atr_surge 동시 발동
-  - rapid_decline + consecutive_losses 동시 활성 복합 케이스 (미확인)
-  - reset_daily 후 rapid_decline 상태 클리어 여부 엣지케이스
+- **배경**: Cycle405 이후 데이터 인프라 커버리지 추가 향상 필요
+- **작업 방향**: `tests/test_feed_boundary.py` 또는 `tests/test_data_feed.py`
+  - WebSocket 재연결 로직 타임아웃 엣지케이스
+  - OHLCV 보정(resample/forward-fill) 경계값 검증
+  - 피처 파이프라인 NaN 전파 방지 케이스
 
-#### D(ML): optimize_frama() 또는 optimize_narrow_range() 엣지케이스
+#### E(실행): PaperConnector / SlippageModel 엣지케이스
 
-- **배경**: ML 카테고리, WFO 최적화 함수 커버리지 향상
-- **작업 방향**: `tests/test_phase_d.py`
-  - `optimize_frama()`: avg_oos_sharpe 타입 검증, oos_sharpe_std 비음수 검증
-  - `optimize_narrow_range()`: 단일 윈도우 엣지케이스, 결과 필드 검증
+- **배경**: Cycle404 이후 실행 레이어 추가 커버리지 향상 필요
+- **작업 방향**: `tests/test_paper_connector.py` 또는 `tests/test_slippage_model.py`
+  - 시장가/지정가 혼합 시나리오 케이스
+  - adaptive_slippage high 레짐 경계 케이스
+  - 포지션 상태 전환(플랫→롱→플랫) 연속 케이스
 
-#### F(리서치): rank 상위 미탐색 전략 분석
+#### F(리서치): dema_cross 1h BTC 파라미터 탐색 가능성 분석
 
-- **배경**: Cycle406 F에서 narrow_range 1h 구조적 한계 확정 (PF<1.0, NR breakout 노이즈)
-- **작업 방향**: 1h composite score rank 상위 미탐색 전략 중 다음 후보
-  - `acceleration_band` (rank 15, Sh=-0.94, Trades=44): 1h BTC 구조 분석 (ATR band breakout)
-  - 또는 `dema_cross` 추가 파라미터 탐색 재검토 (PF=1.38 → 1.50 gap=0.12 여전히 존재)
+- **배경**: Cycle407 F에서 acceleration_band 1h 구조적 실패 확정 (PF<1.0). 다음 후보:
+  - `dema_cross` (rank 4, Sh=0.85, PF=1.38, Tr=26, 2/8 BTC 1h): PF gap=0.12, Sh gap=0.15
+  - 분석 방향: DEMA(10,20) 크로스오버 → 1h 노이즈 취약성 여부, 파라미터 확장 여지
+  - 기본 기간(dema_fast/dema_slow) WFO 그리드 확장 가능성 검토
 
 ### ⚠️ 주의 사항 (Cycle 405 이후)
 

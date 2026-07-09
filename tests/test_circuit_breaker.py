@@ -832,3 +832,87 @@ def test_rapid_decline_oldest_price_exits_window():
     r2 = cb.check(10000, 10000, 10000)
     assert r2["triggered"] is False
     assert r2["size_multiplier"] == 1.0
+
+
+# ── Cycle407 B: 복합 케이스 추가 ────────────────────────────────────────────
+
+def test_total_drawdown_and_atr_surge_drawdown_wins():
+    """전체 낙폭 초과 + ATR surge 동시 → triggered=True, reason='전체', size_multiplier=0.0.
+
+    daily_drawdown + atr_surge 케이스(기존 테스트)와 달리 전체 낙폭 경로로 트리거.
+    ATR surge(부분 축소)는 triggered 낙폭에 묻혀 적용되지 않음.
+    """
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.20,   # 높게 설정 → daily_dd 미트리거
+        total_drawdown_limit=0.15,
+        atr_surge_multiplier=2.0,
+    )
+    result = cb.check(
+        current_balance=8400.0,      # total_dd=(10000-8400)/10000=16% > 15%
+        peak_balance=10000.0,
+        daily_start_balance=8500.0,  # daily_dd=(8500-8400)/8500≈1.2% < 20%
+        current_atr=0.10,            # ATR surge: 10% vs 2% = 5x
+        baseline_atr=0.02,
+    )
+    assert result["triggered"] is True
+    assert result["size_multiplier"] == 0.0
+    assert "전체" in result["reason"]
+    assert "ATR" not in result["reason"]  # ATR surge는 낙폭에 묻혀 표현 안 됨
+
+
+def test_reset_daily_does_not_clear_consecutive_loss_cooldown():
+    """reset_daily() 는 연속손실 쿨다운을 초기화하지 않는다.
+
+    일일 낙폭 트리거 해제 후에도 cooldown_remaining 유지.
+    daily_start_balance 업데이트로 일일 낙폭 미트리거 → 쿨다운이 거래를 차단.
+    """
+    cb = CircuitBreaker(
+        daily_drawdown_limit=0.05,
+        total_drawdown_limit=0.99,
+        max_consecutive_losses=2,
+        cooldown_periods=3,
+    )
+    # 연속 손실 → 쿨다운 활성화
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 3
+
+    # reset_daily()는 일일 트리거 해제용 — 쿨다운은 건드리지 않음
+    cb.reset_daily(9500.0)
+    assert cb.cooldown_remaining == 3  # 쿨다운 유지
+
+    # 새 일일 start_balance로 일일 낙폭 미초과 상태에서 check → 쿨다운이 여전히 차단
+    result = cb.check(
+        current_balance=9480.0,
+        peak_balance=10000.0,
+        daily_start_balance=9500.0,  # daily_dd≈0.2% < 5%
+    )
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+
+
+def test_to_dict_from_dict_preserves_rapid_decline_cooldown():
+    """to_dict/from_dict 라운드트립에 rapid_decline_cooldown 포함 및 복원 검증."""
+    cb = CircuitBreaker(
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=5,
+        daily_drawdown_limit=0.99,
+        total_drawdown_limit=0.99,
+    )
+    cb.record_price(100.0)
+    cb.record_price(90.0)  # 10% 하락 → 쿨다운 5 시작
+    cb.check(current_balance=9000, peak_balance=10000, daily_start_balance=10000)
+    assert cb.rapid_decline_cooldown == 5
+
+    snapshot = cb.to_dict()
+    assert "rapid_decline_cooldown" in snapshot
+    assert snapshot["rapid_decline_cooldown"] == 5
+
+    cb2 = CircuitBreaker(
+        rapid_decline_pct=0.05,
+        rapid_decline_window=2,
+        rapid_decline_cooldown_periods=5,
+    )
+    cb2.from_dict(snapshot)
+    assert cb2.rapid_decline_cooldown == 5  # 복원 확인
