@@ -393,6 +393,25 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # proxy OFI 근본 문제 해결 없이 grid search는 과최적화 위험만 증가
         # lob_maker 탐색 완전 보류 (LOB 인프라 없음)
     },
+    # Cycle407 F(리서치): acceleration_band 1h BTC 구조적 한계 확정
+    # BTC 1h paper_sim: rank15, Sh=-0.94, PF=0.98(<1.0!), Trades=44, MDD=13%, Consist=1/8
+    # ETH 1h: Sh=-2.03, PF=0.57, Trades=13(<15), 0/8 — 신호 부족
+    # SOL 1h: Sh=-0.80, PF=1.00, Trades=11(<15), 0/8 — 신호 부족
+    # 근본 원인:
+    #   1. Headley Acceleration Band 상향돌파 전략 → BTC 1h RANGING 47.3% 지배
+    #      upper band cross 후 mean reversion 지배 → false breakout 다수
+    #   2. PF=0.98 < 1.0: 비용 전 에지가 음수 → 파라미터 조정으로 해결 불가
+    #   3. ETH/SOL: 높은 ATR(2.12%/3.17%) → 밴드 폭 과대 → 신호 부족(Trades<15)
+    # 개선 시도 가능성:
+    #   - strong_band 하드 게이팅(band_width>0.04): ETH/SOL trades 추가 감소 → 역효과
+    #   - vol regime filter(HIGH_VOL만 허용): BTC trades=44→~15-20 감소 가능, 개선 불확실
+    #   - 1h보다 4h/daily 적합한 전략 구조 — 현재 1h 탐색 완전 종료
+    # 결론: acceleration_band 1h 구조적 실패. 추가 탐색 금지.
+    # (4h Bundle OOS 대상 아님 — 현재 5/5 전략 변경 불가)
+    "acceleration_band": {
+        # 파라미터 탐색 미실시 — 1h에서 구조적 PASS 불가 확인
+        # 향후 4h 탐색 시 band_width_min, vol_regime_filter 파라미터화 검토 가능
+    },
 }
 
 # 과최적화 판단 기준
