@@ -457,6 +457,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   - 음의 엣지(PF<1.0) + SL 부재 + RANGING 구조 → 파라미터화로 해결 불가
     #   **volume_breakout 추가 탐색 금지. 구조적 한계 확정 (Cycle411 F).**
     "volume_breakout": {},  # WFO 파라미터 없음 (구조적 한계, Cycle411 F)
+    # Cycle412 F(리서치): momentum_quality BTC 1h 구조적 한계 확정
+    #   - BTC 1h: Sh=-1.19, PF<1.0(음의 엣지), Trades=71, 1/8 Consistency
+    #   - quality_score = consistency*2-1 + (acceleration>0) — RANGING(47.3%)에서 빈발
+    #   - quality_score_buy_threshold=0.8 → accel=1 시 consistency>0.4 이상이면 통과
+    #   - consistency_buy_threshold=0.3: DEAD PARAM — quality_score>0.8 조건이 이미 consistency>0.4 함의
+    #   - quality_score_buy_threshold=1.5 상향 → Trades<15 위험 (72→<15 예상)
+    #   - 구조 자체가 RANGING 47.3% BTC 1h에서 모멘텀 추종 → 음의 엣지
+    #   **momentum_quality 추가 탐색 금지. 구조적 한계 확정 (Cycle412 F).**
+    "momentum_quality": {},  # WFO 파라미터 없음 (구조적 한계, Cycle412 F)
 }
 
 # 과최적화 판단 기준

@@ -1,3 +1,40 @@
+## [2026-07-10] Cycle 412 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] CircuitBreaker max_daily_trades + consecutive_loss 복합 케이스 3개** (+3)
+
+tests/test_circuit_breaker.py (Cycle412 B):
+1. `test_consecutive_loss_cooldown_takes_priority_over_daily_trade_limit`: 쿨다운 활성 + 일일거래한계 동시 → 쿨다운 reason 우선 반환 (check()순서: 쿨다운이 daily_trade_limit보다 먼저 체크됨)
+2. `test_reset_daily_preserves_consecutive_loss_cooldown`: reset_daily()는 일일 통계만 초기화 — cooldown_remaining 미초기화 검증
+3. `test_record_trade_during_cooldown_increments_daily_trade_count`: 쿨다운 중 record_trade_result() 호출 시 _daily_trade_count 계속 증가 검증
+
+**[D(ML)] optimize_roc_ma_cross 미커버 필드 3개** (+3)
+
+tests/test_phase_d.py (Cycle412 D, TestOptimizeRocMaCrossFields):
+4. `test_optimize_roc_ma_cross_oos_sharpe_std_non_negative`: oos_sharpe_std >= 0.0
+5. `test_optimize_roc_ma_cross_best_params_has_roc_min_abs`: best_params에 roc_min_abs 키 포함 (factory에서 전달)
+6. `test_optimize_roc_ma_cross_fold_pass_rate_in_range`: fold_pass_rate ∈ [0.0, 1.0]
+
+**[F(리서치)] momentum_quality BTC 1h 구조적 한계 확정**
+
+분석 결과 (rank 14, BTC 1h, Sh=-1.19, PF=0.96, Trades=71, 1/8 Consistency, SharpeStd=3.29):
+- paper_sim: Sh=-1.19, PF=0.96(**<1.0, 음의 엣지**), Trades=71, Consistency=1/8 → FAIL
+- 근본 원인 1: `quality_score = consistency*2-1 + (acceleration>0)` → RANGING(47.3%)에서 빈발
+  - consistency_buy_threshold=0.3: **DEAD PARAM** — quality_score>0.8 조건이 이미 consistency>0.4 함의 (accel=1시) 또는 >0.9 함의 (accel=0시)
+  - 즉 threshold=0.3 완화가 신호 빈도에 전혀 영향 없음
+- 근본 원인 2: RANGING(47.3%) BTC 1h에서 mom20>0 조건이 ~50% 충족 + quality_score>0.8 구조적 충족 → 노이즈 거래 과다
+- 파라미터 개선 방향 검토:
+  quality_score_buy_threshold=1.5 (0.8→1.5): accel=1 + consistency>0.75 필요 → Trades 급감 (<15 위험)
+  SharpeStd=3.29 (불안정) → 파라미터 개선으로 안정화 불가능
+- walk_forward.py DEFAULT_GRIDS["momentum_quality"]={} 추가 (구조적 한계 주석)
+- **결론**: RANGING 47.3% BTC 1h에서 모멘텀 품질 측정 자체가 노이즈. 추가 탐색 금지.
+
+**시뮬레이션 결과 (Cycle 412)**:
+- 1h PASS: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Tr=14, 4/8) — 유지
+- Bundle OOS: 5/5 PASS (2026-07-08 기준) — 유지 (SSL fallback으로 갱신 불가)
+- 총 테스트: **8679 총계 (+6, 8650→8656 passed)** (full suite: 8656 passed, 23 skipped)
+
+---
+
 ## [2026-07-10] Cycle 411 — B(리스크) + D(ML) + F(리서치)
 
 **[B(리스크)] DrawdownMonitor transition_cushion + set_regime 복합 케이스 3개** (+3)
@@ -17409,6 +17446,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 15:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-10 15:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 15:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 15:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 15:23 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 15:23 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

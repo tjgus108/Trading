@@ -872,6 +872,82 @@ def test_rapid_decline_does_not_set_is_triggered():
     assert cb.is_triggered is False
 
 
+# ── Cycle412 B(리스크): max_daily_trades + consecutive_loss 복합 케이스 ──────
+
+
+def test_consecutive_loss_cooldown_takes_priority_over_daily_trade_limit():
+    """연속 손실 쿨다운 활성 상태에서 일일 거래 한계도 초과된 경우 쿨다운이 우선 반환된다."""
+    cb = CircuitBreaker(
+        max_consecutive_losses=2,
+        cooldown_periods=3,
+        max_daily_trades=2,
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+    )
+    initial = 10000.0
+    # 2 연속 손실 → 쿨다운 시작 (이 과정에서 _daily_trade_count=2 → max_daily_trades 도달)
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)
+    assert cb.cooldown_remaining == 3
+    # 쿨다운 중 추가 거래 1건 → _daily_trade_count=3 (한계 초과)
+    cb.record_trade_result(is_loss=False)
+
+    result = cb.check(initial, initial, initial)
+    # 쿨다운 체크가 일일 거래 한계 체크보다 앞에 있으므로 쿨다운 이유가 반환돼야 함
+    assert result["triggered"] is True
+    assert "쿨다운" in result["reason"]
+    assert "거래 횟수" not in result["reason"]
+
+
+def test_reset_daily_preserves_consecutive_loss_cooldown():
+    """reset_daily()는 일일 통계만 초기화하며 연속 손실 쿨다운을 해제하지 않는다."""
+    cb = CircuitBreaker(
+        max_consecutive_losses=2,
+        cooldown_periods=5,
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+    )
+    initial = 10000.0
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)  # 쿨다운 시작
+    assert cb.cooldown_remaining == 5
+
+    result_before = cb.check(initial, initial, initial)
+    assert result_before["triggered"] is True
+    assert "쿨다운" in result_before["reason"]
+
+    # 일일 리셋 — 쿨다운은 유지
+    cb.reset_daily(initial)
+    assert cb.cooldown_remaining == 5  # reset_daily는 쿨다운 미초기화
+    result_after = cb.check(initial, initial, initial)
+    assert result_after["triggered"] is True
+    assert "쿨다운" in result_after["reason"]
+
+
+def test_record_trade_during_cooldown_increments_daily_trade_count():
+    """쿨다운 중 record_trade_result()를 호출해도 _daily_trade_count는 계속 증가한다."""
+    cb = CircuitBreaker(
+        max_consecutive_losses=2,
+        cooldown_periods=5,
+        max_daily_trades=10,
+        daily_drawdown_limit=0.50,
+        total_drawdown_limit=0.50,
+    )
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=True)  # 쿨다운 시작, _daily_trade_count=2
+    assert cb.cooldown_remaining == 5
+
+    # 쿨다운 중 3건 추가 거래
+    cb.record_trade_result(is_loss=False)
+    cb.record_trade_result(is_loss=True)
+    cb.record_trade_result(is_loss=False)
+
+    # _daily_trade_count는 5여야 함 (쿨다운 무관)
+    assert cb._daily_trade_count == 5
+    # 쿨다운은 여전히 활성
+    assert cb.cooldown_remaining == 5
+
+
 def test_consecutive_loss_cooldown_ignores_atr_surge():
     """연속 손실 쿨다운 활성 + ATR surge 동시 → 쿨다운 우선, triggered=True, size_multiplier=0.0."""
     cb = CircuitBreaker(

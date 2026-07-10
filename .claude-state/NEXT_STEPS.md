@@ -1,46 +1,55 @@
 # Next Steps
 
-_Last updated: 2026-07-10 (Cycle 411 완료)_
+_Last updated: 2026-07-10 (Cycle 412 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 411
+### 이번 세션 완료 사이클: 412
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 406 | B+D+F | DM CRISIS/HIGH_VOL+쿠션 복합3개+select_features_pfi 경계3개(+6→8634 총계), **narrow_range 1h 구조적한계 확정**(PF=0.97<1, NR breakout 1h 노이즈 부재), walk_forward.py narrow_range 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 407 | B+D+F | CB 복합케이스3개+optimize_frama타입2개+TestOptimizeNarrowRange3개(+8→8642 총계, 8619 passed), **acceleration_band 1h 구조적한계 확정**(PF=0.98<1.0, 파라미터화 불가), walk_forward.py DEFAULT_GRIDS["acceleration_band"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 408 | C+B+F | DataFeed ema200/bb_width/macd_hist 경계3개+DM size_multiplier 복합3개(+6→8648 총계, 8625 passed), **htf_ema 1h 구조적한계 확정**(Sh=-0.72, PF=0.91<1.0, iloc[::4] HTF 시뮬레이션 proxy 불정확), walk_forward.py DEFAULT_GRIDS["htf_ema"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 410 | A+C+F | apply_wfe 미커버3개+DataFeed 지표경계3개(+6→8661 총계, 8638 passed), **relative_volume 1h 구조적한계 확정**(Sh=-0.99, PF=0.92<1.0, RANGING 볼륨스파이크→즉각반전→음의엣지), walk_forward.py DEFAULT_GRIDS["relative_volume"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 411 | B+D+F | transition_cushion+set_regime 복합3개+optimize strategyname/bestparams3개(+6→8667 총계, 8644 passed), **volume_breakout 1h 구조적한계 확정**(Sh=-0.74, PF=0.96<1.0, SL부재+spike1.5x과다+RANGING), walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 412 | B+D+F | CB max_daily+consec_loss 복합3개+optimize_roc_ma_cross oos_std/roc_min_abs/fold_pass_rate 3개(+6→8679 총계, 8656 passed), **momentum_quality 1h 구조적한계 확정**(Sh=-1.19, PF=0.96<1.0, consistency_buy_threshold=0.3 DEAD PARAM, RANGING 47.3% 모멘텀 노이즈), walk_forward.py DEFAULT_GRIDS["momentum_quality"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 412 작업 방향 (412 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 413 작업 방향 (413 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
 
-#### B(리스크): CircuitBreaker 미커버 시나리오 또는 DrawdownMonitor 추가
+#### C(데이터): DataFeed 또는 indicators 경계값 테스트
 
-- **배경**: 리스크 카테고리 로테이션 (Cycle411 B 완료 후)
-- **작업 방향**: `tests/test_circuit_breaker.py` 또는 `tests/test_drawdown_monitor.py`
-  - CircuitBreaker 미커버 시나리오: max_daily_trades + consecutive_loss 복합 케이스
-  - DrawdownMonitor: rolling_mdd 또는 trailing_stop_signal 미커버 케이스 검토
+- **배경**: 데이터 카테고리 로테이션 (Cycle410 C 완료 후 3사이클)
+- **작업 방향**: `tests/test_feed_boundary.py` 또는 `tests/test_data_feed.py`
+  - indicator_stationarity: 지표 경계값 케이스 (ema200, atr_zero, etc.)
+  - DataFeed 미커버 경계 케이스 검토
 
-#### D(ML): ML 파이프라인 추가 미커버 케이스
+#### B(리스크): DrawdownMonitor 추가 미커버 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle411 D 완료 후)
-- **작업 방향**: `tests/test_ml_pipeline_edge_cases.py` 또는 `tests/test_phase_d.py`
-  - WalkForwardTrainer.train() feature_selection=True 경로 엣지케이스
-  - optimize_frama 또는 optimize_roc_ma_cross 추가 미커버 필드 검토
+- **배경**: 리스크 카테고리 로테이션 (Cycle412 B 완료 후)
+- **작업 방향**: `tests/test_drawdown_monitor.py`
+  - trailing_stop_signal 추가 케이스 (고속 낙폭 감지 경계)
+  - kelly_fraction_multiplier + mdd_warn 복합 상태 검토
 
-#### F(리서치): momentum_quality BTC 1h 구조 분석
+#### F(리서치): positional_scaling BTC 1h 구조 분석
 
-- **배경**: Cycle411 F에서 volume_breakout 구조적 한계 확정
-- **작업 방향**: 1h composite score rank 10 → rank 분석
-  - `momentum_quality` (rank 10, BTC 1h Sh=-1.19, Trades=71): 모멘텀 품질 전략 구조 분석
-    - Consistency=1/8 → 구조적 실패 패턴 확인
-    - quality_score_buy_threshold=0.8, consistency_buy_threshold=0.3 파라미터화 검토
-    - RANGING 47.3% → 모멘텀 신호 과다 여부 분석
+- **배경**: Cycle412 F에서 momentum_quality 구조적 한계 확정
+- **작업 방향**: composite score rank 5, Sh=-0.38, Trades=34, PF=1.09
+  - triple EMA alignment 조건 분석 (RANGING 47.3%에서 정렬 빈도)
+  - pullback_atr_mult=0.3 하드코딩 파라미터화 가능성 재검토
+  - 구조적 한계 재확정 또는 파라미터화 방향 결정
+
+### ⚠️ 주의 사항 (Cycle 412 이후)
+
+- **momentum_quality 탐색 완전 보류** (Cycle412 F):
+  - quality_score = consistency*2-1 + (acceleration>0) → RANGING(47.3%) BTC 1h에서 빈발
+  - consistency_buy_threshold=0.3: DEAD PARAM (quality_score>0.8 조건이 이미 consistency>0.4 함의)
+  - BTC 1h Sh=-1.19, PF=0.96(**<1.0, 음의 엣지**), Trades=71, 1/8 Consistency, SharpeStd=3.29
+  - quality_score_buy_threshold=1.5 → Trades<15 위험, 구조 미해결
+  - **결론**: RANGING 47.3% BTC 1h에서 모멘텀 품질 전략 구조적 실패. 추가 탐색 금지.
+  - walk_forward.py DEFAULT_GRIDS["momentum_quality"]={} 추가 (구조적 한계 주석)
 
 ### ⚠️ 주의 사항 (Cycle 411 이후)
 
@@ -307,9 +316,9 @@ _Last updated: 2026-07-10 (Cycle 411 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 411 업데이트)
+### 핵심 메트릭 (Cycle 412 업데이트)
 
-| 지표 | Cycle 410 | Cycle 411 | 변화 |
+| 지표 | Cycle 411 | Cycle 412 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -320,18 +329,18 @@ _Last updated: 2026-07-10 (Cycle 411 완료)_
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
+| 1h BTC momentum_quality Sharpe | -1.19 | **-1.19** | 구조적 실패 확정 |
 | 1h BTC volume_breakout Sharpe | -0.74 | **-0.74** | 구조적 실패 확정 |
 | 1h BTC relative_volume Sharpe | -0.99 | **-0.99** | 구조적 실패 확정 |
 | 1h BTC price_action_momentum Sharpe | -1.08 | **-1.08** | 구조적 실패 확정 |
-| 1h BTC frama Trades | 65 | **65** | 유지 (탐색 종료) |
 | 1h BTC lob_maker Sharpe | -0.04 | **-0.04** | 유지 (탐색 보류) |
 | 1h BTC htf_ema Sharpe | -0.72 | **-0.72** | 구조적 실패 확정 |
 | 1h BTC acceleration_band Sharpe | -0.94 | **-0.94** | 구조적 실패 확정 |
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 (passed) | 8638개 | **8644개 passed** | +6 추가 |
-| 테스트 수 (총계) | 8661개 | **8667개 총계** (+6) | +6 추가 |
+| 테스트 수 (passed) | 8644개 | **8656개 passed** | +12 추가 |
+| 테스트 수 (총계) | 8667개 | **8679개 총계** (+12) | +12 추가 |
 
 ### Cycle 397 코드 변경 요약
 

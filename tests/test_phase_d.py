@@ -771,3 +771,34 @@ class TestOptimizeFramaStrategyName:
         df = _make_df(400)
         result = optimize_narrow_range(df, n_windows=2)
         assert result.strategy_name == "narrow_range"
+
+
+# ---------------------------------------------------------------------------
+# Cycle412 D(ML): optimize_roc_ma_cross 추가 미커버 필드 검증
+# ---------------------------------------------------------------------------
+
+class TestOptimizeRocMaCrossFields:
+    """optimize_roc_ma_cross WalkForwardResult 미커버 필드 검증 (Cycle412 D)."""
+
+    def test_optimize_roc_ma_cross_oos_sharpe_std_non_negative(self):
+        """optimize_roc_ma_cross() oos_sharpe_std >= 0.0 (Cycle412 D)."""
+        from src.backtest.walk_forward import optimize_roc_ma_cross
+        df = _make_df(400)
+        result = optimize_roc_ma_cross(df, n_windows=2)
+        assert result.oos_sharpe_std >= 0.0
+
+    def test_optimize_roc_ma_cross_best_params_has_roc_min_abs(self):
+        """optimize_roc_ma_cross best_params에 roc_min_abs 키 포함 (Cycle412 D)."""
+        from src.backtest.walk_forward import optimize_roc_ma_cross
+        df = _make_df(400)
+        result = optimize_roc_ma_cross(df, n_windows=2)
+        if result.best_params:
+            assert "roc_min_abs" in result.best_params
+
+    def test_optimize_roc_ma_cross_fold_pass_rate_in_range(self):
+        """optimize_roc_ma_cross fold_pass_rate ∈ [0.0, 1.0] (Cycle412 D)."""
+        from src.backtest.walk_forward import optimize_roc_ma_cross
+        df = _make_df(400)
+        result = optimize_roc_ma_cross(df, n_windows=2)
+        if result.fold_pass_rate is not None:
+            assert 0.0 <= result.fold_pass_rate <= 1.0
