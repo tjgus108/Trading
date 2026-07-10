@@ -1815,3 +1815,48 @@ def test_reset_daily_none_state_updates_daily_start():
 
     assert not m.is_halted()
     assert m._daily_start == 9800  # 새 daily_start로 갱신됨
+
+
+# ── Cycle413 B(리스크): trailing_stop_signal 경계 + kelly+mdd_warn 복합 ────────
+
+
+def test_trailing_stop_signal_short_window_boundary():
+    """rolling_window=40 → short_window=min(20, 40//2)=20 boundary 검증."""
+    m = DrawdownMonitor(rolling_window=40)
+    # 20봉 안정
+    for _ in range(20):
+        m.update(10000)
+    # 20봉 급락: 단기(20봉) 낙폭 집중
+    for i in range(20):
+        m.update(10000 - (i + 1) * 200)  # 4000 → 40% 낙폭
+    # short_window = min(20, 40//2) = 20 = long_window//2
+    # short_mdd: 최근 20봉에서 40% / 20 = 2% per bar
+    # long_mdd: 전체 40봉 기준 더 낮은 rate → short_rate > long_rate * 1.5
+    assert m.trailing_stop_signal(accel_threshold=1.5) is True
+
+
+def test_trailing_stop_signal_threshold_one_uniform_decline():
+    """accel_threshold=1.0 → short_rate >= long_rate 이면 신호 발생 (균일 낙폭에서도)."""
+    m = DrawdownMonitor(rolling_window=50)
+    # 50봉 균일 하락: short_rate ≈ long_rate → accel_threshold=1.0 에서 >= 성립
+    for i in range(50):
+        m.update(10000 - i * 20)
+    # short_rate / long_rate ≈ 1.0, accel_threshold=1.0 → short_rate >= long_rate * 1.0 → True
+    assert m.trailing_stop_signal(accel_threshold=1.0) is True
+
+
+def test_kelly_fraction_multiplier_and_mdd_warn_compound():
+    """MDD 9% (warn_pct=8%, block_pct=10%): kelly=0.5 + mdd_level=WARN 동시 발생."""
+    m = DrawdownMonitor(
+        mdd_warn_pct=0.08,
+        mdd_block_pct=0.10,
+        kelly_reduce_at_mdd=0.08,
+    )
+    m.update(10000)          # peak
+    m.update(9100)           # 9% 낙폭 → warn_pct(8%) 초과, block_pct(10%) 미만 → WARN
+    # kelly_fraction_multiplier: 9% > kelly_reduce_at_mdd(8%) → 0.5
+    assert m.get_kelly_fraction_multiplier() == pytest.approx(0.5)
+    # mdd_level: 9% ∈ [8%, 10%) → WARN
+    assert m.get_mdd_level() == MddLevel.WARN
+    # get_mdd_size_multiplier: WARN → 0.5
+    assert m.get_mdd_size_multiplier() == pytest.approx(0.5)

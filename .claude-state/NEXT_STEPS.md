@@ -1,45 +1,53 @@
 # Next Steps
 
-_Last updated: 2026-07-10 (Cycle 412 완료)_
+_Last updated: 2026-07-10 (Cycle 413 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 412
+### 이번 세션 완료 사이클: 413
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
-| 407 | B+D+F | CB 복합케이스3개+optimize_frama타입2개+TestOptimizeNarrowRange3개(+8→8642 총계, 8619 passed), **acceleration_band 1h 구조적한계 확정**(PF=0.98<1.0, 파라미터화 불가), walk_forward.py DEFAULT_GRIDS["acceleration_band"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 408 | C+B+F | DataFeed ema200/bb_width/macd_hist 경계3개+DM size_multiplier 복합3개(+6→8648 총계, 8625 passed), **htf_ema 1h 구조적한계 확정**(Sh=-0.72, PF=0.91<1.0, iloc[::4] HTF 시뮬레이션 proxy 불정확), walk_forward.py DEFAULT_GRIDS["htf_ema"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 410 | A+C+F | apply_wfe 미커버3개+DataFeed 지표경계3개(+6→8661 총계, 8638 passed), **relative_volume 1h 구조적한계 확정**(Sh=-0.99, PF=0.92<1.0, RANGING 볼륨스파이크→즉각반전→음의엣지), walk_forward.py DEFAULT_GRIDS["relative_volume"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 411 | B+D+F | transition_cushion+set_regime 복합3개+optimize strategyname/bestparams3개(+6→8667 총계, 8644 passed), **volume_breakout 1h 구조적한계 확정**(Sh=-0.74, PF=0.96<1.0, SL부재+spike1.5x과다+RANGING), walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 412 | B+D+F | CB max_daily+consec_loss 복합3개+optimize_roc_ma_cross oos_std/roc_min_abs/fold_pass_rate 3개(+6→8679 총계, 8656 passed), **momentum_quality 1h 구조적한계 확정**(Sh=-1.19, PF=0.96<1.0, consistency_buy_threshold=0.3 DEAD PARAM, RANGING 47.3% 모멘텀 노이즈), walk_forward.py DEFAULT_GRIDS["momentum_quality"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 413 | C+B+F | DataFeed atr14경계/ema50반응속도/return_5부호 3개+DM trailing_stop경계/threshold1.0/kelly+mdd_warn복합 3개(+6→8685 총계, 8662 passed), **positional_scaling 1h 구조적한계 확정**(Sh=-0.38, pullback==rally 동일조건→BUY/SELL 방향성에지없음, mult 파라미터화 불가), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 413 작업 방향 (413 mod 5 = 3 → C(데이터) + B(리스크) + F(리서치))
+### 🎯 Cycle 414 작업 방향 (414 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### C(데이터): DataFeed 또는 indicators 경계값 테스트
+#### D(ML): ML trainer 또는 walk_forward 미커버 케이스
 
-- **배경**: 데이터 카테고리 로테이션 (Cycle410 C 완료 후 3사이클)
-- **작업 방향**: `tests/test_feed_boundary.py` 또는 `tests/test_data_feed.py`
-  - indicator_stationarity: 지표 경계값 케이스 (ema200, atr_zero, etc.)
-  - DataFeed 미커버 경계 케이스 검토
+- **배경**: ML 카테고리 로테이션 (Cycle413 완료 후)
+- **작업 방향**: `tests/test_phase_d.py` 또는 `tests/test_trainer.py`
+  - optimize 함수 미커버 필드/케이스 검토
+  - select_features 경계값 (0 features, 1 feature 등)
 
-#### B(리스크): DrawdownMonitor 추가 미커버 케이스
+#### E(실행): PaperConnector 또는 execution 미커버 케이스
 
-- **배경**: 리스크 카테고리 로테이션 (Cycle412 B 완료 후)
-- **작업 방향**: `tests/test_drawdown_monitor.py`
-  - trailing_stop_signal 추가 케이스 (고속 낙폭 감지 경계)
-  - kelly_fraction_multiplier + mdd_warn 복합 상태 검토
+- **배경**: 실행 카테고리 로테이션 (Cycle409 E 완료 후)
+- **작업 방향**: `tests/test_exchange.py` 또는 `tests/test_paper_trader.py`
+  - PaperConnector 미커버 경계 케이스 검토
 
-#### F(리서치): positional_scaling BTC 1h 구조 분석
+#### F(리서치): narrow_range BTC 1h 구조 분석
 
-- **배경**: Cycle412 F에서 momentum_quality 구조적 한계 확정
-- **작업 방향**: composite score rank 5, Sh=-0.38, Trades=34, PF=1.09
-  - triple EMA alignment 조건 분석 (RANGING 47.3%에서 정렬 빈도)
-  - pullback_atr_mult=0.3 하드코딩 파라미터화 가능성 재검토
-  - 구조적 한계 재확정 또는 파라미터화 방향 결정
+- **배경**: Cycle413 F에서 positional_scaling 구조적 한계 확정
+- **작업 방향**: rank 7, Sh=-0.51, Trades=46, PF=0.97, 0/8 Consistency
+  - NR7 좁은 범위 + 브레이크아웃 구조가 RANGING에서 어떻게 실패하는지 분석
+  - atr_mult, range_lookback 파라미터화 가능성 검토
+  - 구조적 한계 확정 또는 개선 방향 결정
+
+### ⚠️ 주의 사항 (Cycle 413 이후)
+
+- **positional_scaling 탐색 완전 보류** (Cycle413 F):
+  - `pullback == rally` 동일 조건 (`-threshold <= deviation <= threshold`) — BUY/SELL 진입 구간 완전 동일
+  - BTC 1h Sh=-0.38, PF=1.09(**break-even**), Trades=34, 1/8 Consistency, SharpeStd=2.82
+  - pullback_atr_mult 파라미터화 불가: 구간 넓혀도 BUY/SELL 대칭성 유지 → 에지 없음
+  - **결론**: 방향성 에지가 구조적으로 없음 (pullback=rally 동일). 추가 탐색 금지.
+  - walk_forward.py DEFAULT_GRIDS["positional_scaling"]={} 기존 유지
 
 ### ⚠️ 주의 사항 (Cycle 412 이후)
 
@@ -316,9 +324,9 @@ _Last updated: 2026-07-10 (Cycle 412 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 412 업데이트)
+### 핵심 메트릭 (Cycle 413 업데이트)
 
-| 지표 | Cycle 411 | Cycle 412 | 변화 |
+| 지표 | Cycle 412 | Cycle 413 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -329,6 +337,7 @@ _Last updated: 2026-07-10 (Cycle 412 완료)_
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
+| 1h BTC positional_scaling Sharpe | -0.38 | **-0.38** | 구조적 실패 확정 |
 | 1h BTC momentum_quality Sharpe | -1.19 | **-1.19** | 구조적 실패 확정 |
 | 1h BTC volume_breakout Sharpe | -0.74 | **-0.74** | 구조적 실패 확정 |
 | 1h BTC relative_volume Sharpe | -0.99 | **-0.99** | 구조적 실패 확정 |
@@ -339,8 +348,8 @@ _Last updated: 2026-07-10 (Cycle 412 완료)_
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 (passed) | 8644개 | **8656개 passed** | +12 추가 |
-| 테스트 수 (총계) | 8667개 | **8679개 총계** (+12) | +12 추가 |
+| 테스트 수 (passed) | 8656개 | **8662개 passed** | +6 추가 |
+| 테스트 수 (총계) | 8679개 | **8685개 총계** (+6) | +6 추가 |
 
 ### Cycle 397 코드 변경 요약
 

@@ -828,3 +828,79 @@ class TestInvalidateCache:
         # BTC는 캐시 미스
         feed.fetch("BTC/USDT", "1h", limit=10)
         assert connector.fetch_ohlcv.call_count == 3
+
+
+# ── Cycle413 C(데이터): atr14 영 범위, ema50 지연, return_5 부호 ──────────────
+
+
+class TestIndicatorBoundaryC413:
+    """Cycle413 C(데이터): atr14 상수 가격 경계, ema50 반응 속도, return_5 부호 테스트."""
+
+    def _make_raw(self, closes, volumes=None, base_ts=1704067200000):
+        rows = []
+        for i, c in enumerate(closes):
+            vol = (volumes[i] if volumes else 100.0)
+            rows.append([base_ts + i * 3600000, c * 0.998, c * 1.002, c * 0.995, c, vol])
+        return rows
+
+    def test_atr14_near_zero_for_constant_ohlc(self):
+        """모든 봉의 high/low/close가 동일하면 true range=0 → atr14가 0 또는 매우 작아야 함."""
+        import numpy as np
+        constant = 42000.0
+        closes = [constant] * 50
+        connector = MagicMock()
+        # OHLC 모두 동일: high=low=close → true range=0 on every bar
+        raw = []
+        for i in range(50):
+            raw.append([1704067200000 + i * 3600000, constant, constant, constant, constant, 100.0])
+        connector.fetch_ohlcv.return_value = raw
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "atr14" in df.columns, "atr14 컬럼 없음"
+        last_atr = float(df["atr14"].iloc[-1])
+        assert last_atr < 1.0, (
+            f"상수 OHLC → atr14이 0에 근접해야 함, 실제값: {last_atr:.6f}"
+        )
+
+    def test_ema50_slower_than_ema20_on_price_spike(self):
+        """가격 급등 후 ema50이 ema20보다 close와의 거리가 더 멀어야 함 (ema50 더 느린 반응)."""
+        import numpy as np
+        base_price = 40000.0
+        spike_price = 48000.0
+        closes = [base_price] * 100 + [spike_price] * 20
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=120)
+        df = result.df
+        assert "ema20" in df.columns, "ema20 컬럼 없음"
+        assert "ema50" in df.columns, "ema50 컬럼 없음"
+        last_close = float(df["close"].iloc[-1])
+        dist20 = abs(last_close - float(df["ema20"].iloc[-1]))
+        dist50 = abs(last_close - float(df["ema50"].iloc[-1]))
+        assert dist50 > dist20, (
+            f"ema50({dist50:.2f})이 ema20({dist20:.2f})보다 close와 가까움 — 속도 역전"
+        )
+
+    def test_return_5_sign_matches_trend(self):
+        """지속 상승 추세 → return_5 후반부 양수, 지속 하락 추세 → 음수여야 함."""
+        import numpy as np
+        up_closes = [40000.0 + i * 100.0 for i in range(30)]
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(up_closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=30)
+        df_up = result.df
+        assert "return_5" in df_up.columns, "return_5 컬럼 없음"
+        last_ret_up = float(df_up["return_5"].iloc[-1])
+        assert last_ret_up > 0, f"상승 추세 return_5 양수 기대: {last_ret_up:.6f}"
+
+        down_closes = [42900.0 - i * 100.0 for i in range(30)]
+        connector2 = MagicMock()
+        connector2.fetch_ohlcv.return_value = self._make_raw(down_closes)
+        feed2 = DataFeed(connector2)
+        result2 = feed2.fetch("BTC/USDT", "1h", limit=30)
+        df_down = result2.df
+        last_ret_down = float(df_down["return_5"].iloc[-1])
+        assert last_ret_down < 0, f"하락 추세 return_5 음수 기대: {last_ret_down:.6f}"
