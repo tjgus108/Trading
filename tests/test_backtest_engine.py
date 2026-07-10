@@ -1162,6 +1162,37 @@ def test_summary_negative_wfe_shown_not_na():
 
 
 # ---------------------------------------------------------------------------
+# Cycle410 A(품질): apply_wfe 미커버 IS<=0 브랜치 3개
+# ---------------------------------------------------------------------------
+
+def test_apply_wfe_mild_negative_is_positive_oos_gives_one():
+    """IS 소폭 음수(-1 < IS <= 0), OOS > 0 → wfe=1.0 (과최적화 아님)."""
+    result = _make_result(sharpe=1.0)  # OOS = 1.0 > 0
+    BacktestEngine.apply_wfe(result, is_sharpe=-0.5)  # IS between -1 and 0
+    assert result.wfe == pytest.approx(1.0, abs=1e-4), (
+        f"IS=-0.5, OOS=1.0 → wfe=1.0 기대: {result.wfe}"
+    )
+
+
+def test_apply_wfe_both_nonpositive_gives_zero():
+    """IS 음수, OOS <= 0 → wfe=0.0 (양방향 손실, 과최적화 가능)."""
+    result = _make_result(sharpe=-0.5)  # OOS = -0.5 <= 0
+    BacktestEngine.apply_wfe(result, is_sharpe=-2.0)  # IS < 0
+    assert result.wfe == pytest.approx(0.0, abs=1e-4), (
+        f"IS=-2.0, OOS=-0.5 → wfe=0.0 기대: {result.wfe}"
+    )
+
+
+def test_apply_wfe_zero_is_positive_oos_gives_one():
+    """IS=0.0 정확히, OOS > 0 → wfe=1.0 (IS 소폭 음수 브랜치, is_sharpe not < -1)."""
+    result = _make_result(sharpe=1.2)  # OOS = 1.2 > 0
+    BacktestEngine.apply_wfe(result, is_sharpe=0.0)  # IS = 0 (not > 0, not < -1)
+    assert result.wfe == pytest.approx(1.0, abs=1e-4), (
+        f"IS=0.0, OOS=1.2 → wfe=1.0 기대: {result.wfe}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cycle405 A(품질): 극단 슬리피지/커미션 엣지케이스
 # ---------------------------------------------------------------------------
 

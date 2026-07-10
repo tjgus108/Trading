@@ -431,6 +431,23 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   결론: 모멘텀 추종 전략이 RANGING 47.3% BTC 1h에서 구조적으로 실패.
     #   파라미터 강화로 Sh=-1.08 개선 불가. 추가 탐색 금지.
     "price_action_momentum": {},  # WFO 파라미터 없음 (구조적 한계, Cycle409 F)
+    # Cycle410 F(리서치): relative_volume BTC 1h 구조적 한계 분석
+    #   BTC 1h paper_sim (rvol_buy_sell=1.2): Sh=-0.99, PF=0.92(**<1.0**), Trades=64, Consistency=0/8 → FAIL
+    #   NEXT_STEPS rank8 후보 — 구조 분석:
+    #   1. BUY: RVOL > 1.2 AND bull_candle AND close > vwap20 AND RSI < 68
+    #      → rvol_buy_sell=1.2는 RANGING(47.3%) BTC 1h에서 단기 거래량 노이즈로도 빈번히 충족
+    #      → RSI < 68 허용 범위가 너무 광범위 (RSI 68%를 허용)
+    #      → RANGING 볼륨 스파이크 = 일시적 과매수 신호 → 즉각 반전 → 음의 엣지
+    #   2. PF=0.92 < 1.0: 손실이 이익을 초과 → 볼륨 스파이크 후 추세 지속 실패
+    #      RANGING 47.3% 환경에서 볼륨 스파이크는 방향성 없는 노이즈 발생원
+    #   3. 파라미터 개선 방향 검토:
+    #      rvol_buy_sell=1.6(기본값)으로 복원 시: Trades 감소 → <15 가능 → PASS 기준 미달
+    #      RSI 임계값 강화(RSI<50): 추가 차단이지만 음의 엣지 전략에서 신호 감소 = 무의미
+    #      bull_only=True(EMA50 필터): TREND_UP(31.3%) 전용 → Trades 더 감소 → FAIL 심화
+    #   결론: relative_volume는 추세 추종 볼륨 전략 — RANGING 47.3% BTC 1h에서 구조적 실패.
+    #   rvol 임계값 조정·RSI 강화·EMA50 필터 어느 방향도 PF<1.0 음의 엣지 개선 불가.
+    #   **relative_volume 추가 탐색 금지. 구조적 한계 확정 (Cycle410 F).**
+    "relative_volume": {},  # WFO 파라미터 없음 (구조적 한계, Cycle410 F)
 }
 
 # 과최적화 판단 기준

@@ -691,3 +691,75 @@ class TestIndicatorBoundaryC408:
         assert last_hist > 0, (
             f"단조 상승 추세 macd_hist 마지막 값 음수: {last_hist:.6f}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Cycle410 C(데이터): EMA slope, donchian shift, vwap20 경계 테스트
+# ---------------------------------------------------------------------------
+
+class TestIndicatorBoundaryC410:
+    """Cycle410 C(데이터): feed.py 지표 경계값 테스트."""
+
+    def _make_raw(self, closes, volumes=None):
+        """최소 OHLCV 원시 데이터 생성."""
+        ts_base = 1704067200000
+        result = []
+        for i, c in enumerate(closes):
+            vol = volumes[i] if volumes else 100.0
+            result.append([ts_base + i * 3600000, c * 0.998, c * 1.002, c * 0.995, c, vol])
+        return result
+
+    def test_ema20_slope_positive_for_sustained_uptrend(self):
+        """지속 상승 추세에서 ema20_slope 마지막 값이 양수여야 함."""
+        closes = [40000.0 + i * 100.0 for i in range(60)]
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=60)
+        df = result.df
+        assert "ema20_slope" in df.columns, "ema20_slope 컬럼 없음"
+        last_slope = float(df["ema20_slope"].iloc[-1])
+        assert last_slope > 0, (
+            f"상승 추세 ema20_slope 마지막 값이 양수여야 함: {last_slope:.8f}"
+        )
+
+    def test_donchian_high_excludes_current_bar(self):
+        """donchian_high는 shift(1)로 현재 봉을 제외 — 마지막 봉 직전 20봉 최고가 반영."""
+        # 처음 20봉은 일정 가격, 마지막 봉 high를 대폭 높임
+        closes = [40000.0] * 20 + [50000.0]  # 21봉
+        connector = MagicMock()
+        raw = []
+        ts_base = 1704067200000
+        for i, c in enumerate(closes):
+            h = c * 1.001  # high는 close의 0.1% 위
+            raw.append([ts_base + i * 3600000, c * 0.999, h, c * 0.998, c, 100.0])
+        connector.fetch_ohlcv.return_value = raw
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=21)
+        df = result.df
+        assert "donchian_high" in df.columns, "donchian_high 컬럼 없음"
+        last_donchian = float(df["donchian_high"].iloc[-1])
+        # 마지막 봉(high=50050)이 donchian_high에 반영되지 않아야 함
+        # shift(1) → 마지막 봉 직전 20봉 기준 → max ≈ 40000*1.001 = 40040
+        assert last_donchian < 45000.0, (
+            f"donchian_high는 현재 봉 제외 — 40040 근처 기대, 실제: {last_donchian:.2f}"
+        )
+
+    def test_vwap20_finite_with_uniform_price_volume(self):
+        """균일 가격/거래량 데이터 → vwap20이 NaN/Inf 아닌 유한값이어야 함."""
+        closes = [40000.0] * 50
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes, volumes=[500.0] * 50)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "vwap20" in df.columns, "vwap20 컬럼 없음"
+        last_vwap20 = float(df["vwap20"].iloc[-1])
+        assert not (last_vwap20 != last_vwap20), f"vwap20 NaN: {last_vwap20}"  # NaN check
+        assert abs(last_vwap20) < float("inf"), f"vwap20 Inf: {last_vwap20}"
+        # 균일 가격에서 vwap20 ≈ typical price = (high+low+close)/3
+        # _make_raw: high=close*1.002, low=close*0.995 → typical ≈ 40000*(1.002+0.995+1)/3 = 39960
+        typical_approx = 40000.0 * (1.002 + 0.995 + 1.0) / 3.0
+        assert abs(last_vwap20 - typical_approx) < 10.0, (
+            f"균일 가격 vwap20 ≈ {typical_approx:.0f} 기대: {last_vwap20:.2f}"
+        )
