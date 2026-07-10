@@ -763,3 +763,68 @@ class TestIndicatorBoundaryC410:
         assert abs(last_vwap20 - typical_approx) < 10.0, (
             f"균일 가격 vwap20 ≈ {typical_approx:.0f} 기대: {last_vwap20:.2f}"
         )
+
+
+# ── Cycle403 C(데이터): invalidate_cache() 동작 테스트 ──────────────────────
+
+
+class TestInvalidateCache:
+    """invalidate_cache() 심볼별·전체 무효화 테스트 (Cycle403 C)."""
+
+    def _make_raw(self, n: int = 10):
+        return [
+            [1704067200000 + i * 3600000, 42000, 42500, 41800, 42000, 100]
+            for i in range(n)
+        ]
+
+    def test_invalidate_specific_symbol_forces_refetch(self):
+        """특정 심볼 무효화 → 해당 심볼 다음 fetch는 미스."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw()
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=10)   # miss → cached
+        assert feed.cache_stats()["miss_count"] == 1
+
+        feed.invalidate_cache(symbol="BTC/USDT")
+
+        feed.fetch("BTC/USDT", "1h", limit=10)   # must re-fetch
+        assert feed.cache_stats()["miss_count"] == 2
+        assert connector.fetch_ohlcv.call_count == 2
+
+    def test_invalidate_all_clears_every_entry(self):
+        """전체 무효화 → 모든 심볼 캐시 제거."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw()
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=10)
+        feed.fetch("ETH/USDT", "1h", limit=10)
+        assert feed.cache_stats()["miss_count"] == 2
+
+        feed.invalidate_cache()  # 전체 무효화
+
+        feed.fetch("BTC/USDT", "1h", limit=10)
+        feed.fetch("ETH/USDT", "1h", limit=10)
+        assert feed.cache_stats()["miss_count"] == 4
+        assert connector.fetch_ohlcv.call_count == 4
+
+    def test_invalidate_one_symbol_other_remains_cached(self):
+        """BTC 무효화 → ETH는 캐시 유지."""
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw()
+        feed = DataFeed(connector, cache_ttl=3600)
+
+        feed.fetch("BTC/USDT", "1h", limit=10)
+        feed.fetch("ETH/USDT", "1h", limit=10)
+        assert connector.fetch_ohlcv.call_count == 2
+
+        feed.invalidate_cache(symbol="BTC/USDT")
+
+        # ETH는 여전히 캐시 히트
+        feed.fetch("ETH/USDT", "1h", limit=10)
+        assert connector.fetch_ohlcv.call_count == 2  # ETH는 재요청 없음
+
+        # BTC는 캐시 미스
+        feed.fetch("BTC/USDT", "1h", limit=10)
+        assert connector.fetch_ohlcv.call_count == 3

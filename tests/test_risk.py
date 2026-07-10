@@ -1659,6 +1659,24 @@ class TestKellySizerRolling:
         sizer.record_trade(-float("inf"))
         assert len(sizer._trade_history) == 0
 
+    def test_compute_dynamic_exactly_at_min_trades_boundary(self):
+        """min_trades 경계: 9거래 → fallback, 10거래 → Kelly 경로."""
+        sizer = KellySizer(min_fraction=0.001)
+        capital = 10_000.0
+        # 교대 승패 패턴
+        for i in range(9):
+            sizer.record_trade(0.02 if i % 2 == 0 else -0.01)
+
+        # 9 trades < min_trades=10 → fallback
+        size_before = sizer.compute_dynamic(capital=capital, price=1.0, min_trades=10)
+        assert size_before == sizer.min_fraction * capital
+
+        # 10번째 거래 추가
+        sizer.record_trade(0.02)
+        # 10 trades == min_trades=10 → Kelly 경로 (fallback 아님)
+        size_after = sizer.compute_dynamic(capital=capital, price=1.0, min_trades=10)
+        assert size_after != sizer.min_fraction * capital
+
 
 # ── DrawdownMonitor.get_kelly_fraction_multiplier() 테스트 ────────────────────
 

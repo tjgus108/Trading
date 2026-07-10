@@ -1784,3 +1784,34 @@ def test_get_size_multiplier_atr_and_sharpe_decay_no_streak_mdd():
     assert m.get_sharpe_decay_multiplier() == pytest.approx(0.5)
     # min(1.0 streak, 1.0 mdd, 0.5 atr, 0.5 sharpe) = 0.5
     assert m.get_size_multiplier() == pytest.approx(0.5)
+
+
+# ── Cycle403 B(리스크): reset_daily() 복합 케이스 ────────────────────────────
+
+
+def test_reset_daily_does_not_clear_halt_level():
+    """reset_daily()는 WARNING만 해제하고 HALT 레벨은 해제하지 않는다."""
+    m = DrawdownMonitor(daily_limit=0.03, weekly_limit=0.07, monthly_limit=0.15)
+    m.set_weekly_start(10000)
+    m.set_daily_start(9400)   # 일일 기준 낮게 설정 — daily_dd < 3%
+    m.update(9200)            # 주간 8% 낙폭 → HALT
+    assert m.is_halted()
+    assert m.alert_level() == AlertLevel.HALT
+
+    m.reset_daily(9200)       # 일일 리셋 시도
+    # HALT는 reset_daily()로 해제 불가 — reset_weekly()만 가능
+    assert m.is_halted()
+    assert m.alert_level() == AlertLevel.HALT
+
+
+def test_reset_daily_none_state_updates_daily_start():
+    """halted=False(NONE) 상태에서 reset_daily()는 daily_start만 갱신하고 크래시 없음."""
+    m = DrawdownMonitor(daily_limit=0.03)
+    m.set_daily_start(10000)
+    m.update(9800)            # 2% 낙폭 — WARNING 미달
+
+    assert not m.is_halted()
+    m.reset_daily(9800)       # 경고 없는 상태에서 리셋
+
+    assert not m.is_halted()
+    assert m._daily_start == 9800  # 새 daily_start로 갱신됨
