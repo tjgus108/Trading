@@ -1731,3 +1731,56 @@ def test_trend_down_regime_does_not_change_daily_limit():
     m.set_regime("TREND_DOWN")
     m.update(9700)   # 3% 손실 ≥ 3% 한도 → WARNING
     assert m.alert_level() == AlertLevel.WARNING
+
+
+# ── Cycle411 B(리스크): transition_cushion + set_regime 복합 케이스 ──────────
+
+def test_transition_cushion_disabled_by_default_returns_one():
+    """transition_cushion_enabled=False(기본값) → confidence 무관하게 1.0 반환."""
+    m = DrawdownMonitor()
+    assert not m.transition_cushion_enabled
+    # confidence=0.0 (최저) 이어도 disabled이면 1.0
+    assert m.get_transition_cushion_multiplier(0.0) == pytest.approx(1.0)
+    assert m.get_transition_cushion_multiplier(0.5) == pytest.approx(1.0)
+    assert m.get_transition_cushion_multiplier(1.0) == pytest.approx(1.0)
+
+
+def test_transition_cushion_enabled_crisis_regime_compound():
+    """CRISIS 레짐 + transition_cushion 활성화 + 낮은 confidence → 일일 한도 강화 + cushion 0.5."""
+    m = DrawdownMonitor(
+        daily_limit=0.03,
+        transition_cushion_enabled=True,
+        transition_cushion_threshold=0.6,
+    )
+    m.set_daily_start(10000)
+    m.set_regime("CRISIS")
+    # CRISIS → 일일 한도 2%로 강화 (HIGH_VOL과 동일)
+    m.update(9810)   # 1.9% 손실 < 2% 한도 → NONE
+    assert m.alert_level() == AlertLevel.NONE
+    m.reset_daily(10000)
+    m.set_regime("CRISIS")
+    m.update(9790)   # 2.1% 손실 ≥ 2% 한도 → WARNING
+    assert m.alert_level() == AlertLevel.WARNING
+    # cushion: confidence=0.3 < threshold=0.6 → 0.5
+    assert m.get_transition_cushion_multiplier(0.3) == pytest.approx(0.5)
+    # cushion: confidence=0.7 ≥ threshold=0.6 → 1.0
+    assert m.get_transition_cushion_multiplier(0.7) == pytest.approx(1.0)
+
+
+def test_get_size_multiplier_atr_and_sharpe_decay_no_streak_mdd():
+    """ATR elevated(0.5) + Sharpe decay(0.5), streak/MDD 없음 → get_size_multiplier=0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.10, loss_streak_threshold=5)
+    m.update(10000)   # peak 설정
+    # MDD 없음: equity=9700 → 3% < mdd_warn_pct=10%
+    m.update(9700)
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    # streak 없음
+    assert m._consecutive_losses == 0
+    # ATR elevated
+    m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+    assert m.get_atr_vol_multiplier() == pytest.approx(0.5)
+    # Sharpe decay
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(0.5)
+    # min(1.0 streak, 1.0 mdd, 0.5 atr, 0.5 sharpe) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)

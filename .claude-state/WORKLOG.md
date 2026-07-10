@@ -1,3 +1,57 @@
+## [2026-07-10] Cycle 411 — B(리스크) + D(ML) + F(리서치)
+
+**[B(리스크)] DrawdownMonitor transition_cushion + set_regime 복합 케이스 3개** (+3)
+
+tests/test_drawdown_monitor.py (Cycle411 B):
+1. `test_transition_cushion_disabled_by_default_returns_one`: transition_cushion_enabled=False(기본) → confidence=0.0/0.5/1.0 전부 1.0 반환
+2. `test_transition_cushion_enabled_crisis_regime_compound`: CRISIS 레짐 + cushion 활성화 + confidence<threshold → 일일 한도 2% 강화 + cushion 0.5x 복합 검증
+3. `test_get_size_multiplier_atr_and_sharpe_decay_no_streak_mdd`: ATR elevated(0.5x) + Sharpe decay(0.5x), streak/MDD 없음 → get_size_multiplier()=min(1.0,1.0,0.5,0.5)=0.5
+
+**[D(ML)] optimize 함수 strategy_name + best_params 키 검증 3개** (+3)
+
+tests/test_phase_d.py (Cycle411 D, TestOptimizeFramaStrategyName):
+4. `test_optimize_frama_strategy_name_is_frama`: optimize_frama() → strategy_name == "frama"
+5. `test_optimize_dema_cross_best_params_contains_bb_width_min_filter`: optimize_dema_cross() best_params에 bb_width_min_filter 키 포함 검증
+6. `test_optimize_narrow_range_strategy_name_is_narrow_range`: optimize_narrow_range() → strategy_name == "narrow_range"
+
+**[F(리서치)] volume_breakout BTC 1h 구조적 한계 확정**
+
+분석 결과 (rank 6, BTC 1h, Sh=-0.74, Trades=72, MDD=22.1%):
+- paper_sim: Sh=-0.74, PF=0.96(**<1.0, 음의 엣지**), Trades=72, Consistency=0/8 → FAIL
+- 근본 원인 1: **손절 파라미터 없음** — `atr_mult` 등 SL 파라미터 미구현, BacktestEngine 기본 max_hold_candles=48h만으로 관리
+  → MDD 22.1% > 20% 한계 (x2 FAIL 이유)
+- 근본 원인 2: **_SPIKE_MULT=1.5 하드코딩** — RANGING(47.3%) BTC 1h에서 낮은 임계값 → 신호 빈발(Trades=72, avg 9/window)
+- 근본 원인 3: EMA50 추세 필터가 신호 조건이 아닌 **confidence 결정**에만 사용
+  → RANGING에서 BUY/SELL 신호 동등 발생 → 방향성 없는 노이즈 거래 과다
+- 파라미터 개선 방향 검토:
+  spike_mult=2.0 (1.5→2.0): Trades 감소 (72→~40), MDD 일부 개선 가능하나 PF<1.0 구조 유지
+  spike_mult=2.5+: Trades<15 위험
+  ema50 추세 필터를 신호 조건으로 이동: RANGING(47.3%) 전면 차단 → Trades 더 감소
+  SL 파라미터 추가: 코드 수정 필요, MDD 개선 불확실 (기존 Sh<0 = 손실 자체 문제)
+- **결론**: volume_breakout RANGING 47.3% BTC 1h에서 구조적 실패 확정. Sh=-0.74, PF=0.96, 0/8 Consistency.
+  - 하드코딩 파라미터: _SPIKE_MULT, _HIGH_CONF_MULT, _ATR_LOW/HIGH_PCT 모두 파라미터화 가능
+  - 단 PF<1.0 (음의 엣지) + SL 부재 + RANGING 환경 → 파라미터화로 해결 불가
+  - **추가 탐색 금지**. walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가.
+- **코드 수정**: walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 구조적 한계 주석 추가
+
+**시뮬레이션 결과 (Cycle 411)**
+
+1h Walk-Forward (기존 Cycle 410 보고서 유효, 파라미터 변경 없음):
+- 1h PASS: 1/19 (roc_ma_cross: Sh=1.81, PF=2.02, Trades=14, 4/8 Consistency)
+- 1h 2위: price_cluster (Sh=1.06, PF=1.32, 2/8 FAIL)
+- 1h 3위: dema_cross (Sh=0.85, PF=1.38, 2/8 FAIL)
+
+Bundle OOS 4h (기존 5/5 PASS 유지):
+- cmf: Sh=2.508, PF=1.387, PASS
+- order_flow_imbalance_v2: Sh=4.345, PF=1.941, PASS
+- supertrend_multi: Sh=3.892, PF=2.737, PASS
+- vwap_cross: Sh=3.047, PF=1.917, PASS
+- value_area: Sh=3.069, PF=1.771, PASS
+
+**테스트 현황**: 8644 passed, 23 skipped (+6 추가)
+
+---
+
 ## [2026-07-10] Cycle 410 — A(품질) + C(데이터) + F(리서치)
 
 **[A(품질)] BacktestEngine apply_wfe 미커버 브랜치 3개** (+3)
@@ -17261,6 +17315,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-10 00:19 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 05:11 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-10 05:11 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

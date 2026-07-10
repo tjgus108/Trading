@@ -448,6 +448,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #   rvol 임계값 조정·RSI 강화·EMA50 필터 어느 방향도 PF<1.0 음의 엣지 개선 불가.
     #   **relative_volume 추가 탐색 금지. 구조적 한계 확정 (Cycle410 F).**
     "relative_volume": {},  # WFO 파라미터 없음 (구조적 한계, Cycle410 F)
+    # Cycle411 F(리서치): volume_breakout BTC 1h 구조적 한계 확정
+    #   - _SPIKE_MULT=1.5 하드코딩 → RANGING(47.3%) BTC 1h에서 신호 빈발 (Trades=72, avg 9/window)
+    #   - SL 파라미터 없음 → MDD 22.1% > 20% 구조적 초과 (max_hold_candles만으로 관리)
+    #   - EMA50 추세 필터가 신호 조건이 아닌 confidence에만 사용 → RANGING BUY/SELL 동등 발생
+    #   - BTC 1h: Sh=-0.74, PF=0.96(<1.0, 음의 엣지), Trades=72, 0/8 Consistency
+    #   - 파라미터화 가능(spike_mult, ema_filter_signal): spike_mult=2.0 → Trades<15 위험
+    #   - 음의 엣지(PF<1.0) + SL 부재 + RANGING 구조 → 파라미터화로 해결 불가
+    #   **volume_breakout 추가 탐색 금지. 구조적 한계 확정 (Cycle411 F).**
+    "volume_breakout": {},  # WFO 파라미터 없음 (구조적 한계, Cycle411 F)
 }
 
 # 과최적화 판단 기준

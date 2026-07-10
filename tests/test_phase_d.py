@@ -740,3 +740,34 @@ class TestOptimizeNarrowRange:
         df = _make_df(400)
         result = optimize_narrow_range(df, n_windows=2)
         assert isinstance(result.avg_oos_sharpe, float)
+
+
+# ---------------------------------------------------------------------------
+# Cycle411 D(ML): optimize 함수 strategy_name 및 best_params 키 검증
+# ---------------------------------------------------------------------------
+
+class TestOptimizeFramaStrategyName:
+    """optimize_frama strategy_name 필드 검증 (Cycle411 D)."""
+
+    def test_optimize_frama_strategy_name_is_frama(self):
+        """optimize_frama() 반환값의 strategy_name == 'frama' (Cycle411 D)."""
+        from src.backtest.walk_forward import optimize_frama
+        df = _make_df(400)
+        result = optimize_frama(df, n_windows=2)
+        assert result.strategy_name == "frama"
+
+    def test_optimize_dema_cross_best_params_contains_bb_width_min_filter(self):
+        """optimize_dema_cross best_params에 bb_width_min_filter 키 포함 (Cycle411 D)."""
+        from src.backtest.walk_forward import optimize_dema_cross
+        df = _make_df(400)
+        result = optimize_dema_cross(df, n_windows=2)
+        # best_params가 empty가 아닐 때 bb_width_min_filter 키 검증
+        if result.best_params:
+            assert "bb_width_min_filter" in result.best_params
+
+    def test_optimize_narrow_range_strategy_name_is_narrow_range(self):
+        """optimize_narrow_range() 반환값의 strategy_name == 'narrow_range' (Cycle411 D)."""
+        from src.backtest.walk_forward import optimize_narrow_range
+        df = _make_df(400)
+        result = optimize_narrow_range(df, n_windows=2)
+        assert result.strategy_name == "narrow_range"

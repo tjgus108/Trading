@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-07-10 (Cycle 410 완료)_
+_Last updated: 2026-07-10 (Cycle 411 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 410
+### 이번 세션 완료 사이클: 411
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -15,31 +15,43 @@ _Last updated: 2026-07-10 (Cycle 410 완료)_
 | 408 | C+B+F | DataFeed ema200/bb_width/macd_hist 경계3개+DM size_multiplier 복합3개(+6→8648 총계, 8625 passed), **htf_ema 1h 구조적한계 확정**(Sh=-0.72, PF=0.91<1.0, iloc[::4] HTF 시뮬레이션 proxy 불정확), walk_forward.py DEFAULT_GRIDS["htf_ema"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 410 | A+C+F | apply_wfe 미커버3개+DataFeed 지표경계3개(+6→8661 총계, 8638 passed), **relative_volume 1h 구조적한계 확정**(Sh=-0.99, PF=0.92<1.0, RANGING 볼륨스파이크→즉각반전→음의엣지), walk_forward.py DEFAULT_GRIDS["relative_volume"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 411 | B+D+F | transition_cushion+set_regime 복합3개+optimize strategyname/bestparams3개(+6→8667 총계, 8644 passed), **volume_breakout 1h 구조적한계 확정**(Sh=-0.74, PF=0.96<1.0, SL부재+spike1.5x과다+RANGING), walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 411 작업 방향 (411 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 412 작업 방향 (412 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스
+#### B(리스크): CircuitBreaker 미커버 시나리오 또는 DrawdownMonitor 추가
 
-- **배경**: 리스크 카테고리 로테이션 (Cycle410 이후)
-- **작업 방향**: `tests/test_drawdown_monitor.py` 또는 `tests/test_circuit_breaker.py`
-  - DrawdownMonitor transition_cushion 또는 set_regime 복합 케이스 추가
-  - CircuitBreaker 미커버 시나리오 검토
+- **배경**: 리스크 카테고리 로테이션 (Cycle411 B 완료 후)
+- **작업 방향**: `tests/test_circuit_breaker.py` 또는 `tests/test_drawdown_monitor.py`
+  - CircuitBreaker 미커버 시나리오: max_daily_trades + consecutive_loss 복합 케이스
+  - DrawdownMonitor: rolling_mdd 또는 trailing_stop_signal 미커버 케이스 검토
 
-#### D(ML): select_features_pfi 또는 ML 파이프라인 미커버 케이스
+#### D(ML): ML 파이프라인 추가 미커버 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle410 이후)
+- **배경**: ML 카테고리 로테이션 (Cycle411 D 완료 후)
 - **작업 방향**: `tests/test_ml_pipeline_edge_cases.py` 또는 `tests/test_phase_d.py`
-  - select_features_pfi threshold/empty 시나리오 추가
-  - optimize_frama 또는 optimize_dema_cross 미커버 타입 검토
+  - WalkForwardTrainer.train() feature_selection=True 경로 엣지케이스
+  - optimize_frama 또는 optimize_roc_ma_cross 추가 미커버 필드 검토
 
-#### F(리서치): volume_breakout BTC 1h 구조 분석
+#### F(리서치): momentum_quality BTC 1h 구조 분석
 
-- **배경**: Cycle410 F에서 relative_volume 구조적 한계 확정
-- **작업 방향**: 1h composite score rank 6 미탐색 후보
-  - `volume_breakout` (rank 6, BTC 1h Sh=-0.74, Trades=72): 볼륨 브레이크아웃 구조 분석
-    - MDD 문제: max_drawdown 22.1% > 20% (x2 fail) — 손절이 너무 넓거나 없음
-    - Trades=72 (avg 9/window) — 거래 빈도 높음, 신호 조건 완화 여부 검토
-    - RANGING 47.3% → 볼륨 브레이크아웃 후 즉각 반전 패턴인지 분석 필요
+- **배경**: Cycle411 F에서 volume_breakout 구조적 한계 확정
+- **작업 방향**: 1h composite score rank 10 → rank 분석
+  - `momentum_quality` (rank 10, BTC 1h Sh=-1.19, Trades=71): 모멘텀 품질 전략 구조 분석
+    - Consistency=1/8 → 구조적 실패 패턴 확인
+    - quality_score_buy_threshold=0.8, consistency_buy_threshold=0.3 파라미터화 검토
+    - RANGING 47.3% → 모멘텀 신호 과다 여부 분석
+
+### ⚠️ 주의 사항 (Cycle 411 이후)
+
+- **volume_breakout 탐색 완전 보류** (Cycle411 F):
+  - _SPIKE_MULT=1.5 하드코딩 → RANGING(47.3%) BTC 1h에서 신호 빈발 (Trades=72)
+  - SL 파라미터 없음 → MDD 22.1% > 20% 구조적 초과 (BacktestEngine max_hold_candles만으로 관리)
+  - EMA50 추세 필터가 confidence에만 사용 (신호 차단 불가) → RANGING BUY/SELL 동등 발생
+  - BTC 1h Sh=-0.74, PF=0.96(**<1.0, 음의 엣지**), Trades=72, 0/8 Consistency
+  - 파라미터화 방향: spike_mult=2.0 → Trades<15 위험, SL 추가 → 음의 엣지 구조 미해결
+  - **결론**: RANGING 47.3% BTC 1h에서 구조적 실패. 추가 탐색 금지.
+  - walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가 (구조적 한계 주석)
 
 ### ⚠️ 주의 사항 (Cycle 410 이후)
 
@@ -295,9 +307,9 @@ _Last updated: 2026-07-10 (Cycle 410 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 410 업데이트)
+### 핵심 메트릭 (Cycle 411 업데이트)
 
-| 지표 | Cycle 409 | Cycle 410 | 변화 |
+| 지표 | Cycle 410 | Cycle 411 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -308,6 +320,7 @@ _Last updated: 2026-07-10 (Cycle 410 완료)_
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
 | 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
+| 1h BTC volume_breakout Sharpe | -0.74 | **-0.74** | 구조적 실패 확정 |
 | 1h BTC relative_volume Sharpe | -0.99 | **-0.99** | 구조적 실패 확정 |
 | 1h BTC price_action_momentum Sharpe | -1.08 | **-1.08** | 구조적 실패 확정 |
 | 1h BTC frama Trades | 65 | **65** | 유지 (탐색 종료) |
@@ -317,8 +330,8 @@ _Last updated: 2026-07-10 (Cycle 410 완료)_
 | frama WFO combos | 27 | **27** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 (passed) | 8632개 | **8638개 passed** | +6 추가 |
-| 테스트 수 (총계) | 8655개 | **8661개 총계** (+6) | +6 추가 |
+| 테스트 수 (passed) | 8638개 | **8644개 passed** | +6 추가 |
+| 테스트 수 (총계) | 8661개 | **8667개 총계** (+6) | +6 추가 |
 
 ### Cycle 397 코드 변경 요약
 
