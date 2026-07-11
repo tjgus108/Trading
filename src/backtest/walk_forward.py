@@ -333,6 +333,15 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   결론: vol_ratio_min 하향(1.1) 역효과(Cycle382) 이미 확인. 새 방향 탐색 필요.
         #   → ATR expand filter 탐색 (Cycle385 F): dead param 확정 (Consistency 4/8→2/8 역효과)
         #   교훈: roc_ma_cross는 추가 signal filter 금지 — Trades=14 경계선에서 어떤 추가 필터도 역효과
+        # Cycle416 F(리서치): roc_ma_cross AvgTrades=14 경계 구조적 분석
+        #   PASS 4/8 윈도우: 2023 Q4(BTC 27k→44k 상승) + 2024 Q1(44k→73k 상승) — 볼륨 스파이크 동반
+        #     → vol_ratio≥1.2 충족 신호 빈발 → Trades≥15 달성
+        #   FAIL 4/8 윈도우: 2023 H1(15k→30k 저거래량 회복) + 2024 Q2(73k→65k 조정)
+        #     → vol_ratio at signals=0.89-0.97(<1.2) → 대부분 차단 → Trades=10-12 (경계 미달)
+        #   AvgTrades=14 ceiling 원인: BTC 1h 60d 윈도우 × vol_ratio_min=1.2 필터 = ~10% 통과율
+        #   **결론**: AvgTrades=14는 구조적 ceiling. PASS 윈도우는 BTC 상승/급등 국면 한정.
+        #     vol_ratio 조정 불가(1.1→Consist=2/8 Cycle382), 필터 추가 불가(모두 역효과 확인)
+        #     현재 4/8 Consistency가 1h BTC vol_ratio=1.2 조합의 구조적 최적점. 추가 탐색 종료.
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)

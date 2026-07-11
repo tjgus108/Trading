@@ -1860,3 +1860,71 @@ def test_kelly_fraction_multiplier_and_mdd_warn_compound():
     assert m.get_mdd_level() == MddLevel.WARN
     # get_mdd_size_multiplier: WARN → 0.5
     assert m.get_mdd_size_multiplier() == pytest.approx(0.5)
+
+
+# ── Cycle416 B(리스크): kelly_fraction+sharpe_decay 복합, streak+sharpe_decay 복합 ──
+
+
+def test_kelly_fraction_and_sharpe_decay_compound():
+    """kelly_fraction_multiplier(0.5) + sharpe_decay(0.5) 동시 활성화.
+
+    kelly_fraction_multiplier는 get_size_multiplier()와 독립(포트폴리오 배분 레이어).
+    sharpe_decay는 get_size_multiplier()에 포함 → size_mult=0.5, kelly=0.5 각자 독립.
+    """
+    m = DrawdownMonitor(
+        mdd_warn_pct=0.10,
+        mdd_block_pct=0.15,
+        kelly_reduce_at_mdd=0.08,
+    )
+    m.update(10000)
+    m.update(9100)  # 9% MDD → kelly_reduce_at_mdd(8%) 초과 → kelly=0.5; WARN(10%) 미달 → mdd_size=1.0
+    assert m.get_kelly_fraction_multiplier() == pytest.approx(0.5)
+    assert m.get_mdd_size_multiplier() == pytest.approx(1.0)
+    # sharpe decay 활성화
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(0.5)
+    # get_size_multiplier: min(1.0 streak, 1.0 mdd, 1.0 atr, 0.5 sharpe_decay) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+    # kelly는 get_size_multiplier와 독립 — 둘 다 0.5이나 별개 축소
+    assert m.get_kelly_fraction_multiplier() == pytest.approx(0.5)
+
+
+def test_streak_and_sharpe_decay_no_mdd_atr():
+    """streak(0.5, consecutive_losses >= threshold) + sharpe_decay(0.5), MDD/ATR 정상 → get_size_multiplier=0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.20, loss_streak_threshold=3)
+    m.update(10000)
+    # streak 활성: 3연속 손실
+    m.record_trade_result(pnl=-10.0, equity=9990)
+    m.record_trade_result(pnl=-10.0, equity=9980)
+    m.record_trade_result(pnl=-10.0, equity=9970)
+    assert m._consecutive_losses >= 3
+    # MDD: 0.3% < mdd_warn_pct(20%) → NORMAL
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    # ATR: 기본값 1.0 (정상)
+    assert m.get_atr_vol_multiplier() == pytest.approx(1.0)
+    # sharpe decay 활성
+    m.set_sharpe_decay(recent_sharpe=0.1, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(0.5)
+    # get_size_multiplier: min(0.5 streak, 1.0 mdd, 1.0 atr, 0.5 sharpe_decay) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+
+
+def test_sharpe_decay_recovery_while_high_vol_daily_limit_remains():
+    """HIGH_VOL 레짐 유지 + sharpe_decay 회복 → size_mult 복원(1.0), 일일 한도는 HIGH_VOL 유지(2%)."""
+    m = DrawdownMonitor(
+        daily_limit=0.03,
+        mdd_warn_pct=0.20,
+    )
+    m.set_daily_start(10000)
+    m.set_regime("HIGH_VOL")
+    # sharpe decay 활성
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(0.5)
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+    # sharpe decay 회복 → size_mult 복원
+    m.set_sharpe_decay(recent_sharpe=0.8, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(1.0)
+    assert m.get_size_multiplier() == pytest.approx(1.0)
+    # HIGH_VOL 레짐은 여전히 활성 → 일일 한도 2% 유지
+    m.update(9800)  # 2% 손실 ≥ HIGH_VOL 한도(2%) → WARNING
+    assert m.alert_level() == AlertLevel.WARNING

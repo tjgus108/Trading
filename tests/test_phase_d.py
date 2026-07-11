@@ -831,3 +831,62 @@ class TestOptimizeDonchian:
         df = _make_df(400)
         result = optimize_donchian(df, n_windows=2)
         assert result.oos_sharpe_std >= 0.0
+
+    def test_optimize_donchian_best_params_is_dict(self):
+        """optimize_donchian() best_params가 dict 타입이고, 비어있지 않으면 'channel_period' 포함 (Cycle416 D)."""
+        from src.backtest.walk_forward import optimize_donchian
+        df = _make_df(1500)
+        result = optimize_donchian(df, n_windows=2)
+        assert isinstance(result.best_params, dict)
+        if result.best_params:
+            assert "channel_period" in result.best_params
+
+    def test_optimize_donchian_avg_oos_sharpe_is_float(self):
+        """optimize_donchian() avg_oos_sharpe가 float 타입 (Cycle416 D)."""
+        from src.backtest.walk_forward import optimize_donchian
+        df = _make_df(400)
+        result = optimize_donchian(df, n_windows=2)
+        assert isinstance(result.avg_oos_sharpe, float)
+
+
+# ── Cycle416 D(ML): select_features_pfi 반환값 검증 ──────────────────────────
+
+
+class TestSelectFeaturesPfiOutputValidation:
+    """select_features_pfi 반환 피처명 검증 (Cycle416 D)."""
+
+    def _make_trainer(self):
+        from src.ml.trainer import WalkForwardTrainer
+        return WalkForwardTrainer(symbol="TEST/USDT", n_estimators=5, max_depth=2)
+
+    def _make_clf(self, X, y):
+        from sklearn.ensemble import RandomForestClassifier
+        clf = RandomForestClassifier(n_estimators=5, max_depth=2, random_state=42)
+        clf.fit(X, y)
+        return clf
+
+    def test_select_features_pfi_all_from_input_columns(self):
+        """반환된 피처명이 모두 X_train.columns 내에 있어야 한다 (Cycle416 D)."""
+        import numpy as np
+        trainer = self._make_trainer()
+        rng = np.random.RandomState(10)
+        n = 120
+        feat_names = ["rsi", "ema20", "volume", "atr", "bb_width"]
+        X = pd.DataFrame({f: rng.randn(n) for f in feat_names})
+        y = pd.Series(rng.choice([0, 1], size=n))
+        clf = self._make_clf(X, y)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=3)
+        for feat in selected:
+            assert feat in feat_names, f"반환된 피처 '{feat}'가 입력 컬럼에 없음"
+
+    def test_select_features_pfi_no_duplicates(self):
+        """반환된 피처 목록에 중복이 없어야 한다 (Cycle416 D)."""
+        import numpy as np
+        trainer = self._make_trainer()
+        rng = np.random.RandomState(11)
+        n = 150
+        X = pd.DataFrame({f"f{i}": rng.randn(n) for i in range(6)})
+        y = pd.Series(rng.choice([0, 1], size=n))
+        clf = self._make_clf(X, y)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=4)
+        assert len(selected) == len(set(selected)), "중복 피처 반환됨"

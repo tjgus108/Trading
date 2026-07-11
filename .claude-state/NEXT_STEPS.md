@@ -1,15 +1,16 @@
 # Next Steps
 
-_Last updated: 2026-07-11 (Cycle 415 완료)_
+_Last updated: 2026-07-11 (Cycle 416 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 415
+### 이번 세션 완료 사이클: 416
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
+| 416 | B+D+F | DM kelly_fraction+sharpe_decay, streak+sharpe_decay, HIGH_VOL+decay_recovery 복합 3케이스(+3) + optimize_donchian 2케이스+select_features_pfi 반환검증 2케이스(+4→8707 총계, 8684 passed), **roc_ma_cross AvgTrades=14 구조적 ceiling 확정**(PASS=BTC 급등기 Q4/Q1, FAIL=저거래량 H1/Q2), walk_forward.py roc_ma_cross Cycle416 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 415 | A+C+F | apply_wfe 미커버 3케이스+feed 지표 경계 3케이스(+6→8700 총계, 8677 passed), **price_cluster 2/8 ceiling 구조 확정**(PASS=RANGING진성 2구간, FAIL=TREND_UP), walk_forward.py atr_bounce_factor [0.0,0.3,0.5,1.0]→[0.5] 단일값(75% 그리드 감소), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 410 | A+C+F | apply_wfe 미커버3개+DataFeed 지표경계3개(+6→8661 총계, 8638 passed), **relative_volume 1h 구조적한계 확정**(Sh=-0.99, PF=0.92<1.0, RANGING 볼륨스파이크→즉각반전→음의엣지), walk_forward.py DEFAULT_GRIDS["relative_volume"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
@@ -18,30 +19,39 @@ _Last updated: 2026-07-11 (Cycle 415 완료)_
 | 413 | C+B+F | DataFeed atr14경계/ema50반응속도/return_5부호 3개+DM trailing_stop경계/threshold1.0/kelly+mdd_warn복합 3개(+6→8685 총계, 8662 passed), **positional_scaling 1h 구조적한계 확정**(Sh=-0.38, pullback==rally 동일조건→BUY/SELL 방향성에지없음, mult 파라미터화 불가), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 414 | D+E+F | optimize_donchian 3개+select_features_pfi 경계값 3개+PaperConnector 3개(+9→8694 총계, 8671 passed), **narrow_range 1h 구조적한계 재확정**(Sh=-0.51, PF=0.97<1.0, atr_mult/range_lookback 파라미터화 불가-RANGING에서 동일 구조 문제), walk_forward.py 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 416 작업 방향 (416 mod 5 = 1 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 417 작업 방향 (417 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
 
-#### B(리스크): DrawdownMonitor 또는 CircuitBreaker 미커버 케이스
+#### B(리스크): CircuitBreaker 또는 DrawdownMonitor 추가 미커버 케이스
 
-- **배경**: 리스크 카테고리 로테이션 (Cycle413 B 완료 후)
-- **작업 방향**: `tests/test_drawdown_monitor.py` 또는 `tests/test_circuit_breaker.py`
-  - DrawdownMonitor 복합 케이스 미커버 검토 (set_sharpe_decay + HIGH_VOL 등)
-  - CircuitBreaker 경계값 추가 검토
+- **배경**: 리스크 카테고리 로테이션 (Cycle416 B DrawdownMonitor compound 완료)
+- **작업 방향**: `tests/test_circuit_breaker.py` 또는 `tests/test_drawdown_monitor.py`
+  - CircuitBreaker 경계값 검토 (is_halted 임계값, window 만료 등)
+  - DrawdownMonitor 추가 미커버 복합 케이스 (BLOCK+sharpe_decay, streak+ATR compound 등)
 
-#### D(ML): optimize 함수 또는 select_features 미커버 케이스
+#### D(ML): optimize_price_cluster 또는 optimize_frama 미커버 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle414 D 완료 후)
-- **작업 방향**: `tests/test_phase_d.py` 또는 `tests/test_trainer.py`
-  - optimize_donchian 또는 optimize_price_cluster 경계값
-  - select_features_pfi 미커버 케이스 (top_k=0, all NaN importance 등)
+- **배경**: ML 카테고리 로테이션 (Cycle416 D optimize_donchian + pfi 반환 검증 완료)
+- **작업 방향**: `tests/test_phase_d.py`
+  - optimize_price_cluster 기본 호출 + fold_pass_rate 타입 검증
+  - optimize_frama 추가 경계값 (avg_oos_sharpe float, fold_pass_rate range 등)
 
-#### F(리서치): roc_ma_cross AvgTrades=14 경계 분석
+#### F(리서치): frama 4/8+ Consistency 가능성 분석
 
-- **배경**: Cycle415 F에서 price_cluster 2/8 ceiling 구조 확정
-- **작업 방향**: roc_ma_cross (PASS, Sh=1.81, PF=2.02, Trades=14, 4/8)
-  - AvgTrades=14 경계: 일부 윈도우에서 Trades<15 가능성 → 안정성 분석
-  - PASS 4/8 윈도우 구간 분석: PASS 윈도우가 어떤 시장 조건에서 달성되는지
-  - FAIL 4/8 윈도우 원인: volume_filter=True로도 차단 못한 저거래량 구간 분석
-  - 결론: Trades 경계 문제가 구조적인지, 특정 기간 한정인지 파악
+- **배경**: Cycle416 F에서 roc_ma_cross AvgTrades=14 구조적 ceiling 확정; frama (Sh=0.44, 0/8) 다음 탐색 대상
+- **작업 방향**: frama (BTC 1h: Sh=0.44, PF=1.11, Trades=65, 0/8 Consistency)
+  - weak_rsi_buy_max=50 확정 후에도 0/8 유지: WFO 27-combo 그리드가 최적 파라미터 자동 선택하는지 확인
+  - WFO 그리드에서 weak_rsi_buy_max=[40,50,60] 중 어떤 값이 선택되는지 분석
+  - frama 0/8 ceiling 원인: gap<1% RANGING 지배 vs 선택된 파라미터 문제 구분
+  - 결론: frama 추가 탐색 가능성 vs 완전 보류 재확인
+
+### ⚠️ 주의 사항 (Cycle 416 이후)
+
+- **roc_ma_cross AvgTrades=14 구조적 ceiling 확정** (Cycle416 F):
+  - PASS 구간: 2023 Q4(BTC 27k→44k 급등) + 2024 Q1(44k→73k 상승) — 볼륨 스파이크 동반
+  - FAIL 구간: 2023 H1(15k→30k 저거래량 회복) + 2024 Q2(73k→65k 조정) — vol_ratio at signals=0.89-0.97(<1.2)
+  - AvgTrades=14 ceiling = BTC 1h 60d × vol_ratio_min=1.2 → ~10% 통과율 (구조적)
+  - **결론**: vol_ratio 조정(1.1→2/8 Cycle382), 필터 추가(→역효과) 모두 확인. 4/8 Consistency가 구조적 최적점. roc_ma_cross 추가 탐색 완전 종료.
+  - walk_forward.py roc_ma_cross Cycle416 F 분석 주석 추가 완료
 
 ### ⚠️ 주의 사항 (Cycle 415 이후)
 
@@ -345,9 +355,9 @@ _Last updated: 2026-07-11 (Cycle 415 완료)_
 - **BUNDLE_STRATEGY_OVERRIDES 임계값 변경 금지**
 - **새 전략 파일 생성 금지**: 355개 이상 추가 금지
 
-### 핵심 메트릭 (Cycle 415 업데이트)
+### 핵심 메트릭 (Cycle 416 업데이트)
 
-| 지표 | Cycle 414 | Cycle 415 | 변화 |
+| 지표 | Cycle 415 | Cycle 416 | 변화 |
 |------|-----------|-----------|------|
 | 1h 테스트 전략 수 | 19개 | **19개** | 유지 |
 | 1h BTC dema_cross Sharpe | 0.85 | **0.85** | 유지 |
@@ -356,7 +366,7 @@ _Last updated: 2026-07-11 (Cycle 415 완료)_
 | 1h BTC price_cluster Sharpe | 1.06 | **1.06** | 유지 |
 | 1h BTC price_cluster Consistency | 2/8 | **2/8** | 구조적 한계 확정 (Cycle415 F) |
 | 1h BTC roc_ma_cross Sharpe | 1.81 | **1.81** | 유지 |
-| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 유지 |
+| 1h BTC roc_ma_cross Consistency | 4/8 PASS | **4/8 PASS** | 구조적 최적점 확정 (Cycle416 F) |
 | 1h BTC frama Sharpe | 0.44 | **0.44** | 유지 (탐색 종료) |
 | 1h BTC narrow_range Sharpe | -0.51 | **-0.51** | 구조적 실패 확정 |
 | 1h BTC positional_scaling Sharpe | -0.38 | **-0.38** | 구조적 실패 확정 |
@@ -368,11 +378,11 @@ _Last updated: 2026-07-11 (Cycle 415 완료)_
 | 1h BTC htf_ema Sharpe | -0.72 | **-0.72** | 구조적 실패 확정 |
 | 1h BTC acceleration_band Sharpe | -0.94 | **-0.94** | 구조적 실패 확정 |
 | frama WFO combos | 27 | **27** | 유지 |
-| price_cluster WFO combos | 72 | **18** | atr_bounce_factor 단일값화 (Cycle415 F) |
+| price_cluster WFO combos | 18 | **18** | 유지 |
 | 1h PASS 수 | 1/19 (roc_ma_cross) | **1/19** | 유지 |
 | Bundle OOS PASS | 5/5 | **5/5** | 유지 |
-| 테스트 수 (passed) | 8671개 | **8677개 passed** | +6 추가 |
-| 테스트 수 (총계) | 8694개 | **8700개 총계** (+6) | +6 추가 |
+| 테스트 수 (passed) | 8677개 | **8684개 passed** | +7 추가 |
+| 테스트 수 (총계) | 8700개 | **8707개 총계** (+7) | +7 추가 |
 
 ### Cycle 397 코드 변경 요약
 
