@@ -277,8 +277,16 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         # 결론: factor=0.5가 Sharpe/안정성 최적. Consistency ceiling=2/8 돌파 불가.
         # → price_cluster 1h BTC 최적화 완전 종료. 추가 atr_bounce_factor 실험 금지.
         # paper_sim 확정 파라미터: factor=0.5 (Sh=1.06, SharpeStd=1.67)
-        "atr_bounce_factor": [0.0, 0.3, 0.5, 1.0],
+        # Cycle415 F(리서치): WFO 그리드에서 DEAD 값 제거 (0.0, 0.3, 1.0 → 단일값 0.5)
+        #   탐색 종료 후 72 combos→18 combos (75% 감소), IS 최적화 속도 개선
+        "atr_bounce_factor": [0.5],
         # Cycle384: rsi_oversold_filter DEAD (0 trades). 그리드에서 제거됨.
+        # Cycle415 F(리서치): price_cluster 2/8 Consistency ceiling 구조적 원인 확정
+        #   PASS 구간: 2023 Q2(BTC 25k-31k 횡보) + 2023 Q4(Oct 펌프 이후 공고화) — 진성 RANGING
+        #   FAIL 구간: 2023 H1 강한 상승(15k→30k), 2024 H1 강한 상승(40k→60k) — TREND_UP
+        #   vol_regime_filter=True 적용에도 TREND_UP 일부 구간 신호 발생 → PF<1.5
+        #   결론: RANGING 47.3% BTC 1h에서 cluster bounce는 2/8 ceiling이 구조적 한계
+        #   추가 파라미터 탐색 완전 종료. 이 전략은 보조 전략(roc_ma_cross 비활성 시)으로 보존.
     },
     # Cycle 326 D(ML): roc_ma_cross 1h WFO 그리드
     # 현재 상태: rank1(2/8 consistency), Sharpe=0.34, SharpeStd=2.44 — FAIL (mc_p=0.485)

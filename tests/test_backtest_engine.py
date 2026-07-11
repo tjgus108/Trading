@@ -1193,6 +1193,40 @@ def test_apply_wfe_zero_is_positive_oos_gives_one():
 
 
 # ---------------------------------------------------------------------------
+# Cycle415 A(품질): apply_wfe 미커버 3케이스
+# ---------------------------------------------------------------------------
+
+
+def test_apply_wfe_below_min_wfe_sets_fail_and_not_passed():
+    """IS>0, 0 < wfe < MIN_WFE(0.5) → fail_reasons에 wfe 메시지 추가 + passed=False."""
+    result = _make_result(sharpe=0.6)  # OOS=0.6
+    BacktestEngine.apply_wfe(result, is_sharpe=2.0)  # wfe=0.3 < 0.5
+    assert result.wfe == pytest.approx(0.3, abs=1e-4), f"wfe=0.3 기대: {result.wfe}"
+    assert result.passed is False, "wfe<MIN_WFE → passed=False 기대"
+    assert any("wfe" in r for r in result.fail_reasons), (
+        f"fail_reasons에 wfe 메시지 없음: {result.fail_reasons}"
+    )
+
+
+def test_apply_wfe_is_exactly_neg1_boundary_gives_wfe1():
+    """IS=-1.0 경계값 → is_sharpe < -1.0 이 False → 소폭 음수 브랜치 → wfe=1.0."""
+    result = _make_result(sharpe=1.0)  # OOS > 0
+    BacktestEngine.apply_wfe(result, is_sharpe=-1.0)  # IS=-1.0, not < -1.0
+    assert result.wfe == pytest.approx(1.0, abs=1e-4), (
+        f"IS=-1.0(경계), OOS=1.0 → wfe=1.0 기대: {result.wfe}"
+    )
+
+
+def test_apply_wfe_oos_exactly_1p5_when_is_strong_neg_gives_zero():
+    """IS<-1.0, OOS=1.5 정확히 → OOS > 1.5 False → wfe=0.0 (강한 역방향)."""
+    result = _make_result(sharpe=1.5)  # OOS = 1.5 (not > 1.5)
+    BacktestEngine.apply_wfe(result, is_sharpe=-2.0)  # IS < -1.0
+    assert result.wfe == pytest.approx(0.0, abs=1e-4), (
+        f"IS=-2.0, OOS=1.5(경계) → wfe=0.0 기대: {result.wfe}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cycle405 A(품질): 극단 슬리피지/커미션 엣지케이스
 # ---------------------------------------------------------------------------
 

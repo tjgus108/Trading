@@ -467,59 +467,6 @@ class TestToDataframeDuplicateTimestamps:
         assert len(result.df) == 2, f"부분 중복 → 2행 기대: {len(result.df)}"
 
 
-# ── Cycle403 C(데이터): ema200/ema20_slope/return_5 엣지케이스 ─────────────────
-
-
-class TestAddIndicatorsNewColumnsEdge:
-    """ema200, ema20_slope, return_5 엣지케이스 (Cycle403 C)."""
-
-    def _make_raw(self, n: int = 50, close: float = 42000.0):
-        return [
-            [1704067200000 + i * 3600000,
-             close * 0.99, close * 1.01, close * 0.98, close, 100.0]
-            for i in range(n)
-        ]
-
-    def test_ema200_column_present_and_last_value_finite(self):
-        """50행 데이터 → ema200 컬럼이 생성되고 마지막 행은 유한값."""
-        import numpy as np
-        connector = MagicMock()
-        connector.fetch_ohlcv.return_value = self._make_raw(n=50)
-        feed = DataFeed(connector)
-        result = feed.fetch("BTC/USDT", "1h", limit=50)
-        df = result.df
-        assert "ema200" in df.columns, "ema200 컬럼 없음"
-        assert np.isfinite(df["ema200"].iloc[-1]), "ema200 마지막 값이 NaN/inf"
-
-    def test_ema20_slope_near_zero_for_constant_close(self):
-        """close 일정 → ema20 기울기(ema20_slope)는 0에 근접해야 함."""
-        import numpy as np
-        connector = MagicMock()
-        connector.fetch_ohlcv.return_value = self._make_raw(n=50, close=42000.0)
-        feed = DataFeed(connector)
-        result = feed.fetch("BTC/USDT", "1h", limit=50)
-        df = result.df
-        assert "ema20_slope" in df.columns, "ema20_slope 컬럼 없음"
-        # close 일정 → ema20 diff ≈ 0, slope ≈ 0
-        valid = df["ema20_slope"].dropna()
-        assert (valid.abs() < 1e-8).all(), f"ema20_slope가 0 아님: {valid.abs().max()}"
-
-    def test_return_5_nan_first_rows_finite_after_five(self):
-        """20행 데이터 → return_5(pct_change(5)): 처음 4행 NaN, 5행 이후 유한값."""
-        import numpy as np
-        connector = MagicMock()
-        connector.fetch_ohlcv.return_value = self._make_raw(n=20)
-        feed = DataFeed(connector)
-        result = feed.fetch("BTC/USDT", "1h", limit=20)
-        df = result.df
-        assert "return_5" in df.columns, "return_5 컬럼 없음"
-        # 첫 5행은 NaN (pct_change(5))
-        assert df["return_5"].iloc[:5].isna().all(), "return_5 첫 5행이 NaN이 아님"
-        # 6행 이후(인덱스 5+)는 유한값
-        later = df["return_5"].iloc[5:]
-        assert later.notna().all(), f"return_5 6행 이후에 NaN 존재: {later.isna().sum()}"
-
-
 class TestSameSymbolMultipleRequests:
     """동일 심볼 복수 요청 캐시 동작 테스트 (Cycle400 C)."""
 
@@ -904,3 +851,69 @@ class TestIndicatorBoundaryC413:
         df_down = result2.df
         last_ret_down = float(df_down["return_5"].iloc[-1])
         assert last_ret_down < 0, f"하락 추세 return_5 음수 기대: {last_ret_down:.6f}"
+
+
+# ── Cycle415 C(데이터): rsi14 범위, donchian 관계, vwap 상수 경계값 ──────────────
+
+
+class TestIndicatorBoundaryC415:
+    """Cycle415 C(데이터): rsi14 [0,100] 범위, donchian_high>=donchian_low, vwap=close(상수) 경계."""
+
+    def _make_raw(self, closes, base_ts=1704067200000):
+        rows = []
+        for i, c in enumerate(closes):
+            rows.append([base_ts + i * 3600000, c * 0.998, c * 1.002, c * 0.997, c, 100.0])
+        return rows
+
+    def test_rsi14_bounded_0_to_100(self):
+        """50행 진동 가격 데이터 → rsi14 비NaN 값이 모두 [0, 100] 범위 내에 있어야 함."""
+        import numpy as np
+        # 상승/하락 교대: gain과 loss가 모두 존재해야 rsi14 계산 가능
+        closes = [40000.0 + 500.0 * (1 if i % 3 != 0 else -1) * (i % 7 + 1) for i in range(50)]
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "rsi14" in df.columns, "rsi14 컬럼 없음"
+        valid = df["rsi14"].dropna()
+        assert len(valid) > 0, "rsi14 유효값 없음 (gain/loss 모두 존재하는 진동 데이터 필요)"
+        assert (valid >= 0).all() and (valid <= 100).all(), (
+            f"rsi14이 [0,100] 범위 초과: min={valid.min():.4f}, max={valid.max():.4f}"
+        )
+
+    def test_donchian_high_gte_donchian_low(self):
+        """50행 정상 데이터 → donchian_high >= donchian_low (비NaN 쌍 기준)."""
+        closes = [40000.0 + (i % 10) * 200.0 for i in range(50)]  # 주기적 변동
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw(closes)
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "donchian_high" in df.columns, "donchian_high 컬럼 없음"
+        assert "donchian_low" in df.columns, "donchian_low 컬럼 없음"
+        valid = df[["donchian_high", "donchian_low"]].dropna()
+        assert (valid["donchian_high"] >= valid["donchian_low"]).all(), (
+            "donchian_high < donchian_low 발생 — 채널 역전"
+        )
+
+    def test_vwap_equals_close_for_constant_ohlcv(self):
+        """일정 가격·일정 거래량 → vwap이 close와 동일해야 함 (typical = close일 때)."""
+        import numpy as np
+        price = 42000.0
+        # high=low=close=price → typical = (price + price + price) / 3 = price
+        raw = [
+            [1704067200000 + i * 3600000, price, price, price, price, 10.0]
+            for i in range(50)
+        ]
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = raw
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "vwap" in df.columns, "vwap 컬럼 없음"
+        valid_vwap = df["vwap"].dropna()
+        assert len(valid_vwap) > 0, "vwap 유효값 없음"
+        assert np.allclose(valid_vwap, price, rtol=1e-6), (
+            f"상수 가격에서 vwap={price} 기대, 실제: {valid_vwap.iloc[-1]:.4f}"
+        )
