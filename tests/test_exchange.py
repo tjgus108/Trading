@@ -1251,3 +1251,37 @@ class TestPaperConnectorCycle409:
         order = pc.create_order("BTC/USDT", "buy", 2.0, price=10000.0)
         assert order["status"] == "closed"
         assert order["remaining"] == pytest.approx(0.0, abs=1e-9)
+
+
+class TestPaperConnectorCycle414:
+    """Cycle 414 E(실행): PaperConnector 미커버 케이스."""
+
+    def _make_pc(self, initial: float = 50000.0) -> PaperConnector:
+        return PaperConnector(
+            symbol="BTC/USDT", initial_balance=initial,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+
+    def test_partial_sell_leaves_remaining_position(self):
+        """buy 1.0 → sell 0.5 → open_positions['BTC/USDT'] == 0.5 (Cycle414 E)."""
+        pc = self._make_pc(initial=50000.0)
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        pc.create_order("BTC/USDT", "sell", 0.5, price=11000.0)
+        summary = pc.get_paper_summary()
+        qty = summary.get("open_positions", {}).get("BTC/USDT", 0.0)
+        assert qty == pytest.approx(0.5, abs=1e-9)
+
+    def test_fetch_balance_used_reflects_open_position(self):
+        """buy 후 fetch_balance()['used'] > 0 (open position value 반영) (Cycle414 E)."""
+        pc = self._make_pc(initial=50000.0)
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        balance = pc.fetch_balance()
+        assert balance["used"] > 0
+
+    def test_fetch_balance_total_equals_free_plus_used(self):
+        """fetch_balance()['total'] == free + used (Cycle414 E)."""
+        pc = self._make_pc(initial=50000.0)
+        pc.create_order("BTC/USDT", "buy", 1.0, price=10000.0)
+        balance = pc.fetch_balance()
+        assert balance["total"] == pytest.approx(balance["free"] + balance["used"], abs=1e-9)

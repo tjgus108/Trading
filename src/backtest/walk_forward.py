@@ -138,28 +138,14 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         "va_period": [10, 15, 20],  # 10 추가: 4h 봉 신호 빈도 개선
         "va_mult": [0.55, 0.60, 0.65],
     },
-    "narrow_range": {
-        "nr_lookback": [5, 6, 7],  # NR5/NR6/NR7 — 4h봉 0거래 문제 완화
-        # Cycle307 D(ML): ATR/ATR_MA(20) ratio가 BTC 4h에서 ~1.0 유지 (1.1/1.4 모두 미트리거)
-        # trend_regime_filter=True + atr_trend_max 조합은 비효율적 확정
-        # → trend_regime_filter=False 고정, nr_lookback 탐색으로 전환
-        "trend_regime_filter": [False],
-        # Cycle310 C(데이터): EMA slope 추세 필터 — fold1/3 베어마켓 BUY 차단, fold3 불마켓 SELL 차단
-        # Cycle346 D(ML): 0.002 제거, 0.0005 추가 — BTC 1h RANGING 분석 결과
-        #   ema_slope_min_buy=0.001: RANGING 기간 BUY 27.1%만 통과 (72.9% 차단) → 거래 수 부족 위험
-        #   ema_slope_min_buy=0.0005: RANGING 기간 BUY 38.2%만 통과 (61.8% 차단) → 중간 균형점
-        #   ema_slope_min_buy=0.002: RANGING BUY ~20% 통과 → 과도하게 엄격, 제거
-        "ema_slope_min_buy": [0.0, 0.0005, 0.001],   # BUY: EMA20 slope ≥ N (상승추세 필수)
-        "ema_slope_max_sell": [0.0, -0.0005, -0.001], # SELL: EMA20 slope ≤ N (하락추세 필수)
-        # Cycle406 F(리서치): narrow_range 1h BTC 구조적 한계 확정
-        #   BTC 1h WFO 결과: Sh=-0.51, PF=0.97(<1.0!), Trades=46, MDD=10.1%, 0/8 Consistency
-        #   PF<1.0 → 평균 손실 > 평균 이익 → 파라미터 조정으로 해결 불가 수준
-        #   EMA slope filter: trades=46→~20-25로 감소 → Trades<15 위험, PF 개선폭 불확실
-        #   NR7(엄격): trades 추가 감소 + 동일 구조 문제 → 근본 해결 안 됨
-        #   핵심 원인: 1h BTC 고빈도 노이즈 → NR breakout 지속성 부재
-        #   NR전략은 4h/daily 타임프레임에 적합 (5-bundle OOS 대상이 아님)
-        #   → narrow_range 1h 탐색 보류. 기존 확정 파라미터 유지, 추가 실험 금지.
-    },
+    # Cycle406 F: narrow_range 1h BTC 구조적 한계 확정 (Cycle414 F 재확인 → 탐색 완전 종료)
+    #   BTC 1h: Sh=-0.51, PF=0.97(<1.0=음의엣지), Trades=46, MDD=10.1%, 0/8 Consistency
+    #   전방 수익 분석(Cycle414 F): BUY 1h fwd_ret=+0.032% < 슬리피지 0.1% → 비용 > 에지
+    #   SELL 8h fwd_ret=-0.074% (BTC 상승 바이어스로 SELL 구조적 불리)
+    #   ema_slope filter: trades=46→~20-25 → Trades<15 위험, PF 개선 불가
+    #   NR전략은 4h/daily 타임프레임에 적합 (1h 고빈도 노이즈 환경 부적합)
+    #   → narrow_range 1h WFO 탐색 완전 종료. 추가 파라미터 실험 금지.
+    "narrow_range": {},
     # Cycle407 F(리서치): acceleration_band 1h BTC 구조적 한계 확정
     #   paper_sim BTC 1h: Sh=-0.94, PF=0.98(<1.0=음의엣지), Trades=44, Consistency=1/8
     #   paper_sim ETH 1h: Sh=-2.03, PF=0.57, Trades=13 (<15 min) — 신호 부족
