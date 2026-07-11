@@ -25,10 +25,10 @@ tests/test_phase_d.py (Cycle416 D, TestOptimizeDonchian + TestSelectFeaturesPfiO
 - **코드 개선**: walk_forward.py roc_ma_cross 섹션에 Cycle416 F 구조적 분석 주석 추가
 
 **시뮬레이션 결과**:
-- Paper Sim (1h BTC): 실행 중 (SSL 차단 → 로컬 CSV 사용, 기존 1/19 PASS 유지 예상)
-- Bundle OOS: 실행 중 (SSL 차단 → synthetic fallback 방지, 기존 5/5 PASS 유지)
+- Paper Sim (1h BTC, 2026-07-11): roc_ma_cross PASS 유지 (Sh=1.81, PF=2.02, Trades=14, 4/8) — 1/19 PASS 유지
+- Bundle OOS: SSL 차단으로 합성 데이터 fallback → 리포트 보존 (기존 5/5 PASS 유지)
 
-**테스트**: 8700+7=8707 총계, 8677+7=8684 passed (+7 신규)
+**테스트**: 8704 총계, 8681 passed (+7 신규, 실측 8674→8681)
 
 ---
 

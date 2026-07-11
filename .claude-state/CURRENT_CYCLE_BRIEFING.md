@@ -21,7 +21,7 @@ _Last updated: 2026-07-11 (Cycle 416 완료)_
 - **acceleration_band**: Sh=-0.94, PF=0.98(<1.0), Tr=44, 1/8 → 구조적 실패 확정
 - **lob_maker**: Sh=-0.04, Trades=75, MDD=17%, 0/8 → 구조적 한계 확정 (LOB 데이터 없음)
 - **Bundle OOS**: 5/5 PASS (2026-07-08 실거래소 데이터 기준, SSL 차단으로 신규 실행 불가)
-- **전체 테스트 수**: 8707 총계 (8684 passed + 23 skipped) — Cycle416 +7 추가
+- **전체 테스트 수**: 8704 총계 (8681 passed + 23 skipped) — Cycle416 +7 추가
 
 ## Cycle 416 주요 결과
 
