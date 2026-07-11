@@ -159,6 +159,13 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   핵심 원인: 1h BTC 고빈도 노이즈 → NR breakout 지속성 부재
         #   NR전략은 4h/daily 타임프레임에 적합 (5-bundle OOS 대상이 아님)
         #   → narrow_range 1h 탐색 보류. 기존 확정 파라미터 유지, 추가 실험 금지.
+        # Cycle414 F(리서치): narrow_range BTC 1h 구조적 한계 재확정
+        #   paper_sim BTC 1h Cycle414: Sh=-0.51, PF=0.97, Trades=46, MDD=10.1%, 0/8 Consistency (동일)
+        #   atr_mult 파라미터화 검토: _atr_threshold(0.95) 조정 → RANGING에서 ATR 이미 낮아 조건 과다 충족
+        #     → atr_threshold 강화(0.80) 시 Trades 추가 감소, 구조적 음의 에지 미해결
+        #   range_lookback(=nr_lookback=5→7) 검토: RANGING에서 NR7도 빈발 (좁은 범위 7봉 연속 흔함)
+        #     → NR7 강화해도 RANGING BUY/SELL 대칭성 유지 → 에지 없음
+        #   결론: narrow_range 1h BTC 추가 파라미터 탐색 완전 종료. Cycle406 결론 재확정.
     },
     # Cycle407 F(리서치): acceleration_band 1h BTC 구조적 한계 확정
     #   paper_sim BTC 1h: Sh=-0.94, PF=0.98(<1.0=음의엣지), Trades=44, Consistency=1/8

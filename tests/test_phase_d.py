@@ -802,3 +802,32 @@ class TestOptimizeRocMaCrossFields:
         result = optimize_roc_ma_cross(df, n_windows=2)
         if result.fold_pass_rate is not None:
             assert 0.0 <= result.fold_pass_rate <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Cycle414 D(ML): optimize_donchian 기본 호출 + select_features_pfi 경계값
+# ---------------------------------------------------------------------------
+
+class TestOptimizeDonchian:
+    """optimize_donchian() 기본 호출 테스트 (Cycle414 D)."""
+
+    def test_optimize_donchian_returns_wf_result(self):
+        """optimize_donchian() → WalkForwardResult 타입 반환 (Cycle414 D)."""
+        from src.backtest.walk_forward import optimize_donchian
+        df = _make_df(400)
+        result = optimize_donchian(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+
+    def test_optimize_donchian_strategy_name_is_donchian(self):
+        """optimize_donchian() 반환값 strategy_name == 'donchian_breakout' (Cycle414 D)."""
+        from src.backtest.walk_forward import optimize_donchian
+        df = _make_df(400)
+        result = optimize_donchian(df, n_windows=2)
+        assert result.strategy_name == "donchian_breakout"
+
+    def test_optimize_donchian_oos_sharpe_std_non_negative(self):
+        """optimize_donchian() oos_sharpe_std >= 0.0 (Cycle414 D)."""
+        from src.backtest.walk_forward import optimize_donchian
+        df = _make_df(400)
+        result = optimize_donchian(df, n_windows=2)
+        assert result.oos_sharpe_std >= 0.0

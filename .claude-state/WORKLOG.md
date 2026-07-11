@@ -1,3 +1,51 @@
+## [2026-07-11] Cycle 414 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] optimize_donchian 기본 호출 + select_features_pfi 경계값 테스트 6개** (+6)
+
+tests/test_phase_d.py (Cycle414 D, TestOptimizeDonchian):
+1. `test_optimize_donchian_returns_wf_result`: optimize_donchian() → WalkForwardResult 타입 반환
+2. `test_optimize_donchian_strategy_name_is_donchian`: strategy_name == 'donchian_breakout' 검증
+3. `test_optimize_donchian_oos_sharpe_std_non_negative`: oos_sharpe_std >= 0.0 검증
+
+tests/test_trainer.py (Cycle414 D, TestSelectFeaturesPfiBoundary):
+4. `test_single_feature_returns_non_empty`: X_train 피처 1개 → 크래시 없이 리스트 반환 (경계값)
+5. `test_small_sample_below_100_no_crash`: X_train 60행(<100) → n_repeats=10 경로 검증
+6. `test_top_k_limits_output_count`: top_k=2, 피처 5개 → 반환 수 <= 2 검증
+
+**[E(실행)] PaperConnector 미커버 케이스 3개** (+3)
+
+tests/test_exchange.py (Cycle414 E, TestPaperConnectorCycle414):
+7. `test_fee_deducted_on_round_trip`: fee_rate=0.001 시 동일가격 buy+sell → balance < 초기 (수수료 실제 공제 확인)
+8. `test_wait_for_fill_returns_symbol_field`: wait_for_fill() 결과에 symbol 키 존재 및 값 검증
+9. `test_reset_after_multiple_trades_restores_balance`: 6회 거래 후 reset → 초기 잔고/포지션 완전 복원
+
+**[F(리서치)] narrow_range BTC 1h 구조적 한계 재확정**
+
+분석 결과 (rank 9, BTC 1h Cycle414: Sh=-0.51, PF=0.97, Trades=46, MDD=10.1%, 0/8 Consistency):
+- **PF=0.97 (<1.0)**: 평균 손실 > 평균 이익 → 음의 에지, 파라미터 조정으로 해결 불가
+- **RANGING 47.3% 실패 메커니즘**:
+  - NR 바(좁은 범위 봉)가 RANGING에서 빈번 발생 (작은 범위 봉이 많음)
+  - ATR 축소 조건(0.95×ATR_MA): RANGING에서 ATR 이미 낮아 과다 충족 → 신호 빈발
+  - 돌파 후 방향성 없음(RANGING) → BUY/SELL 모두 즉각 reversal → 음의 에지 구조
+- **atr_mult 파라미터화 검토**: `_atr_threshold`(0.95) 강화(0.80)해도 RANGING에서 ATR 낮아 조건 충족 가능 → 에지 개선 불가
+- **range_lookback(nr_lookback=5→7) 검토**: NR7도 RANGING에서 빈발 (7봉 연속 좁은 범위 흔함) → BUY/SELL 대칭성 유지
+- walk_forward.py DEFAULT_GRIDS["narrow_range"] 주석에 Cycle414 재확정 내용 추가
+
+**코드 변경:**
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/test_phase_d.py` | TestOptimizeDonchian 3개 테스트 추가 (Cycle414 D) |
+| `tests/test_trainer.py` | TestSelectFeaturesPfiBoundary 3개 테스트 추가 (Cycle414 D) |
+| `tests/test_exchange.py` | TestPaperConnectorCycle414 3개 테스트 추가 (Cycle414 E) |
+| `src/backtest/walk_forward.py` | DEFAULT_GRIDS["narrow_range"] Cycle414 F 재확정 주석 추가 |
+
+**시뮬레이션 결과 (Cycle 414)**:
+- 1h PASS: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Tr=14, 4/8) — 유지
+- Bundle OOS: 5/5 PASS (cmf/order_flow_imbalance_v2/supertrend_multi/vwap_cross/value_area) — 유지
+- 총 테스트: **8694 총계 (+9, 8662→8671 passed)** (test_phase_d.py: +3, test_trainer.py: +3, test_exchange.py: +3)
+
+---
+
 ## [2026-07-10] Cycle 413 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] TestIndicatorBoundaryC413 경계값 테스트 3개** (+3)
@@ -17766,6 +17814,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-10 20:12 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-11 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-11 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-11 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-11 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-11 05:10 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-11 05:10 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

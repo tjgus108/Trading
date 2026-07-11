@@ -1251,3 +1251,45 @@ class TestPaperConnectorCycle409:
         order = pc.create_order("BTC/USDT", "buy", 2.0, price=10000.0)
         assert order["status"] == "closed"
         assert order["remaining"] == pytest.approx(0.0, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# Cycle414 E(실행): PaperConnector 미커버 케이스
+# ---------------------------------------------------------------------------
+
+class TestPaperConnectorCycle414:
+    """Cycle414 E(실행): fee 공제, wait_for_fill 심볼 필드, 다중 reset."""
+
+    def test_fee_deducted_on_round_trip(self):
+        """fee_rate > 0 시 동일 가격 buy+sell 후 잔고 < 초기 잔고 (수수료 지불됨)."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=10000.0,
+            fee_rate=0.001, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        pc.create_order("BTC/USDT", "buy", 1.0, price=1000.0)
+        pc.create_order("BTC/USDT", "sell", 1.0, price=1000.0)
+        balance = pc.fetch_balance()
+        assert balance["total"] < 10000.0
+
+    def test_wait_for_fill_returns_symbol_field(self):
+        """wait_for_fill() 결과에 symbol 키가 존재하고 올바른 값 반환 (Cycle414 E)."""
+        pc = PaperConnector(symbol="BTC/USDT")
+        result = pc.wait_for_fill("order_42", "BTC/USDT")
+        assert "symbol" in result
+        assert result["symbol"] == "BTC/USDT"
+
+    def test_reset_after_multiple_trades_restores_balance(self):
+        """여러 거래 후 reset() → 초기 잔고 복원, 포지션 비어있음 (Cycle414 E)."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=20000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        for buy_p, sell_p in [(1000, 1100), (1100, 900), (900, 1200)]:
+            pc.create_order("BTC/USDT", "buy", 1.0, price=float(buy_p))
+            pc.create_order("BTC/USDT", "sell", 1.0, price=float(sell_p))
+        pc.reset_paper_account()
+        assert pc.paper_trader.account.balance == 20000.0
+        assert pc.paper_trader.account.positions == {}
+        assert pc.paper_trader.account.trades == []

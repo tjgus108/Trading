@@ -1032,3 +1032,58 @@ class TestCompareFeatureImportance:
         has_no_scaler = len(result["no_scaler"]) > 0
         has_with_scaler = len(result["with_scaler"]) > 0
         assert has_no_scaler or has_with_scaler or (not has_no_scaler and not has_with_scaler)
+
+
+# ---------------------------------------------------------------------------
+# Cycle414 D(ML): select_features_pfi 경계값 테스트
+# ---------------------------------------------------------------------------
+
+class TestSelectFeaturesPfiBoundary:
+    """select_features_pfi 경계값 테스트 (Cycle414 D)."""
+
+    def _make_trainer(self):
+        return WalkForwardTrainer(symbol="TEST/USDT", n_estimators=10, max_depth=3)
+
+    def _make_clf(self, X, y):
+        from sklearn.ensemble import RandomForestClassifier
+        clf = RandomForestClassifier(n_estimators=5, max_depth=2, random_state=42)
+        clf.fit(X, y)
+        return clf
+
+    def test_single_feature_returns_non_empty(self):
+        """X_train 피처 1개 → 크래시 없이 리스트 반환 (Cycle414 D)."""
+        trainer = self._make_trainer()
+        rng = np.random.RandomState(0)
+        X = pd.DataFrame({"feat_a": rng.randn(200)})
+        y = pd.Series(rng.choice([0, 1], size=200))
+        clf = self._make_clf(X, y)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=8)
+        assert isinstance(selected, list)
+        assert len(selected) >= 1
+
+    def test_small_sample_below_100_no_crash(self):
+        """X_train 50행(<100) → n_repeats=10 경로, 크래시 없이 반환 (Cycle414 D)."""
+        trainer = self._make_trainer()
+        rng = np.random.RandomState(1)
+        X = pd.DataFrame({
+            "f1": rng.randn(60),
+            "f2": rng.randn(60),
+            "f3": rng.randn(60),
+        })
+        y = pd.Series(rng.choice([0, 1], size=60))
+        clf = self._make_clf(X, y)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=3)
+        assert isinstance(selected, list)
+        assert 1 <= len(selected) <= 3
+
+    def test_top_k_limits_output_count(self):
+        """top_k=2, 피처 5개 → 반환 피처 수 <= 2 (Cycle414 D)."""
+        trainer = self._make_trainer()
+        rng = np.random.RandomState(2)
+        n = 150
+        X = pd.DataFrame({f"f{i}": rng.randn(n) for i in range(5)})
+        y = pd.Series(rng.choice([0, 1], size=n))
+        clf = self._make_clf(X, y)
+        selected = trainer.select_features_pfi(clf, X, y, top_k=2)
+        assert isinstance(selected, list)
+        assert len(selected) <= 2
