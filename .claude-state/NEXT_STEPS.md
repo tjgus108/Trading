@@ -1,12 +1,12 @@
 # Next Steps
 
-_Last updated: 2026-07-10 (Cycle 413 완료)_
+_Last updated: 2026-07-11 (Cycle 414 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 413
+### 이번 세션 완료 사이클: 414
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
@@ -16,29 +16,30 @@ _Last updated: 2026-07-10 (Cycle 413 완료)_
 | 411 | B+D+F | transition_cushion+set_regime 복합3개+optimize strategyname/bestparams3개(+6→8667 총계, 8644 passed), **volume_breakout 1h 구조적한계 확정**(Sh=-0.74, PF=0.96<1.0, SL부재+spike1.5x과다+RANGING), walk_forward.py DEFAULT_GRIDS["volume_breakout"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 412 | B+D+F | CB max_daily+consec_loss 복합3개+optimize_roc_ma_cross oos_std/roc_min_abs/fold_pass_rate 3개(+6→8679 총계, 8656 passed), **momentum_quality 1h 구조적한계 확정**(Sh=-1.19, PF=0.96<1.0, consistency_buy_threshold=0.3 DEAD PARAM, RANGING 47.3% 모멘텀 노이즈), walk_forward.py DEFAULT_GRIDS["momentum_quality"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 413 | C+B+F | DataFeed atr14경계/ema50반응속도/return_5부호 3개+DM trailing_stop경계/threshold1.0/kelly+mdd_warn복합 3개(+6→8685 총계, 8662 passed), **positional_scaling 1h 구조적한계 확정**(Sh=-0.38, pullback==rally 동일조건→BUY/SELL 방향성에지없음, mult 파라미터화 불가), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
+| 414 | D+E+F | select_features_pfi 경계3개+PaperConnector 미커버3개(+6→8691 총계, 8668 passed), **narrow_range 1h 구조적한계 최종 확정**(Sh=-0.51, BUY 1h fwd=+0.032%<슬리피지0.1%, SELL 음에지), walk_forward.py DEFAULT_GRIDS["narrow_range"]={} 설정, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 414 작업 방향 (414 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 415 작업 방향 (415 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): ML trainer 또는 walk_forward 미커버 케이스
+#### A(품질): BacktestEngine 또는 apply_wfe 미커버 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle413 완료 후)
-- **작업 방향**: `tests/test_phase_d.py` 또는 `tests/test_trainer.py`
-  - optimize 함수 미커버 필드/케이스 검토
-  - select_features 경계값 (0 features, 1 feature 등)
+- **배경**: 품질 카테고리 로테이션 (Cycle410 A 완료 후)
+- **작업 방향**: `tests/test_backtest_engine.py`
+  - apply_wfe 또는 BacktestEngine 엣지케이스 검토
+  - fee 계산 경계값 또는 단일 거래 케이스
 
-#### E(실행): PaperConnector 또는 execution 미커버 케이스
+#### C(데이터): DataFeed 지표 경계값 케이스
 
-- **배경**: 실행 카테고리 로테이션 (Cycle409 E 완료 후)
-- **작업 방향**: `tests/test_exchange.py` 또는 `tests/test_paper_trader.py`
-  - PaperConnector 미커버 경계 케이스 검토
+- **배경**: 데이터 카테고리 로테이션 (Cycle413 C 완료 후)
+- **작업 방향**: `tests/test_feed_boundary.py`
+  - DataFeed 미커버 지표 경계값 검토 (rsi14, donchian_high/low 등)
 
-#### F(리서치): narrow_range BTC 1h 구조 분석
+#### F(리서치): lob_maker BTC 1h 구조 분석
 
-- **배경**: Cycle413 F에서 positional_scaling 구조적 한계 확정
-- **작업 방향**: rank 7, Sh=-0.51, Trades=46, PF=0.97, 0/8 Consistency
-  - NR7 좁은 범위 + 브레이크아웃 구조가 RANGING에서 어떻게 실패하는지 분석
-  - atr_mult, range_lookback 파라미터화 가능성 검토
-  - 구조적 한계 확정 또는 개선 방향 결정
+- **배경**: Cycle414 F에서 narrow_range 구조적 한계 최종 확정
+- **작업 방향**: rank 5 (composite score 43.6), Sh=-0.04, Trades=75, 0/8 Consistency
+  - OFI proxy = (close-open)/(high-low) 정확도 분석 (Cycle405 확정 사항 재검토 불필요)
+  - lob_maker 구조적 한계가 이미 Cycle405에서 확정됨 → 확인 후 다음 후보로 전환
+  - 다음 F 탐색 후보: frama (rank 2, Sh=0.44) → weak_rsi 개선 방향 재검토
 
 ### ⚠️ 주의 사항 (Cycle 413 이후)
 

@@ -1,44 +1,39 @@
 # Current Cycle Briefing
 
-_Last updated: 2026-07-10 (Cycle 413 완료)_
+_Last updated: 2026-07-11 (Cycle 414 완료)_
 
 ## 현재 상태
 
-- **완료된 사이클**: 413
-- **다음 사이클**: 414 (414 mod 5 = 4 → D+E+F)
+- **완료된 사이클**: 414
+- **다음 사이클**: 415 (415 mod 5 = 0 → A+C+F)
 - **1h paper_sim PASS**: 1/19 (roc_ma_cross — Sh=1.81, PF=2.02, Consist=4/8)
-- **positional_scaling**: Sh=-0.38, PF=1.09, Tr=34, 1/8 → 구조적 실패 확정 (pullback==rally 동일 조건, BUY/SELL 에지 없음)
-- **momentum_quality**: Sh=-1.19, PF=0.96(<1.0), Tr=71, 1/8, SharpeStd=3.29 → 구조적 실패 확정 (DEAD PARAM + RANGING)
-- **volume_breakout**: Sh=-0.74, PF=0.96(<1.0), Tr=72, 0/8 → 구조적 실패 확정 (SL 없음+spike 1.5x 과다+RANGING)
-- **relative_volume**: Sh=-0.99, PF=0.92(<1.0), Tr=64, 0/8 → 구조적 실패 확정 (RANGING 볼륨 노이즈, 탐색 금지)
-- **price_action_momentum**: Sh=-1.08, PF=0.97(<1.0), Tr=73, 1/8 → 구조적 실패 확정 (모멘텀 vs RANGING 부조화, 탐색 금지)
-- **htf_ema**: Sh=-0.72, PF=0.91(<1.0), Tr=43, 0/8 → 구조적 실패 확정 (iloc[::4] HTF proxy 불정확, 탐색 금지)
-- **acceleration_band**: Sh=-0.94, PF=0.98(<1.0), Tr=44, 1/8 → 구조적 실패 확정 (음의 엣지, 탐색 금지)
-- **narrow_range**: Sh=-0.51, PF=0.97, Tr=46, 0/8 → 구조적 한계 확정, 탐색 보류 (Cycle414 F 분석 예정)
-- **lob_maker**: Sh=-0.04, Trades=75, MDD=17%, 0/8 → 구조적 한계 확정 (LOB 데이터 없음), 탐색 보류
-- **Bundle OOS**: 5/5 PASS (2026-07-08, 실 BTC CSV 4h) — SSL fallback으로 갱신 불가, 보존
-- **전체 테스트 수**: 8685 총계 (8662 passed + 23 skipped) — Cycle413 +6 추가
+- **narrow_range**: Sh=-0.51, PF=0.97, Tr=46, 0/8 → **탐색 완전 종료** (DEFAULT_GRIDS={}, Cycle414 F 확정)
+- **Bundle OOS**: 5/5 PASS (2026-07-08, 실 BTC CSV 4h) — SSL fallback 보존
+- **전체 테스트 수**: 8668 passed + 23 skipped (Cycle414 +6 추가)
 
-## Cycle 413 주요 결과
+## Cycle 414 주요 결과
 
-### C(데이터): DataFeed 지표 경계값 테스트 (3개 추가)
-1. `test_atr14_near_zero_for_constant_ohlc`: OHLC 모두 동일 → atr14 < 1.0 (true range=0)
-2. `test_ema50_slower_than_ema20_on_price_spike`: 가격 급등 후 ema50이 ema20보다 close와 더 멀어야 함
-3. `test_return_5_sign_matches_trend`: 상승 추세 → return_5 양수, 하락 추세 → 음수
+### D(ML): WalkForwardTrainer.select_features_pfi 경계값 테스트 (3개 추가)
+1. `test_pfi_one_feature_no_crash`: 피처 1개 → k=max(2,1)=2 → ranked[:2]는 1개만 반환 (크래시 없음)
+2. `test_pfi_two_features_returns_both`: 피처 2개 → k=2 → 정확히 2개 반환
+3. `test_pfi_small_sample_no_crash`: n_samples=50 < 100 → n_repeats=10 경로, 크래시 없음
 
-### B(리스크): DrawdownMonitor trailing_stop 경계 + kelly+mdd_warn 복합 (3개 추가)
-4. `test_trailing_stop_signal_short_window_boundary`: rolling_window=40 → short_window=20 경계값 급락 시 True
-5. `test_trailing_stop_signal_threshold_one_uniform_decline`: accel_threshold=1.0 → 균일 하락에서도 True
-6. `test_kelly_fraction_multiplier_and_mdd_warn_compound`: MDD 9% → kelly=0.5 + mdd_level=WARN 동시 발생
+### E(실행): PaperConnector 경계값 테스트 (3개 추가)
+4. `test_partial_sell_leaves_remaining_position`: buy 1.0 → sell 0.5 → open_positions == 0.5
+5. `test_fetch_balance_used_reflects_open_position`: buy 후 fetch_balance()['used'] > 0
+6. `test_fetch_balance_total_equals_free_plus_used`: total == free + used 항등식
 
-### F(리서치): positional_scaling BTC 1h 구조적 한계 확정
-- Sh=-0.38, PF=1.09, Trades=34, 1/8 Consistency, SharpeStd=2.82
-- `pullback == rally` 동일 조건 → BUY/SELL 진입 구간 완전 동일, 방향성 에지 없음
-- pullback_atr_mult 파라미터화로 구간 변경해도 대칭성 유지 → 에지 개선 불가
-- walk_forward.py DEFAULT_GRIDS["positional_scaling"]={} 기존 유지
+### F(리서치): narrow_range BTC 1h 구조적 한계 최종 확정
+- Sh=-0.51, PF=0.97 (<1.0 = 음의 엣지), Trades=46, MDD=10.1%, 0/8 Consistency
+- **전방 수익 분석 (12,000 BTC 1h 캔들)**:
+  - BUY 1h fwd_ret = +0.032% → 슬리피지 0.1% (0.05%/leg × 2) 미만 → 비용 > 엣지
+  - SELL 8h fwd_ret = -0.074% → BTC 상승 바이어스로 SELL 구조적 불리
+- `ema_slope` 필터 적용 시: trades=46→~20-25 → Trades<15 위험, PF 개선 불가
+- NR전략은 4h/daily 타임프레임에 적합 (1h 고빈도 노이즈 환경 부적합)
+- **DEFAULT_GRIDS["narrow_range"] = {} 설정** (탐색 완전 종료, 추가 실험 금지)
 
-## 다음 사이클 414 방향
+## 다음 사이클 415 방향 (A+C+F)
 
-- **D(ML)**: ML trainer 또는 walk_forward 미커버 케이스 3개
-- **E(실행)**: PaperConnector 또는 paper_trader 미커버 케이스 3개
-- **F(리서치)**: narrow_range BTC 1h 구조 분석 (Sh=-0.51, Trades=46, PF=0.97, 0/8)
+- **A(백테스트)**: BacktestEngine 미커버 경계값 3개 (A=415 mod 5=0)
+- **C(데이터)**: DataFeed rsi14/donchian 경계값 3개
+- **F(리서치)**: frama rank 2 전략 분석 (paper_sim에서 rank 2 전략 OOS 구조 점검)

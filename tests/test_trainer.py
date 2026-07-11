@@ -1032,3 +1032,53 @@ class TestCompareFeatureImportance:
         has_no_scaler = len(result["no_scaler"]) > 0
         has_with_scaler = len(result["with_scaler"]) > 0
         assert has_no_scaler or has_with_scaler or (not has_no_scaler and not has_with_scaler)
+
+
+# ---------------------------------------------------------------------------
+# select_features_pfi 경계값 (Cycle414 D)
+# ---------------------------------------------------------------------------
+
+class TestSelectFeaturesPfiEdgeCases:
+    """WalkForwardTrainer.select_features_pfi 경계값 테스트 (Cycle414 D).
+
+    k = max(2, min(top_k, n_features)) 계산 경계:
+    - n_features=1: k=max(2,1)=2 → ranked[:2]는 1개만 있어 1개 반환
+    - n_features=2: k=max(2,2)=2 → 정확히 2개 반환
+    - n_samples<100:   n_repeats=10 경로 (PFI 분산 감소) 크래시 없음
+    """
+
+    def _make_clf_and_data(self, n_features: int, n_samples: int = 50):
+        from sklearn.ensemble import RandomForestClassifier
+        rng = np.random.default_rng(42)
+        X = pd.DataFrame(
+            rng.standard_normal((n_samples, n_features)),
+            columns=[f"feat_{i}" for i in range(n_features)],
+        )
+        y = pd.Series(rng.choice([0, 1], n_samples))
+        clf = RandomForestClassifier(n_estimators=5, random_state=42)
+        clf.fit(X, y)
+        return clf, X, y
+
+    def test_pfi_one_feature_no_crash(self):
+        """피처 1개: k=max(2,1)=2 → ranked[:2]가 1개 → 반환 리스트 길이 <= 1 (Cycle414 D)."""
+        trainer = WalkForwardTrainer()
+        clf, X, y = self._make_clf_and_data(n_features=1)
+        result = trainer.select_features_pfi(clf, X, y, top_k=8)
+        assert isinstance(result, list)
+        assert len(result) <= 1
+
+    def test_pfi_two_features_returns_both(self):
+        """피처 2개: k=max(2, min(8,2))=2 → 정확히 2개 반환 (Cycle414 D)."""
+        trainer = WalkForwardTrainer()
+        clf, X, y = self._make_clf_and_data(n_features=2)
+        result = trainer.select_features_pfi(clf, X, y, top_k=8)
+        assert isinstance(result, list)
+        assert len(result) == 2
+
+    def test_pfi_small_sample_no_crash(self):
+        """n_samples=50 < 100: n_repeats=10 경로 실행, 크래시 없음 (Cycle414 D)."""
+        trainer = WalkForwardTrainer()
+        clf, X, y = self._make_clf_and_data(n_features=5, n_samples=50)
+        result = trainer.select_features_pfi(clf, X, y, top_k=3)
+        assert isinstance(result, list)
+        assert len(result) <= 3
