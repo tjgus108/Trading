@@ -1,15 +1,16 @@
 # Next Steps
 
-_Last updated: 2026-07-12 (Cycle 417 완료)_
+_Last updated: 2026-07-12 (Cycle 418 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 417
+### 이번 세션 완료 사이클: 418
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
+| 418 | C+B+F | DataFeed ema20_slope/vwap20/macd_hist 경계 3케이스(+3) + DM BLOCK+sharpe_decay/streak+ATR/BLOCK+ATR 복합 3케이스(+3→8716 총계, 8693 passed), **dema_cross 2/8 Consistency ceiling 구조적 확정**(RANGING 47.3%+false cross, PF=1.38 gap=0.12 달성불가), walk_forward.py Cycle418 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 417 | B+D+F | CB flash_crash+balances+priority 3케이스(+3) + optimize_price_cluster 함수추가+테스트3케이스(+3→8710 총계, 8687 passed), **avg_oos_trades 필드 WalkForwardResult 추가**(거래 0건 fold 진단), **frama 0/8 Consistency ceiling 확정**(PF=1.11 구조적 ceiling, 27-combo WFO도 OOS PF<1.5), 1h PASS 1/19 유지, Bundle OOS 합성 0/5 |
 | 416 | B+D+F | DM kelly_fraction+sharpe_decay, streak+sharpe_decay, HIGH_VOL+decay_recovery 복합 3케이스(+3) + optimize_donchian 2케이스+select_features_pfi 반환검증 2케이스(+4→8704 총계, 8681 passed), **roc_ma_cross AvgTrades=14 구조적 ceiling 확정**(PASS=BTC 급등기 Q4/Q1, FAIL=저거래량 H1/Q2), walk_forward.py roc_ma_cross Cycle416 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 415 | A+C+F | apply_wfe 미커버 3케이스+feed 지표 경계 3케이스(+6→8700 총계, 8677 passed), **price_cluster 2/8 ceiling 구조 확정**(PASS=RANGING진성 2구간, FAIL=TREND_UP), walk_forward.py atr_bounce_factor [0.0,0.3,0.5,1.0]→[0.5] 단일값(75% 그리드 감소), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
@@ -20,30 +21,38 @@ _Last updated: 2026-07-12 (Cycle 417 완료)_
 | 413 | C+B+F | DataFeed atr14경계/ema50반응속도/return_5부호 3개+DM trailing_stop경계/threshold1.0/kelly+mdd_warn복합 3개(+6→8685 총계, 8662 passed), **positional_scaling 1h 구조적한계 확정**(Sh=-0.38, pullback==rally 동일조건→BUY/SELL 방향성에지없음, mult 파라미터화 불가), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 414 | D+E+F | optimize_donchian 3개+select_features_pfi 경계값 3개+PaperConnector 3개(+9→8694 총계, 8671 passed), **narrow_range 1h 구조적한계 재확정**(Sh=-0.51, PF=0.97<1.0, atr_mult/range_lookback 파라미터화 불가-RANGING에서 동일 구조 문제), walk_forward.py 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 417 작업 방향 (417 mod 5 = 2 → B(리스크) + D(ML) + F(리서치))
+### 🎯 Cycle 419 작업 방향 (419 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
 
-#### B(리스크): CircuitBreaker 또는 DrawdownMonitor 추가 미커버 케이스
+#### D(ML): optimize_supertrend_multi 또는 avg_oos_trades 활용 케이스
 
-- **배경**: 리스크 카테고리 로테이션 (Cycle416 B DrawdownMonitor compound 완료)
-- **작업 방향**: `tests/test_circuit_breaker.py` 또는 `tests/test_drawdown_monitor.py`
-  - CircuitBreaker 경계값 검토 (is_halted 임계값, window 만료 등)
-  - DrawdownMonitor 추가 미커버 복합 케이스 (BLOCK+sharpe_decay, streak+ATR compound 등)
-
-#### D(ML): optimize_supertrend_multi 또는 WalkForwardResult avg_oos_trades 활용 케이스
-
-- **배경**: Cycle417 D에서 optimize_price_cluster 함수 추가+테스트 3케이스 완료
+- **배경**: Cycle418 완료. 419 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
 - **작업 방향**: `tests/test_phase_d.py`
-  - optimize_supertrend_multi 기본 호출 + avg_oos_trades 타입 검증 (새 필드 활용)
-  - WalkForwardResult avg_oos_trades: None이 아닌 float 검증 케이스
+  - optimize_supertrend_multi 기본 호출 + WalkForwardResult avg_oos_trades float 검증
+  - WalkForwardResult avg_oos_trades: None이 아닌 float 검증 케이스 (Cycle417 D에서 필드 추가)
 
-#### F(리서치): dema_cross 2/8 Consistency ceiling 원인 분석
+#### E(실행): PaperConnector 또는 PaperTrader 추가 미커버 케이스
 
-- **배경**: Cycle417 F에서 frama 0/8 Consistency ceiling 확정 (PF 구조적 <1.5). 다음 탐색 대상: dema_cross
-- **작업 방향**: dema_cross (BTC 1h: Sh=0.85, PF=1.38, Trades=26, 2/8 Consistency)
-  - Rank 4 in paper sim, Sh=0.85 양호하나 PF=1.38<1.5가 blocking
-  - dema_cross FAIL reason: sharpe 0.63 < 1.0 (x1), profit_factor 1.14 < 1.5 (x1)
-  - 2/8 PASS 윈도우 구간 분석: TREND 구간에서 EMA 크로스 신호 품질 확인
-  - bb_width_min_filter 파라미터 탐색 가능성 검토
+- **배경**: 실행 카테고리 로테이션
+- **작업 방향**: `tests/test_paper_trader.py` 또는 `tests/test_exchange.py`
+  - PaperConnector 추가 엣지케이스 (잔고 초과 주문, 정밀도 처리 등)
+  - PaperTrader 상태 복원 추가 케이스
+
+#### F(리서치): price_cluster 2/8 Ceiling과 roc_ma_cross PASS 구간 비교 분석
+
+- **배경**: Cycle418 F에서 dema_cross 2/8 ceiling 구조적 확정 완료.
+- **작업 방향**: roc_ma_cross PASS 4/8 vs dema_cross/price_cluster FAIL 2/8 구조 비교
+  - roc_ma_cross PASS 4윈도우 = vol_ratio≥1.2 동반 BTC 급등기 (Q4/Q1)
+  - dema_cross/price_cluster FAIL = 같은 기간 2/8 → 왜 roc는 4/8 가능한지 분석
+  - volume filter 없는 전략들의 구조적 ceiling 원인 비교
+
+### ⚠️ 주의 사항 (Cycle 418 이후)
+
+- **dema_cross 2/8 Consistency ceiling 구조적 확정** (Cycle418 F):
+  - BTC 1h: Sh=0.85, PF=1.38, Trades=26, 2/8 Consistency, Rank 3
+  - FAIL reason: sharpe 0.63<1.0(x1), profit_factor 1.14<1.5(x1)
+  - RANGING(47.3%) → DEMA(8,20) false cross, PF gap=0.12 달성 불가
+  - walk_forward.py dema_cross 섹션에 Cycle418 F 분석 주석 추가 완료
+  - **결론**: dema_cross 추가 탐색 완전 종료 재확인 (Cycle377 F 결론과 동일)
 
 ### ⚠️ 주의 사항 (Cycle 417 이후)
 

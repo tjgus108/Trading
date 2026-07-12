@@ -399,6 +399,19 @@ DEFAULT_GRIDS: Dict[str, dict] = {
     #     macd_hist_filter=True — dead param (Cycle373 F 역효과)
     #     bb_width_min_filter=0.0 — 0.04 mild positive 확정 (Cycle374 D, Cycle375 C)
     #     ema200_filter=True — dead param (Cycle377 D: Sh↓34%)
+    # Cycle418 F(리서치): dema_cross 2/8 Consistency ceiling 원인 확정 (2026-07-12)
+    #   BTC 1h paper_sim: Sh=0.85, PF=1.38, Trades=26, 2/8 Consistency, Rank 3
+    #   FAIL reason: sharpe 0.63 < 1.0 (x1), profit_factor 1.14 < 1.5 (x1)
+    #   2/8 ceiling 구조적 원인:
+    #     1. RANGING(47.3%) → DEMA(8,20) 크로스가 방향성 없는 노이즈 신호 생성
+    #        rsi_dir_filter=True + threshold=40이 일부 차단하나 RANGING 전체 제거 불가
+    #     2. PASS 2윈도우 = BTC TREND_UP 구간(2023 Q4/2024 Q1) — 볼륨 스파이크+추세 일치
+    #        FAIL 6윈도우 = RANGING/BEAR 구간에서 false cross 빈발 → PF 구조적 <1.5
+    #     3. bb_width_min_filter=0.04: 이미 BB squeeze(p25=0.041) 차단 중
+    #        0.05 → dead param(Cycle375 C), 추가 상향 시 Trades<15 위험
+    #     4. PF gap=0.12 (1.38→1.50): 20+ 사이클 탐색으로 달성 불가 확인됨
+    #   결론: dema_cross 2/8 ceiling은 frama(0/8), price_cluster(2/8)와 동일한
+    #         RANGING 47.3% BTC 1h 구조적 한계. 추가 탐색 완전 종료 재확인.
     "dema_cross": {
         "fast": [8, 10, 12],           # DEAD: 10,12 (8 확정, Cycle367 D)
         "slow": [15, 20, 25],          # DEAD: 15,25 (20 확정, Cycle367 D)

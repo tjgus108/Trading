@@ -917,3 +917,66 @@ class TestIndicatorBoundaryC415:
         assert np.allclose(valid_vwap, price, rtol=1e-6), (
             f"상수 가격에서 vwap={price} 기대, 실제: {valid_vwap.iloc[-1]:.4f}"
         )
+
+
+# ── Cycle418 C(데이터): ema20_slope, vwap20, macd_hist 경계값 ─────────────────
+
+
+class TestIndicatorBoundaryC418:
+    """Cycle418 C(데이터): ema20_slope 상수가격 영점, vwap20 상수=close, macd_hist 상수 영점."""
+
+    def _make_raw_const(self, price, n=50):
+        """상수 가격+거래량 OHLCV 생성 (high=low=close=price, volume=10.0)."""
+        return [
+            [1704067200000 + i * 3600000, price, price, price, price, 10.0]
+            for i in range(n)
+        ]
+
+    def test_ema20_slope_near_zero_for_constant_prices(self):
+        """상수 가격 50봉 → ema20 수렴 후 변화없음 → ema20_slope 마지막값 ≈ 0."""
+        import numpy as np
+        price = 42000.0
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_const(price)
+        from src.data.feed import DataFeed
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "ema20_slope" in df.columns, "ema20_slope 컬럼 없음"
+        last_slope = df["ema20_slope"].iloc[-1]
+        assert abs(float(last_slope)) < 1e-10, (
+            f"상수 가격 → ema20_slope ≈ 0 기대, 실제: {last_slope:.2e}"
+        )
+
+    def test_vwap20_equals_close_for_constant_ohlcv(self):
+        """상수 가격·거래량 → vwap20(롤링 20봉) = close와 동일해야 함."""
+        import numpy as np
+        price = 38000.0
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_const(price)
+        from src.data.feed import DataFeed
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "vwap20" in df.columns, "vwap20 컬럼 없음"
+        valid = df["vwap20"].dropna()
+        assert len(valid) > 0, "vwap20 유효값 없음"
+        assert np.allclose(valid, price, rtol=1e-6), (
+            f"상수 가격에서 vwap20={price} 기대, 실제 마지막값: {float(valid.iloc[-1]):.4f}"
+        )
+
+    def test_macd_hist_near_zero_for_constant_prices(self):
+        """상수 가격 50봉 → macd≈0, signal≈0, macd_hist≈0 (EMA12=EMA26=EMA9=price 수렴)."""
+        import numpy as np
+        price = 45000.0
+        connector = MagicMock()
+        connector.fetch_ohlcv.return_value = self._make_raw_const(price)
+        from src.data.feed import DataFeed
+        feed = DataFeed(connector)
+        result = feed.fetch("BTC/USDT", "1h", limit=50)
+        df = result.df
+        assert "macd_hist" in df.columns, "macd_hist 컬럼 없음"
+        last_hist = float(df["macd_hist"].iloc[-1])
+        assert abs(last_hist) < 1.0, (
+            f"상수 가격 → macd_hist ≈ 0 기대 (|hist| < 1.0), 실제: {last_hist:.6f}"
+        )

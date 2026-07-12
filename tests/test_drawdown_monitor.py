@@ -1928,3 +1928,54 @@ def test_sharpe_decay_recovery_while_high_vol_daily_limit_remains():
     # HIGH_VOL 레짐은 여전히 활성 → 일일 한도 2% 유지
     m.update(9800)  # 2% 손실 ≥ HIGH_VOL 한도(2%) → WARNING
     assert m.alert_level() == AlertLevel.WARNING
+
+
+# ── Cycle418 B(리스크): BLOCK_ENTRY+sharpe_decay, streak+ATR, BLOCK+ATR 복합 ──
+
+
+def test_block_entry_and_sharpe_decay_block_dominates():
+    """BLOCK_ENTRY(mdd_mult=0.0) + sharpe_decay(0.5) → get_size_multiplier=0.0 (BLOCK 지배)."""
+    m = DrawdownMonitor(mdd_block_pct=0.10, mdd_warn_pct=0.05)
+    m.update(10000)
+    m.update(8900)  # 11% → BLOCK_ENTRY → mdd_size_multiplier=0.0
+    assert m.get_mdd_level() == MddLevel.BLOCK_ENTRY
+    assert m.get_mdd_size_multiplier() == 0.0
+    # sharpe decay 추가 (0.5 배수)
+    m.set_sharpe_decay(recent_sharpe=0.2, historical_sharpe=1.0, threshold=0.50)
+    assert m.get_sharpe_decay_multiplier() == 0.5
+    # min(1.0 streak, 0.0 block, 1.0 atr, 0.5 sharpe) = 0.0 — BLOCK이 decay 무력화
+    assert m.get_size_multiplier() == pytest.approx(0.0)
+
+
+def test_streak_and_atr_elevated_no_mdd_no_sharpe():
+    """streak(0.5) + ATR elevated(0.5), MDD/sharpe 정상 → get_size_multiplier=0.5."""
+    m = DrawdownMonitor(mdd_warn_pct=0.15, loss_streak_threshold=2)
+    m.update(10000)
+    m.update(9700)  # 3% MDD < mdd_warn_pct=15% → NORMAL
+    assert m.get_mdd_level() == MddLevel.NORMAL
+    # streak: 2연속 손실
+    m.record_trade_result(pnl=-100.0, equity=9700)
+    m.record_trade_result(pnl=-100.0, equity=9600)
+    assert m._consecutive_losses >= 2
+    streak_mult = 0.5 if m._consecutive_losses >= m.loss_streak_threshold else 1.0
+    assert streak_mult == 0.5
+    # ATR elevated
+    m.set_atr_state(atr=300.0, atr_ma=100.0, threshold=1.5)
+    assert m.get_atr_vol_multiplier() == 0.5
+    # sharpe 정상 (decay 없음)
+    assert m.get_sharpe_decay_multiplier() == pytest.approx(1.0)
+    # min(0.5 streak, 1.0 mdd, 0.5 atr, 1.0 sharpe) = 0.5
+    assert m.get_size_multiplier() == pytest.approx(0.5)
+
+
+def test_block_entry_and_atr_elevated_block_dominates():
+    """BLOCK_ENTRY(0.0) + ATR elevated(0.5) → get_size_multiplier=0.0 (BLOCK 지배)."""
+    m = DrawdownMonitor(mdd_block_pct=0.10)
+    m.update(10000)
+    m.update(8900)  # 11% → BLOCK_ENTRY → 0.0
+    assert m.get_mdd_size_multiplier() == 0.0
+    # ATR elevated 추가
+    m.set_atr_state(atr=200.0, atr_ma=100.0, threshold=1.5)
+    assert m.get_atr_vol_multiplier() == 0.5
+    # min(1.0, 0.0, 0.5, 1.0) = 0.0
+    assert m.get_size_multiplier() == pytest.approx(0.0)
