@@ -1,3 +1,45 @@
+## [2026-07-12] Cycle 419 — D(ML) + E(실행) + F(리서치)
+
+**[D(ML)] optimize_supertrend_multi + avg_oos_trades 검증 3개** (+3)
+
+tests/test_phase_d.py (Cycle419 D, TestOptimizeSupertrendMulti):
+1. `test_optimize_supertrend_multi_returns_wf_result`: 기본 호출 → WalkForwardResult 반환, strategy_name='supertrend_multi' 확인
+2. `test_optimize_supertrend_multi_avg_oos_trades_none_or_float`: avg_oos_trades 필드(Cycle417 D 추가)가 None이거나 float인지 검증
+3. `test_optimize_supertrend_multi_single_window_no_crash`: n_windows=1에서도 크래시 없이 반환 확인
+
+**[E(실행)] PaperConnector 엣지케이스 3개** (+3)
+
+tests/test_exchange.py (Cycle419 E, TestPaperConnectorCycle419):
+1. `test_buy_exceeds_balance_raises_value_error`: 잔고(100 USDT) 초과 매수(10@1000=10000 USDT) → rejected → ValueError 발생
+2. `test_sell_without_position_raises_value_error`: 포지션 없이 SELL 시도 → rejected → ValueError 발생
+3. `test_create_order_without_price_raises_value_error`: price=None → PaperConnector에서 직접 ValueError 발생
+
+**코드 개선 1건**:
+1. `walk_forward.py` roc_ma_cross 섹션에 Cycle419 F 비교 분석 주석 추가
+   - vol_ratio≥1.2 = 묵시적 레짐 필터 (Implicit Regime Gate) 개념 문서화
+   - price_cluster/dema_cross 2/8 ceiling 원인과의 대비 분석
+
+**[F(리서치)] roc_ma_cross 4/8 vs price_cluster/dema_cross 2/8 비교 분석**
+
+핵심 발견:
+- **roc_ma_cross 4/8 PASS 원인**: vol_ratio≥1.2 필터 = 묵시적 레짐 필터
+  - BTC 급등기(2023 Q4: 27k→44k, 2024 Q1: 44k→73k)에서 거래량 급증 동반
+  - vol_ratio≥1.2 충족 신호 빈발 → Trades≥15 달성 → PASS
+  - RANGING 구간: vol_ratio=0.89-0.97 → 대부분 차단 → Trades=10-12 → FAIL (trades 부족)
+- **price_cluster 2/8 구조**: 레짐 필터 없음 → TREND_UP 시 cluster 레벨 sweep → false BUY → PF<1.5
+- **dema_cross 2/8 구조**: rsi_dir_filter=True는 볼륨 무관 약한 필터 → RANGING false cross 제거 불완전
+- **구조적 ceiling 공통 원인**: RANGING 47.3% BTC 1h에서 signal noise 제거 불가
+  - volume filter 없는 전략 = regime-agnostic → noise trades 포함 → PF gap 구조적 존재
+  - roc_ma_cross만 vol_ratio gate로 RANGING에서 자동 비활성화 → 4/8 PASS 가능
+
+**시뮬레이션 결과**:
+- Paper Sim (1h BTC CSV fallback, 2026-07-12 기준): roc_ma_cross 1/19 PASS 유지 (Sh=1.81, PF=2.02, Trades=14, 4/8)
+- Bundle OOS (4h, 2026-07-08 기준): 5/5 PASS 유지 (supertrend_multi avg OOS Sharpe=3.892, avg trades=7.6)
+
+**총 테스트**: 8722 총계 (8699 passed, 23 skipped) [Cycle418 대비 +6]
+
+---
+
 ## [2026-07-12] Cycle 418 — C(데이터) + B(리스크) + F(리서치)
 
 **[C(데이터)] DataFeed 지표 경계값 3개** (+3)
@@ -18999,6 +19041,100 @@ Context: score=N/A news=NONE
 Notes: CRITICAL: Connector is halted due to consecutive failures
 
 ## [2026-07-12 05:13 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-12 11:51 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 20.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: 15.00bps
+
+## [2026-04-11 00:00 UTC]
+Pipeline: execution
+Status: OK
+Signal: BUY BTC/USDT
+Risk: APPROVED
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: none
+ImplShortfall: -5.00bps
+
+## [2026-07-12 11:51 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-12 11:51 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-12 11:51 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-12 11:51 UTC]
+Pipeline: preflight
+Status: ERROR
+Signal: N/A
+Risk: N/A
+Execution: SKIPPED
+Context: score=N/A news=NONE
+Notes: CRITICAL: Connector is halted due to consecutive failures
+
+## [2026-07-12 11:51 UTC]
 Pipeline: preflight
 Status: ERROR
 Signal: N/A

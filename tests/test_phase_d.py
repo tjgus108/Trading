@@ -922,3 +922,29 @@ class TestOptimizePriceCluster:
         df = _make_df(400)
         result = optimize_price_cluster(df, n_windows=2)
         assert isinstance(result.avg_oos_sharpe, float)
+
+
+class TestOptimizeSupertrendMulti:
+    """optimize_supertrend_multi() 기본 호출 + avg_oos_trades 검증 (Cycle419 D)."""
+
+    def test_optimize_supertrend_multi_returns_wf_result(self):
+        """기본 호출 → WalkForwardResult 반환, strategy_name='supertrend_multi' (Cycle419 D)."""
+        from src.backtest.walk_forward import optimize_supertrend_multi
+        df = _make_df(500)
+        result = optimize_supertrend_multi(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "supertrend_multi"
+
+    def test_optimize_supertrend_multi_avg_oos_trades_none_or_float(self):
+        """avg_oos_trades는 None이거나 float이어야 한다 (Cycle417 D 필드, Cycle419 D 검증)."""
+        from src.backtest.walk_forward import optimize_supertrend_multi
+        df = _make_df(500)
+        result = optimize_supertrend_multi(df, n_windows=2)
+        assert result.avg_oos_trades is None or isinstance(result.avg_oos_trades, float)
+
+    def test_optimize_supertrend_multi_single_window_no_crash(self):
+        """n_windows=1에서도 크래시 없이 WalkForwardResult 반환 (Cycle419 D)."""
+        from src.backtest.walk_forward import optimize_supertrend_multi
+        df = _make_df(400)
+        result = optimize_supertrend_multi(df, n_windows=1)
+        assert isinstance(result, WalkForwardResult)

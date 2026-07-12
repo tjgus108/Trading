@@ -1293,3 +1293,33 @@ class TestPaperConnectorCycle414:
         assert pc.paper_trader.account.balance == 20000.0
         assert pc.paper_trader.account.positions == {}
         assert pc.paper_trader.account.trades == []
+
+
+class TestPaperConnectorCycle419:
+    """Cycle419 E(실행): 잔고 초과/포지션 없음/price 미전달 엣지케이스."""
+
+    def test_buy_exceeds_balance_raises_value_error(self):
+        """잔고 초과 매수 → PaperTrader rejected → PaperConnector가 ValueError 발생 (Cycle419 E)."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=100.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        with pytest.raises(ValueError):
+            pc.create_order("BTC/USDT", "buy", 10.0, price=1000.0)
+
+    def test_sell_without_position_raises_value_error(self):
+        """포지션 없이 SELL → PaperTrader rejected → PaperConnector가 ValueError 발생 (Cycle419 E)."""
+        pc = PaperConnector(
+            symbol="BTC/USDT", initial_balance=10000.0,
+            fee_rate=0.0, slippage_pct=0.0,
+            partial_fill_prob=0.0, timeout_prob=0.0,
+        )
+        with pytest.raises(ValueError):
+            pc.create_order("BTC/USDT", "sell", 1.0, price=1000.0)
+
+    def test_create_order_without_price_raises_value_error(self):
+        """price=None 시 PaperConnector에서 직접 ValueError 발생 (Cycle419 E)."""
+        pc = PaperConnector(symbol="BTC/USDT")
+        with pytest.raises(ValueError):
+            pc.create_order("BTC/USDT", "buy", 1.0, price=None)

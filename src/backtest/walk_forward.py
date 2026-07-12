@@ -342,6 +342,17 @@ DEFAULT_GRIDS: Dict[str, dict] = {
         #   **결론**: AvgTrades=14는 구조적 ceiling. PASS 윈도우는 BTC 상승/급등 국면 한정.
         #     vol_ratio 조정 불가(1.1→Consist=2/8 Cycle382), 필터 추가 불가(모두 역효과 확인)
         #     현재 4/8 Consistency가 1h BTC vol_ratio=1.2 조합의 구조적 최적점. 추가 탐색 종료.
+        # Cycle419 F(리서치): roc_ma_cross 4/8 vs price_cluster/dema_cross 2/8 구조 비교 분석
+        #   핵심 발견: vol_ratio≥1.2 필터 = 묵시적 레짐 필터 (Implicit Regime Gate)
+        #   roc_ma_cross 4/8 PASS 원인:
+        #     BTC 급등기(2023 Q4: 27k→44k, 2024 Q1: 44k→73k)에 vol_ratio≥1.2 충족 빈발
+        #     → 거래량 급증 = 강한 추세 확인 → ROC cross 신호 정밀도↑ → Sharpe≥1.0, PF≥1.5, Trades≥15
+        #   price_cluster/dema_cross 2/8 FAIL 구조 비교:
+        #     price_cluster: 레짐 필터 없음 → TREND_UP 시 cluster 레벨 sweep → false BUY 신호 → PF<1.5
+        #     dema_cross: rsi_dir_filter=True 약한 필터 (RSI 방향성, 볼륨 무관) → RANGING false cross 제거 불완전
+        #   결론: volume filter 없는 전략의 구조적 ceiling 원인
+        #     = RANGING 47.3% BTC 1h에서 signal noise 제거 불가 → PF gap 구조적 존재
+        #     roc_ma_cross만 vol_ratio로 실질적 regime gate를 구현 → RANGING에서 자동 비활성화
     },
     # Cycle356 D(ML): dema_cross WFO 그리드 추가
     # 배경: 기본값 fast=10/slow=25는 BTC 1h에서 avg 3 trades (0/8 consistency 35사이클 이상 지속)

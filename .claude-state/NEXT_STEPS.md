@@ -1,15 +1,16 @@
 # Next Steps
 
-_Last updated: 2026-07-12 (Cycle 418 완료)_
+_Last updated: 2026-07-12 (Cycle 419 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 418
+### 이번 세션 완료 사이클: 419
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
+| 419 | D+E+F | optimize_supertrend_multi 기본호출+avg_oos_trades 타입검증+n_windows=1 3케이스(+3) + PaperConnector 잔고초과/포지션없음/price=None 3케이스(+3→8722 총계, 8699 passed), **vol_ratio≥1.2=묵시적 레짐 필터 확정**(roc_ma_cross 4/8 PASS vs price_cluster/dema_cross 2/8 FAIL 구조 비교), walk_forward.py Cycle419 F 분析 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 418 | C+B+F | DataFeed ema20_slope/vwap20/macd_hist 경계 3케이스(+3) + DM BLOCK+sharpe_decay/streak+ATR/BLOCK+ATR 복합 3케이스(+3→8716 총계, 8693 passed), **dema_cross 2/8 Consistency ceiling 구조적 확정**(RANGING 47.3%+false cross, PF=1.38 gap=0.12 달성불가), walk_forward.py Cycle418 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 417 | B+D+F | CB flash_crash+balances+priority 3케이스(+3) + optimize_price_cluster 함수추가+테스트3케이스(+3→8710 총계, 8687 passed), **avg_oos_trades 필드 WalkForwardResult 추가**(거래 0건 fold 진단), **frama 0/8 Consistency ceiling 확정**(PF=1.11 구조적 ceiling, 27-combo WFO도 OOS PF<1.5), 1h PASS 1/19 유지, Bundle OOS 합성 0/5 |
 | 416 | B+D+F | DM kelly_fraction+sharpe_decay, streak+sharpe_decay, HIGH_VOL+decay_recovery 복합 3케이스(+3) + optimize_donchian 2케이스+select_features_pfi 반환검증 2케이스(+4→8704 총계, 8681 passed), **roc_ma_cross AvgTrades=14 구조적 ceiling 확정**(PASS=BTC 급등기 Q4/Q1, FAIL=저거래량 H1/Q2), walk_forward.py roc_ma_cross Cycle416 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
@@ -21,29 +22,37 @@ _Last updated: 2026-07-12 (Cycle 418 완료)_
 | 413 | C+B+F | DataFeed atr14경계/ema50반응속도/return_5부호 3개+DM trailing_stop경계/threshold1.0/kelly+mdd_warn복합 3개(+6→8685 총계, 8662 passed), **positional_scaling 1h 구조적한계 확정**(Sh=-0.38, pullback==rally 동일조건→BUY/SELL 방향성에지없음, mult 파라미터화 불가), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 414 | D+E+F | optimize_donchian 3개+select_features_pfi 경계값 3개+PaperConnector 3개(+9→8694 총계, 8671 passed), **narrow_range 1h 구조적한계 재확정**(Sh=-0.51, PF=0.97<1.0, atr_mult/range_lookback 파라미터화 불가-RANGING에서 동일 구조 문제), walk_forward.py 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 
-### 🎯 Cycle 419 작업 방향 (419 mod 5 = 4 → D(ML) + E(실행) + F(리서치))
+### 🎯 Cycle 420 작업 방향 (420 mod 5 = 0 → A(품질) + C(데이터) + F(리서치))
 
-#### D(ML): optimize_supertrend_multi 또는 avg_oos_trades 활용 케이스
+#### A(품질): BacktestEngine 또는 apply_wfe 미커버 케이스
 
-- **배경**: Cycle418 완료. 419 mod 5 = 4 → D(ML) + E(실행) + F(리서치)
-- **작업 방향**: `tests/test_phase_d.py`
-  - optimize_supertrend_multi 기본 호출 + WalkForwardResult avg_oos_trades float 검증
-  - WalkForwardResult avg_oos_trades: None이 아닌 float 검증 케이스 (Cycle417 D에서 필드 추가)
+- **배경**: Cycle419 완료. 420 mod 5 = 0 → A(품질) + C(데이터) + F(리서치)
+- **작업 방향**: `tests/test_backtest_engine.py`
+  - BacktestEngine apply_wfe 미커버 케이스 또는 기타 엣지케이스
+  - 예: 초기 잔고 0, 신호 스킵 조건, fee_rate 극단값 등
 
-#### E(실행): PaperConnector 또는 PaperTrader 추가 미커버 케이스
+#### C(데이터): DataFeed 지표 경계값 추가 케이스
 
-- **배경**: 실행 카테고리 로테이션
-- **작업 방향**: `tests/test_paper_trader.py` 또는 `tests/test_exchange.py`
-  - PaperConnector 추가 엣지케이스 (잔고 초과 주문, 정밀도 처리 등)
-  - PaperTrader 상태 복원 추가 케이스
+- **배경**: DataFeed 지표 경계값 테스트 로테이션
+- **작업 방향**: `tests/test_feed_boundary.py`
+  - 미커버 지표 경계: ema50, volume_sma20, return_1, atr_ratio 등
 
-#### F(리서치): price_cluster 2/8 Ceiling과 roc_ma_cross PASS 구간 비교 분석
+#### F(리서치): supertrend_multi avg_oos_trades=7.6 저거래 구조 분석
 
-- **배경**: Cycle418 F에서 dema_cross 2/8 ceiling 구조적 확정 완료.
-- **작업 방향**: roc_ma_cross PASS 4/8 vs dema_cross/price_cluster FAIL 2/8 구조 비교
-  - roc_ma_cross PASS 4윈도우 = vol_ratio≥1.2 동반 BTC 급등기 (Q4/Q1)
-  - dema_cross/price_cluster FAIL = 같은 기간 2/8 → 왜 roc는 4/8 가능한지 분석
-  - volume filter 없는 전략들의 구조적 ceiling 원인 비교
+- **배경**: Bundle OOS supertrend_multi avg trades=7.6 (fold 2,3=3 trades). 4h WFO min_trades_override=8 기준 borderline.
+- **작업 방향**:
+  - supertrend_multi fold 2,3 저거래 원인: trend_confirm_bars=2-3이 4h에서 과다 차단 가능성
+  - DEFAULT_GRIDS["supertrend_multi"] trend_confirm_bars 재탐색 검토 (현재 [2,3])
+### ⚠️ 주의 사항 (Cycle 419 이후)
+
+- **vol_ratio≥1.2 = 묵시적 레짐 필터 확정** (Cycle419 F):
+  - roc_ma_cross 4/8 PASS 원인: BTC 급등기(Q4/Q1) vol_ratio≥1.2 빈발 → Trades≥15 달성
+  - price_cluster/dema_cross 2/8 FAIL 원인: 레짐 필터 없음 → RANGING 47.3% noise trades → PF<1.5 구조적
+  - volume filter 없는 전략의 구조적 ceiling = RANGING에서 signal noise 제거 불가
+  - walk_forward.py roc_ma_cross 섹션 Cycle419 F 비교 분析 주석 추가 완료
+- **supertrend_multi avg_oos_trades=7.6 저거래 확인** (Cycle419 D):
+  - Bundle OOS fold 2,3: trades=3 (min_trades_override=8 기준 미달 가능성)
+  - Cycle420 F에서 trend_confirm_bars 저거래 원인 분析 예정
 
 ### ⚠️ 주의 사항 (Cycle 418 이후)
 
