@@ -890,3 +890,35 @@ class TestSelectFeaturesPfiOutputValidation:
         clf = self._make_clf(X, y)
         selected = trainer.select_features_pfi(clf, X, y, top_k=4)
         assert len(selected) == len(set(selected)), "중복 피처 반환됨"
+
+
+# ---------------------------------------------------------------------------
+# Cycle417 D(ML): optimize_price_cluster 기본 호출 + fold_pass_rate 타입 검증
+# ---------------------------------------------------------------------------
+
+class TestOptimizePriceCluster:
+    """optimize_price_cluster() 기본 호출 테스트 (Cycle417 D)."""
+
+    def test_optimize_price_cluster_returns_wf_result(self):
+        """기본 호출 → WalkForwardResult 반환, strategy_name='price_cluster' (Cycle417 D)."""
+        from src.backtest.walk_forward import optimize_price_cluster
+        df = _make_df(500)
+        result = optimize_price_cluster(df, n_windows=2)
+        assert isinstance(result, WalkForwardResult)
+        assert result.strategy_name == "price_cluster"
+
+    def test_optimize_price_cluster_fold_pass_rate_type(self):
+        """fold_pass_rate는 None이거나 [0.0, 1.0] 범위의 float이어야 한다 (Cycle417 D)."""
+        from src.backtest.walk_forward import optimize_price_cluster
+        df = _make_df(600)
+        result = optimize_price_cluster(df, n_windows=2)
+        if result.fold_pass_rate is not None:
+            assert isinstance(result.fold_pass_rate, float)
+            assert 0.0 <= result.fold_pass_rate <= 1.0
+
+    def test_optimize_price_cluster_avg_oos_sharpe_is_float(self):
+        """avg_oos_sharpe는 float 타입이어야 한다 (Cycle417 D)."""
+        from src.backtest.walk_forward import optimize_price_cluster
+        df = _make_df(400)
+        result = optimize_price_cluster(df, n_windows=2)
+        assert isinstance(result.avg_oos_sharpe, float)

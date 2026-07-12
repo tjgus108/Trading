@@ -1,15 +1,16 @@
 # Next Steps
 
-_Last updated: 2026-07-11 (Cycle 416 완료)_
+_Last updated: 2026-07-12 (Cycle 417 완료)_
 
 > **정책**: 이 파일은 "다음에 뭘 할지" 포인터만 보관. 과거 사이클 히스토리는 `.claude-state/WORKLOG.md`로 이관.
 
 ## 다음 세션이 이어받을 지점
 
-### 이번 세션 완료 사이클: 416
+### 이번 세션 완료 사이클: 417
 
 | Cycle | 카테고리 | 주요 성과 |
 |-------|---------|----------|
+| 417 | B+D+F | CB flash_crash+balances+priority 3케이스(+3) + optimize_price_cluster 함수추가+테스트3케이스(+3→8710 총계, 8687 passed), **avg_oos_trades 필드 WalkForwardResult 추가**(거래 0건 fold 진단), **frama 0/8 Consistency ceiling 확정**(PF=1.11 구조적 ceiling, 27-combo WFO도 OOS PF<1.5), 1h PASS 1/19 유지, Bundle OOS 합성 0/5 |
 | 416 | B+D+F | DM kelly_fraction+sharpe_decay, streak+sharpe_decay, HIGH_VOL+decay_recovery 복합 3케이스(+3) + optimize_donchian 2케이스+select_features_pfi 반환검증 2케이스(+4→8704 총계, 8681 passed), **roc_ma_cross AvgTrades=14 구조적 ceiling 확정**(PASS=BTC 급등기 Q4/Q1, FAIL=저거래량 H1/Q2), walk_forward.py roc_ma_cross Cycle416 F 분석 주석 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 415 | A+C+F | apply_wfe 미커버 3케이스+feed 지표 경계 3케이스(+6→8700 총계, 8677 passed), **price_cluster 2/8 ceiling 구조 확정**(PASS=RANGING진성 2구간, FAIL=TREND_UP), walk_forward.py atr_bounce_factor [0.0,0.3,0.5,1.0]→[0.5] 단일값(75% 그리드 감소), 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
 | 409 | D+E+F | select_features_pfi n99/2feat/subset 3개+optimize_narrow_range type 1개+PaperConnector 3개(+7→8655 총계, 8632 passed), **price_action_momentum 1h 구조적한계 확정**(Sh=-1.08, PF=0.97<1.0, roc5+body_strength가 RANGING에서 14%/bar 과다 신호), walk_forward.py DEFAULT_GRIDS["price_action_momentum"]={} 추가, 1h PASS 1/19 유지, Bundle OOS 5/5 유지 |
@@ -28,21 +29,33 @@ _Last updated: 2026-07-11 (Cycle 416 완료)_
   - CircuitBreaker 경계값 검토 (is_halted 임계값, window 만료 등)
   - DrawdownMonitor 추가 미커버 복합 케이스 (BLOCK+sharpe_decay, streak+ATR compound 등)
 
-#### D(ML): optimize_price_cluster 또는 optimize_frama 미커버 케이스
+#### D(ML): optimize_supertrend_multi 또는 WalkForwardResult avg_oos_trades 활용 케이스
 
-- **배경**: ML 카테고리 로테이션 (Cycle416 D optimize_donchian + pfi 반환 검증 완료)
+- **배경**: Cycle417 D에서 optimize_price_cluster 함수 추가+테스트 3케이스 완료
 - **작업 방향**: `tests/test_phase_d.py`
-  - optimize_price_cluster 기본 호출 + fold_pass_rate 타입 검증
-  - optimize_frama 추가 경계값 (avg_oos_sharpe float, fold_pass_rate range 등)
+  - optimize_supertrend_multi 기본 호출 + avg_oos_trades 타입 검증 (새 필드 활용)
+  - WalkForwardResult avg_oos_trades: None이 아닌 float 검증 케이스
 
-#### F(리서치): frama 4/8+ Consistency 가능성 분석
+#### F(리서치): dema_cross 2/8 Consistency ceiling 원인 분석
 
-- **배경**: Cycle416 F에서 roc_ma_cross AvgTrades=14 구조적 ceiling 확정; frama (Sh=0.44, 0/8) 다음 탐색 대상
-- **작업 방향**: frama (BTC 1h: Sh=0.44, PF=1.11, Trades=65, 0/8 Consistency)
-  - weak_rsi_buy_max=50 확정 후에도 0/8 유지: WFO 27-combo 그리드가 최적 파라미터 자동 선택하는지 확인
-  - WFO 그리드에서 weak_rsi_buy_max=[40,50,60] 중 어떤 값이 선택되는지 분석
-  - frama 0/8 ceiling 원인: gap<1% RANGING 지배 vs 선택된 파라미터 문제 구분
-  - 결론: frama 추가 탐색 가능성 vs 완전 보류 재확인
+- **배경**: Cycle417 F에서 frama 0/8 Consistency ceiling 확정 (PF 구조적 <1.5). 다음 탐색 대상: dema_cross
+- **작업 방향**: dema_cross (BTC 1h: Sh=0.85, PF=1.38, Trades=26, 2/8 Consistency)
+  - Rank 4 in paper sim, Sh=0.85 양호하나 PF=1.38<1.5가 blocking
+  - dema_cross FAIL reason: sharpe 0.63 < 1.0 (x1), profit_factor 1.14 < 1.5 (x1)
+  - 2/8 PASS 윈도우 구간 분석: TREND 구간에서 EMA 크로스 신호 품질 확인
+  - bb_width_min_filter 파라미터 탐색 가능성 검토
+
+### ⚠️ 주의 사항 (Cycle 417 이후)
+
+- **frama 0/8 Consistency ceiling 완전 확정** (Cycle417 F):
+  - BTC 1h CSV, Sh=0.44, PF=1.11, Trades=65, SharpeStd=1.23, 0/8 Consistency
+  - 1차 fail reason: 'profit_factor 1.00 < 1.5 (x2), profit_factor 0.89 < 1.5 (x1)' — PF ceiling
+  - WFO 27-combo (period×rsi_period×weak_rsi_buy_max) 최적화해도 OOS PF < 1.5
+  - **결론**: frama 추가 파라미터 탐색 완전 종료. 보조 전략으로 보존.
+  - walk_forward.py optimize_frama() docstring에 Cycle417 F 분석 주석 추가 완료
+- **avg_oos_trades 필드 추가** (Cycle417 D):
+  - WalkForwardResult.avg_oos_trades: fold 평균 OOS 거래 수 (거래 0건 fold 비율 진단)
+  - supertrend_multi 합성 Bundle OOS fold 4 (0 trades) 패턴 대응
 
 ### ⚠️ 주의 사항 (Cycle 416 이후)
 

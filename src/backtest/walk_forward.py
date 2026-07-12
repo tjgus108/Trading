@@ -548,6 +548,8 @@ class WalkForwardResult:
     is_oos_pearson: Optional[float] = None
     # avg_oos_mdd: fold 평균 OOS MDD (0~1). RANGING 레짐 등 고-MDD 패턴 진단용
     avg_oos_mdd: Optional[float] = None
+    # avg_oos_trades: fold 평균 OOS 거래 수. 거래 0건 fold 비율 진단용 (Cycle417 D)
+    avg_oos_trades: Optional[float] = None
 
     @property
     def is_robust(self) -> bool:
@@ -962,6 +964,13 @@ class WalkForwardOptimizer:
         if oos_mdds:
             avg_oos_mdd = round(sum(oos_mdds) / len(oos_mdds), 4)
 
+        # avg_oos_trades: fold별 OOS 거래 수 평균 (Cycle417 D — 거래 0 fold 진단용)
+        avg_oos_trades: Optional[float] = None
+        if window_results:
+            avg_oos_trades = round(
+                sum(wr.oos_trades for wr in window_results) / len(window_results), 1
+            )
+
         result = WalkForwardResult(
             strategy_name=self.strategy_name,
             best_params=best_final_params,
@@ -980,6 +989,7 @@ class WalkForwardOptimizer:
             plateau_score=plateau_score,
             is_oos_pearson=is_oos_pearson,
             avg_oos_mdd=avg_oos_mdd,
+            avg_oos_trades=avg_oos_trades,
         )
         logger.info(result.summary())
         return result
@@ -1423,7 +1433,14 @@ def optimize_narrow_range(df: pd.DataFrame, n_windows: int = 3,
 
 def optimize_frama(df: pd.DataFrame, n_windows: int = 3,
                    plateau_pct: float = 0.9) -> WalkForwardResult:
-    """FRAMA 전략 파라미터 최적화."""
+    """FRAMA 전략 파라미터 최적화.
+
+    Cycle417 F: frama 0/8 Consistency ceiling 원인 확정 (BTC 1h CSV 실데이터)
+      Sh=0.44, PF=1.11(avg), Trades=65, SharpeStd=1.23, 0/8 Consistency
+      fail reason: profit_factor 1.00 < 1.5 (x2) — PF가 구조적으로 1.0~1.11 ceiling
+      WFO 27-combo (period×rsi_period×weak_rsi_buy_max) 그리드로 IS 최적화해도
+      OOS PF < 1.5 → PASS 불가. 추가 파라미터 탐색 완전 종료.
+    """
     from src.strategy.frama import FRAMAStrategy
 
     def factory(params: dict) -> BaseStrategy:
@@ -1526,6 +1543,32 @@ def optimize_roc_ma_cross(df: pd.DataFrame, n_windows: int = 3,
         strategy_name="roc_ma_cross",
         strategy_factory=factory,
         param_grid=DEFAULT_GRIDS["roc_ma_cross"],
+        n_windows=n_windows,
+        plateau_pct=plateau_pct,
+    )
+    return opt.run(df)
+
+
+def optimize_price_cluster(df: pd.DataFrame, n_windows: int = 3,
+                           plateau_pct: float = 0.9) -> WalkForwardResult:
+    """PriceCluster 전략 파라미터 최적화 (Cycle417 D)."""
+    from src.strategy.price_cluster import PriceClusterStrategy
+
+    def factory(params: dict) -> BaseStrategy:
+        return PriceClusterStrategy(
+            bounce_pct=params.get("bounce_pct", 0.006),
+            n_bins=params.get("n_bins", 5),
+            close_window=params.get("close_window", 50),
+            vol_regime_filter=params.get("vol_regime_filter", False),
+            vol_atr_trend_min=params.get("vol_atr_trend_min", 1.2),
+            atr_bounce_factor=params.get("atr_bounce_factor", 0.5),
+            confirmation_bars=params.get("confirmation_bars", 0),
+        )
+
+    opt = WalkForwardOptimizer(
+        strategy_name="price_cluster",
+        strategy_factory=factory,
+        param_grid=DEFAULT_GRIDS["price_cluster"],
         n_windows=n_windows,
         plateau_pct=plateau_pct,
     )

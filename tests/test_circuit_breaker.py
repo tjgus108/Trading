@@ -973,3 +973,67 @@ def test_consecutive_loss_cooldown_ignores_atr_surge():
     assert "쿨다운" in result["reason"]
     # ATR surge는 쿨다운에 묻혀 표현되지 않음
     assert result["volatility_surge"] is False
+
+
+# ── Cycle417 B(리스크): CircuitBreaker 추가 미커버 케이스 ──────────────────────
+
+
+def test_flash_crash_trigger_cleared_by_reset_daily():
+    """플래시 크래시 트리거 후 reset_daily()로 해제 확인 (reason에 '플래시' 포함 → 해제)."""
+    cb = CircuitBreaker(flash_crash_pct=0.05, daily_drawdown_limit=0.50, total_drawdown_limit=0.50)
+    # 단일 캔들 10% 변동 → 플래시 크래시 트리거
+    result = cb.check(
+        current_balance=10000.0,
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=100.0,
+        candle_close=90.0,  # 10% 하락
+    )
+    assert result["triggered"] is True
+    assert "플래시" in result["reason"]
+    assert cb.is_triggered is True
+
+    # reset_daily: 플래시 크래시는 일일 트리거 → 해제
+    cb.reset_daily(daily_start_balance=10000.0)
+    assert cb.is_triggered is False
+
+
+def test_check_returns_no_trigger_when_balances_invalid():
+    """daily_start_balance=0 또는 peak_balance=0 → triggered=False 조기 반환 (Cycle417 B)."""
+    cb = CircuitBreaker()
+    # daily_start_balance=0 → 조기 반환
+    result_zero_daily = cb.check(
+        current_balance=9000.0,
+        peak_balance=10000.0,
+        daily_start_balance=0.0,
+    )
+    assert result_zero_daily["triggered"] is False
+
+    # peak_balance=0 → 조기 반환
+    result_zero_peak = cb.check(
+        current_balance=9000.0,
+        peak_balance=0.0,
+        daily_start_balance=10000.0,
+    )
+    assert result_zero_peak["triggered"] is False
+
+
+def test_flash_crash_takes_priority_over_daily_drawdown():
+    """플래시 크래시와 일일 낙폭 동시 발생 시 플래시 크래시가 우선 처리된다 (Cycle417 B)."""
+    cb = CircuitBreaker(
+        flash_crash_pct=0.05,
+        daily_drawdown_limit=0.05,
+        total_drawdown_limit=0.50,
+    )
+    # 캔들 변동 10% (플래시 크래시 임계값 5% 초과) + 일일 낙폭 10% (한계 5% 초과) 동시
+    result = cb.check(
+        current_balance=9000.0,        # 10% 일일 낙폭
+        peak_balance=10000.0,
+        daily_start_balance=10000.0,
+        candle_open=100.0,
+        candle_close=90.0,             # 10% 캔들 변동
+    )
+    assert result["triggered"] is True
+    # 플래시 크래시가 낙폭보다 먼저 체크됨 → reason에 '플래시' 포함
+    assert "플래시" in result["reason"]
+    assert "일일" not in result["reason"]
